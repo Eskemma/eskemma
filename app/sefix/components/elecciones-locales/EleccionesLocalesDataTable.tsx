@@ -11,7 +11,10 @@ interface TableRow {
 }
 
 const PAGE_SIZES = [15, 25, 50, 100];
-const FMT = (n: number) => n.toLocaleString("es-MX");
+
+function fmtNum(n: number): string {
+  return n.toLocaleString("es-MX");
+}
 
 export default function EleccionesLocalesDataTable({
   committed,
@@ -24,6 +27,7 @@ export default function EleccionesLocalesDataTable({
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const cancelRef = useRef(false);
   const lastVersion = useRef(-1);
@@ -52,6 +56,7 @@ export default function EleccionesLocalesDataTable({
     if (queryVersion !== lastVersion.current) {
       lastVersion.current = queryVersion;
       setPage(1);
+      setSearch("");
     }
     cancelRef.current = false;
     setIsLoading(true);
@@ -72,7 +77,7 @@ export default function EleccionesLocalesDataTable({
       )
     : [];
   const allCols = ["seccion","cabecera","municipio","tipo","principio",...partidoCols,"total_votos","lne","part_ciud"];
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function handleDownload() {
     window.open(
@@ -81,88 +86,111 @@ export default function EleccionesLocalesDataTable({
     );
   }
 
-  const cellCls = "px-3 py-2 text-xs text-black-eske dark:text-[#C7D6E0] whitespace-nowrap";
-  const headCls = "px-3 py-2 text-[11px] font-semibold text-black-eske-60 dark:text-[#9AAEBE] uppercase tracking-wide whitespace-nowrap text-left";
+  const filtered = search
+    ? rows.filter((row) =>
+        allCols.some((c) =>
+          String(row[c] ?? "").toLowerCase().includes(search.toLowerCase())
+        )
+      )
+    : rows;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
-          {total.toLocaleString("es-MX")} filas
-        </span>
-        <div className="flex items-center gap-2">
-          <label htmlFor="loc-page-size" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Filas:</label>
+      {/* Controles superiores */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="loc-tabla-pagesize" className="text-black-eske-60 dark:text-[#9AAEBE]">
+            Mostrar
+          </label>
           <select
-            id="loc-page-size"
+            id="loc-tabla-pagesize"
             value={pageSize}
             onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
-            className="text-xs border border-gray-eske-20 dark:border-white/10 rounded px-1.5 py-0.5 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
+            className="border border-gray-eske-30 dark:border-white/10 rounded px-1.5 py-1 text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="text-xs px-2.5 py-1 rounded bg-bluegreen-eske text-white-eske hover:bg-bluegreen-eske-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
-          >
-            Descargar CSV
-          </button>
+          <span className="text-black-eske-60 dark:text-[#9AAEBE]">registros</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="loc-tabla-search" className="text-black-eske-60 dark:text-[#9AAEBE]">Buscar:</label>
+          <input
+            id="loc-tabla-search"
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-eske-30 dark:border-white/10 rounded px-2 py-1 text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske w-36"
+          />
         </div>
       </div>
 
-      <div
-        className="overflow-x-auto rounded-lg border border-gray-eske-20 dark:border-white/10"
-        style={{ minHeight: `${pageSize * 37 + 44}px` }}
-      >
-        <table className="min-w-full divide-y divide-gray-eske-20 dark:divide-white/10">
-          <thead className="bg-gray-eske-10 dark:bg-[#0D1E2C]">
+      {/* Tabla */}
+      <div className="overflow-x-auto rounded-lg border border-gray-eske-20 dark:border-white/10">
+        <table className="w-full text-xs min-w-max">
+          <thead className="bg-bluegreen-eske text-white-eske">
             <tr>
               {allCols.map((c) => (
-                <th key={c} className={headCls}>
+                <th key={c} className="px-3 py-2 text-left font-semibold whitespace-nowrap">
                   {TABLA_COLUMN_LABELS_LOC[c] ?? getPartidoLabelLoc(c)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-eske-10 dark:divide-white/5 bg-white-eske dark:bg-[#112230]">
+          <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={allCols.length} className="py-8 text-center text-xs text-red-eske">
+                <td colSpan={allCols.length} className="px-3 py-8 text-center text-black-eske-60 dark:text-[#6D8294]">
                   Cargando…
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={allCols.length} className="py-8 text-center text-xs text-black-eske-60 dark:text-[#9AAEBE]">
-                  Sin resultados
+                <td colSpan={allCols.length} className="px-3 py-8 text-center text-black-eske-60 dark:text-[#6D8294]">
+                  Sin datos para esta consulta
                 </td>
               </tr>
-            ) : rows.map((row, i) => (
-              <tr key={i} className="hover:bg-gray-eske-10 dark:hover:bg-white/5">
-                {allCols.map((c) => (
-                  <td key={c} className={cellCls}>
-                    {c === "part_ciud"
-                      ? `${(row[c] as number).toFixed(2)}%`
-                      : typeof row[c] === "number" && !["anio"].includes(c)
-                        ? FMT(row[c] as number)
-                        : row[c]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            ) : (
+              filtered.map((row, i) => (
+                <tr
+                  key={i}
+                  className={[
+                    "border-t border-gray-eske-10 dark:border-white/5",
+                    i % 2 === 0
+                      ? "bg-white-eske dark:bg-[#18324A]"
+                      : "bg-gray-eske-10 dark:bg-[#21425E]",
+                    "hover:bg-blue-eske-10 dark:hover:bg-white/5",
+                  ].join(" ")}
+                >
+                  {allCols.map((c) => (
+                    <td key={c} className="px-3 py-1.5 whitespace-nowrap text-black-eske dark:text-[#C7D6E0]">
+                      {c === "part_ciud"
+                        ? `${(row[c] as number).toFixed(2)}%`
+                        : typeof row[c] === "number" && !["anio"].includes(c)
+                          ? fmtNum(row[c] as number)
+                          : String(row[c] ?? "")}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+      {/* Paginación */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          {total > 0 ? `${total.toLocaleString("es-MX")} registros en total` : ""}
+        </p>
+        <div className="flex items-center gap-2 text-sm">
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="text-xs px-2 py-1 rounded border border-gray-eske-20 dark:border-white/10 disabled:opacity-40 hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            disabled={page <= 1 || isLoading}
+            aria-label="Página anterior"
+            className="px-2 py-1 rounded border border-gray-eske-20 dark:border-white/10 disabled:opacity-40 hover:bg-gray-eske-10 dark:hover:bg-white/5 text-black-eske dark:text-[#C7D6E0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
-            ‹ Anterior
+            ‹
           </button>
           <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
             {page} / {totalPages}
@@ -170,13 +198,36 @@ export default function EleccionesLocalesDataTable({
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="text-xs px-2 py-1 rounded border border-gray-eske-20 dark:border-white/10 disabled:opacity-40 hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            disabled={page >= totalPages || isLoading}
+            aria-label="Página siguiente"
+            className="px-2 py-1 rounded border border-gray-eske-20 dark:border-white/10 disabled:opacity-40 hover:bg-gray-eske-10 dark:hover:bg-white/5 text-black-eske dark:text-[#C7D6E0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
-            Siguiente ›
+            ›
           </button>
         </div>
-      )}
+      </div>
+
+      {/* Fuente + botón descarga — centrados */}
+      <div className="flex flex-col items-center gap-2 pt-1">
+        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center">
+          Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Locales
+        </p>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={isLoading || total === 0}
+          aria-label="Descargar datos en formato CSV"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded
+                     bg-bluegreen-eske text-white-eske hover:bg-bluegreen-eske-40
+                     disabled:opacity-40 disabled:cursor-not-allowed
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+        >
+          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Descargar CSV
+        </button>
+      </div>
     </div>
   );
 }

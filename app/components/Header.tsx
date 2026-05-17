@@ -146,9 +146,15 @@ const Header = () => {
           <div>
             <a href="/" aria-label="Eskemma - Ir a la página de inicio" className="focus-ring-primary rounded">
               <img
-                src={mounted && isDark ? "/images/esk_log_wsm.svg" : "/images/esk_log_csm.svg"}
+                src="/images/esk_log_csm.svg"
                 alt="Eskemma - Consultoría política"
-                className="h-4 w-auto sm:h-8 md:h-10"
+                className="h-4 w-auto sm:h-8 md:h-10 dark:hidden"
+              />
+              <img
+                src="/images/esk_log_wsm.svg"
+                alt="Eskemma - Consultoría política"
+                className="h-4 w-auto sm:h-8 md:h-10 hidden dark:block"
+                aria-hidden="true"
               />
             </a>
           </div>

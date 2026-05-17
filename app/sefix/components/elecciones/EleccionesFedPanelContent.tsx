@@ -49,9 +49,13 @@ function SectionHeader({ title, scope, scope2 }: { title: string; scope?: string
 }
 
 export default function EleccionesFedPanelContent() {
+  const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
-  useEscapeKey(rightOpen, useCallback(() => setRightOpen(false), []));
+  useEscapeKey(
+    leftOpen || rightOpen,
+    useCallback(() => { setLeftOpen(false); setRightOpen(false); }, [])
+  );
 
   const {
     pendingAnio, pendingCargo, pendingEstado, pendingPartidos,
@@ -99,7 +103,14 @@ export default function EleccionesFedPanelContent() {
 
   return (
     <div className="space-y-6 pb-14 sm:pb-0">
-      {/* Overlay derecho — solo mobile */}
+      {/* Overlays — solo mobile */}
+      {leftOpen && (
+        <div
+          className="fixed inset-0 bg-black-eske/40 z-30 sm:hidden"
+          aria-hidden="true"
+          onClick={() => setLeftOpen(false)}
+        />
+      )}
       {rightOpen && (
         <div
           className="fixed inset-0 bg-black-eske/40 z-30 sm:hidden"
@@ -108,37 +119,93 @@ export default function EleccionesFedPanelContent() {
         />
       )}
 
-      {/* ── Barra de Filtros (horizontal, encima del contenido) ── */}
-      <EleccionesFilters
-        pendingAnio={pendingAnio}
-        pendingCargo={pendingCargo}
-        pendingEstado={pendingEstado}
-        pendingPartidos={pendingPartidos}
-        pendingTipo={pendingTipo}
-        pendingPrincipio={pendingPrincipio}
-        pendingCabecera={pendingCabecera}
-        pendingMunicipio={pendingMunicipio}
-        pendingSecciones={pendingSecciones}
-        pendingIncluirExtranjero={pendingIncluirExtranjero}
-        setAnio={setAnio}
-        setCargo={setCargo}
-        setEstado={setEstado}
-        setPartidos={setPartidos}
-        setTipo={setTipo}
-        setPrincipio={setPrincipio}
-        setCabecera={setCabecera}
-        setMunicipio={setMunicipio}
-        setSecciones={setSecciones}
-        setIncluirExtranjero={setIncluirExtranjero}
-        hasPending={hasPending}
-        onConsultar={handleConsultar}
-        onRestablecer={handleRestablecer}
-        cargosDisponibles={cargosDisponibles}
-        partidosDisponibles={partidosDisponibles}
-        tiposDisponibles={tiposDisponibles}
-        principiosDisponibles={principiosDisponibles}
-        hasExtranjero={hasExtranjero}
-      />
+      {/* ── Barra de Filtros desktop (horizontal, encima del contenido) ── */}
+      <div className="hidden sm:block">
+        <EleccionesFilters
+          pendingAnio={pendingAnio}
+          pendingCargo={pendingCargo}
+          pendingEstado={pendingEstado}
+          pendingPartidos={pendingPartidos}
+          pendingTipo={pendingTipo}
+          pendingPrincipio={pendingPrincipio}
+          pendingCabecera={pendingCabecera}
+          pendingMunicipio={pendingMunicipio}
+          pendingSecciones={pendingSecciones}
+          pendingIncluirExtranjero={pendingIncluirExtranjero}
+          setAnio={setAnio}
+          setCargo={setCargo}
+          setEstado={setEstado}
+          setPartidos={setPartidos}
+          setTipo={setTipo}
+          setPrincipio={setPrincipio}
+          setCabecera={setCabecera}
+          setMunicipio={setMunicipio}
+          setSecciones={setSecciones}
+          setIncluirExtranjero={setIncluirExtranjero}
+          hasPending={hasPending}
+          onConsultar={handleConsultar}
+          onRestablecer={handleRestablecer}
+          cargosDisponibles={cargosDisponibles}
+          partidosDisponibles={partidosDisponibles}
+          tiposDisponibles={tiposDisponibles}
+          principiosDisponibles={principiosDisponibles}
+          hasExtranjero={hasExtranjero}
+        />
+      </div>
+
+      {/* ── Drawer de Filtros mobile (izquierdo) ── */}
+      <div
+        className={[
+          "fixed left-0 top-0 bottom-14 w-[min(85vw,320px)]",
+          "bg-white-eske dark:bg-[#112230] overflow-y-auto z-40 shadow-xl",
+          "transition-transform duration-300 ease-in-out sm:hidden",
+          leftOpen ? "translate-x-0" : "-translate-x-full",
+        ].join(" ")}
+      >
+        <div className="sticky top-0 flex items-center justify-between px-4 py-3 bg-bluegreen-eske text-white-eske">
+          <span className="text-sm font-semibold">Filtros de Consulta</span>
+          <button
+            type="button"
+            onClick={() => setLeftOpen(false)}
+            aria-label="Cerrar filtros"
+            className="hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white-eske rounded"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-4">
+          <EleccionesFilters
+            pendingAnio={pendingAnio}
+            pendingCargo={pendingCargo}
+            pendingEstado={pendingEstado}
+            pendingPartidos={pendingPartidos}
+            pendingTipo={pendingTipo}
+            pendingPrincipio={pendingPrincipio}
+            pendingCabecera={pendingCabecera}
+            pendingMunicipio={pendingMunicipio}
+            pendingSecciones={pendingSecciones}
+            pendingIncluirExtranjero={pendingIncluirExtranjero}
+            setAnio={setAnio}
+            setCargo={setCargo}
+            setEstado={setEstado}
+            setPartidos={setPartidos}
+            setTipo={setTipo}
+            setPrincipio={setPrincipio}
+            setCabecera={setCabecera}
+            setMunicipio={setMunicipio}
+            setSecciones={setSecciones}
+            setIncluirExtranjero={setIncluirExtranjero}
+            hasPending={hasPending}
+            onConsultar={() => { handleConsultar(); setLeftOpen(false); }}
+            onRestablecer={handleRestablecer}
+            cargosDisponibles={cargosDisponibles}
+            partidosDisponibles={partidosDisponibles}
+            tiposDisponibles={tiposDisponibles}
+            principiosDisponibles={principiosDisponibles}
+            hasExtranjero={hasExtranjero}
+          />
+        </div>
+      </div>
 
       {/* ── Layout 2 columnas: visualizaciones | análisis ── */}
       <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-6 lg:items-start">
@@ -157,7 +224,10 @@ export default function EleccionesFedPanelContent() {
                   {[...Array(committed.cargo !== "dip" && hasExtranjero ? 5 : 4)].map((_, i) => (
                     <div
                       key={i}
-                      className="h-24 rounded-lg bg-gray-eske-10 dark:bg-white/10 animate-pulse"
+                      className={[
+                        "h-24 rounded-lg bg-gray-eske-10 dark:bg-white/10 animate-pulse",
+                        committed.cargo !== "dip" && hasExtranjero && i === 2 ? "col-span-2 sm:col-span-1" : "",
+                      ].join(" ")}
                       aria-hidden="true"
                     />
                   ))}
@@ -242,12 +312,11 @@ export default function EleccionesFedPanelContent() {
         </div>
       </div>
 
-      {/* Barra inferior mobile — solo "Análisis" (filtros ya están arriba) */}
       <MobileBottomBar
-        leftOpen={false}
+        leftOpen={leftOpen}
         rightOpen={rightOpen}
-        onFiltros={() => {}}
-        onAnalisis={() => setRightOpen((v) => !v)}
+        onFiltros={() => { setLeftOpen((v) => !v); setRightOpen(false); }}
+        onAnalisis={() => { setRightOpen((v) => !v); setLeftOpen(false); }}
       />
     </div>
   );

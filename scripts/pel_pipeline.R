@@ -1,5 +1,5 @@
 # ==============================================================================
-# PIPELINE DE NORMALIZACIÓN ELECTORAL LOCAL (ESKEMMA) - Versión 4.3
+# PIPELINE DE NORMALIZACIÓN ELECTORAL LOCAL (ESKEMMA) - Versión 4.5
 # Produce CSVs normalizados compatibles con el dashboard Sefix (Next.js)
 #
 # Schema de salida:
@@ -9,9 +9,19 @@
 #   total_votos, lne, part_ciud
 #
 # Estructura de entrada esperada:
-#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{CARGO_csv}/{anio}_SEE_*_SEC.csv
-#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{ESTADO}_PEL_{anio}/{CARGO_csv}/*_SEC.csv
-#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{ESTADO}_PEL_EXT_{anio}/{CARGO_csv}/*_SEC_EXT.csv
+#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{CARGO_csv}/*_SEC*.csv
+#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{ESTADO}_PEL_{anio}/{CARGO_csv}/*_SEC*.csv
+#   preparacion/PEL_{anio}/{ESTADO}_PEL_{anio}/{ESTADO}_PEL_EXT_{anio}/{CARGO_csv}/*_SEC*.csv
+#
+# Cambios v4.10 (2023):
+#   - ANIO <- 2017 (4 estados: COAH, MEX, NAY, VER — 11 CSVs)
+#   - NAY REGIDURIAS usa ID_DEMARCACION_TERRITORIAL / DEMARCACION_TERRITORIAL
+#     en lugar de ID_DISTRITO / CABECERA_DISTRITAL → añadidos a detección
+#   - VER CASILLA (singular) → ya manejado desde v4.4 en columnas_partido
+#   - VER_PEL_EXT_2018 dentro de PEL_2017 → detectado como ext correctamente
+#   - JEFE.*GOBIERNO|JEFATURA.*GOBIERNO pattern (fix v4.5 para CDMX 2018)
+#   - Robustez heredada de v4.4/4.5: tab/coma, BOM, SECCIONES, ID_COMUNIDAD,
+#     col_mun_id/col_mun_nom fallback, col_no_reg ausente, es_ext dual-detección
 # ==============================================================================
 
 library(dplyr)
@@ -28,9 +38,9 @@ RUTA_PREP   <- "/Users/raul/Documents/development/eskemma/data/results/locals/pr
 RUTA_SALIDA <- "/Users/raul/Documents/development/eskemma/data/results/locals/procesados"
 
 # Año a procesar (solo un año por ejecución)
-ANIO <- 2021
+ANIO <- 2023
 
-# Entidades a procesar — NULL = todas; usar clave de carpeta, e.g. c("CHIS")
+# Entidades a procesar — NULL = todas; usar clave de carpeta, e.g. c("AGS", "CHIH")
 ENTIDADES_FILTRO <- NULL
 
 # ------------------------------------------------------------------------------
@@ -41,16 +51,19 @@ ENTIDADES_FILTRO <- NULL
 CARGO_FOLDERS <- tribble(
   ~patron_carpeta,            ~cargo_key,  ~cve_cargo, ~cargo_label,
   "JEFE_DELEGACIONAL",        "jef_del",   10L,        "JEFATURA DELEGACIONAL",
-  "JEFE_GOBIERNO",            "jef_gob",   8L,         "JEFATURA DE GOBIERNO",
+  "JEFE.*GOBIERNO|JEFATURA.*GOBIERNO", "jef_gob", 8L, "JEFATURA DE GOBIERNO",
   "ALCALDIAS",                "alc",       9L,         "ALCALDIA",
   "JUNTAS_MUNICIPALES",       "junta",     7L,         "JUNTA MUNICIPAL",
   "GUBERNATURA",              "gob",       4L,         "GUBERNATURA",
-  "DIPUTACIONES_LOC",         "dip_loc",   5L,         "DIPUTACION LOCAL",
+  # Acepta espacio o guión bajo: "DIPUTACIONES_LOC" y "DIPUTACIONES LOC" (QROO 2022)
+  "DIPUTACIONES.LOC",         "dip_loc",   5L,         "DIPUTACION LOCAL",
   "AYUNTAMIENTOS",            "ayun",      6L,         "AYUNTAMIENTO",
   "SINDICATURA",              "sind",      11L,        "SINDICATURA",
   "REGIDURIA",                "reg",       12L,        "REGIDURIA",
-  "ASAMBLEISTA",              "asm",       13L,        "ASAMBLEISTA",
-  "PRESIDENCIA_COMUNIDAD",    "pres_com",  14L,        "PRESIDENCIA COMUNITARIA"
+  # ASAMB_CONST: Asamblea Constituyente CDMX 2016 (carpeta ASAMB_CONST_csv)
+  "ASAMB",                    "asm",       13L,        "ASAMBLEISTA",
+  # PRESIDENCIA DE COMUNIDAD (con espacio) y PRESIDENCIA_COMUNIDAD (guión bajo)
+  "PRESIDENCIA.*COMUNIDAD",   "pres_com",  14L,        "PRESIDENCIA COMUNITARIA"
 )
 
 # ------------------------------------------------------------------------------
@@ -98,12 +111,17 @@ es_fila_agregado <- function(seccion_val) {
   is.na(seccion_val) || seccion_val == 0 || seccion_val == ""
 }
 
-# Columnas de partido: entre CASILLAS/CASILLA y la columna de no-registrados
-# (acepta NUM_VOTOS_CAN_NREG o NO_REGISTRADOS como marcador derecho)
+# Columnas de partido: entre CASILLAS/CASILLA y la columna de no-registrados.
+# Fallback: si no existe NUM_VOTOS_CAN_NREG (e.g. ASAMB_CONST CDMX 2016),
+# usa NUM_VOTOS_NULOS como límite derecho.
 columnas_partido <- function(cols) {
-  cols_up   <- toupper(cols)
-  idx_cas   <- which(cols_up %in% c("CASILLAS", "CASILLA"))
-  idx_nreg  <- which(cols_up %in% c("NUM_VOTOS_CAN_NREG", "NO_REGISTRADOS"))
+  cols_up  <- toupper(trimws(cols))
+  idx_cas  <- which(cols_up %in% c("CASILLAS", "CASILLA"))
+  idx_nreg <- which(cols_up %in% c("NUM_VOTOS_CAN_NREG", "NO_REGISTRADOS"))
+  if (length(idx_nreg) == 0) {
+    # Fallback para archivos sin columna de no-registrados (ASAMB_CONST)
+    idx_nreg <- which(cols_up %in% c("NUM_VOTOS_NULOS", "NUM_VOTOS_VALIDOS"))
+  }
   if (length(idx_cas) == 0 || length(idx_nreg) == 0) return(character(0))
   cols[(idx_cas[1] + 1):(idx_nreg[1] - 1)]
 }
@@ -122,9 +140,9 @@ quitar_bom_raw <- function(raw) {
   raw[!excl]
 }
 
-# Lee un CSV con manejo robusto de BOM y encoding UTF-8.
+# Lee un CSV/TSV con manejo robusto de BOM y encoding UTF-8.
 # Opera en bytes: lee crudo, quita BOMs, convierte a texto UTF-8 y parsea.
-# Requiere que el locale sea UTF-8 (Sys.setlocale al inicio del script).
+# Auto-detección de separador: tab (ZAC 2016 ordinario) o coma (resto).
 # - Elimina columnas duplicadas (conserva primera aparición)
 # - Elimina columnas con nombre vacío o NA
 leer_csv <- function(ruta) {
@@ -156,9 +174,15 @@ leer_csv <- function(ruta) {
     if (is.na(texto) || nchar(texto, type = "bytes") == 0L) texto <- texto_tmp
   }
 
+  # Auto-detect separator: ZAC 2016 ordinary files use tabs instead of commas
+  primera_linea <- strsplit(texto, "\n", fixed = TRUE)[[1]][1]
+  sep <- if (grepl("\t", primera_linea, fixed = TRUE)) "\t" else ","
+  if (sep == "\t") message("  AVISO: separador TAB detectado en ", basename(ruta))
+
   df <- tryCatch(
     suppressWarnings(
-      read.csv(textConnection(texto), check.names = FALSE, stringsAsFactors = FALSE)
+      read.csv(textConnection(texto), check.names = FALSE,
+               stringsAsFactors = FALSE, sep = sep)
     ),
     error = function(e) NULL
   )
@@ -246,40 +270,63 @@ procesar_archivo <- function(ruta_archivo, es_ext) {
   # Normalize column names: strip accented vowels and uppercase.
   # Some INE files use SECCIÓN (with accent) instead of SECCION.
   col_nms <- toupper(trimws(names(df_raw)))
-  col_nms <- gsub("Á", "A", col_nms, fixed = TRUE)  # Á
-  col_nms <- gsub("É", "E", col_nms, fixed = TRUE)  # É
-  col_nms <- gsub("Í", "I", col_nms, fixed = TRUE)  # Í
-  col_nms <- gsub("Ó", "O", col_nms, fixed = TRUE)  # Ó
-  col_nms <- gsub("Ú", "U", col_nms, fixed = TRUE)  # Ú
+  col_nms <- gsub("Á", "A", col_nms, fixed = TRUE)
+  col_nms <- gsub("É", "E", col_nms, fixed = TRUE)
+  col_nms <- gsub("Í", "I", col_nms, fixed = TRUE)
+  col_nms <- gsub("Ó", "O", col_nms, fixed = TRUE)
+  col_nms <- gsub("Ú", "U", col_nms, fixed = TRUE)
   names(df_raw) <- col_nms
 
   cols_partido <- columnas_partido(names(df_raw))
   cve_tipo_val <- if (es_ext) 2L else 1L
   tipo_val     <- if (es_ext) "EXTRAORDINARIA" else "ORDINARIA"
 
-  # Normalizar nombre de columna de cabecera (acepta espacio, guión bajo, o sufijo _LOCAL)
+  # Columna de sección: SECCION (2015/2021) o SECCIONES (TLAX PRES_COM 2016)
+  col_sec <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
+                 c("SECCION", "SECCIONES")][1]
+  if (is.na(col_sec)) {
+    message("  AVISO: Columna SECCION no encontrada en ", basename(ruta_archivo))
+    col_sec <- "SECCION"
+  }
+
+  # Normalizar nombre de columna de cabecera
+  # Acepta: CABECERA_DISTRITAL (2015/2017), CABECERA_DISTRITAL_LOCAL (2021),
+  # COMUNIDAD (TLAX PRES_COM 2016), DEMARCACION_TERRITORIAL (NAY REG 2017)
   col_cab <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
                c("CABECERA_DISTRITAL", "CABECERA DISTRITAL",
-                 "CABECERA_DISTRITAL_LOCAL")][1]
+                 "CABECERA_DISTRITAL_LOCAL", "COMUNIDAD",
+                 "DEMARCACION_TERRITORIAL")][1]
   if (is.na(col_cab)) {
     message("  AVISO: Columna CABECERA_DISTRITAL no encontrada en ", basename(ruta_archivo))
     col_cab <- NA_character_
   }
 
-  # Detectar columna de ID de distrito (2015: ID_DISTRITO, 2021: ID_DISTRITO_LOCAL)
+  # Columna de ID de distrito: ID_DISTRITO (2015/2017), ID_DISTRITO_LOCAL (2021),
+  # ID_COMUNIDAD (TLAX PRES_COM 2016), ID_DEMARCACION_TERRITORIAL (NAY REG 2017)
   col_dist_id <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
-                   c("ID_DISTRITO", "ID_DISTRITO_LOCAL")][1]
+                   c("ID_DISTRITO", "ID_DISTRITO_LOCAL",
+                     "ID_COMUNIDAD", "ID_DEMARCACION_TERRITORIAL")][1]
   if (is.na(col_dist_id)) col_dist_id <- "ID_DISTRITO"
 
-  # Detectar columna de votos no registrados (varía por fuente INE)
+  # Columna de votos no registrados (varía por fuente INE o está ausente)
   col_no_reg <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
                    c("NUM_VOTOS_CAN_NREG", "NO_REGISTRADOS")][1]
-  if (is.na(col_no_reg)) col_no_reg <- "NUM_VOTOS_CAN_NREG"
+  # col_no_reg puede ser NA (ASAMB_CONST no tiene esta columna)
+
+  # Columna de clave de municipio: ID_MUNICIPIO (2015/2021) o ausente (TLAX PRES_COM)
+  col_mun_id <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
+                   c("ID_MUNICIPIO")][1]
+  # col_mun_id puede ser NA (TLAX PRES_COM usa ID_COMUNIDAD para cve_del, sin municipio)
+
+  # Columna de nombre de municipio: MUNICIPIO (2015/2021) o ausente (TLAX PRES_COM)
+  col_mun_nom <- names(df_raw)[toupper(trimws(names(df_raw))) %in%
+                    c("MUNICIPIO")][1]
+  # col_mun_nom puede ser NA (TLAX PRES_COM: usa COMUNIDAD como unidad geográfica base)
 
   # Construir df de salida fila por fila (mutate)
   df_out <- df_raw %>%
     mutate(
-      .seccion_int = suppressWarnings(as.integer(.data[["SECCION"]])),
+      .seccion_int = suppressWarnings(as.integer(.data[[col_sec]])),
     ) %>%
     filter(!is.na(.seccion_int), .seccion_int > 0) %>%
     mutate(
@@ -304,10 +351,18 @@ procesar_archivo <- function(ruta_archivo, es_ext) {
         sprintf("%02d", suppressWarnings(as.integer(.data[["ID_ESTADO"]]))),
         sprintf("%02d", suppressWarnings(as.integer(.data[[col_dist_id]])))
       ),
-      cve_mun       = suppressWarnings(as.integer(.data[["ID_MUNICIPIO"]])),
-      municipio     = patch_nombres_corruptos(norm_texto(toupper(trimws(.data[["MUNICIPIO"]])))),
+      cve_mun       = if (!is.na(col_mun_id))
+                        suppressWarnings(as.integer(.data[[col_mun_id]]))
+                      else 0L,
+      municipio     = if (!is.na(col_mun_nom))
+                        patch_nombres_corruptos(norm_texto(toupper(trimws(.data[[col_mun_nom]]))))
+                      else if (!is.na(col_cab))
+                        patch_nombres_corruptos(norm_texto(toupper(trimws(.data[[col_cab]]))))
+                      else NA_character_,
       seccion       = .seccion_int,
-      no_reg        = suppressWarnings(as.integer(.data[[col_no_reg]])),
+      no_reg        = if (!is.na(col_no_reg))
+                        suppressWarnings(as.integer(.data[[col_no_reg]]))
+                      else 0L,
       vot_nul       = suppressWarnings(as.integer(.data[["NUM_VOTOS_NULOS"]])),
       total_votos   = suppressWarnings(as.integer(.data[["TOTAL_VOTOS"]])),
       lne           = suppressWarnings(as.integer(.data[["LISTA_NOMINAL"]])),
@@ -338,12 +393,14 @@ procesar_archivo <- function(ruta_archivo, es_ext) {
 ruta_pel <- file.path(RUTA_PREP, paste0("PEL_", ANIO))
 if (!dir.exists(ruta_pel)) stop("No existe la carpeta: ", ruta_pel)
 
-# Buscar todos los archivos *_SEC*.csv de forma recursiva
-todos_sec <- list.files(ruta_pel, pattern = "_SEC.*\\.csv$",
+# Buscar todos los archivos con sufijos reconocidos de forma recursiva.
+# TLAX PRES_COM usa _COMUN.csv / _COMUN_EXT.csv (no _SEC.csv).
+todos_sec <- list.files(ruta_pel, pattern = "\\.(csv)$",
                         recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
 
-# Filtrar solo archivos que terminan exactamente en _SEC.csv o _SEC_EXT.csv (o _SEC_EXT.csv)
-todos_sec <- todos_sec[str_detect(toupper(basename(todos_sec)), "_SEC\\.CSV$|_SEC_EXT\\.CSV$")]
+# Filtrar: _SEC.csv, _SEC_EXT.csv, _COMUN.csv, _COMUN_EXT.csv
+SUFIJOS_OK <- "_SEC\\.CSV$|_SEC_EXT\\.CSV$|_COMUN\\.CSV$|_COMUN_EXT\\.CSV$"
+todos_sec <- todos_sec[str_detect(toupper(basename(todos_sec)), SUFIJOS_OK)]
 
 # Aplicar filtro de entidades si se especificó
 if (!is.null(ENTIDADES_FILTRO) && length(ENTIDADES_FILTRO) > 0) {
@@ -352,14 +409,18 @@ if (!is.null(ENTIDADES_FILTRO) && length(ENTIDADES_FILTRO) > 0) {
 }
 
 cat("Archivos _SEC encontrados:", length(todos_sec), "\n")
-for (f in todos_sec) cat(" -", str_replace(f, ruta_pel, "PEL_2015"), "\n")
+for (f in todos_sec) cat(" -", str_replace(f, ruta_pel, paste0("PEL_", ANIO)), "\n")
 
 # Acumulador por cargo_key
 acum <- list()
 
 for (ruta_archivo in todos_sec) {
   ruta_rel <- str_replace(ruta_archivo, paste0(ruta_pel, "/"), "")
-  es_ext   <- str_detect(toupper(basename(ruta_archivo)), "_SEC_EXT\\.CSV$")
+
+  # Extraordinaria si el nombre del archivo termina _SEC_EXT.csv / _COMUN_EXT.csv
+  # O si la ruta contiene _PEL_EXT_ (e.g. COL_PEL_EXT_2016, TLAX_PEL_EXT_2017)
+  es_ext <- str_detect(toupper(basename(ruta_archivo)), "_(SEC|COMUN)_EXT\\.CSV$") ||
+            str_detect(toupper(ruta_rel), "_PEL_EXT_")
 
   cat("\nProcesando:", ruta_rel, "(EXT:", es_ext, ")\n")
 
@@ -374,8 +435,9 @@ for (ruta_archivo in todos_sec) {
 
   cargo_key    <- attr(df_proc, "cargo_key")
   # Extrae clave del estado desde el primer segmento de la ruta relativa:
-  # e.g. "CHIS_PEL_2015/..." → "chis"
-  estado_clave <- tolower(str_match(ruta_rel, "^([A-Z]+)_PEL")[, 2])
+  # e.g. "CHIS_PEL_2016/..." → "chis"
+  # e.g. "CDMX_ASAMB_CONST_2016/..." → "cdmx"
+  estado_clave <- tolower(str_match(ruta_rel, "^([A-Z]+)_(?:PEL|ASAMB)")[, 2])
   llave        <- paste0(estado_clave, "_pel_", cargo_key, "_", ANIO)
   if (is.null(acum[[llave]])) acum[[llave]] <- list()
   acum[[llave]] <- append(acum[[llave]], list(df_proc))
