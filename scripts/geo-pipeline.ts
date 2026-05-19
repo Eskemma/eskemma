@@ -5,13 +5,18 @@
  * Converts INE/INEGI SHP files → WGS84 GeoJSON → TopoJSON → Firebase Storage.
  * Reads projection from the SHP's companion .prj file and reprojects with proj4.
  *
- * Usage:
+ * INE layers (electoral):
  *   npx tsx scripts/geo-pipeline.ts --layer entidades [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer municipios [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer distritos_fed [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer distritos_loc [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer secciones --estado 01 [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer secciones --all-estados [--upload]
+ *
+ * INEGI layers (geostatistical):
+ *   npx tsx scripts/geo-pipeline.ts --layer ageb_urbana --estado 14 [--upload]
+ *   npx tsx scripts/geo-pipeline.ts --layer ageb_urbana --all-estados [--upload]
+ *
  *   npx tsx scripts/geo-pipeline.ts --dry-run --layer entidades
  *
  * Output in Firebase Storage:
@@ -20,9 +25,7 @@
  *   sefix/geo/ine/nacional/distritos_fed.topojson
  *   sefix/geo/ine/nacional/distritos_loc.topojson
  *   sefix/geo/ine/estados/{ID}/secciones.topojson
- *   sefix/geo/ine/estados/{ID}/municipios.topojson
- *   sefix/geo/ine/estados/{ID}/distritos_fed.topojson
- *   sefix/geo/ine/estados/{ID}/distritos_loc.topojson
+ *   sefix/geo/inegi/estados/{ID}/ageb_urbana.topojson
  */
 
 import fs from "fs";
@@ -49,10 +52,12 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const INFO_GEO = path.resolve(__dirname, "../info_geo_eske");
 const MGS_NACIONAL = path.join(INFO_GEO, "mgs_2025_INE/nacional/mgs_nacional_2025_INE");
-const MGS_ESTADOS = path.join(INFO_GEO, "mgs_2025_INE/estados");
+const MGS_ESTADOS  = path.join(INFO_GEO, "mgs_2025_INE/estados");
+const MG_INEGI_ESTADOS = path.join(INFO_GEO, "mg_2025_INEGI_estados");
 
-const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
-const STORAGE_PREFIX = "sefix/geo/ine";
+const STORAGE_BUCKET        = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+const STORAGE_PREFIX_INE    = "sefix/geo/ine";
+const STORAGE_PREFIX_INEGI  = "sefix/geo/inegi";
 
 /**
  * Finds the per-state directory in MGS_ESTADOS by matching the numeric prefix
@@ -76,6 +81,7 @@ const SIMPLIFY_THRESHOLD: Record<string, number> = {
   distritos_fed: 5e-11,
   distritos_loc: 5e-11,
   secciones:    1e-11,
+  ageb_urbana:  1e-11,
 };
 
 // Column mapping: source SHP column (uppercase) → target output column name
@@ -106,6 +112,14 @@ const COLUMN_MAP: Record<string, ColMap[]> = {
     { src: "SECCION",    dest: "CVE_SECCION", pad: 4 },
     { src: "DISTRITO_F", dest: "DISTRITO_FED", pad: 3 },
     { src: "DISTRITO_L", dest: "DISTRITO_LOC", pad: 3 },
+  ],
+  // INEGI Marco Geoestadístico 2025 — AGEB urbana ({id}a.shp)
+  ageb_urbana: [
+    { src: "CVE_ENT",  dest: "CVE_ENT",  pad: 2 },
+    { src: "CVE_MUN",  dest: "CVE_MUN",  pad: 3 },
+    { src: "CVE_LOC",  dest: "CVE_LOC",  pad: 4 },
+    { src: "CVE_AGEB", dest: "CVE_AGEB", pad: 4 },
+    { src: "CVEGEO",   dest: "CVEGEO" },
   ],
 };
 
@@ -334,7 +348,7 @@ async function processNacionalLayer(
   const sizeMB = (buf.length / 1e6).toFixed(2);
   process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
 
-  const storagePath = `${STORAGE_PREFIX}/nacional/${layer}.topojson`;
+  const storagePath = `${STORAGE_PREFIX_INE}/nacional/${layer}.topojson`;
 
   if (dryRun) {
     const outPath = path.join(os.tmpdir(), `geo_${layer}.topojson`);
@@ -412,7 +426,7 @@ async function processEstadoSecciones(
   const sizeMB = (buf.length / 1e6).toFixed(2);
   process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
 
-  const storagePath = `${STORAGE_PREFIX}/estados/${estadoId}/secciones.topojson`;
+  const storagePath = `${STORAGE_PREFIX_INE}/estados/${estadoId}/secciones.topojson`;
 
   if (dryRun) {
     const outPath = path.join(os.tmpdir(), `geo_secciones_${estadoId}.topojson`);
@@ -462,7 +476,7 @@ async function processEstadoLayer(
   const sizeMB = (buf.length / 1e6).toFixed(2);
   process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
 
-  const storagePath = `${STORAGE_PREFIX}/estados/${estadoId}/${layer}.topojson`;
+  const storagePath = `${STORAGE_PREFIX_INE}/estados/${estadoId}/${layer}.topojson`;
 
   if (dryRun) {
     const outPath = path.join(os.tmpdir(), `geo_${layer}_${estadoId}.topojson`);
@@ -544,7 +558,7 @@ async function processSeccionesNacionalBatch(
     const fc: FeatureCollection = { type: "FeatureCollection", features };
     const buf = toTopoJSON(fc, "secciones", SIMPLIFY_THRESHOLD["secciones"]);
     const sizeMB = (buf.length / 1e6).toFixed(2);
-    const storagePath = `${STORAGE_PREFIX}/estados/${id}/secciones.topojson`;
+    const storagePath = `${STORAGE_PREFIX_INE}/estados/${id}/secciones.topojson`;
 
     process.stdout.write(`  Estado ${id}: ${features.length} secciones → ${sizeMB} MB\n`);
 
@@ -557,6 +571,69 @@ async function processSeccionesNacionalBatch(
       await uploadBuffer(app!, storagePath, buf);
       process.stdout.write(`    ✓ Done\n`);
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INEGI processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Finds the per-state directory in MG_INEGI_ESTADOS by matching the numeric
+ * prefix (e.g. "09" matches "09_ciudaddemexico"). Returns null if not found.
+ */
+function findInegEstadoDir(estadoId: string): string | null {
+  const prefix = `${estadoId}_`;
+  const entries = fs.readdirSync(MG_INEGI_ESTADOS);
+  const match = entries.find((e) => e.startsWith(prefix));
+  if (!match) return null;
+  const fullPath = path.join(MG_INEGI_ESTADOS, match);
+  return fs.statSync(fullPath).isDirectory() ? fullPath : null;
+}
+
+/**
+ * Processes AGEB urbana for a single estado from the INEGI Marco Geoestadístico
+ * 2025. Reads {id}a.shp from conjunto_de_datos/, reprojects to WGS84, and
+ * uploads to sefix/geo/inegi/estados/{id}/ageb_urbana.topojson.
+ */
+async function processInegEstadoAgebUrbana(
+  estadoId: string,
+  dryRun: boolean,
+  app: App | null
+): Promise<void> {
+  const estadoDir = findInegEstadoDir(estadoId);
+  if (!estadoDir) {
+    throw new Error(`No INEGI directory found for estado ${estadoId} in ${MG_INEGI_ESTADOS}`);
+  }
+
+  const shpPath = path.join(estadoDir, "conjunto_de_datos", `${estadoId}a.shp`);
+  if (!fs.existsSync(shpPath)) {
+    throw new Error(`AGEB urbana SHP not found: ${shpPath}`);
+  }
+
+  process.stdout.write(`Estado ${estadoId}: reading ${shpPath}…\n`);
+  const geojson = await readShp(shpPath, "ageb_urbana");
+  process.stdout.write(`  → ${geojson.features.length} AGEB urbanas\n`);
+
+  if (geojson.features.length === 0) {
+    process.stdout.write(`  [skip] No features found for estado ${estadoId}\n`);
+    return;
+  }
+
+  const buf = toTopoJSON(geojson, "ageb_urbana", SIMPLIFY_THRESHOLD["ageb_urbana"]);
+  const sizeMB = (buf.length / 1e6).toFixed(2);
+  process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
+
+  const storagePath = `${STORAGE_PREFIX_INEGI}/estados/${estadoId}/ageb_urbana.topojson`;
+
+  if (dryRun) {
+    const outPath = path.join(os.tmpdir(), `geo_ageb_urbana_${estadoId}.topojson`);
+    fs.writeFileSync(outPath, buf);
+    process.stdout.write(`  [dry-run] Written to ${outPath}\n`);
+  } else {
+    process.stdout.write(`  ↑ Uploading to ${storagePath}…\n`);
+    await uploadBuffer(app!, storagePath, buf);
+    process.stdout.write(`  ✓ Done\n`);
   }
 }
 
@@ -576,10 +653,13 @@ async function main(): Promise<void> {
   const estadoIdx = args.indexOf("--estado");
   const estadoArg = estadoIdx >= 0 ? args[estadoIdx + 1]?.padStart(2, "0") : null;
 
+  const inegiLayers = ["ageb_urbana"];
+
   if (!layer) {
     process.stderr.write(
       "Usage: npx tsx scripts/geo-pipeline.ts --layer <layer> [--estado <id>] [--all-estados] [--upload] [--dry-run]\n" +
-      "Layers: entidades, municipios, distritos_fed, distritos_loc, secciones\n"
+      "INE layers:   entidades, municipios, distritos_fed, distritos_loc, secciones\n" +
+      "INEGI layers: ageb_urbana\n"
     );
     process.exit(1);
   }
@@ -590,6 +670,21 @@ async function main(): Promise<void> {
   }
 
   const app = (!dryRun && upload) ? initFirebase() : null;
+
+  // INEGI per-state layers
+  if (inegiLayers.includes(layer)) {
+    const estados = allEstados ? ALL_ESTADO_IDS : estadoArg ? [estadoArg] : [];
+    if (estados.length === 0) {
+      process.stderr.write("Specify --estado <id> or --all-estados for INEGI layers.\n");
+      process.exit(1);
+    }
+    if (layer === "ageb_urbana") {
+      for (const id of estados) {
+        await processInegEstadoAgebUrbana(id, dryRun, app);
+      }
+    }
+    return;
+  }
 
   const nationalLayers = ["entidades", "municipios", "distritos_fed", "distritos_loc"];
 

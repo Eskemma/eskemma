@@ -21,6 +21,9 @@ function sessionKey(tipo: GeoLayerTipo, estadoId?: string): string {
   return tipo === "secciones" ? `secciones:${estadoId}` : `${tipo}:nacional`;
 }
 
+// Layer types that are stored per-state only (no national file)
+const PER_ESTADO_TIPOS: GeoLayerTipo[] = ["secciones", "ageb_urbana"];
+
 /**
  * Determines which Storage file to fetch:
  *
@@ -28,6 +31,7 @@ function sessionKey(tipo: GeoLayerTipo, estadoId?: string): string {
  * - municipios:   always nacional (2,477 features, 970 KB) — filter client-side
  * - distritos_*:  always nacional (300-400 features, <1 MB) — filter client-side
  * - secciones:    per-estado (nacional is 147 MB — too large)
+ * - ageb_urbana:  per-estado (INEGI Marco Geoestadístico 2025)
  *
  * Returns null if the combination is unsupported (e.g. secciones nacional).
  */
@@ -35,8 +39,8 @@ function resolveParams(
   tipo: GeoLayerTipo,
   scope: GeoScopeElectoral
 ): { nivel: "nacional" | "estado"; estado_id?: string } | null {
-  if (tipo === "secciones") {
-    if (!scope.estado_id) return null; // nacional secciones not stored
+  if (PER_ESTADO_TIPOS.includes(tipo)) {
+    if (!scope.estado_id) return null;
     return { nivel: "estado", estado_id: scope.estado_id };
   }
   // All other tipos use the national file and filter client-side
@@ -84,6 +88,14 @@ function filterByScope(
     const secSet = new Set(cve_secciones.map(s => s.padStart(4, "0")));
     features = features.filter(
       (f) => secSet.has(String(f.properties?.["CVE_SECCION"] ?? "").padStart(4, "0"))
+    );
+  }
+
+  // Filter by AGEB code (INEGI layers)
+  if (scope.cve_ageb) {
+    const target = scope.cve_ageb.padStart(4, "0");
+    features = features.filter(
+      (f) => String(f.properties?.["CVE_AGEB"] ?? "").padStart(4, "0") === target
     );
   }
 
@@ -230,8 +242,7 @@ export function useGeoShapes(
     setGeojson(filtered);
     setBounds(computeBounds(filtered));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(",")]);
+  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(","), scope.cve_ageb]);
 
   return { geojson, isLoading, error, bounds };
 }

@@ -22,6 +22,7 @@ export interface GeoScopeElectoral {
   cve_municipio?: string;     // e.g. "039"
   cve_seccion?: string;       // e.g. "0123"
   cve_secciones?: string[];   // multi-select, e.g. ["0123", "0456"]
+  cve_ageb?: string;          // e.g. "1234" (INEGI AGEB code, 4 chars)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +34,8 @@ export type GeoLayerTipo =
   | "municipios"
   | "distritos_fed"
   | "distritos_loc"
-  | "secciones";
+  | "secciones"
+  | "ageb_urbana";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Choropleth style
@@ -136,7 +138,22 @@ export function getFeatureKey(tipo: GeoLayerTipo, props: IneFeatureProps): strin
     case "distritos_fed": return ent + (props.DISTRITO_FED ?? "");
     case "distritos_loc": return ent + (props.DISTRITO_LOC ?? "");
     case "secciones":     return ent + (props.CVE_SECCION ?? "");
+    case "ageb_urbana":   return (props as unknown as InegAgebProps).CVEGEO ?? ent;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INEGI AGEB properties (Marco Geoestadístico 2025)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface InegAgebProps {
+  CVE_ENT:  string;  // "14"
+  CVE_MUN:  string;  // "039"
+  CVE_LOC:  string;  // "0001"
+  CVE_AGEB: string;  // "1234"
+  /** Unique 13-digit geographic code: CVE_ENT(2)+CVE_MUN(3)+CVE_LOC(4)+CVE_AGEB(4) */
+  CVEGEO:   string;  // "14039000112345"
+  [key: string]: unknown;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

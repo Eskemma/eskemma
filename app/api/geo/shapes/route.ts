@@ -4,12 +4,16 @@ import { adminApp } from "@/lib/firebase-admin";
 import type { GeoLayerTipo } from "@/types/geo.types";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
-const STORAGE_PREFIX = "sefix/geo/ine";
+const STORAGE_PREFIX_INE   = "sefix/geo/ine";
+const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
+
+// Types sourced from INEGI (per-state only, no national file)
+const INEGI_TIPOS: GeoLayerTipo[] = ["ageb_urbana"];
 
 type NivelParam = "nacional" | "estado";
 
 const VALID_TIPOS: GeoLayerTipo[] = [
-  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones",
+  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones", "ageb_urbana",
 ];
 
 function buildStoragePath(
@@ -17,13 +21,17 @@ function buildStoragePath(
   nivel: NivelParam,
   estado_id?: string
 ): string | null {
+  const isInegi = INEGI_TIPOS.includes(tipo);
+  const prefix  = isInegi ? STORAGE_PREFIX_INEGI : STORAGE_PREFIX_INE;
+
   if (nivel === "nacional") {
-    if (tipo === "secciones") return null; // national secciones not stored
-    return `${STORAGE_PREFIX}/nacional/${tipo}.topojson`;
+    if (isInegi)           return null; // INEGI layers are per-state only
+    if (tipo === "secciones") return null;
+    return `${prefix}/nacional/${tipo}.topojson`;
   }
   if (!estado_id) return null;
   const id = estado_id.padStart(2, "0");
-  return `${STORAGE_PREFIX}/estados/${id}/${tipo}.topojson`;
+  return `${prefix}/estados/${id}/${tipo}.topojson`;
 }
 
 export async function GET(req: NextRequest) {
@@ -56,7 +64,7 @@ export async function GET(req: NextRequest) {
   const storagePath = buildStoragePath(tipo, nivel, estado_id);
   if (!storagePath) {
     return NextResponse.json(
-      { error: "National secciones are not available. Use nivel=estado with an estado_id." },
+      { error: `'${tipo}' is only available per-state. Use nivel=estado with an estado_id.` },
       { status: 400 }
     );
   }

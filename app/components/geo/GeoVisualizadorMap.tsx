@@ -45,7 +45,8 @@ function featureStyle(feature: Feature | undefined, layerConfig: GeoLayerConfig)
   if (layerConfig.colorRamp && layerConfig.data && feature?.properties) {
     const p = feature.properties;
     let key = "";
-    if (p.CVE_SECCION) key = (p.CVE_ENT ?? "") + (p.CVE_SECCION ?? "");
+    if (p.CVEGEO)       key = String(p.CVEGEO);
+    else if (p.CVE_SECCION) key = (p.CVE_ENT ?? "") + (p.CVE_SECCION ?? "");
     else if (p.CVE_MUN) key = (p.CVE_ENT ?? "") + (p.CVE_MUN ?? "");
     else if (p.DISTRITO_FED) key = (p.CVE_ENT ?? "") + (p.DISTRITO_FED ?? "");
     else if (p.DISTRITO_LOC) key = (p.CVE_ENT ?? "") + (p.DISTRITO_LOC ?? "");
@@ -94,11 +95,12 @@ function sanitize(fc: FeatureCollection): FeatureCollection {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TIPO_GRANULARITY: Record<string, number> = {
-  secciones: 0,
-  municipios: 1,
-  distritos_loc: 2,
-  distritos_fed: 3,
-  entidades: 4,
+  ageb_urbana: 0,
+  secciones: 1,
+  municipios: 2,
+  distritos_loc: 3,
+  distritos_fed: 4,
+  entidades: 5,
 };
 
 function mostGranularTipo(layers: GeoLayerConfig[]): GeoLayerTipo {
