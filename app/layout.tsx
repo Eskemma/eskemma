@@ -86,6 +86,8 @@ export default function RootLayout({
       <head>
         {/* Script anti-FOUC: aplica .dark antes de que React hidrate */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('eskemma:theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();` }} />
+        {/* Leaflet CSS — imported as static asset to avoid Tailwind v4 CSS scanner conflict */}
+        <link rel="stylesheet" href="/leaflet.css" />
       </head>
       <body
         className={`${arimo.variable} ${ptSans.variable} ${philosopher.variable} min-h-screen`}
