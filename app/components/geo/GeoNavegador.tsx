@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { GeoVisualizador } from "./GeoVisualizador";
 import { useGeoOptions } from "./hooks/useGeoOptions";
+import { clearGeoShapeCache } from "./hooks/useGeoShapes";
 import PartidosMultiSelect from "@/app/sefix/components/elecciones/PartidosMultiSelect";
 import type {
   GeoScopeElectoral,
@@ -328,6 +329,9 @@ export function GeoNavegador({
   }
 
   function handleConsultar() {
+    // Clear per-state cache entries so stale data (e.g. pre-pipeline ageb CVE_SECCION)
+    // is not served from the module-level cache on this explicit query.
+    if (pending.estado_id) clearGeoShapeCache(pending.estado_id);
     setState(prev => ({ ...prev, committed: prev.pending, queryVersion: prev.queryVersion + 1 }));
     onScopeChange?.(deriveScope(fuente, pending));
   }
@@ -548,7 +552,7 @@ export function GeoNavegador({
               </div>
             )}
 
-            {/* Botón Consultar — INE only, cuando hay cambios pendientes */}
+            {/* Botón Consultar — INE: solo cuando hay cambios pendientes */}
             {fuente === "ine" && hasPending && (
               <div className="flex items-end">
                 <button
@@ -558,6 +562,22 @@ export function GeoNavegador({
                              bg-blue-eske text-white-eske hover:bg-blue-eske-60
                              transition-colors focus-visible:outline-none
                              focus-visible:ring-2 focus-visible:ring-blue-eske"
+                >
+                  Consultar
+                </button>
+              </div>
+            )}
+
+            {/* Botón Consultar — INEGI: siempre visible para forzar re-consulta explícita */}
+            {fuente === "inegi" && (
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleConsultar}
+                  className="px-4 py-1.5 rounded-md text-sm font-medium
+                             bg-red-500 text-white hover:bg-red-600
+                             transition-colors focus-visible:outline-none
+                             focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   Consultar
                 </button>

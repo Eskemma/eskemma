@@ -17,8 +17,11 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 
 function sessionKey(tipo: GeoLayerTipo, estadoId?: string): string {
-  // secciones are per-state; all other tipos use national file
-  return tipo === "secciones" ? `secciones:${estadoId}` : `${tipo}:nacional`;
+  // Per-state types need estado_id in key to avoid cache collisions across states.
+  // All other types (entidades, municipios, distritos_*) use the single national file.
+  return PER_ESTADO_TIPOS.includes(tipo) && estadoId
+    ? `${tipo}:${estadoId}`
+    : `${tipo}:nacional`;
 }
 
 // Layer types that are stored per-state only (no national file)
@@ -155,6 +158,23 @@ function computeBounds(geojson: FeatureCollection): LatLngBounds | null {
 
   if (!isFinite(minLat)) return null;
   return L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
+}
+
+/**
+ * Clears specific entries from the module-level cache.
+ * Pass estado_id to remove per-state entries for that state.
+ * Called from GeoNavegador on explicit Consultar to force fresh data.
+ */
+export function clearGeoShapeCache(estadoId?: string): void {
+  if (!estadoId) {
+    cache.clear();
+    return;
+  }
+  for (const key of Array.from(cache.keys())) {
+    if (key.endsWith(`:${estadoId}`)) {
+      cache.delete(key);
+    }
+  }
 }
 
 export interface GeoShapesResult {
