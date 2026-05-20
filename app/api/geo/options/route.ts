@@ -8,7 +8,7 @@ const STORAGE_PREFIX_INE   = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day — data changes once a year
 
-type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades";
+type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades" | "agebs";
 
 interface CacheEntry { options: GeoOption[]; ts: number }
 const cache = new Map<string, CacheEntry>();
@@ -18,15 +18,17 @@ function cacheKey(
   estado_id: string,
   distrito_fed?: string,
   distrito_loc?: string,
-  municipio?: string
+  municipio?: string,
+  loc?: string
 ): string {
-  return `${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}`;
+  return `${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}:${loc ?? ""}`;
 }
 
 function buildStoragePath(tipo: OptionTipo, estado_id: string): string {
   const id = estado_id.padStart(2, "0");
-  if (tipo === "secciones")   return `${STORAGE_PREFIX_INE}/estados/${id}/secciones.topojson`;
-  if (tipo === "localidades") return `${STORAGE_PREFIX_INEGI}/estados/${id}/ageb_urbana.topojson`;
+  if (tipo === "secciones")               return `${STORAGE_PREFIX_INE}/estados/${id}/secciones.topojson`;
+  if (tipo === "localidades" || tipo === "agebs")
+                                          return `${STORAGE_PREFIX_INEGI}/estados/${id}/ageb_urbana.topojson`;
   return `${STORAGE_PREFIX_INE}/nacional/${tipo}.topojson`;
 }
 
@@ -36,7 +38,8 @@ function extractOptions(
   estado_id: string,
   distrito_fed?: string,
   distrito_loc?: string,
-  municipio?: string
+  municipio?: string,
+  loc?: string
 ): GeoOption[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { feature } = require("topojson-client") as typeof import("topojson-client");
@@ -69,6 +72,14 @@ function extractOptions(
     );
   }
 
+  // Localidad filter — applies to both "localidades" (extract unique locs) and "agebs"
+  if (loc && (tipo === "agebs")) {
+    const padLoc = loc.padStart(4, "0");
+    features = features.filter(
+      (f) => String(f.properties?.["CVE_LOC"] ?? "").padStart(4, "0") === padLoc
+    );
+  }
+
   const seen = new Set<string>();
   const options: GeoOption[] = [];
 
@@ -98,6 +109,15 @@ function extractOptions(
         cve = String(p["CVE_LOC"] ?? "").padStart(4, "0");
         nombre = `Localidad ${cve}`;
         break;
+      case "agebs": {
+        // cve = full CVEGEO (unique 13-char code); nombre = short 4-char AGEB code
+        cve = String(p["CVEGEO"] ?? "");
+        const ageb4 = String(p["CVE_AGEB"] ?? "").padStart(4, "0");
+        const cveLoc = String(p["CVE_LOC"] ?? "").padStart(4, "0");
+        // Show localidad context when no loc filter so user can distinguish same CVE_AGEB across locs
+        nombre = loc ? `AGEB ${ageb4}` : `AGEB ${ageb4} · Loc ${cveLoc}`;
+        break;
+      }
     }
 
     if (cve && !seen.has(cve)) {
@@ -116,8 +136,9 @@ export async function GET(req: NextRequest) {
   const distrito_fed = searchParams.get("distrito_fed") ?? undefined;
   const distrito_loc = searchParams.get("distrito_loc") ?? undefined;
   const municipio = searchParams.get("municipio") ?? undefined;
+  const loc = searchParams.get("loc") ?? undefined;
 
-  const VALID_TIPOS: OptionTipo[] = ["municipios", "distritos_fed", "distritos_loc", "secciones", "localidades"];
+  const VALID_TIPOS: OptionTipo[] = ["municipios", "distritos_fed", "distritos_loc", "secciones", "localidades", "agebs"];
   if (!tipo || !VALID_TIPOS.includes(tipo)) {
     return NextResponse.json(
       { error: `Invalid 'tipo'. Must be one of: ${VALID_TIPOS.join(", ")}` },
@@ -129,7 +150,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "'estado_id' is required" }, { status: 400 });
   }
 
-  const key = cacheKey(tipo, estado_id, distrito_fed, distrito_loc, municipio);
+  const key = cacheKey(tipo, estado_id, distrito_fed, distrito_loc, municipio, loc);
   const cached = cache.get(key);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
     return NextResponse.json(cached.options, {
@@ -151,7 +172,7 @@ export async function GET(req: NextRequest) {
     const [buf] = await file.download();
     const topojson = JSON.parse(buf.toString("utf-8"));
 
-    const options = extractOptions(topojson, tipo, estado_id, distrito_fed, distrito_loc, municipio);
+    const options = extractOptions(topojson, tipo, estado_id, distrito_fed, distrito_loc, municipio, loc);
     cache.set(key, { options, ts: Date.now() });
 
     return NextResponse.json(options, {

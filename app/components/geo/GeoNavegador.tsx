@@ -58,6 +58,7 @@ interface GeoNavPending {
   modo: Modo | null;
   cve_unidad: string;    // municipio, d.fed o d.loc seleccionado
   cve_loc: string;       // INEGI only: localidad (CVE_LOC)
+  cve_agebs: string[];   // INEGI only: multi-select AGEBs (CVEGEO full codes)
   secciones: string[];   // multi-select secciones (INE only)
 }
 
@@ -73,6 +74,7 @@ const DEFAULT_PENDING: GeoNavPending = {
   modo: null,
   cve_unidad: "",
   cve_loc: "",
+  cve_agebs: [],
   secciones: [],
 };
 
@@ -87,16 +89,17 @@ const DEFAULT_RAMP: GeoColorRamp = {
 const STROKE_CONTORNO = { strokeColor: "#1e3a5f", strokeWidth: 2.5 };
 
 function deriveScope(fuente: GeoFuente, p: GeoNavPending): GeoScopeElectoral {
-  const { estado_id, modo, cve_unidad, cve_loc, secciones } = p;
+  const { estado_id, modo, cve_unidad, cve_loc, cve_agebs, secciones } = p;
   const secField = secciones.length > 0 ? { cve_secciones: secciones } : {};
 
   if (!estado_id) return { nivel: "nacional" };
 
   if (fuente === "inegi") {
+    const agebField = cve_agebs.length > 0 ? { cve_agebs } : {};
     if (cve_unidad && cve_loc)
-      return { nivel: "municipio", estado_id, cve_municipio: cve_unidad, cve_loc };
+      return { nivel: "municipio", estado_id, cve_municipio: cve_unidad, cve_loc, ...agebField };
     if (cve_unidad)
-      return { nivel: "municipio", estado_id, cve_municipio: cve_unidad };
+      return { nivel: "municipio", estado_id, cve_municipio: cve_unidad, ...agebField };
     return { nivel: "entidad", estado_id };
   }
 
@@ -152,20 +155,22 @@ function deriveLayers(
   colorRamp: GeoColorRamp,
   data?: Record<string, number>
 ): GeoLayerConfig[] {
-  const { estado_id, modo, cve_unidad, cve_loc, secciones } = p;
+  const { estado_id, modo, cve_unidad, cve_loc, cve_agebs, secciones } = p;
 
   // ── INEGI mode ──────────────────────────────────────────────────────────
   if (fuente === "inegi") {
     if (!estado_id) {
       return [{ id: "entidades", tipo: "entidades", visible: true, colorRamp, data, tooltip: TOOLTIP_ENT }];
     }
-    // Estado selected: show AGEBs immediately + municipios outlines for drill-down
-    // Both ageb_urbana and ageb_rural are per-state files — loaded once and cached.
-    // When municipio or localidad is selected, filterByScope narrows the results.
+    // AGEBs selected → highlight them with selectedKeys; contorno municipio as context
+    const agebSelectedKeys = cve_agebs.length > 0 ? new Set(cve_agebs) : undefined;
+    const agebSelectedStyle = { color: "#1d4ed8", weight: 2, fillColor: "#bfdbfe", fillOpacity: 0.55 };
     return [
       { id: "municipios",  tipo: "municipios",  visible: true, ...STROKE_CONTORNO, tooltip: TOOLTIP_MUN },
-      { id: "ageb_urbana", tipo: "ageb_urbana", visible: true, ...AGEB_STYLE, tooltip: TOOLTIP_AGEB },
-      { id: "ageb_rural",  tipo: "ageb_rural",  visible: true, ...AGEB_STYLE, strokeWidth: 0.3, tooltip: TOOLTIP_AGEB },
+      { id: "ageb_urbana", tipo: "ageb_urbana", visible: true, ...AGEB_STYLE,
+        selectedKeys: agebSelectedKeys, selectedStyle: agebSelectedStyle, tooltip: TOOLTIP_AGEB },
+      { id: "ageb_rural",  tipo: "ageb_rural",  visible: true, ...AGEB_STYLE, strokeWidth: 0.3,
+        selectedKeys: agebSelectedKeys, selectedStyle: agebSelectedStyle, tooltip: TOOLTIP_AGEB },
     ];
   }
 
@@ -230,6 +235,7 @@ function scopeLabel(fuente: GeoFuente, p: GeoNavPending): string {
   if (fuente === "inegi") {
     if (p.cve_unidad) parts.push(`Mun. ${p.cve_unidad}`);
     if (p.cve_loc) parts.push(`Loc. ${p.cve_loc}`);
+    if (p.cve_agebs.length > 0) parts.push(`${p.cve_agebs.length} AGEB(s)`);
   } else {
     const modoLabel = p.modo === "municipio" ? "Municipio"
       : p.modo === "distrito_fed" ? "Dist. Electoral Federal"
@@ -287,7 +293,7 @@ export function GeoNavegador({
   // ── Mutaciones del pending ───────────────────────────────────────────────
 
   function setPendingEstado(estado_id: string) {
-    const next: GeoNavPending = { estado_id, modo: "municipio", cve_unidad: "", cve_loc: "", secciones: [] };
+    const next: GeoNavPending = { estado_id, modo: "municipio", cve_unidad: "", cve_loc: "", cve_agebs: [], secciones: [] };
     if (fuente === "inegi") {
       // Auto-commit immediately in INEGI mode
       setState(prev => ({ ...prev, pending: next, committed: next, queryVersion: prev.queryVersion + 1 }));
@@ -306,7 +312,8 @@ export function GeoNavegador({
 
   function setPendingUnidad(cve_unidad: string) {
     if (fuente === "inegi") {
-      const next: GeoNavPending = { ...pending, cve_unidad, cve_loc: "" };
+      // Reset loc and agebs when municipio changes
+      const next: GeoNavPending = { ...pending, cve_unidad, cve_loc: "", cve_agebs: [] };
       setState(prev => ({ ...prev, pending: next, committed: next, queryVersion: prev.queryVersion + 1 }));
       onScopeChange?.(deriveScope(fuente, next));
     } else {
@@ -315,10 +322,15 @@ export function GeoNavegador({
   }
 
   function setPendingLoc(cve_loc: string) {
-    // INEGI only — auto-commit
-    const next: GeoNavPending = { ...pending, cve_loc };
+    // INEGI only — auto-commit; reset agebs when localidad changes
+    const next: GeoNavPending = { ...pending, cve_loc, cve_agebs: [] };
     setState(prev => ({ ...prev, pending: next, committed: next, queryVersion: prev.queryVersion + 1 }));
     onScopeChange?.(deriveScope(fuente, next));
+  }
+
+  function setPendingAgebs(cve_agebs: string[]) {
+    // INEGI only — does NOT auto-commit; requires explicit Consultar
+    setState(prev => ({ ...prev, pending: { ...prev.pending, cve_agebs } }));
   }
 
   function setPendingSecciones(secciones: string[]) {
@@ -361,6 +373,21 @@ export function GeoNavegador({
     estadoId: fuente === "inegi" && pending.cve_unidad ? pending.estado_id : "",
     municipio: fuente === "inegi" ? pending.cve_unidad : undefined,
   });
+
+  // AGEBs: INEGI only, needs estado + municipio (+ optional localidad)
+  const { options: agebOptions, isLoading: loadingAgebs } = useGeoOptions({
+    tipo: "agebs",
+    estadoId: fuente === "inegi" && pending.cve_unidad ? pending.estado_id : "",
+    municipio: fuente === "inegi" ? pending.cve_unidad : undefined,
+    cve_loc:   fuente === "inegi" ? pending.cve_loc || undefined : undefined,
+  });
+
+  const agebMultiOptions = useMemo(
+    () => agebOptions.map(o => ({ value: o.cve, label: o.nombre })),
+    [agebOptions]
+  );
+
+  const agebsSelected = pending.cve_agebs.length > 0 ? pending.cve_agebs : ["Todas"];
 
   const { options: seccionesOptions, isLoading: loadingSecciones } = useGeoOptions({
     tipo: "secciones",
@@ -524,6 +551,31 @@ export function GeoNavegador({
                     <option key={o.cve} value={o.cve}>{o.nombre}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* AGEBs — INEGI only, cuando hay municipio */}
+            {fuente === "inegi" && pending.cve_unidad && (
+              <div className="relative min-w-[200px] sm:max-w-[300px]">
+                <PartidosMultiSelect
+                  label={
+                    <>
+                      AGEB(s)
+                      {loadingAgebs && (
+                        <span className="ml-1 text-[10px] text-red-500 font-normal">(Cargando…)</span>
+                      )}
+                    </>
+                  }
+                  options={agebMultiOptions}
+                  selected={agebsSelected}
+                  onChange={(vals) => {
+                    const clean = vals.filter(v => v !== "Todas");
+                    setPendingAgebs(clean);
+                  }}
+                  disabled={loadingAgebs}
+                  placeholder="Buscar AGEB…"
+                  todosLabel="Todas"
+                />
               </div>
             )}
 

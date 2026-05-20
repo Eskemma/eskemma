@@ -110,11 +110,19 @@ function filterByScope(
     );
   }
 
-  // Filter by AGEB code (INEGI layers)
+  // Filter by single AGEB code — legacy, single-select (INEGI layers)
   if (scope.cve_ageb) {
     const target = scope.cve_ageb.padStart(4, "0");
     features = features.filter(
       (f) => String(f.properties?.["CVE_AGEB"] ?? "").padStart(4, "0") === target
+    );
+  }
+
+  // Filter by multi-select AGEBs: match CVEGEO (full 13-char unique code)
+  if (scope.cve_agebs && scope.cve_agebs.length > 0) {
+    const agebSet = new Set(scope.cve_agebs);
+    features = features.filter(
+      (f) => agebSet.has(String(f.properties?.["CVEGEO"] ?? ""))
     );
   }
 
@@ -278,7 +286,7 @@ export function useGeoShapes(
     setGeojson(filtered);
     setBounds(computeBounds(filtered));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(","), scope.cve_ageb, scope.cve_loc]);
+  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(","), scope.cve_ageb, scope.cve_loc, scope.cve_agebs?.join(",")]);
 
   return { geojson, isLoading, error, bounds };
 }

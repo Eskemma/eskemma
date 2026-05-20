@@ -22,7 +22,8 @@ export interface GeoScopeElectoral {
   cve_municipio?: string;     // e.g. "039"
   cve_seccion?: string;       // e.g. "0123"
   cve_secciones?: string[];   // multi-select, e.g. ["0123", "0456"]
-  cve_ageb?: string;          // e.g. "1234" (INEGI AGEB code, 4 chars)
+  cve_ageb?: string;          // e.g. "1234" (INEGI AGEB code, 4 chars) — legacy single
+  cve_agebs?: string[];       // multi-select, e.g. ["0900700012437", ...] (CVEGEO full codes)
   cve_loc?: string;           // e.g. "0001" (INEGI localidad code)
 }
 
