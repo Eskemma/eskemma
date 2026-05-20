@@ -48,6 +48,7 @@ const ENTIDADES: { id: string; nombre: string }[] = [
 ];
 
 type Modo = "municipio" | "distrito_fed" | "distrito_loc";
+type GeoFuente = "ine" | "inegi";
 
 // ─── Estado de navegación (pending + committed) ────────────────────────────
 
@@ -55,10 +56,11 @@ interface GeoNavPending {
   estado_id: string;
   modo: Modo | null;
   cve_unidad: string;    // municipio, d.fed o d.loc seleccionado
-  secciones: string[];   // multi-select secciones
+  secciones: string[];   // multi-select secciones (INE only)
 }
 
 interface GeoNavState {
+  fuente: GeoFuente;
   pending: GeoNavPending;
   committed: GeoNavPending;
   queryVersion: number;
@@ -105,19 +107,58 @@ const TOOLTIP_MUN    = (p: Record<string, unknown>) => `<strong>${p.NOMGEO ?? p.
 const TOOLTIP_DFED   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Federal ${p.DISTRITO_FED ?? ""}</strong><br/><span style="font-size:11px">${p.NOMBRE_ENT ?? ""}</span>`;
 const TOOLTIP_DLOC   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Local ${p.DISTRITO_LOC ?? ""}</strong><br/><span style="font-size:11px">${p.NOMBRE_ENT ?? ""}</span>`;
 const TOOLTIP_ENT    = (p: Record<string, unknown>) => `<strong>${p.NOMBRE_ENT ?? p.CVE_ENT ?? ""}</strong>`;
-const TOOLTIP_SEC    = (p: Record<string, unknown>) =>
-  `<strong>Sección ${p.CVE_SECCION ?? ""}</strong>` +
-  `<br/>Municipio: ${p.NOMGEO ?? "—"}` +
-  `<br/>Distrito Federal: ${p.DISTRITO_FED ?? "—"}` +
-  `<br/>Distrito Local: ${p.DISTRITO_LOC ?? "—"}`;
+const TOOLTIP_SEC    = (p: Record<string, unknown>) => {
+  const agebStr = p.AGEBS ? String(p.AGEBS) : "";
+  const agebList = agebStr ? agebStr.split(",") : [];
+  const agebLine = agebList.length > 0
+    ? `<br/><span style="font-size:10px">AGEBs (${agebList.length}): ${agebList.slice(0, 4).join(", ")}${agebList.length > 4 ? "…" : ""}</span>`
+    : "";
+  return `<strong>Sección ${p.CVE_SECCION ?? ""}</strong>` +
+    `<br/>Municipio: ${p.NOMGEO ?? "—"}` +
+    `<br/>Distrito Federal: ${p.DISTRITO_FED ?? "—"}` +
+    `<br/>Distrito Local: ${p.DISTRITO_LOC ?? "—"}` +
+    agebLine;
+};
+const TOOLTIP_AGEB   = (p: Record<string, unknown>) =>
+  `<strong>AGEB ${p.CVEGEO ?? ""}</strong>` +
+  `<br/>Municipio: ${p.CVE_MUN ?? "—"}` +
+  (p.CVE_LOC ? `<br/>Localidad: ${p.CVE_LOC}` : "") +
+  (p.CVE_SECCION  ? `<br/>Sección: ${p.CVE_SECCION}`           : "") +
+  (p.DISTRITO_FED ? `<br/>Distrito Federal: ${p.DISTRITO_FED}` : "") +
+  (p.DISTRITO_LOC ? `<br/>Distrito Local: ${p.DISTRITO_LOC}`   : "");
+
+const AGEB_STYLE = {
+  fillColor: "#ef4444",
+  fillOpacity: 0.55,
+  strokeColor: "#991b1b",
+  strokeWidth: 0.4,
+} as const;
 
 function deriveLayers(
+  fuente: GeoFuente,
   p: GeoNavPending,
   colorRamp: GeoColorRamp,
   data?: Record<string, number>
 ): GeoLayerConfig[] {
-  const { estado_id, modo, cve_unidad } = p;
+  const { estado_id, modo, cve_unidad, secciones } = p;
 
+  // ── INEGI mode ──────────────────────────────────────────────────────────
+  if (fuente === "inegi") {
+    if (!estado_id) {
+      return [{ id: "entidades", tipo: "entidades", visible: true, colorRamp, data, tooltip: TOOLTIP_ENT }];
+    }
+    // With municipio selected: show AGEB layer filtered to that municipio
+    if (cve_unidad && modo === "municipio") {
+      return [
+        { id: "contorno_mun", tipo: "municipios", visible: true, ...STROKE_CONTORNO, tooltip: TOOLTIP_MUN },
+        { id: "ageb", tipo: "ageb_urbana", visible: true, ...AGEB_STYLE, tooltip: TOOLTIP_AGEB },
+      ];
+    }
+    // Estado selected, no municipio: show municipios for drill-down
+    return [{ id: "municipios", tipo: "municipios", visible: true, colorRamp, data, tooltip: TOOLTIP_MUN }];
+  }
+
+  // ── INE mode (default) ──────────────────────────────────────────────────
   if (!estado_id) {
     return [{ id: "entidades", tipo: "entidades", visible: true, colorRamp, data, tooltip: TOOLTIP_ENT }];
   }
@@ -127,6 +168,17 @@ function deriveLayers(
       : modo === "distrito_fed" ? "distritos_fed" : "distritos_loc";
     const contourTooltip = modo === "municipio" ? TOOLTIP_MUN
       : modo === "distrito_fed" ? TOOLTIP_DFED : TOOLTIP_DLOC;
+
+    // Single sección selected → show AGEB polygons (red) inside sección contour (blue outline)
+    if (secciones.length === 1) {
+      return [
+        { id: "contorno", tipo: contourTipo, visible: true, ...STROKE_CONTORNO, tooltip: contourTooltip },
+        { id: "ageb_urbana", tipo: "ageb_urbana", visible: true, ...AGEB_STYLE, tooltip: TOOLTIP_AGEB },
+        { id: "ageb_rural",  tipo: "ageb_rural",  visible: true, ...AGEB_STYLE, strokeWidth: 0.3, tooltip: TOOLTIP_AGEB },
+        { id: "secciones", tipo: "secciones", visible: true, fillColor: "transparent", strokeColor: "#1e40af", strokeWidth: 1.5, tooltip: TOOLTIP_SEC },
+      ];
+    }
+
     return [
       { id: "contorno", tipo: contourTipo, visible: true, ...STROKE_CONTORNO, colorRamp, data, tooltip: contourTooltip },
       { id: "secciones", tipo: "secciones", visible: true, colorRamp, data, strokeColor: "#475569", strokeWidth: 0.4, tooltip: TOOLTIP_SEC },
@@ -185,13 +237,25 @@ export function GeoNavegador({
   onFeatureClick,
 }: GeoNavegadorProps) {
   const [state, setState] = useState<GeoNavState>({
+    fuente: "ine",
     pending: DEFAULT_PENDING,
     committed: DEFAULT_PENDING,
     queryVersion: 0,
   });
 
-  const { pending, committed } = state;
+  const { fuente, pending, committed } = state;
   const hasPending = JSON.stringify(pending) !== JSON.stringify(committed);
+
+  // ── Cambio de fuente (aplica inmediatamente, reset de filtros) ──────────
+
+  function setFuente(f: GeoFuente) {
+    setState(prev => ({
+      fuente: f,
+      pending: DEFAULT_PENDING,
+      committed: DEFAULT_PENDING,
+      queryVersion: prev.queryVersion + 1,
+    }));
+  }
 
   // ── Mutaciones del pending ───────────────────────────────────────────────
 
@@ -229,13 +293,16 @@ export function GeoNavegador({
   }
 
   function handleRestablecer() {
-    setState(prev => ({ pending: DEFAULT_PENDING, committed: DEFAULT_PENDING, queryVersion: prev.queryVersion + 1 }));
+    setState(prev => ({ ...prev, pending: DEFAULT_PENDING, committed: DEFAULT_PENDING, queryVersion: prev.queryVersion + 1 }));
     onScopeChange?.(deriveScope(DEFAULT_PENDING));
   }
 
   // ── Opciones para los selects ────────────────────────────────────────────
 
-  const optTipo = pending.modo === "municipio" ? "municipios"
+  // In INEGI mode only municipio is available; INE supports all three levels
+  const optTipo = fuente === "inegi"
+    ? "municipios"
+    : pending.modo === "municipio" ? "municipios"
     : pending.modo === "distrito_fed" ? "distritos_fed"
     : pending.modo === "distrito_loc" ? "distritos_loc"
     : "municipios";
@@ -262,8 +329,8 @@ export function GeoNavegador({
   const seccionesSelected = pending.secciones.length > 0 ? pending.secciones : ["Todas"];
 
   // ── Derivar scope y layers del committed (no del pending) ────────────────
-  const scope  = useMemo(() => deriveScope(committed),                   [committed]);
-  const layers = useMemo(() => deriveLayers(committed, colorRamp, data), [committed, colorRamp, data]);
+  const scope  = useMemo(() => deriveScope(committed),                          [committed]);
+  const layers = useMemo(() => deriveLayers(fuente, committed, colorRamp, data), [fuente, committed, colorRamp, data]);
 
   // ── Labels dinámicos ─────────────────────────────────────────────────────
   const modoLabel = pending.modo === "municipio" ? "Municipio"
@@ -277,18 +344,43 @@ export function GeoNavegador({
       {/* ── Panel de filtros ────────────────────────────────────────────── */}
       <div className="p-4 bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 space-y-3">
 
-        {/* Fila header: scope label + Restablecer */}
+        {/* Fila header: selector de fuente + scope label + Restablecer */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] font-medium">
-            {scopeLabel(committed)}
-          </span>
-          <button
-            type="button"
-            onClick={handleRestablecer}
-            className="text-xs text-orange-eske hover:text-orange-eske-60 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-eske rounded"
-          >
-            Restablecer
-          </button>
+
+          {/* Selector de fuente: Vista Electoral / Datos Generales */}
+          <div className="flex gap-1" role="group" aria-label="Vista de datos">
+            {(["ine", "inegi"] as GeoFuente[]).map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFuente(f)}
+                aria-pressed={fuente === f}
+                className={`px-3 py-1 rounded text-xs font-medium border transition-colors
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske ${
+                  fuente === f
+                    ? f === "ine"
+                      ? "bg-blue-eske text-white-eske border-blue-eske"
+                      : "bg-red-500 text-white border-red-500"
+                    : "bg-white-eske dark:bg-[#18324A] text-black-eske-60 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
+                }`}
+              >
+                {f === "ine" ? "Vista Electoral" : "Datos Generales"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] font-medium">
+              {scopeLabel(committed)}
+            </span>
+            <button
+              type="button"
+              onClick={handleRestablecer}
+              className="text-xs text-orange-eske hover:text-orange-eske-60 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-eske rounded"
+            >
+              Restablecer
+            </button>
+          </div>
         </div>
 
         {/* Fila 1: Entidad + Nivel de análisis */}
@@ -310,8 +402,8 @@ export function GeoNavegador({
             </select>
           </div>
 
-          {/* Nivel de análisis — visible solo cuando hay entidad */}
-          {pending.estado_id && (
+          {/* Nivel de análisis — INE only, visible solo cuando hay entidad */}
+          {fuente === "ine" && pending.estado_id && (
             <fieldset>
               <legend className={LABEL_CLS}>Nivel de análisis</legend>
               <div className="flex gap-1" role="group" aria-label="Nivel de análisis">
@@ -337,13 +429,13 @@ export function GeoNavegador({
         </div>
 
         {/* Fila 2: Unidad + Secciones + Consultar */}
-        {pending.estado_id && pending.modo && (
+        {pending.estado_id && (fuente === "inegi" || pending.modo) && (
           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
 
-            {/* Unidad (municipio / distrito) */}
+            {/* Unidad (municipio — en ambos modos; distrito solo en INE) */}
             <div>
               <label htmlFor="geo-nav-unidad" className={LABEL_CLS}>
-                {modoLabel}
+                {fuente === "inegi" ? "Municipio" : modoLabel}
                 {loadingUnidad && (
                   <span className="ml-1 text-[10px] text-blue-eske">(Cargando…)</span>
                 )}
@@ -355,15 +447,15 @@ export function GeoNavegador({
                 disabled={loadingUnidad}
                 className={SELECT_CLS}
               >
-                <option value="">Todas</option>
+                <option value="">Todos</option>
                 {unidadOptions.map(o => (
                   <option key={o.cve} value={o.cve}>{o.nombre}</option>
                 ))}
               </select>
             </div>
 
-            {/* Multi-select de secciones — visible solo cuando hay unidad seleccionada */}
-            {pending.cve_unidad && (
+            {/* Multi-select de secciones — INE only, visible solo cuando hay unidad seleccionada */}
+            {fuente === "ine" && pending.cve_unidad && (
               <div className="relative min-w-[200px] sm:max-w-[280px]">
                 <PartidosMultiSelect
                   label={

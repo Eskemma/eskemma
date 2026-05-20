@@ -16,6 +16,8 @@
  * INEGI layers (geostatistical):
  *   npx tsx scripts/geo-pipeline.ts --layer ageb_urbana --estado 14 [--upload]
  *   npx tsx scripts/geo-pipeline.ts --layer ageb_urbana --all-estados [--upload]
+ *   npx tsx scripts/geo-pipeline.ts --layer ageb_rural --estado 09 [--upload]
+ *   npx tsx scripts/geo-pipeline.ts --layer ageb_rural --all-estados [--upload]
  *
  *   npx tsx scripts/geo-pipeline.ts --dry-run --layer entidades
  *
@@ -26,6 +28,7 @@
  *   sefix/geo/ine/nacional/distritos_loc.topojson
  *   sefix/geo/ine/estados/{ID}/secciones.topojson
  *   sefix/geo/inegi/estados/{ID}/ageb_urbana.topojson
+ *   sefix/geo/inegi/estados/{ID}/ageb_rural.topojson
  */
 
 import fs from "fs";
@@ -82,6 +85,7 @@ const SIMPLIFY_THRESHOLD: Record<string, number> = {
   distritos_loc: 5e-11,
   secciones:    1e-11,
   ageb_urbana:  1e-11,
+  ageb_rural:   1e-11,
 };
 
 // Column mapping: source SHP column (uppercase) → target output column name
@@ -118,6 +122,14 @@ const COLUMN_MAP: Record<string, ColMap[]> = {
     { src: "CVE_ENT",  dest: "CVE_ENT",  pad: 2 },
     { src: "CVE_MUN",  dest: "CVE_MUN",  pad: 3 },
     { src: "CVE_LOC",  dest: "CVE_LOC",  pad: 4 },
+    { src: "CVE_AGEB", dest: "CVE_AGEB", pad: 4 },
+    { src: "CVEGEO",   dest: "CVEGEO" },
+  ],
+  // INEGI Marco Geoestadístico 2025 — AGEB rural ({id}ar.shp)
+  // No CVE_LOC — rural AGEBs don't belong to a localidad
+  ageb_rural: [
+    { src: "CVE_ENT",  dest: "CVE_ENT",  pad: 2 },
+    { src: "CVE_MUN",  dest: "CVE_MUN",  pad: 3 },
     { src: "CVE_AGEB", dest: "CVE_AGEB", pad: 4 },
     { src: "CVEGEO",   dest: "CVEGEO" },
   ],
@@ -637,6 +649,274 @@ async function processInegEstadoAgebUrbana(
   }
 }
 
+/**
+ * Processes AGEB rural for a single estado from the INEGI Marco Geoestadístico
+ * 2025. Reads {id}ar.shp from conjunto_de_datos/, reprojects to WGS84, and
+ * uploads to sefix/geo/inegi/estados/{id}/ageb_rural.topojson.
+ */
+async function processInegEstadoAgebRural(
+  estadoId: string,
+  dryRun: boolean,
+  app: App | null
+): Promise<void> {
+  const estadoDir = findInegEstadoDir(estadoId);
+  if (!estadoDir) {
+    throw new Error(`No INEGI directory found for estado ${estadoId} in ${MG_INEGI_ESTADOS}`);
+  }
+
+  const shpPath = path.join(estadoDir, "conjunto_de_datos", `${estadoId}ar.shp`);
+  if (!fs.existsSync(shpPath)) {
+    process.stdout.write(`  [skip] AGEB rural SHP not found: ${shpPath}\n`);
+    return;
+  }
+
+  process.stdout.write(`Estado ${estadoId}: reading ${shpPath}…\n`);
+  const geojson = await readShp(shpPath, "ageb_rural");
+  process.stdout.write(`  → ${geojson.features.length} AGEB rurales\n`);
+
+  if (geojson.features.length === 0) {
+    process.stdout.write(`  [skip] No features found for estado ${estadoId}\n`);
+    return;
+  }
+
+  const buf = toTopoJSON(geojson, "ageb_rural", SIMPLIFY_THRESHOLD["ageb_rural"]);
+  const sizeMB = (buf.length / 1e6).toFixed(2);
+  process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
+
+  const storagePath = `${STORAGE_PREFIX_INEGI}/estados/${estadoId}/ageb_rural.topojson`;
+
+  if (dryRun) {
+    const outPath = path.join(os.tmpdir(), `geo_ageb_rural_${estadoId}.topojson`);
+    fs.writeFileSync(outPath, buf);
+    process.stdout.write(`  [dry-run] Written to ${outPath}\n`);
+  } else {
+    process.stdout.write(`  ↑ Uploading to ${storagePath}…\n`);
+    await uploadBuffer(app!, storagePath, buf);
+    process.stdout.write(`  ✓ Done\n`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spatial join — geometry utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface BBox { minX: number; minY: number; maxX: number; maxY: number }
+
+function computePolygonCentroid(ring: number[][]): [number, number] {
+  let sx = 0, sy = 0;
+  for (const [x, y] of ring) { sx += x; sy += y; }
+  return [sx / ring.length, sy / ring.length];
+}
+
+function computeCentroid(geom: GeoJSONGeometry): [number, number] | null {
+  if (!geom) return null;
+  if (geom.type === "Polygon") {
+    return computePolygonCentroid((geom.coordinates as number[][][])[0]);
+  }
+  if (geom.type === "MultiPolygon") {
+    // Choose the ring with most vertices as the representative polygon
+    const rings = (geom.coordinates as number[][][][]).map(p => p[0]);
+    const largest = rings.reduce((a, b) => a.length > b.length ? a : b);
+    return computePolygonCentroid(largest);
+  }
+  return null;
+}
+
+function pointInRing(px: number, py: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointInGeometry(point: [number, number], geom: GeoJSONGeometry): boolean {
+  const [px, py] = point;
+  if (geom.type === "Polygon") {
+    const rings = geom.coordinates as number[][][];
+    if (!pointInRing(px, py, rings[0])) return false;
+    for (let h = 1; h < rings.length; h++) if (pointInRing(px, py, rings[h])) return false;
+    return true;
+  }
+  if (geom.type === "MultiPolygon") {
+    return (geom.coordinates as number[][][][]).some(poly => {
+      if (!pointInRing(px, py, poly[0])) return false;
+      for (let h = 1; h < poly.length; h++) if (pointInRing(px, py, poly[h])) return false;
+      return true;
+    });
+  }
+  return false;
+}
+
+function geomBBox(geom: GeoJSONGeometry): BBox {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  function walk(c: unknown[]): void {
+    if (!c || !c.length) return;
+    if (typeof c[0] === "number") {
+      const [x, y] = c as number[];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    } else for (const sub of c as unknown[][]) walk(sub);
+  }
+  walk(geom.coordinates as unknown[]);
+  return { minX, minY, maxX, maxY };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spatial join — INE secciones ↔ INEGI AGEBs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Performs a bidirectional spatial join for one state:
+ *  - Enriches each AGEB feature with CVE_SECCION, DISTRITO_FED, DISTRITO_LOC
+ *    from the INE sección whose polygon contains the AGEB's centroid.
+ *  - Enriches each sección feature with AGEBS (comma-separated CVEGEO list)
+ *    of all AGEBs whose centroids fall within it.
+ *
+ * Re-reads from SHP sources to ensure consistent projection/simplification,
+ * then overwrites the existing TopoJSON files in Firebase Storage.
+ */
+async function processEstadoSpatialJoin(
+  estadoId: string,
+  dryRun: boolean,
+  app: App | null
+): Promise<void> {
+  // ── 1. Read secciones ────────────────────────────────────────────────────
+  const estadoDirINE = findEstadoDir(estadoId);
+  if (!estadoDirINE) throw new Error(`No INE per-state directory for estado ${estadoId}`);
+  const secShpPath = path.join(estadoDirINE, "SECCION.shp");
+  if (!fs.existsSync(secShpPath)) throw new Error(`SECCION.shp not found: ${secShpPath}`);
+
+  process.stdout.write(`Estado ${estadoId}: reading secciones…\n`);
+  const secGeojson = await readShp(secShpPath, "secciones");
+  process.stdout.write(`  → ${secGeojson.features.length} secciones\n`);
+
+  // Enrich secciones with municipality names
+  const munNombres = await buildMunNombreMap(estadoId, estadoDirINE);
+  for (const f of secGeojson.features) {
+    const cve = String(f.properties["CVE_MUN"] ?? "").padStart(3, "0");
+    const nom = munNombres.get(cve);
+    if (nom) f.properties["NOMGEO"] = nom;
+  }
+
+  // ── 2. Read AGEB urbana ──────────────────────────────────────────────────
+  const estadoDirINEGI = findInegEstadoDir(estadoId);
+  if (!estadoDirINEGI) throw new Error(`No INEGI directory for estado ${estadoId}`);
+
+  const urbShp = path.join(estadoDirINEGI, "conjunto_de_datos", `${estadoId}a.shp`);
+  if (!fs.existsSync(urbShp)) throw new Error(`AGEB urbana SHP not found: ${urbShp}`);
+
+  process.stdout.write(`  reading ageb_urbana…\n`);
+  const urbGeojson = await readShp(urbShp, "ageb_urbana");
+  process.stdout.write(`  → ${urbGeojson.features.length} AGEB urbanas\n`);
+
+  // ── 3. Read AGEB rural (optional) ────────────────────────────────────────
+  const rurShp = path.join(estadoDirINEGI, "conjunto_de_datos", `${estadoId}ar.shp`);
+  let rurGeojson: FeatureCollection | null = null;
+  if (fs.existsSync(rurShp)) {
+    process.stdout.write(`  reading ageb_rural…\n`);
+    rurGeojson = await readShp(rurShp, "ageb_rural");
+    process.stdout.write(`  → ${rurGeojson.features.length} AGEB rurales\n`);
+  }
+
+  // ── 4. Build secciones spatial index keyed by CVE_MUN ────────────────────
+  interface SecEntry { feature: Feature; bbox: BBox }
+  const secByMun = new Map<string, SecEntry[]>();
+  for (const sec of secGeojson.features) {
+    const mun = String(sec.properties["CVE_MUN"] ?? "").padStart(3, "0");
+    if (!secByMun.has(mun)) secByMun.set(mun, []);
+    secByMun.get(mun)!.push({ feature: sec, bbox: geomBBox(sec.geometry) });
+  }
+
+  // ── 5. Match each AGEB centroid to its containing sección ────────────────
+  function joinAgebsToSecciones(agebFeatures: Feature[]): void {
+    for (const ageb of agebFeatures) {
+      const centroid = computeCentroid(ageb.geometry);
+      if (!centroid) continue;
+      const [cx, cy] = centroid;
+      const mun = String(ageb.properties["CVE_MUN"] ?? "").padStart(3, "0");
+      for (const { feature: sec, bbox } of secByMun.get(mun) ?? []) {
+        if (cx < bbox.minX || cx > bbox.maxX || cy < bbox.minY || cy > bbox.maxY) continue;
+        if (pointInGeometry(centroid, sec.geometry)) {
+          ageb.properties["CVE_SECCION"]  = sec.properties["CVE_SECCION"]  ?? "";
+          ageb.properties["DISTRITO_FED"] = sec.properties["DISTRITO_FED"] ?? "";
+          ageb.properties["DISTRITO_LOC"] = sec.properties["DISTRITO_LOC"] ?? "";
+          break;
+        }
+      }
+    }
+  }
+
+  process.stdout.write(`  Spatial join (AGEB → sección)…\n`);
+  joinAgebsToSecciones(urbGeojson.features);
+  if (rurGeojson) joinAgebsToSecciones(rurGeojson.features);
+
+  const allAgebs = [...urbGeojson.features, ...(rurGeojson?.features ?? [])];
+  const matched = allAgebs.filter(f => f.properties["CVE_SECCION"]).length;
+  process.stdout.write(`  → ${matched}/${allAgebs.length} AGEBs matched to a sección\n`);
+
+  // ── 6. Build AGEBS list on each sección ──────────────────────────────────
+  const agebsForSec = new Map<string, string[]>();
+  for (const ageb of allAgebs) {
+    const sec = String(ageb.properties["CVE_SECCION"] ?? "");
+    const cvegeo = String(ageb.properties["CVEGEO"] ?? "");
+    if (!sec || !cvegeo) continue;
+    if (!agebsForSec.has(sec)) agebsForSec.set(sec, []);
+    agebsForSec.get(sec)!.push(cvegeo);
+  }
+  for (const sec of secGeojson.features) {
+    const cve = String(sec.properties["CVE_SECCION"] ?? "");
+    const agebs = agebsForSec.get(cve);
+    if (agebs) sec.properties["AGEBS"] = agebs.join(",");
+  }
+
+  const secsWithAgebs = secGeojson.features.filter(f => f.properties["AGEBS"]).length;
+  process.stdout.write(`  → ${secsWithAgebs} secciones enriched with AGEBS\n`);
+
+  // ── 7. Convert to TopoJSON and upload/write ───────────────────────────────
+  type FileSpec = { geojson: FeatureCollection; layer: string; storagePath: string; threshold: number; tmpSuffix: string };
+  const files: FileSpec[] = [
+    {
+      geojson: secGeojson,
+      layer: "secciones",
+      storagePath: `${STORAGE_PREFIX_INE}/estados/${estadoId}/secciones.topojson`,
+      threshold: SIMPLIFY_THRESHOLD["secciones"],
+      tmpSuffix: "secciones",
+    },
+    {
+      geojson: urbGeojson,
+      layer: "ageb_urbana",
+      storagePath: `${STORAGE_PREFIX_INEGI}/estados/${estadoId}/ageb_urbana.topojson`,
+      threshold: SIMPLIFY_THRESHOLD["ageb_urbana"],
+      tmpSuffix: "ageb_urbana",
+    },
+    ...(rurGeojson ? [{
+      geojson: rurGeojson,
+      layer: "ageb_rural",
+      storagePath: `${STORAGE_PREFIX_INEGI}/estados/${estadoId}/ageb_rural.topojson`,
+      threshold: SIMPLIFY_THRESHOLD["ageb_rural"],
+      tmpSuffix: "ageb_rural",
+    }] : []),
+  ];
+
+  for (const { geojson, layer, storagePath, threshold, tmpSuffix } of files) {
+    const buf = toTopoJSON(geojson, layer, threshold);
+    const sizeMB = (buf.length / 1e6).toFixed(2);
+    if (dryRun) {
+      const outPath = path.join(os.tmpdir(), `geo_sjoin_${tmpSuffix}_${estadoId}.topojson`);
+      fs.writeFileSync(outPath, buf);
+      process.stdout.write(`  ${layer}: ${sizeMB} MB [dry-run] → ${outPath}\n`);
+    } else {
+      process.stdout.write(`  ${layer}: ${sizeMB} MB ↑ ${storagePath}…\n`);
+      await uploadBuffer(app!, storagePath, buf);
+      process.stdout.write(`    ✓ Done\n`);
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CLI
 // ─────────────────────────────────────────────────────────────────────────────
@@ -653,13 +933,15 @@ async function main(): Promise<void> {
   const estadoIdx = args.indexOf("--estado");
   const estadoArg = estadoIdx >= 0 ? args[estadoIdx + 1]?.padStart(2, "0") : null;
 
-  const inegiLayers = ["ageb_urbana"];
+  const inegiLayers = ["ageb_urbana", "ageb_rural"];
+  const joinLayers  = ["spatial-join"];
 
   if (!layer) {
     process.stderr.write(
       "Usage: npx tsx scripts/geo-pipeline.ts --layer <layer> [--estado <id>] [--all-estados] [--upload] [--dry-run]\n" +
       "INE layers:   entidades, municipios, distritos_fed, distritos_loc, secciones\n" +
-      "INEGI layers: ageb_urbana\n"
+      "INEGI layers: ageb_urbana, ageb_rural\n" +
+      "Join layers:  spatial-join  (enriches secciones + AGEBs with cross-system fields)\n"
     );
     process.exit(1);
   }
@@ -671,6 +953,19 @@ async function main(): Promise<void> {
 
   const app = (!dryRun && upload) ? initFirebase() : null;
 
+  // Spatial join layers
+  if (joinLayers.includes(layer)) {
+    const estados = allEstados ? ALL_ESTADO_IDS : estadoArg ? [estadoArg] : [];
+    if (estados.length === 0) {
+      process.stderr.write("Specify --estado <id> or --all-estados for spatial-join.\n");
+      process.exit(1);
+    }
+    for (const id of estados) {
+      await processEstadoSpatialJoin(id, dryRun, app);
+    }
+    return;
+  }
+
   // INEGI per-state layers
   if (inegiLayers.includes(layer)) {
     const estados = allEstados ? ALL_ESTADO_IDS : estadoArg ? [estadoArg] : [];
@@ -681,6 +976,10 @@ async function main(): Promise<void> {
     if (layer === "ageb_urbana") {
       for (const id of estados) {
         await processInegEstadoAgebUrbana(id, dryRun, app);
+      }
+    } else if (layer === "ageb_rural") {
+      for (const id of estados) {
+        await processInegEstadoAgebRural(id, dryRun, app);
       }
     }
     return;

@@ -96,6 +96,7 @@ function sanitize(fc: FeatureCollection): FeatureCollection {
 
 const TIPO_GRANULARITY: Record<string, number> = {
   ageb_urbana: 0,
+  ageb_rural: 0,
   secciones: 1,
   municipios: 2,
   distritos_loc: 3,

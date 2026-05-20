@@ -22,7 +22,7 @@ function sessionKey(tipo: GeoLayerTipo, estadoId?: string): string {
 }
 
 // Layer types that are stored per-state only (no national file)
-const PER_ESTADO_TIPOS: GeoLayerTipo[] = ["secciones", "ageb_urbana"];
+const PER_ESTADO_TIPOS: GeoLayerTipo[] = ["secciones", "ageb_urbana", "ageb_rural"];
 
 /**
  * Determines which Storage file to fetch:
@@ -47,13 +47,19 @@ function resolveParams(
   return { nivel: "nacional" };
 }
 
+// Layer types that carry CVE_SECCION and can be filtered by sección
+const SECCION_FILTERABLE: GeoLayerTipo[] = ["secciones", "ageb_urbana", "ageb_rural"];
+
 /**
  * Filters a FeatureCollection by estado and/or district, depending on scope.
  * National files are filtered to the requested estado when scope is sub-national.
+ * The `tipo` parameter prevents sección filters from being applied to layers
+ * (e.g. municipios/distritos) that don't carry CVE_SECCION in their properties.
  */
 function filterByScope(
   geojson: FeatureCollection,
-  scope: GeoScopeElectoral
+  scope: GeoScopeElectoral,
+  tipo?: GeoLayerTipo
 ): FeatureCollection {
   const { nivel, estado_id, cve_distrito_fed, cve_distrito_loc, cve_municipio, cve_secciones } = scope;
 
@@ -84,7 +90,9 @@ function filterByScope(
     );
   }
 
-  if (cve_secciones && cve_secciones.length > 0) {
+  // Only filter by CVE_SECCION for layers that carry this field after the spatial join.
+  // Municipios/distritos/entidades don't have CVE_SECCION and would return 0 features.
+  if (cve_secciones && cve_secciones.length > 0 && (!tipo || SECCION_FILTERABLE.includes(tipo))) {
     const secSet = new Set(cve_secciones.map(s => s.padStart(4, "0")));
     features = features.filter(
       (f) => secSet.has(String(f.properties?.["CVE_SECCION"] ?? "").padStart(4, "0"))
@@ -176,7 +184,7 @@ export function useGeoShapes(
     const cached = cache.get(key);
 
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-      const filtered = filterByScope(cached.geojson, scope);
+      const filtered = filterByScope(cached.geojson, scope, tipo);
       setGeojson(filtered);
       setBounds(computeBounds(filtered));
       setError(null);
@@ -214,7 +222,7 @@ export function useGeoShapes(
 
         cache.set(key, { geojson: fc, ts: Date.now() });
 
-        const filtered = filterByScope(fc, scope);
+        const filtered = filterByScope(fc, scope, tipo);
         setGeojson(filtered);
         setBounds(computeBounds(filtered));
         setIsLoading(false);
@@ -238,7 +246,7 @@ export function useGeoShapes(
     const cached = cache.get(key);
     if (!cached || !geojson) return;
 
-    const filtered = filterByScope(cached.geojson, scope);
+    const filtered = filterByScope(cached.geojson, scope, tipo);
     setGeojson(filtered);
     setBounds(computeBounds(filtered));
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -8,12 +8,12 @@ const STORAGE_PREFIX_INE   = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
 
 // Types sourced from INEGI (per-state only, no national file)
-const INEGI_TIPOS: GeoLayerTipo[] = ["ageb_urbana"];
+const INEGI_TIPOS: GeoLayerTipo[] = ["ageb_urbana", "ageb_rural"];
 
 type NivelParam = "nacional" | "estado";
 
 const VALID_TIPOS: GeoLayerTipo[] = [
-  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones", "ageb_urbana",
+  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones", "ageb_urbana", "ageb_rural",
 ];
 
 function buildStoragePath(
