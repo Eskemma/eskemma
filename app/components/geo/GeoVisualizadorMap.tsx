@@ -10,6 +10,7 @@ import {
 import type { PathOptions, Layer, LeafletMouseEvent } from "leaflet";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
 import type { GeoVisualizadorProps, GeoLayerConfig, GeoColorRamp, GeoScopeElectoral, GeoLayerTipo } from "@/types/geo.types";
+import { getFeatureKey } from "@/types/geo.types";
 import { useGeoShapes } from "./hooks/useGeoShapes";
 import { GeoLegend } from "./GeoLegend";
 
@@ -35,6 +36,19 @@ function interpolateColor(ramp: GeoColorRamp, value: number): string {
 }
 
 function featureStyle(feature: Feature | undefined, layerConfig: GeoLayerConfig): PathOptions {
+  // Apply selected highlight style if this feature's key is in selectedKeys
+  if (layerConfig.selectedKeys && feature?.properties) {
+    const key = getFeatureKey(layerConfig.tipo, feature.properties as Parameters<typeof getFeatureKey>[1]);
+    if (key && layerConfig.selectedKeys.has(key)) {
+      return layerConfig.selectedStyle ?? {
+        color: "#1d4ed8",
+        weight: 2.5,
+        fillColor: "#bfdbfe",
+        fillOpacity: 0.35,
+      };
+    }
+  }
+
   const base: PathOptions = {
     color: layerConfig.strokeColor ?? "#1e293b",
     weight: layerConfig.strokeWidth ?? 0.8,

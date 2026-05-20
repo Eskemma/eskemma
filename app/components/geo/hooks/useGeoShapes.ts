@@ -99,6 +99,14 @@ function filterByScope(
     );
   }
 
+  // Filter by localidad (INEGI ageb_urbana layers)
+  if (scope.cve_loc) {
+    const target = scope.cve_loc.padStart(4, "0");
+    features = features.filter(
+      (f) => String(f.properties?.["CVE_LOC"] ?? "").padStart(4, "0") === target
+    );
+  }
+
   // Filter by AGEB code (INEGI layers)
   if (scope.cve_ageb) {
     const target = scope.cve_ageb.padStart(4, "0");
@@ -250,7 +258,7 @@ export function useGeoShapes(
     setGeojson(filtered);
     setBounds(computeBounds(filtered));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(","), scope.cve_ageb]);
+  }, [scope.nivel, scope.estado_id, scope.cve_municipio, scope.cve_distrito_fed, scope.cve_distrito_loc, scope.cve_secciones?.join(","), scope.cve_ageb, scope.cve_loc]);
 
   return { geojson, isLoading, error, bounds };
 }

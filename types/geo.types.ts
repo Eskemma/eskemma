@@ -1,5 +1,5 @@
 import type { FeatureCollection, Feature, Geometry } from "geojson";
-import type { LatLngBounds } from "leaflet";
+import type { LatLngBounds, PathOptions } from "leaflet";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Geographic scope
@@ -23,6 +23,7 @@ export interface GeoScopeElectoral {
   cve_seccion?: string;       // e.g. "0123"
   cve_secciones?: string[];   // multi-select, e.g. ["0123", "0456"]
   cve_ageb?: string;          // e.g. "1234" (INEGI AGEB code, 4 chars)
+  cve_loc?: string;           // e.g. "0001" (INEGI localidad code)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,6 +72,10 @@ export interface GeoLayerConfig {
   strokeColor?: string;
   strokeWidth?: number;
   fillOpacity?: number;
+  /** Feature keys (from getFeatureKey) that should receive selectedStyle. */
+  selectedKeys?: Set<string>;
+  /** Leaflet PathOptions applied to features whose key is in selectedKeys. */
+  selectedStyle?: PathOptions;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

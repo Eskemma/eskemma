@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { GeoOption } from "@/types/geo.types";
 
-type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones";
+type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades";
 
 interface UseGeoOptionsParams {
   tipo: OptionTipo;

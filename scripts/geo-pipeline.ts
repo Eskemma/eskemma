@@ -822,14 +822,31 @@ async function processEstadoSpatialJoin(
     process.stdout.write(`  → ${rurGeojson.features.length} AGEB rurales\n`);
   }
 
-  // ── 4. Build secciones spatial index keyed by CVE_MUN ────────────────────
+  // ── 4. Build geographic grid index for secciones (0.25° × 0.25° cells) ─────
+  // Using a geographic grid instead of CVE_MUN because INE and INEGI may use
+  // different municipio numbering schemes for the same geographic areas.
+  const GRID_SIZE = 0.25; // degrees
   interface SecEntry { feature: Feature; bbox: BBox }
-  const secByMun = new Map<string, SecEntry[]>();
+  const secByGrid = new Map<string, SecEntry[]>();
   for (const sec of secGeojson.features) {
-    const mun = String(sec.properties["CVE_MUN"] ?? "").padStart(3, "0");
-    if (!secByMun.has(mun)) secByMun.set(mun, []);
-    secByMun.get(mun)!.push({ feature: sec, bbox: geomBBox(sec.geometry) });
+    const bbox = geomBBox(sec.geometry);
+    const x0 = Math.floor(bbox.minX / GRID_SIZE);
+    const x1 = Math.floor(bbox.maxX / GRID_SIZE);
+    const y0 = Math.floor(bbox.minY / GRID_SIZE);
+    const y1 = Math.floor(bbox.maxY / GRID_SIZE);
+    for (let gx = x0; gx <= x1; gx++) {
+      for (let gy = y0; gy <= y1; gy++) {
+        const key = `${gx},${gy}`;
+        if (!secByGrid.has(key)) secByGrid.set(key, []);
+        secByGrid.get(key)!.push({ feature: sec, bbox });
+      }
+    }
   }
+
+  // Pre-compute sección centroids for nearest-neighbor fallback
+  interface SecCentroidEntry { centroid: [number, number]; props: Record<string, unknown> }
+  const secCentroids: SecCentroidEntry[] = secGeojson.features
+    .map(f => ({ centroid: computeCentroid(f.geometry) ?? ([0, 0] as [number, number]), props: f.properties }));
 
   // ── 5. Match each AGEB centroid to its containing sección ────────────────
   function joinAgebsToSecciones(agebFeatures: Feature[]): void {
@@ -837,8 +854,8 @@ async function processEstadoSpatialJoin(
       const centroid = computeCentroid(ageb.geometry);
       if (!centroid) continue;
       const [cx, cy] = centroid;
-      const mun = String(ageb.properties["CVE_MUN"] ?? "").padStart(3, "0");
-      for (const { feature: sec, bbox } of secByMun.get(mun) ?? []) {
+      const key = `${Math.floor(cx / GRID_SIZE)},${Math.floor(cy / GRID_SIZE)}`;
+      for (const { feature: sec, bbox } of secByGrid.get(key) ?? []) {
         if (cx < bbox.minX || cx > bbox.maxX || cy < bbox.minY || cy > bbox.maxY) continue;
         if (pointInGeometry(centroid, sec.geometry)) {
           ageb.properties["CVE_SECCION"]  = sec.properties["CVE_SECCION"]  ?? "";
@@ -855,8 +872,35 @@ async function processEstadoSpatialJoin(
   if (rurGeojson) joinAgebsToSecciones(rurGeojson.features);
 
   const allAgebs = [...urbGeojson.features, ...(rurGeojson?.features ?? [])];
+  const primaryMatched = allAgebs.filter(f => f.properties["CVE_SECCION"]).length;
+
+  // ── 5b. Nearest-neighbor fallback for unmatched AGEBs ────────────────────
+  // Guarantees 100% coverage when centroid falls on a boundary or outside all
+  // secciones due to slight projection differences or concave polygon shapes.
+  let fallbackCount = 0;
+  for (const ageb of allAgebs) {
+    if (ageb.properties["CVE_SECCION"]) continue;
+    const c = computeCentroid(ageb.geometry);
+    if (!c) continue;
+    let best: SecCentroidEntry | null = null;
+    let bestDist = Infinity;
+    for (const sc of secCentroids) {
+      const dx = sc.centroid[0] - c[0];
+      const dy = sc.centroid[1] - c[1];
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; best = sc; }
+    }
+    if (best) {
+      ageb.properties["CVE_SECCION"]  = best.props["CVE_SECCION"]  ?? "";
+      ageb.properties["DISTRITO_FED"] = best.props["DISTRITO_FED"] ?? "";
+      ageb.properties["DISTRITO_LOC"] = best.props["DISTRITO_LOC"] ?? "";
+      fallbackCount++;
+    }
+  }
+
   const matched = allAgebs.filter(f => f.properties["CVE_SECCION"]).length;
-  process.stdout.write(`  → ${matched}/${allAgebs.length} AGEBs matched to a sección\n`);
+  process.stdout.write(`  → ${primaryMatched}/${allAgebs.length} AGEBs matched (grid), ${fallbackCount} via nearest-neighbor fallback\n`);
+  process.stdout.write(`  → ${matched}/${allAgebs.length} AGEBs total matched\n`);
 
   // ── 6. Build AGEBS list on each sección ──────────────────────────────────
   const agebsForSec = new Map<string, string[]>();
