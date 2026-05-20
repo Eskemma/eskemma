@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStorage } from "firebase-admin/storage";
 import { adminApp } from "@/lib/firebase-admin";
 import type { GeoOption } from "@/types/geo.types";
+import cabecerasFed from "@/lib/geo/cabeceras_fed.json";
+import cabecerasLoc from "@/lib/geo/cabeceras_loc.json";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE   = "sefix/geo/ine";
@@ -93,14 +95,20 @@ function extractOptions(
         cve = String(p["CVE_MUN"] ?? "").padStart(3, "0");
         nombre = String(p["NOMGEO"] ?? cve);
         break;
-      case "distritos_fed":
+      case "distritos_fed": {
         cve = String(p["DISTRITO_FED"] ?? "").padStart(3, "0");
-        nombre = `D.F. ${cve}`;
+        const fedKey = padId + String(Number(p["DISTRITO_FED"])).padStart(2, "0");
+        const fedNom = (cabecerasFed as Record<string, string>)[fedKey];
+        nombre = fedNom ? `D.F. ${cve} – ${fedNom}` : `D.F. ${cve}`;
         break;
-      case "distritos_loc":
+      }
+      case "distritos_loc": {
         cve = String(p["DISTRITO_LOC"] ?? "").padStart(3, "0");
-        nombre = `D.L. ${cve}`;
+        const locKey = padId + String(Number(p["DISTRITO_LOC"])).padStart(2, "0");
+        const locNom = (cabecerasLoc as Record<string, string>)[locKey];
+        nombre = locNom ? `D.L. ${cve} – ${locNom}` : `D.L. ${cve}`;
         break;
+      }
       case "secciones":
         cve = String(p["CVE_SECCION"] ?? "").padStart(4, "0");
         nombre = `Sección ${cve}`;
