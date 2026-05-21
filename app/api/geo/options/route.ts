@@ -10,6 +10,26 @@ const STORAGE_PREFIX_INE   = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day — data changes once a year
 
+// Strip accents from geographic names but preserve Ñ and Ü.
+// Applies to NOMGEO values from the TopoJSON (municipios).
+const GEO_ACCENT_MAP: Record<string, string> = {
+  "Á":"A","À":"A","Â":"A","Ä":"A",
+  "É":"E","È":"E","Ê":"E","Ë":"E",
+  "Í":"I","Ì":"I","Î":"I","Ï":"I",
+  "Ó":"O","Ò":"O","Ô":"O","Ö":"O",
+  "Ú":"U","Ù":"U","Û":"U",
+  "á":"A","à":"A","â":"A","ä":"A",
+  "é":"E","è":"E","ê":"E","ë":"E",
+  "í":"I","ì":"I","î":"I","ï":"I",
+  "ó":"O","ò":"O","ô":"O","ö":"O",
+  "ú":"U","ù":"U","û":"U",
+  "ñ":"Ñ",  // lowercase → uppercase
+  "ü":"Ü",  // lowercase → uppercase
+};
+function normalizeGeoName(s: string): string {
+  return s.split("").map(c => GEO_ACCENT_MAP[c] ?? c).join("").toUpperCase();
+}
+
 type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades" | "agebs";
 
 interface CacheEntry { options: GeoOption[]; ts: number }
@@ -94,7 +114,7 @@ function extractOptions(
     switch (tipo) {
       case "municipios":
         cve = String(p["CVE_MUN"] ?? "").padStart(3, "0");
-        nombre = String(p["NOMGEO"] ?? cve);
+        nombre = normalizeGeoName(String(p["NOMGEO"] ?? cve));
         break;
       case "distritos_fed": {
         cve = String(p["DISTRITO_FED"] ?? "").padStart(3, "0");
