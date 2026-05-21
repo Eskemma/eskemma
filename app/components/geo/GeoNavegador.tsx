@@ -164,7 +164,7 @@ function deriveLayers(
     }
     // AGEBs selected → highlight them with selectedKeys; contorno municipio as context
     const agebSelectedKeys = cve_agebs.length > 0 ? new Set(cve_agebs) : undefined;
-    const agebSelectedStyle = { color: "#1d4ed8", weight: 2, fillColor: "#bfdbfe", fillOpacity: 0.55 };
+    const agebSelectedStyle = { color: "#7f1d1d", weight: 2.5, fillColor: "#fca5a5", fillOpacity: 0.75 };
     return [
       { id: "municipios",  tipo: "municipios",  visible: true, ...STROKE_CONTORNO, tooltip: TOOLTIP_MUN },
       { id: "ageb_urbana", tipo: "ageb_urbana", visible: true, ...AGEB_STYLE,

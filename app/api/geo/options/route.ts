@@ -23,7 +23,8 @@ function cacheKey(
   municipio?: string,
   loc?: string
 ): string {
-  return `${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}:${loc ?? ""}`;
+  // v2: busts entries cached before cabecera names were added
+  return `v2:${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}:${loc ?? ""}`;
 }
 
 function buildStoragePath(tipo: OptionTipo, estado_id: string): string {
