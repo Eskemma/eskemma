@@ -43,8 +43,8 @@ function cacheKey(
   municipio?: string,
   loc?: string
 ): string {
-  // v2: busts entries cached before cabecera names were added
-  return `v2:${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}:${loc ?? ""}`;
+  // v3: busts entries cached before encoding normalization (Ñ/Ü fix + accent removal)
+  return `v3:${tipo}:${estado_id}:${distrito_fed ?? ""}:${distrito_loc ?? ""}:${municipio ?? ""}:${loc ?? ""}`;
 }
 
 function buildStoragePath(tipo: OptionTipo, estado_id: string): string {
