@@ -260,6 +260,48 @@ export function getPartidoLabel(col: string): string {
 // DEFAULTS DE CONSULTA
 // ============================================================
 
+// ============================================================
+// MAPEO NOMBRE DE ESTADO (UI/CSV electoral) → CVE_ENT INEGI
+// Usado para construir el GeoScopeElectoral en la vista geo.
+// Los nombres corresponden a los que aparecen en ESTADOS_LIST y en la columna
+// "estado" de los CSVs del INE (sin acentos, sin artículos constitucionales).
+// ============================================================
+
+export const ESTADO_CVE_MAP: Record<string, string> = {
+  "AGUASCALIENTES":      "01",
+  "BAJA CALIFORNIA":     "02",
+  "BAJA CALIFORNIA SUR": "03",
+  "CAMPECHE":            "04",
+  "COAHUILA":            "05",
+  "COLIMA":              "06",
+  "CHIAPAS":             "07",
+  "CHIHUAHUA":           "08",
+  "CIUDAD DE MEXICO":    "09",
+  "DURANGO":             "10",
+  "GUANAJUATO":          "11",
+  "GUERRERO":            "12",
+  "HIDALGO":             "13",
+  "JALISCO":             "14",
+  "ESTADO DE MEXICO":    "15",
+  "MICHOACAN":           "16",
+  "MORELOS":             "17",
+  "NAYARIT":             "18",
+  "NUEVO LEON":          "19",
+  "OAXACA":              "20",
+  "PUEBLA":              "21",
+  "QUERETARO":           "22",
+  "QUINTANA ROO":        "23",
+  "SAN LUIS POTOSI":     "24",
+  "SINALOA":             "25",
+  "SONORA":              "26",
+  "TABASCO":             "27",
+  "TAMAULIPAS":          "28",
+  "TLAXCALA":            "29",
+  "VERACRUZ":            "30",
+  "YUCATAN":             "31",
+  "ZACATECAS":           "32",
+};
+
 export const ELECCIONES_DEFAULTS = {
   anio: 2024,
   cargo: "dip" as const,

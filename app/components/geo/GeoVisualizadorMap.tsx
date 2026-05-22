@@ -55,6 +55,11 @@ function featureStyle(feature: Feature | undefined, layerConfig: GeoLayerConfig)
     fillOpacity: layerConfig.fillOpacity ?? 0.75,
   };
   if (layerConfig.fillColor === "transparent") return { ...base, fillOpacity: 0 };
+  if (layerConfig.colorByKey && feature?.properties) {
+    const key = getFeatureKey(layerConfig.tipo, feature.properties as Parameters<typeof getFeatureKey>[1]);
+    const color = layerConfig.colorByKey[key] ?? "#B0BEC5";
+    return { ...base, fillColor: color, fillOpacity: layerConfig.fillOpacity ?? 0.82, color: layerConfig.strokeColor ?? "#ffffff", weight: layerConfig.strokeWidth ?? 0.6 };
+  }
   if (layerConfig.fillColor) return { ...base, fillColor: layerConfig.fillColor };
   if (layerConfig.colorRamp && layerConfig.data && feature?.properties) {
     const p = feature.properties;

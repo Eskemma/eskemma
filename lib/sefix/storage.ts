@@ -3,6 +3,7 @@
 import { adminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { createInterface } from "readline";
+import { PARTIDOS_MAPPING } from "@/lib/sefix/eleccionesConstants";
 
 const BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 
@@ -2889,4 +2890,115 @@ export async function getEleccionesLocalesTablaRows(params: {
     return { rows: allRows.slice(start, start + pageSize), total };
   }
   return { rows: allRows, total };
+}
+
+// ==========================================
+// GANADORES POR FEATURE (para mapa coroplético electoral)
+// ==========================================
+
+export interface GanadorFeature {
+  ganador: string;
+  top3: { partido: string; votos: number; pct: number }[];
+  totalVotos: number;
+  label: string;
+}
+
+/**
+ * Retorna el partido ganador (top3) por cada unidad geográfica para colorear el mapa.
+ * nivel="entidades"   → featureKey = cve_estado (2 chars, ej. "14")
+ * nivel="distritos_fed" → featureKey = cve_estado + cve_def (5 chars, ej. "14010")
+ * nivel="secciones"   → featureKey = cve_estado + seccion (6 chars, ej. "140123")
+ */
+export async function getGanadorPorFeature(params: {
+  nivel: "entidades" | "distritos_fed" | "secciones";
+  cargo: string;
+  anio: number;
+  estadoNombre?: string;
+  cveDistrito?: string;
+  municipio?: string;
+}): Promise<Record<string, GanadorFeature>> {
+  const { nivel, cargo, anio, estadoNombre, cveDistrito, municipio } = params;
+
+  const csvEstado = estadoNombre ? toElectoralEstado(estadoNombre) : undefined;
+  const cacheKey = `geo-ganador:${nivel}:${cargo}:${anio}:${csvEstado ?? "NAC"}:${cveDistrito ?? ""}:${municipio ?? ""}`;
+  const cached = getCached<Record<string, GanadorFeature>>(cacheKey);
+  if (cached) return cached;
+
+  const path = await resolveEleccionesPath(anio, cargo);
+  if (!path) return {};
+
+  // Use only known party columns to avoid BOM-prefixed "id" or metadata columns being treated as parties
+  const validPartidoCols = new Set(
+    (PARTIDOS_MAPPING[`${anio}_${cargo}`] ?? []).filter((c) => c !== "vot_nul" && c !== "no_reg")
+  );
+
+  // partidoVotos[featureKey][partido] = totalVotos
+  const acum = new Map<string, { votos: Map<string, number>; label: string }>();
+
+  await streamCsvRows(path, (row) => {
+    const rowSeccion = row.seccion?.trim();
+    if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
+
+    const rowMunUpper = row.municipio?.trim().toUpperCase();
+    if (rowMunUpper === "VOTO EN EL EXTRANJERO") return;
+    if (row.tipo?.trim().toUpperCase() !== "ORDINARIA") return;
+    if (row.principio?.trim().toUpperCase() !== "MAYORIA RELATIVA") return;
+
+    if (csvEstado && row.estado?.trim() !== csvEstado) return;
+    // cveDistrito is the full cabecera string (e.g. "1405 PUERTO VALLARTA")
+    if (cveDistrito && row.cabecera?.trim() !== cveDistrito) return;
+    if (municipio && row.municipio?.trim() !== municipio) return;
+
+    const cveEnt = (row.cve_estado ?? "").trim().padStart(2, "0");
+    const secPad = rowSeccion.padStart(4, "0");
+    // Extract the state-local district number from cabecera (format: "SSDDD NAME" where SS=state, DDD=local dist)
+    const cabCode = (row.cabecera ?? "").trim().match(/^(\d+)/)?.[1] ?? "";
+    const localDist = cabCode.substring(2).padStart(3, "0");
+
+    let featureKey: string;
+    let label: string;
+    if (nivel === "entidades") {
+      featureKey = cveEnt;
+      label = row.estado?.trim() ?? cveEnt;
+    } else if (nivel === "distritos_fed") {
+      featureKey = cveEnt + localDist;
+      label = row.cabecera?.trim() ?? `Distrito ${localDist}`;
+    } else {
+      featureKey = cveEnt + secPad;
+      label = `Sección ${rowSeccion} · ${row.municipio?.trim() ?? row.estado?.trim() ?? ""}`;
+    }
+
+    if (!acum.has(featureKey)) {
+      acum.set(featureKey, { votos: new Map(), label });
+    }
+    const entry = acum.get(featureKey)!;
+
+    for (const col of validPartidoCols) {
+      const n = parseInt(row[col] ?? "0") || 0;
+      if (n <= 0) continue;
+      entry.votos.set(col, (entry.votos.get(col) ?? 0) + n);
+    }
+  });
+
+  const result: Record<string, GanadorFeature> = {};
+  for (const [featureKey, { votos, label }] of acum) {
+    if (votos.size === 0) continue;
+    const sorted = [...votos.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const totalVotos = [...votos.values()].reduce((s, v) => s + v, 0);
+    result[featureKey] = {
+      ganador: sorted[0][0],
+      top3: sorted.map(([partido, v]) => ({
+        partido,
+        votos: v,
+        pct: totalVotos > 0 ? Math.round((v / totalVotos) * 1000) / 10 : 0,
+      })),
+      totalVotos,
+      label,
+    };
+  }
+
+  setCache(cacheKey, result);
+  return result;
 }

@@ -23,7 +23,7 @@ export const SEFIX_TABS: SefixTab[] = [
   { id: "lne", label: "Padrón y Lista Nominal", available: true },
   { id: "elecciones_fed", label: "Elecciones Federales", available: true },
   { id: "elecciones_loc", label: "Elecciones Locales", available: true },
-  { id: "geo", label: "Visualización Geográfica", available: false },
+  { id: "geo", label: "Visualización Geográfica", available: true },
   { id: "geoestadisticos", label: "Estadísticos Geoelectorales", available: false },
   { id: "otros", label: "Otros Estadísticos", available: false },
 ];

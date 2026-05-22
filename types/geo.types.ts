@@ -77,6 +77,8 @@ export interface GeoLayerConfig {
   selectedKeys?: Set<string>;
   /** Leaflet PathOptions applied to features whose key is in selectedKeys. */
   selectedStyle?: PathOptions;
+  /** Map from feature key → hex color for categorical (party-based) coloring. */
+  colorByKey?: Record<string, string>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
