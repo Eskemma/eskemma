@@ -163,7 +163,7 @@ function GeoLayerRenderer({
           onFeatureClick?.(layerConfig.id, props);
         });
         layer.on("mouseover", () => {
-          (layer as any).setStyle?.({ weight: (layerConfig.strokeWidth ?? 0.8) * 2.5, fillOpacity: 0.92 });
+          (layer as any).setStyle?.({ weight: (layerConfig.strokeWidth ?? 0.8) * 2.5, fillOpacity: (layerConfig.fillOpacity ?? 0.8) * 0.5 });
         });
         layer.on("mouseout", () => {
           (layer as any).setStyle?.(featureStyle(feature as Feature, layerConfig));

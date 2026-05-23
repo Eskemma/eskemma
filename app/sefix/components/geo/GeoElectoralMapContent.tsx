@@ -138,7 +138,7 @@ export default function GeoElectoralMapContent() {
             Visualización Geográfica
           </h2>
           <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">
-            Resultados electorales federales por demarcación territorial
+            Resultados electorales federales por demarcación territorial (2024)
           </p>
         </div>
 
@@ -201,10 +201,9 @@ export default function GeoElectoralMapContent() {
         )}
 
         {/* Methodological notes */}
-        <div className="space-y-2">
+        <div className="space-y-1 text-center">
           <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
             El color refleja el partido o coalición con mayor número de votos en la demarcación.
-            Elección ordinaria, principio de mayoría relativa.
           </p>
           <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
             Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Federales.
