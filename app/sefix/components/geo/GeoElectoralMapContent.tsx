@@ -175,40 +175,41 @@ export default function GeoElectoralMapContent() {
           )}
         </div>
 
-        {/* Party legend */}
+        {/* Party legend + methodological note (same card) */}
         {partidosVisibles.length > 0 && !loadingGanadores && (
-          <div className="bg-white-eske dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10 rounded-lg p-4">
-            <h4 className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE] uppercase tracking-wide mb-3">
+          <div className="bg-white-eske dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10 rounded-lg p-4 space-y-2">
+            <h4 className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE] uppercase tracking-wide">
               Leyenda
             </h4>
-            <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {partidosVisibles
-                .sort((a, b) => a.label.localeCompare(b.label))
-                .map(({ partido, color, label }) => (
-                  <li key={partido} className="flex items-center gap-1.5">
-                    <span
-                      className="flex-shrink-0 w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: color }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-xs text-black-eske dark:text-[#EAF2F8]">
-                      {label}
-                    </span>
-                  </li>
-                ))}
-            </ul>
+            {/* Desktop: legend items left, note right — Mobile: items row, note below */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+              <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+                {partidosVisibles
+                  .sort((a, b) => a.label.localeCompare(b.label))
+                  .map(({ partido, color, label }) => (
+                    <li key={partido} className="flex items-center gap-1.5">
+                      <span
+                        className="flex-shrink-0 w-3 h-3 rounded-sm"
+                        style={{ backgroundColor: color }}
+                        aria-hidden="true"
+                      />
+                      <span className="text-xs text-black-eske dark:text-[#EAF2F8]">
+                        {label}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+              <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] sm:text-right sm:flex-shrink-0 sm:max-w-[260px]">
+                El color refleja el partido o coalición con mayor número de votos en la demarcación.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Methodological notes */}
-        <div className="space-y-1 text-center">
-          <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
-            El color refleja el partido o coalición con mayor número de votos en la demarcación.
-          </p>
-          <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
-            Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Federales.
-          </p>
-        </div>
+        {/* Source */}
+        <p className="text-xs text-center text-black-eske-60 dark:text-[#9AAEBE]">
+          Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Federales.
+        </p>
       </div>
 
       {/* Mobile bottom bar */}
