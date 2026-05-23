@@ -53,6 +53,10 @@ interface Props {
   tiposDisponibles: string[];
   principiosDisponibles: string[];
   hasExtranjero: boolean;
+  /** When true, hide the Partidos/Coaliciones multiselect (used by Visualización Geográfica). */
+  hidePartidos?: boolean;
+  /** When true, show the year as a static read-only badge instead of a select. */
+  fixedAnio?: boolean;
 }
 
 export default function EleccionesFilters({
@@ -65,6 +69,8 @@ export default function EleccionesFilters({
   cargosDisponibles, partidosDisponibles,
   tiposDisponibles, principiosDisponibles,
   hasExtranjero,
+  hidePartidos = false,
+  fixedAnio = false,
 }: Props) {
   const { opciones: distritos, isLoading: loadingDist } = useEleccionesDistritos(
     pendingAnio, pendingCargo, pendingEstado,
@@ -127,16 +133,25 @@ export default function EleccionesFilters({
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
           <label htmlFor="ef-anio" className={LABEL_CLS}>Año</label>
-          <select
-            id="ef-anio"
-            value={pendingAnio}
-            onChange={(e) => setAnio(parseInt(e.target.value))}
-            className={SELECT_CLS}
-          >
-            {AVAILABLE_YEARS.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          {fixedAnio ? (
+            <div
+              className={`${SELECT_CLS} bg-gray-eske-10 dark:bg-white/5 text-black-eske-60 dark:text-[#6D8294] cursor-default select-none`}
+              aria-label={`Año fijo: ${pendingAnio}`}
+            >
+              {pendingAnio}
+            </div>
+          ) : (
+            <select
+              id="ef-anio"
+              value={pendingAnio}
+              onChange={(e) => setAnio(parseInt(e.target.value))}
+              className={SELECT_CLS}
+            >
+              {AVAILABLE_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
@@ -322,18 +337,20 @@ export default function EleccionesFilters({
           </fieldset>
         )}
 
-        {/* Partidos */}
-        <div className="flex-1 sm:flex-none sm:min-w-[200px]">
-          <PartidosMultiSelect
-            id="ef-partidos"
-            label="Partidos / coaliciones"
-            options={partidoOptions}
-            selected={pendingPartidos}
-            onChange={setPartidos}
-            placeholder="Buscar partido..."
-            todosLabel="Todos"
-          />
-        </div>
+        {/* Partidos — oculto en modo geo (hidePartidos=true) */}
+        {!hidePartidos && (
+          <div className="flex-1 sm:flex-none sm:min-w-[200px]">
+            <PartidosMultiSelect
+              id="ef-partidos"
+              label="Partidos / coaliciones"
+              options={partidoOptions}
+              selected={pendingPartidos}
+              onChange={setPartidos}
+              placeholder="Buscar partido..."
+              todosLabel="Todos"
+            />
+          </div>
+        )}
 
         {/* Botón Consultar — solo cuando hay cambios pendientes */}
         {hasPending && (

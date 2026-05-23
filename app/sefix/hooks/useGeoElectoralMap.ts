@@ -17,6 +17,7 @@ interface GeoElectoralParams {
   anio: number;
   estado: string;
   cabecera: string;
+  municipio: string;
   secciones: string[];
   queryVersion: number;
 }
@@ -58,10 +59,13 @@ function buildTooltip(label: string, ganador: GanadorFeature): string {
 }
 
 export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResult {
-  const { cargo, anio, estado, cabecera, secciones, queryVersion } = params;
+  const { cargo, anio, estado, cabecera, municipio, secciones, queryVersion } = params;
   const [ganadores, setGanadores] = useState<Record<string, GanadorFeature>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // dataKey increments each time a successful fetch completes, forcing GeoJSON remount
+  // so that tooltip closures and mouseout handlers capture the latest ganadores data.
+  const [dataKey, setDataKey] = useState(0);
   const cancelRef = useRef(false);
   const prevVersionRef = useRef(-1);
 
@@ -82,6 +86,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
     const qs = new URLSearchParams({ nivel, cargo, anio: String(anio) });
     if (estado) qs.set("estado", estado);
     if (cabecera) qs.set("cabecera", cabecera);
+    if (municipio) qs.set("municipio", municipio);
 
     try {
       const res = await fetch(`/api/sefix/geo-resultados?${qs}`);
@@ -89,6 +94,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
       const data = await res.json();
       if (!cancelRef.current) {
         setGanadores(data.ganadores ?? {});
+        setDataKey((k) => k + 1);
       }
     } catch (e) {
       if (!cancelRef.current) {
@@ -98,7 +104,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
     } finally {
       if (!cancelRef.current) setIsLoading(false);
     }
-  }, [cargo, anio, estado, cabecera]);
+  }, [cargo, anio, estado, cabecera, municipio]);
 
   useEffect(() => {
     if (queryVersion === prevVersionRef.current) return;
@@ -149,6 +155,8 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
       strokeColor: "#ffffff",
       strokeWidth: 0.6,
       fillOpacity: 0.82,
+      // version forces GeoJSON remount when data arrives, ensuring fresh tooltip closures
+      version: dataKey,
       tooltip: (props) => {
         const cveEnt = String(props.CVE_ENT ?? "").padStart(2, "0");
         let featureKey: string;
@@ -156,7 +164,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
         else if (tipoShape === "distritos_fed") featureKey = cveEnt + String(props.DISTRITO_FED ?? "").padStart(3, "0");
         else featureKey = cveEnt + String(props.CVE_SECCION ?? "").padStart(4, "0");
         const g = ganadores[featureKey];
-        if (!g) return `<span style="font-size:12px">${featureKey}</span>`;
+        if (!g) return `<span style="font-size:12px;color:#64748b">${featureKey}</span>`;
         return buildTooltip(g.label, g);
       },
     },

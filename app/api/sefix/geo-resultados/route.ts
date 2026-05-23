@@ -1,7 +1,8 @@
 // app/api/sefix/geo-resultados/route.ts
 // Devuelve el partido ganador (top3) por feature geográfica para el mapa coroplético.
+// Sin autenticación requerida: los datos electorales del INE son dominio público,
+// consistente con todos los demás endpoints de /api/sefix/*.
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getGanadorPorFeature } from "@/lib/sefix/storage";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +12,6 @@ const VALID_CARGOS = new Set(["dip", "sen", "pdte"]);
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionFromRequest(request);
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const nivel = searchParams.get("nivel") ?? "";
     const cargo = searchParams.get("cargo") ?? "dip";

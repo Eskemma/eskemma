@@ -79,6 +79,8 @@ export interface GeoLayerConfig {
   selectedStyle?: PathOptions;
   /** Map from feature key → hex color for categorical (party-based) coloring. */
   colorByKey?: Record<string, string>;
+  /** Increment this value to force the GeoJSON layer to remount (refreshes tooltips and event handlers). */
+  version?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

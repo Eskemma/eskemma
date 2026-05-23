@@ -149,7 +149,7 @@ function GeoLayerRenderer({
 
   return (
     <GeoJSON
-      key={JSON.stringify({ id: layerConfig.id, n: safe.features.length, dk: Object.keys(layerConfig.data ?? {}).length })}
+      key={JSON.stringify({ id: layerConfig.id, n: safe.features.length, dk: Object.keys(layerConfig.data ?? {}).length, v: layerConfig.version })}
       data={safe}
       style={(feature) => featureStyle(feature as Feature, layerConfig)}
       onEachFeature={(feature, layer: Layer) => {

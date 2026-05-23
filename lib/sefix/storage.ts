@@ -24,6 +24,14 @@ function setCache(key: string, data: unknown) {
   cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL });
 }
 
+// Raw row cache: avoids re-downloading the same CSV from Firebase Storage within the TTL.
+// Shared across all callers (getResultadosByEstado, getGanadorPorFeature, etc.) so a single
+// download serves multiple query paths within the same server process.
+const rowsCache = new Map<string, { rows: Record<string, string>[]; headers: string[]; expiresAt: number }>();
+
+// Deduplicates concurrent downloads of the same file — only one HTTP fetch runs at a time.
+const ongoingDownloads = new Map<string, Promise<{ rows: Record<string, string>[]; headers: string[] }>>();
+
 // ==========================================
 // LECTURA STREAMING DE CSV
 // ==========================================
@@ -32,17 +40,17 @@ function getBucket() {
   return getStorage(adminApp).bucket(BUCKET);
 }
 
-/** Lee un CSV de Storage línea por línea, filtrando y acumulando solo lo necesario */
-async function streamCsvRows(
-  storagePath: string,
-  onRow: (row: Record<string, string>, headers: string[]) => void
-): Promise<string[]> {
+/** Downloads and parses a CSV file from Firebase Storage, storing all rows in rowsCache. */
+async function downloadAndParseRows(
+  storagePath: string
+): Promise<{ rows: Record<string, string>[]; headers: string[] }> {
   const file = getBucket().file(storagePath);
   const stream = file.createReadStream();
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
 
   let headers: string[] = [];
   let isFirst = true;
+  const allRows: Record<string, string>[] = [];
 
   for await (const line of rl) {
     if (!line.trim()) continue;
@@ -61,9 +69,39 @@ async function streamCsvRows(
       // Strip RFC 4180 quoting: "" → empty string, "value" → value
       row[headers[i]] = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
     }
-    onRow(row, headers);
+    allRows.push(row);
   }
 
+  const result = { rows: allRows, headers };
+  rowsCache.set(storagePath, { ...result, expiresAt: Date.now() + CACHE_TTL });
+  return result;
+}
+
+/** Lee un CSV de Storage línea por línea.
+ *  - Rows are cached in memory for CACHE_TTL to avoid re-downloading the same file.
+ *  - Concurrent calls for the same uncached file share a single download promise (no stampede). */
+async function streamCsvRows(
+  storagePath: string,
+  onRow: (row: Record<string, string>, headers: string[]) => void
+): Promise<string[]> {
+  const now = Date.now();
+  const cached = rowsCache.get(storagePath);
+
+  if (cached && now < cached.expiresAt) {
+    for (const row of cached.rows) onRow(row, cached.headers);
+    return cached.headers;
+  }
+
+  // Deduplicate: if another call is already downloading this file, wait for that promise.
+  let promise = ongoingDownloads.get(storagePath);
+  if (!promise) {
+    promise = downloadAndParseRows(storagePath);
+    ongoingDownloads.set(storagePath, promise);
+    promise.finally(() => ongoingDownloads.delete(storagePath));
+  }
+
+  const { rows, headers } = await promise;
+  for (const row of rows) onRow(row, headers);
   return headers;
 }
 
