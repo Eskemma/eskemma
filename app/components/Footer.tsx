@@ -129,95 +129,56 @@ const Footer = () => {
               <h3 className="text-[14px] max-sm:text-sm font-semibold mb-4 max-sm:mb-3 max-sm:text-center">
                 Navegación
               </h3>
-              {/* Grid con 2 columnas en mobile, 1 columna en desktop */}
-              <div className="grid grid-cols-1 max-sm:grid-cols-2 gap-2 max-sm:gap-x-3 max-sm:gap-y-1.5">
-                {/* Primera columna - Primeros 5 links */}
-                <ul className="space-y-2 max-sm:space-y-1.5">
-                  <li>
-                    <Link
-                      href="/"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Inicio
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/recursos"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Recursos
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/blog"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      El Baúl de Fouché
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/servicios"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Servicios
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/moddulo"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Moddulo
-                    </Link>
-                  </li>
-                </ul>
-                {/* Segunda columna - Últimos 5 links */}
-                <ul className="space-y-2 max-sm:space-y-1.5">
-                  <li>
-                    <Link
-                      href="/sefix"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Sefix
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/cursos"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Cursos
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/monitor"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Monitor
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/contacto"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Contacto
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/faq"
-                      className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
-                    >
-                      Preguntas frecuentes
-                    </Link>
-                  </li>
-                </ul>
-              </div>
+              <ul className="space-y-2 max-sm:space-y-1.5">
+                <li>
+                  <Link
+                    href="/"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    Inicio
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/blog"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    El Baúl de Fouché
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/sefix"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    Sefix
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/servicios"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    Servicios
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/contacto"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    Contacto
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/faq"
+                    className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
+                  >
+                    Preguntas frecuentes
+                  </Link>
+                </li>
+              </ul>
             </nav>
             {/* Línea divisoria después de Navegación (móvil) */}
             <hr className="hidden max-sm:block border-t border-white-eske max-sm:my-4" />

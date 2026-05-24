@@ -161,25 +161,6 @@ const Header = () => {
 
           {/* Contenedor Derecho (Links, Ícono de Hamburguesa y Avatar) */}
           <div className="flex items-center space-x-4 max-sm:space-x-2">
-            {/* Links de Registro e Inicio (Solo visible antes de iniciar sesión) */}
-            {!user && (
-              <div className="flex items-center space-x-4 max-sm:space-x-2">
-                <button
-                  className="text-10px max-sm:text-xs font-semibold hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
-                  onClick={() => setIsSignInModalOpen(true)}
-                  aria-label="Abrir formulario de registro"
-                >
-                  REGISTRO
-                </button>
-                <button
-                  className="text-10px max-sm:text-xs font-semibold hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
-                  onClick={() => setIsLoginModalOpen(true)}
-                  aria-label="Abrir formulario de inicio de sesión"
-                >
-                  INICIO
-                </button>
-              </div>
-            )}            
 
             {/* Ícono de Hamburguesa */}
             <button
@@ -294,36 +275,6 @@ const Header = () => {
                 </li>
                 <li role="none">
                   <a
-                    href="/moddulo"
-                    role="menuitem"
-                    className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    MODDULO
-                  </a>
-                </li>
-                <li role="none">
-                  <a
-                    href="/monitor"
-                    role="menuitem"
-                    className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    MONITOR
-                  </a>
-                </li>
-                <li role="none">
-                  <a
-                    href="/cursos"
-                    role="menuitem"
-                    className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    CURSOS
-                  </a>
-                </li>
-                <li role="none">
-                  <a
                     href="/servicios"
                     role="menuitem"
                     className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
@@ -340,16 +291,6 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     EL BAÚL DE FOUCHÉ
-                  </a>
-                </li>
-                <li role="none">
-                  <a
-                    href="/recursos"
-                    role="menuitem"
-                    className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    RECURSOS
                   </a>
                 </li>
                 <li role="none">
