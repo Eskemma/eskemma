@@ -16,13 +16,12 @@ export default function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (user) {
-      loadNotifications();
-      // Recargar notificaciones cada 30 segundos
-      const interval = setInterval(loadNotifications, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user]);
+    if (!user) return;
+    const controller = new AbortController();
+    loadNotifications(controller.signal);
+    const interval = setInterval(() => loadNotifications(controller.signal), 30000);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -41,7 +40,7 @@ export default function NotificationBell() {
     };
   }, [isOpen]);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (signal?: AbortSignal) => {
     if (!user) return;
 
     try {
@@ -51,9 +50,8 @@ export default function NotificationBell() {
       const token = await currentUser.getIdToken();
 
       const response = await fetch("/api/notifications", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
 
       if (response.ok) {
@@ -62,6 +60,7 @@ export default function NotificationBell() {
         setUnreadCount(data.unreadCount);
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error("Error al cargar notificaciones:", error);
     }
   };

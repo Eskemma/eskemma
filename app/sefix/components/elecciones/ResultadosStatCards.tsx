@@ -70,11 +70,23 @@ export default function ResultadosStatCards({ data, committed }: ResultadosStatC
         value={FMT.format(data.lne)}
         sub="Ciudadanos habilitados"
       />
-      <StatCard
-        label="Participación"
-        value={`${FMT_PCT.format(data.participacion)}%`}
-        sub={ganador ? `1°: ${ganador.partido} (${FMT_PCT.format(ganador.porcentaje)}%)` : undefined}
-      />
+      {showExtranjeroCard ? (
+        <div className="col-span-2 sm:col-span-1 flex sm:block justify-center">
+          <div className="w-[calc(50%-6px)] sm:w-full">
+            <StatCard
+              label="Participación"
+              value={`${FMT_PCT.format(data.participacion)}%`}
+              sub={ganador ? `1°: ${ganador.partido} (${FMT_PCT.format(ganador.porcentaje)}%)` : undefined}
+            />
+          </div>
+        </div>
+      ) : (
+        <StatCard
+          label="Participación"
+          value={`${FMT_PCT.format(data.participacion)}%`}
+          sub={ganador ? `1°: ${ganador.partido} (${FMT_PCT.format(ganador.porcentaje)}%)` : undefined}
+        />
+      )}
       <StatCard
         label="Votos Nulos"
         value={FMT.format(data.votosNulos)}

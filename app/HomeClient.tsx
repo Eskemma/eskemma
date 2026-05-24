@@ -10,10 +10,6 @@ import TeamModal from "./components/componentsHome/TeamModal";
 import ScheduleDate from "./components/componentsHome/ScheduleDate";
 import ResponseDate from "./components/componentsHome/ReponseDate";
 import BenefitsSection from "./components/componentsHome/BenefitsSection";
-import SuscriptionBasicModal from "./components/componentsHome/SuscriptionBasicModal";
-import SuscriptionPremiumModal from "./components/componentsHome/SuscriptionPremiumModal";
-import SuscriptionProfessionalModal from "./components/componentsHome/SuscriptionProfessioinalModal";
-import SuscriptionResponseModal from "./components/componentsHome/SucriptionResponseModal";
 import FaqSection from "./components/componentsHome/FaqSection";
 import { BlogPost } from "@/types/post.types";
 
@@ -30,16 +26,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
     dateTime: "",
   });
 
-  const [isBasicSuscriptionModalOpen, setIsBasicSuscriptionModalOpen] =
-    useState(false);
-  const [isPremiumSuscriptionModalOpen, setIsPremiumSuscriptionModalOpen] =
-    useState(false);
-  const [isProfessionalSuscriptionModalOpen, setIsProfessionalSuscriptionModalOpen] =
-    useState(false);
-  const [isResponseSuscriptionModalOpen, setIsResponseSuscriptionModalOpen] =
-    useState(false);
-
-  // ✅ NUEVO: Estado para controlar carga del video
+  // Estado para controlar carga del video
   const [isVideoLoading, setIsVideoLoading] = useState(true);
 
   const userName = "Usuario";
@@ -210,15 +197,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 en las elecciones federales de México 2006-2021
               </p>
 
-              {/* Wrapper del botón con mt-auto para empujarlo al fondo */}
-              <div className="mt-auto w-full max-w-62.5">
-                <Link
-                  href="/monitor"
-                  className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
-                >
-                  Consultar información →
-                </Link>
-              </div>
             </div>
 
             {/* Card 2 */}
@@ -237,15 +215,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 elecciones presidenciales en México?
               </p>
 
-              {/* Wrapper del botón con mt-auto para empujarlo al fondo */}
-              <div className="mt-auto w-full max-w-62.5">
-                <Link
-                  href="/monitor"
-                  className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
-                >
-                  Consultar información →
-                </Link>
-              </div>
             </div>
           </div>
         </div>
@@ -279,15 +248,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               </span>
               <span className="block">asesoría gratuita de 30 minutos.</span>
             </p>
-
-            {/* Botón "AGENDAR ASESORÍA GRATUITA" */}
-            <div className="text-center mt-6 max-w-75 mx-auto">
-              <Button
-                label="AGENDAR ASESORÍA GRATUITA"
-                variant="secondary"
-                onClick={() => setIsScheduleModalOpen(true)}
-              />
-            </div>
 
             {/* Modal de Agendar Asesoría */}
             <ScheduleDate
@@ -565,262 +525,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Sección - Planes de suscripción */}
-      <section
-        id="suscripciones"
-        className="bg-white-eske min-h-200 py-18 max-sm:py-12 px-4 sm:px-6 md:px-8 dark:bg-[#0B1620]"
-        aria-labelledby="subscriptions-heading"
-      >
-        <div className="w-[90%] mx-auto max-w-7xl">
-          {/* Título de la Sección */}
-          <h2
-            id="subscriptions-heading"
-            className="text-3xl max-sm:text-xl font-bold text-center text-bluegreen-eske mb-6 max-sm:mb-4 dark:text-[#6BA4C6]"
-          >
-            Selecciona el mejor plan para tu proyecto político
-          </h2>
-
-          {/* Párrafo Descriptivo */}
-          <p className="mt-12 max-sm:mt-6 text-2xl max-sm:text-lg font-light text-center text-black-eske mb-24 max-sm:mb-12 max-w-150 mx-auto dark:text-[#C7D6E0]">
-            <span>Suscríbete y accede al</span>
-            <br />
-            <span>ecosistema digital de Eskemma</span>
-          </p>
-
-          {/* Contenedor de las Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-sm:gap-6">
-            {/* Card 1 - Sólo un producto (Plan Básico) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-2 sm:order-1">
-              {/* Encabezado con fondo white-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-white-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-black-eske text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap dark:bg-[#21425E] dark:text-[#EAF2F8] dark:border-white/20"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite IA Básica
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Básico
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Para 1 persona</p>                   
-                  <p className="mt-4 max-sm:mt-2 text-[16px] text-center max-sm:text-[9px]">
-                    <strong>Ideal para candidatos locales y equipos pequeños.</strong>
-                  </p>
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-[9px]">
-                    <strong>Obtienes:</strong>
-                  </p>
-                  <p>
-                    Acceso a versiones básicas de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 8 Apps Estándar</p>
-                  <p>Soporte por email</p>
-                  <p>Almacenamiento de 5 GB</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
-                      alt="México"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 2,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="primary"
-                    onClick={() => setIsBasicSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-
-            {/* Card 2 - Todo Eskemma (Plan Premium) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-1 sm:order-2">
-              {/* Encabezado con fondo black-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-black-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-white-eske text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite Avanzada con IA
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Premium
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Hasta 5 personas</p> 
-                  <p className="mt-4 max-sm:mt-2 text-[16px] text-center max-sm:text-[9px]">
-                    <strong>Ideal para equipos de 5-15 personas</strong>
-                  </p>                 
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
-                    <strong>Obtienes Plan Básico +</strong></p>
-                  <p>
-                    Acceso a versiones Premium de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 16 Apps Avanzadas</p>
-                  <p>Soporte por email / chat</p>
-                  <p>Capacitación grupal online (1 sesión)</p>
-                  <p>Almacenamiento de 50 GB</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
-                      alt="México"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 5,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="secondary"
-                    onClick={() => setIsPremiumSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-
-            {/* Card 3 - Trabajo colaborativo (Plan Grupal) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-3 sm:order-3">
-              {/* Encabezado con fondo white-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-white-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-black text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap dark:bg-[#21425E] dark:text-[#EAF2F8] dark:border-white/20"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite Completa con IA
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Profesional
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Usuarios ilimitados</p>
-                  <p className="mt-4 max-sm:mt-2 text-center text-[16px] max-sm:text-sm">
-                    <strong>Ideal para equipos de 15-50+ personas</strong>
-                  </p>
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
-                    <strong>Obtienes Plan Premium +</strong>
-                  </p>
-                  <p>
-                    Acceso a versiones profesionales de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 25 Apps Avanzadas</p>
-                  <p>Soporte por teléfono, email y chat</p>
-                  <p>Capacitación personalizada</p>
-                  <p>Consultoría estratégica (4 hrs/mes incluidas)</p>
-                  <p>Almacenamiento ilimitado</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
-                      alt="México"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 9,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="primary"
-                    onClick={() => setIsProfessionalSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* MODALES */}
-      {/* Modal de Suscripción (Plan Básico) */}
-      <SuscriptionBasicModal
-        isOpen={isBasicSuscriptionModalOpen}
-        onClose={() => setIsBasicSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsBasicSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Suscripción (Plan Premium) */}
-      <SuscriptionPremiumModal
-        isOpen={isPremiumSuscriptionModalOpen}
-        onClose={() => setIsPremiumSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsPremiumSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Suscripción (Plan Grupal) */}
-      <SuscriptionProfessionalModal
-        isOpen={isProfessionalSuscriptionModalOpen}
-        onClose={() => setIsProfessionalSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsProfessionalSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Respuesta después de la suscripción */}
-      <SuscriptionResponseModal
-        isOpen={isResponseSuscriptionModalOpen}
-        onClose={() => setIsResponseSuscriptionModalOpen(false)}
-        userName={userName}
-      />
-
       {/* Sección - FAQ */}
       <FaqSection />
 
@@ -841,27 +545,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
             className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-sm:gap-4"
             aria-label="Enlaces rápidos a secciones principales"
           >
-            <Link
-              href="/moddulo"
-              className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-60 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
-            >
-              <img
-                src="/icons/icon_Moddulo.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <img
-                src="/icons/icons_dark_mode/icon_Moddulo_wd.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Moddulo
-              </span>
-            </Link>
-
             <Link
               href="/sefix"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
@@ -901,48 +584,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
                 Servicios
-              </span>
-            </Link>
-
-            <Link
-              href="/cursos"
-              className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
-            >
-              <img
-                src="/icons/icon_Cursos.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <img
-                src="/icons/icons_dark_mode/icon_Cursos_wd.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Cursos
-              </span>
-            </Link>
-
-            <Link
-              href="/monitor"
-              className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
-            >
-              <img
-                src="/icons/icon_Monitor.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <img
-                src="/icons/icons_dark_mode/icon_Monitor_wd.svg"
-                alt=""
-                aria-hidden="true"
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">
-                Monitor
               </span>
             </Link>
 

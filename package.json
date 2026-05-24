@@ -11,6 +11,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@heroicons/react": "^2.2.0",
+    "@types/leaflet": "^1.9.21",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",
@@ -22,6 +23,7 @@
     "gray-matter": "^4.0.3",
     "gtoken": "^8.0.0",
     "isomorphic-dompurify": "^2.26.0",
+    "leaflet": "^1.9.4",
     "mammoth": "^1.12.0",
     "next": "^16.1.1",
     "nodemailer": "^7.0.10",
@@ -29,12 +31,14 @@
     "puppeteer": "^24.36.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
     "remark-html": "^16.0.1",
-    "resend": "^6.3.0"
+    "resend": "^6.3.0",
+    "topojson-client": "^3.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.5",
@@ -45,11 +49,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sharp": "^0.31.1",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-server": "^3.0.4",
+    "@types/topojson-specification": "^1.0.5",
     "csv-parse": "^6.2.1",
     "dotenv": "^17.4.1",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
+    "proj4": "^2.20.8",
+    "shapefile": "^0.6.6",
     "tailwindcss": "^4.1.5",
+    "topojson-server": "^3.0.1",
+    "topojson-simplify": "^3.0.3",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

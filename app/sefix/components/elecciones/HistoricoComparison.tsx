@@ -33,6 +33,8 @@ export default function HistoricoComparison({ data }: HistoricoComparisonProps) 
     anio: d.anio,
     participacion: d.participacion,
     totalVotos: d.totalVotos,
+    distritoRedistritado: d.distritoRedistritado,
+    redistritadoScope: d.redistritadoScope,
   }));
 
   const validData = chartData.filter((d) => d.participacion > 0);
@@ -61,15 +63,39 @@ export default function HistoricoComparison({ data }: HistoricoComparisonProps) 
           domain={["auto", "auto"]}
         />
         <Tooltip
-          formatter={(value) => [
-            `${FMT_PCT.format(Number(value))}%`,
-            "Participación",
-          ]}
-          labelStyle={{ color: "#2b2b2b" }}
-          contentStyle={{
-            fontSize: 12,
-            borderRadius: 6,
-            borderColor: "var(--color-gray-eske-20)",
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const pt = payload[0];
+            const pct = Number(pt.value);
+            const { distritoRedistritado: redistritado, redistritadoScope: scope } =
+              pt.payload as { distritoRedistritado?: string; redistritadoScope?: string };
+            const borderColor = isDark ? "#2a4255" : "var(--color-gray-eske-20)";
+            return (
+              <div style={{
+                fontSize: 12, borderRadius: 6, padding: "8px 10px",
+                border: `1px solid ${borderColor}`,
+                backgroundColor: isDark ? "#112230" : "#ffffff",
+                color: isDark ? "#EAF2F8" : "#2b2b2b",
+                maxWidth: 260,
+              }}>
+                <p style={{ fontWeight: 600, marginBottom: 4 }}>Año {String(label ?? "")}</p>
+                <p>Participación: {FMT_PCT.format(pct)}%</p>
+                {redistritado && (
+                  <p style={{
+                    marginTop: 6, fontSize: 11,
+                    color: isDark ? "#F4A636" : "var(--color-orange-eske)",
+                    borderTop: `1px solid ${borderColor}`,
+                    paddingTop: 5,
+                  }}>
+                    ⚠ En {String(label)},{" "}
+                    {scope === "secciones"
+                      ? "las secciones seleccionadas pertenecieron"
+                      : "este municipio perteneció"}{" "}
+                    al Dist. {redistritado}
+                  </p>
+                )}
+              </div>
+            );
           }}
         />
         <ReferenceLine

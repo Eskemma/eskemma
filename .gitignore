@@ -96,3 +96,9 @@ app/secrets/
 
 # Datos electorales locales (archivos grandes ~2GB, no van al repositorio)
 /data/
+
+# Datos geográficos SHP (~23 GB, procesados offline con geo-pipeline.ts)
+/info_geo_eske/
+
+# CSS de Leaflet copiado a public/ (se regenera con: cp node_modules/leaflet/dist/leaflet.css public/)
+/public/leaflet.css
