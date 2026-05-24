@@ -101,4 +101,5 @@ app/secrets/
 /info_geo_eske/
 
 # CSS de Leaflet copiado a public/ (se regenera con: cp node_modules/leaflet/dist/leaflet.css public/)
-/public/leaflet.css
+# Nota: leaflet.css SÍ debe estar en git — sin él, los polígonos no se renderizan en producción
+# /public/leaflet.css
