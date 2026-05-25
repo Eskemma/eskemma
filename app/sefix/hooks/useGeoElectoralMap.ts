@@ -122,8 +122,10 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
     if (!estado) return { nivel: "nacional" };
     const estado_id = ESTADO_CVE_MAP[estado];
     if (cabecera) {
-      // cabecera format: "SSDDD NAME" (e.g. "1405 PUERTO VALLARTA") → local dist = substring(2) = "05" → "005"
-      const cve_distrito_fed = (cabecera.match(/^(\d+)/)?.[1] ?? "").substring(2).padStart(3, "0");
+      // cabecera format: "SSDDD NAME" where SS=estado(2 digits), DDD=district number
+      // e.g. "1405 PUERTO VALLARTA" → SS="14", DDD="05" → cve_distrito_fed="005"
+      const distMatch = cabecera.match(/^(\d{2})(\d+)/);
+      const cve_distrito_fed = distMatch ? distMatch[2].padStart(3, "0") : "";
       return {
         nivel: "distrito_fed",
         estado_id,

@@ -9,32 +9,20 @@ import {
 } from "react-leaflet";
 import type { PathOptions, Layer, LeafletMouseEvent } from "leaflet";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
-import type { GeoVisualizadorProps, GeoLayerConfig, GeoColorRamp, GeoScopeElectoral, GeoLayerTipo } from "@/types/geo.types";
+import type { GeoVisualizadorProps, GeoLayerConfig, GeoScopeElectoral, GeoLayerTipo } from "@/types/geo.types";
 import { getFeatureKey } from "@/types/geo.types";
 import { useGeoShapes } from "./hooks/useGeoShapes";
 import { GeoLegend } from "./GeoLegend";
+import { interpolateColor } from "@/lib/geo/colorUtils";
 
 const OSM_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 const OSM_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const MEXICO_CENTER: [number, number] = [23.6, -102.5];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Color utilities
-// ─────────────────────────────────────────────────────────────────────────────
-
-function hexToRgb(hex: string): [number, number, number] {
-  const c = hex.replace("#", "");
-  return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
-}
-
-function interpolateColor(ramp: GeoColorRamp, value: number): string {
-  const range = ramp.max - ramp.min;
-  const t = range === 0 ? 1 : Math.max(0, Math.min(1, (value - ramp.min) / range));
-  const [lr, lg, lb] = hexToRgb(ramp.colorLow);
-  const [hr, hg, hb] = hexToRgb(ramp.colorHigh);
-  return `rgb(${Math.round(lr + (hr - lr) * t)},${Math.round(lg + (hg - lg) * t)},${Math.round(lb + (hb - lb) * t)})`;
-}
+// Map fit constants
+const MAP_FIT_MAX_ZOOM = 14;
+const MAP_FIT_PADDING: [number, number] = [24, 24];
 
 function featureStyle(feature: Feature | undefined, layerConfig: GeoLayerConfig): PathOptions {
   // Apply selected highlight style if this feature's key is in selectedKeys
@@ -238,7 +226,7 @@ function GeoLayerWithData({
     const key = `${JSON.stringify(scope)}|${minLat.toFixed(4)}|${minLng.toFixed(4)}`;
     if (key === prevFitKeyRef.current) return;
     prevFitKeyRef.current = key;
-    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
+    map.fitBounds(bounds, { padding: MAP_FIT_PADDING, maxZoom: MAP_FIT_MAX_ZOOM });
   }, [geojson, isPrimary, map, scope]);
 
   if (!geojson || !layerConfig.visible) return null;

@@ -5,7 +5,7 @@ import type { FeatureCollection } from "geojson";
 import type { LatLngBounds } from "leaflet";
 import type { GeoLayerTipo, GeoScopeElectoral } from "@/types/geo.types";
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — consistent with storage.ts CACHE_TTL
 
 interface CacheEntry {
   geojson: FeatureCollection;

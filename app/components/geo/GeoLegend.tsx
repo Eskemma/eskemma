@@ -1,23 +1,10 @@
 import type { GeoColorRamp } from "@/types/geo.types";
+import { interpolateColor } from "@/lib/geo/colorUtils";
 
 interface GeoLegendProps {
   colorRamp: GeoColorRamp;
   label?: string;
   formatValue?: (v: number) => string;
-}
-
-function lerp(a: string, b: string, t: number): string {
-  const hex = (s: string) => [
-    parseInt(s.slice(1, 3), 16),
-    parseInt(s.slice(3, 5), 16),
-    parseInt(s.slice(5, 7), 16),
-  ];
-  const [ar, ag, ab] = hex(a);
-  const [br, bg, bb] = hex(b);
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${bl})`;
 }
 
 export function GeoLegend({ colorRamp, label, formatValue }: GeoLegendProps) {
