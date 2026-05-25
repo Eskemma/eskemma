@@ -2,6 +2,10 @@
 // app/sefix/hooks/useGeoElectoralMap.ts
 // Construye scope, capas y colorByKey para el mapa coroplético electoral.
 import { useState, useEffect, useRef, useCallback } from "react";
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 import { ESTADO_CVE_MAP, PARTY_COLORS, PARTIDO_LABELS } from "@/lib/sefix/eleccionesConstants";
 import type { GeoScopeElectoral, GeoLayerConfig, GeoLayerTipo } from "@/types/geo.types";
 
@@ -39,7 +43,7 @@ function buildTooltip(label: string, ganador: GanadorFeature): string {
   const rows = ganador.top3
     .map((t, i) => {
       const color = PARTY_COLORS[t.partido] ?? "#B0BEC5";
-      const nombrePartido = PARTIDO_LABELS[t.partido] ?? t.partido;
+      const nombrePartido = escapeHtml(PARTIDO_LABELS[t.partido] ?? t.partido);
       return `<tr>
         <td style="padding:1px 4px 1px 0;white-space:nowrap">
           <span style="display:inline-block;width:8px;height:8px;background:${color};border-radius:50%;margin-right:4px"></span>
@@ -52,7 +56,7 @@ function buildTooltip(label: string, ganador: GanadorFeature): string {
     .join("");
 
   return `<div style="background:#ffffff;border-radius:6px;padding:8px 4px 4px;font-family:system-ui,sans-serif;font-size:12px;min-width:180px;max-width:240px;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
-    <p style="font-weight:600;margin:0 0 5px;color:#0f172a;font-size:11px;line-height:1.3">${label}</p>
+    <p style="font-weight:600;margin:0 0 5px;color:#0f172a;font-size:11px;line-height:1.3">${escapeHtml(label)}</p>
     <table style="border-collapse:collapse;width:100%">${rows}</table>
     <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">Total: ${formatVotos(ganador.totalVotos)} votos</p>
   </div>`;
@@ -66,7 +70,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
   // dataKey increments each time a successful fetch completes, forcing GeoJSON remount
   // so that tooltip closures and mouseout handlers capture the latest ganadores data.
   const [dataKey, setDataKey] = useState(0);
-  const cancelRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
   const prevVersionRef = useRef(-1);
 
   const fetchGanadores = useCallback(async () => {
@@ -79,7 +83,10 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
       nivel = "distritos_fed";
     }
 
-    cancelRef.current = false;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setError(null);
 
@@ -89,29 +96,25 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
     if (municipio) qs.set("municipio", municipio);
 
     try {
-      const res = await fetch(`/api/sefix/geo-resultados?${qs}`);
+      const res = await fetch(`/api/sefix/geo-resultados?${qs}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (!cancelRef.current) {
-        setGanadores(data.ganadores ?? {});
-        setDataKey((k) => k + 1);
-      }
+      setGanadores(data.ganadores ?? {});
+      setDataKey((k) => k + 1);
     } catch (e) {
-      if (!cancelRef.current) {
-        setError(e instanceof Error ? e.message : "Error desconocido");
-        setGanadores({});
-      }
+      if (e instanceof Error && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Error desconocido");
+      setGanadores({});
     } finally {
-      if (!cancelRef.current) setIsLoading(false);
+      if (abortRef.current === controller) setIsLoading(false);
     }
   }, [cargo, anio, estado, cabecera, municipio]);
 
   useEffect(() => {
     if (queryVersion === prevVersionRef.current) return;
     prevVersionRef.current = queryVersion;
-    cancelRef.current = false;
     fetchGanadores();
-    return () => { cancelRef.current = true; };
+    return () => { abortRef.current?.abort(); };
   }, [queryVersion, fetchGanadores]);
 
   // Scope geográfico derivado de los filtros
@@ -164,7 +167,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
         else if (tipoShape === "distritos_fed") featureKey = cveEnt + String(props.DISTRITO_FED ?? "").padStart(3, "0");
         else featureKey = cveEnt + String(props.CVE_SECCION ?? "").padStart(4, "0");
         const g = ganadores[featureKey];
-        if (!g) return `<span style="font-size:12px;color:#64748b">${featureKey}</span>`;
+        if (!g) return `<span style="font-size:12px;color:#64748b">${escapeHtml(featureKey)}</span>`;
         return buildTooltip(g.label, g);
       },
     },

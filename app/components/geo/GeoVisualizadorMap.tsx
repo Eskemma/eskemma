@@ -29,7 +29,8 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function interpolateColor(ramp: GeoColorRamp, value: number): string {
-  const t = Math.max(0, Math.min(1, (value - ramp.min) / (ramp.max - ramp.min)));
+  const range = ramp.max - ramp.min;
+  const t = range === 0 ? 1 : Math.max(0, Math.min(1, (value - ramp.min) / range));
   const [lr, lg, lb] = hexToRgb(ramp.colorLow);
   const [hr, hg, hb] = hexToRgb(ramp.colorHigh);
   return `rgb(${Math.round(lr + (hr - lr) * t)},${Math.round(lg + (hg - lg) * t)},${Math.round(lb + (hb - lb) * t)})`;

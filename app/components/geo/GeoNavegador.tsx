@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function esc(v: unknown): string { return escapeHtml(String(v ?? "")); }
 import { GeoVisualizador } from "./GeoVisualizador";
 import { useGeoOptions } from "./hooks/useGeoOptions";
 import { clearGeoShapeCache } from "./hooks/useGeoShapes";
@@ -118,29 +123,29 @@ function deriveScope(fuente: GeoFuente, p: GeoNavPending): GeoScopeElectoral {
   return { nivel: "entidad", estado_id };
 }
 
-const TOOLTIP_MUN    = (p: Record<string, unknown>) => `<strong>${p.NOMGEO ?? p.CVE_MUN ?? ""}</strong><br/><span style="font-size:11px">${p.NOMBRE_ENT ?? ""}</span>`;
-const TOOLTIP_DFED   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Federal ${p.DISTRITO_FED ?? ""}</strong><br/><span style="font-size:11px">${p.NOMBRE_ENT ?? ""}</span>`;
-const TOOLTIP_DLOC   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Local ${p.DISTRITO_LOC ?? ""}</strong><br/><span style="font-size:11px">${p.NOMBRE_ENT ?? ""}</span>`;
-const TOOLTIP_ENT    = (p: Record<string, unknown>) => `<strong>${p.NOMBRE_ENT ?? p.CVE_ENT ?? ""}</strong>`;
+const TOOLTIP_MUN    = (p: Record<string, unknown>) => `<strong>${esc(p.NOMGEO ?? p.CVE_MUN)}</strong><br/><span style="font-size:11px">${esc(p.NOMBRE_ENT)}</span>`;
+const TOOLTIP_DFED   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Federal ${esc(p.DISTRITO_FED)}</strong><br/><span style="font-size:11px">${esc(p.NOMBRE_ENT)}</span>`;
+const TOOLTIP_DLOC   = (p: Record<string, unknown>) => `<strong>Distrito Electoral Local ${esc(p.DISTRITO_LOC)}</strong><br/><span style="font-size:11px">${esc(p.NOMBRE_ENT)}</span>`;
+const TOOLTIP_ENT    = (p: Record<string, unknown>) => `<strong>${esc(p.NOMBRE_ENT ?? p.CVE_ENT)}</strong>`;
 const TOOLTIP_SEC    = (p: Record<string, unknown>) => {
   const agebStr = p.AGEBS ? String(p.AGEBS) : "";
   const agebList = agebStr ? agebStr.split(",") : [];
   const agebLine = agebList.length > 0
-    ? `<br/><span style="font-size:10px">AGEBs (${agebList.length}): ${agebList.slice(0, 4).join(", ")}${agebList.length > 4 ? "…" : ""}</span>`
+    ? `<br/><span style="font-size:10px">AGEBs (${agebList.length}): ${agebList.slice(0, 4).map(esc).join(", ")}${agebList.length > 4 ? "…" : ""}</span>`
     : "";
-  return `<strong>Sección ${p.CVE_SECCION ?? ""}</strong>` +
-    `<br/>Municipio: ${p.NOMGEO ?? "—"}` +
-    `<br/>Distrito Federal: ${p.DISTRITO_FED ?? "—"}` +
-    `<br/>Distrito Local: ${p.DISTRITO_LOC ?? "—"}` +
+  return `<strong>Sección ${esc(p.CVE_SECCION)}</strong>` +
+    `<br/>Municipio: ${esc(p.NOMGEO) || "—"}` +
+    `<br/>Distrito Federal: ${esc(p.DISTRITO_FED) || "—"}` +
+    `<br/>Distrito Local: ${esc(p.DISTRITO_LOC) || "—"}` +
     agebLine;
 };
 const TOOLTIP_AGEB   = (p: Record<string, unknown>) =>
-  `<strong>AGEB ${p.CVEGEO ?? ""}</strong>` +
-  `<br/>Municipio: ${p.CVE_MUN ?? "—"}` +
-  (p.CVE_LOC ? `<br/>Localidad: ${p.CVE_LOC}` : "") +
-  (p.CVE_SECCION  ? `<br/>Sección: ${p.CVE_SECCION}`           : "") +
-  (p.DISTRITO_FED ? `<br/>Distrito Federal: ${p.DISTRITO_FED}` : "") +
-  (p.DISTRITO_LOC ? `<br/>Distrito Local: ${p.DISTRITO_LOC}`   : "");
+  `<strong>AGEB ${esc(p.CVEGEO)}</strong>` +
+  `<br/>Municipio: ${esc(p.CVE_MUN) || "—"}` +
+  (p.CVE_LOC      ? `<br/>Localidad: ${esc(p.CVE_LOC)}`               : "") +
+  (p.CVE_SECCION  ? `<br/>Sección: ${esc(p.CVE_SECCION)}`             : "") +
+  (p.DISTRITO_FED ? `<br/>Distrito Federal: ${esc(p.DISTRITO_FED)}`   : "") +
+  (p.DISTRITO_LOC ? `<br/>Distrito Local: ${esc(p.DISTRITO_LOC)}`     : "");
 
 const AGEB_STYLE = {
   fillColor: "#ef4444",
