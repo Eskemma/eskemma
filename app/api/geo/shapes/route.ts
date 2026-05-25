@@ -6,14 +6,19 @@ import type { GeoLayerTipo } from "@/types/geo.types";
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE   = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
+const STORAGE_PREFIX_ECEG  = "sefix/geo/eceg_2020";
 
 // Types sourced from INEGI (per-state only, no national file)
 const INEGI_TIPOS: GeoLayerTipo[] = ["ageb_urbana", "ageb_rural"];
+// Types sourced from ECEG 2020 (per-state only)
+const ECEG_TIPOS: GeoLayerTipo[] = ["eceg_secciones_2020", "eceg_municipios_2020"];
 
 type NivelParam = "nacional" | "estado";
 
 const VALID_TIPOS: GeoLayerTipo[] = [
-  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones", "ageb_urbana", "ageb_rural",
+  "entidades", "municipios", "distritos_fed", "distritos_loc", "secciones",
+  "ageb_urbana", "ageb_rural",
+  "eceg_secciones_2020", "eceg_municipios_2020",
 ];
 
 function buildStoragePath(
@@ -21,6 +26,14 @@ function buildStoragePath(
   nivel: NivelParam,
   estado_id?: string
 ): string | null {
+  // ECEG layers are per-state only
+  if (ECEG_TIPOS.includes(tipo)) {
+    if (!estado_id) return null;
+    const id = estado_id.padStart(2, "0");
+    const subdir = tipo === "eceg_secciones_2020" ? "secciones" : "municipios";
+    return `${STORAGE_PREFIX_ECEG}/${subdir}/${id}.topojson`;
+  }
+
   const isInegi = INEGI_TIPOS.includes(tipo);
   const prefix  = isInegi ? STORAGE_PREFIX_INEGI : STORAGE_PREFIX_INE;
 
@@ -68,6 +81,7 @@ export async function GET(req: NextRequest) {
       { status: 400 }
     );
   }
+
 
   try {
     const bucket = getStorage(adminApp).bucket(STORAGE_BUCKET);

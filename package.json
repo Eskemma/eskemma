@@ -62,6 +62,7 @@
     "topojson-server": "^3.0.1",
     "topojson-simplify": "^3.0.3",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   }
 }

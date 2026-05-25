@@ -9,6 +9,7 @@ import LnePanel from "./components/LnePanel";
 import EleccionesFedPanel from "./components/EleccionesFedPanel";
 import EleccionesLocalesPanel from "./components/EleccionesLocalesPanel";
 import GeoElectoralMapPanel from "./components/geo/GeoElectoralMapPanel";
+import GeoEcegPanel from "./components/geo/GeoEcegPanel";
 import UnderConstructionPage from "@/app/components/UnderConstructionPage";
 
 interface SefixDashboardProps {
@@ -28,15 +29,7 @@ export default function SefixDashboard({ role: _role }: SefixDashboardProps) {
       {activeTab === "elecciones_fed" && <EleccionesFedPanel />}
       {activeTab === "elecciones_loc" && <EleccionesLocalesPanel />}
       {activeTab === "geo" && <GeoElectoralMapPanel />}
-      {activeTab === "geoestadisticos" && (
-        <section
-          id="sefix-panel-geoestadisticos"
-          role="tabpanel"
-          aria-labelledby="sefix-tab-geoestadisticos"
-        >
-          <UnderConstructionPage title="Estadísticos Geoelectorales" />
-        </section>
-      )}
+      {activeTab === "geoestadisticos" && <GeoEcegPanel />}
       {activeTab === "otros" && (
         <section
           id="sefix-panel-otros"

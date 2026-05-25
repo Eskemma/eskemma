@@ -38,7 +38,9 @@ export type GeoLayerTipo =
   | "distritos_loc"
   | "secciones"
   | "ageb_urbana"
-  | "ageb_rural";
+  | "ageb_rural"
+  | "eceg_secciones_2020"
+  | "eceg_municipios_2020";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Choropleth style
@@ -150,7 +152,9 @@ export function getFeatureKey(tipo: GeoLayerTipo, props: IneFeatureProps): strin
     case "distritos_loc": return ent + (props.DISTRITO_LOC ?? "");
     case "secciones":     return ent + (props.CVE_SECCION ?? "");
     case "ageb_urbana":
-    case "ageb_rural":    return (props as unknown as InegAgebProps).CVEGEO ?? ent;
+    case "ageb_rural":       return (props as unknown as InegAgebProps).CVEGEO ?? ent;
+    case "eceg_secciones_2020": return ent + (props.CVE_SECCION ?? "");
+    case "eceg_municipios_2020": return ent + (props.CVE_MUN ?? "");
   }
 }
 

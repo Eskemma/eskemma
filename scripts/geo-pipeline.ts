@@ -57,10 +57,12 @@ const INFO_GEO = path.resolve(__dirname, "../info_geo_eske");
 const MGS_NACIONAL = path.join(INFO_GEO, "mgs_2025_INE/nacional/mgs_nacional_2025_INE");
 const MGS_ESTADOS  = path.join(INFO_GEO, "mgs_2025_INE/estados");
 const MG_INEGI_ESTADOS = path.join(INFO_GEO, "mg_2025_INEGI_estados");
+const ECEG_ESTADOS = path.join(INFO_GEO, "eceg_2020/ECEG_2020_estados");
 
 const STORAGE_BUCKET        = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE    = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI  = "sefix/geo/inegi";
+const STORAGE_PREFIX_ECEG   = "sefix/geo/eceg_2020";
 
 /**
  * Finds the per-state directory in MGS_ESTADOS by matching the numeric prefix
@@ -86,6 +88,8 @@ const SIMPLIFY_THRESHOLD: Record<string, number> = {
   secciones:    1e-11,
   ageb_urbana:  1e-11,
   ageb_rural:   1e-11,
+  eceg_secciones_2020: 1e-11,
+  eceg_municipios_2020: 5e-11,
 };
 
 // Column mapping: source SHP column (uppercase) → target output column name
@@ -116,6 +120,20 @@ const COLUMN_MAP: Record<string, ColMap[]> = {
     { src: "SECCION",    dest: "CVE_SECCION", pad: 4 },
     { src: "DISTRITO_F", dest: "DISTRITO_FED", pad: 3 },
     { src: "DISTRITO_L", dest: "DISTRITO_LOC", pad: 3 },
+  ],
+  // ECEG 2020 — secciones electorales (SECCION.shp)
+  // DISTRITO in ECEG = DISTRITO_F in INE (both are federal district number)
+  eceg_secciones_2020: [
+    { src: "ENTIDAD",   dest: "CVE_ENT",      pad: 2 },
+    { src: "MUNICIPIO", dest: "CVE_MUN",      pad: 3 },
+    { src: "SECCION",   dest: "CVE_SECCION",  pad: 4 },
+    { src: "DISTRITO",  dest: "DISTRITO_FED", pad: 3 },
+  ],
+  // ECEG 2020 — municipios (MUNICIPIO.shp)
+  eceg_municipios_2020: [
+    { src: "ENTIDAD",   dest: "CVE_ENT", pad: 2 },
+    { src: "MUNICIPIO", dest: "CVE_MUN", pad: 3 },
+    { src: "NOMBRE",    dest: "NOMGEO" },
   ],
   // INEGI Marco Geoestadístico 2025 — AGEB urbana ({id}a.shp)
   ageb_urbana: [
@@ -587,6 +605,79 @@ async function processSeccionesNacionalBatch(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ECEG 2020 processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Finds the per-state directory in ECEG_ESTADOS by matching the numeric prefix
+ * (e.g. "14" matches "14_eceg_2020_jalisco"). Returns null if not found.
+ */
+function findEcegEstadoDir(estadoId: string): string | null {
+  const prefix = `${estadoId}_`;
+  const entries = fs.readdirSync(ECEG_ESTADOS);
+  const match = entries.find((e) => e.startsWith(prefix));
+  if (!match) return null;
+  const fullPath = path.join(ECEG_ESTADOS, match);
+  return fs.statSync(fullPath).isDirectory() ? fullPath : null;
+}
+
+/**
+ * Processes ECEG 2020 secciones or municipios for a single estado.
+ * Reads SECCION.shp or MUNICIPIO.shp from the state's ECEG directory,
+ * reprojects to WGS84, and uploads to Firebase Storage.
+ *
+ * @param layer "eceg_secciones_2020" | "eceg_municipios_2020"
+ */
+async function processEcegEstadoLayer(
+  layer: "eceg_secciones_2020" | "eceg_municipios_2020",
+  estadoId: string,
+  dryRun: boolean,
+  app: App | null
+): Promise<void> {
+  const estadoDir = findEcegEstadoDir(estadoId);
+  if (!estadoDir) {
+    process.stdout.write(`  [skip] No ECEG directory found for estado ${estadoId}\n`);
+    return;
+  }
+
+  const shpFile = layer === "eceg_secciones_2020" ? "SECCION.shp" : "MUNICIPIO.shp";
+  const shpPath = path.join(estadoDir, shpFile);
+  if (!fs.existsSync(shpPath)) {
+    process.stdout.write(`  [skip] ${shpFile} not found: ${shpPath}\n`);
+    return;
+  }
+
+  const geojsonLayer = layer; // column map key equals layer name
+  process.stdout.write(`Estado ${estadoId} / ${layer}: reading ${shpPath}…\n`);
+  const geojson = await readShp(shpPath, geojsonLayer);
+  process.stdout.write(`  → ${geojson.features.length} features\n`);
+
+  if (geojson.features.length === 0) {
+    process.stdout.write(`  [skip] No features for estado ${estadoId}\n`);
+    return;
+  }
+
+  // Use canonical layer name for TopoJSON object key (strip "_2020" suffix)
+  const topoKey = layer === "eceg_secciones_2020" ? "secciones" : "municipios";
+  const buf = toTopoJSON(geojson, topoKey, SIMPLIFY_THRESHOLD[layer]);
+  const sizeMB = (buf.length / 1e6).toFixed(2);
+  process.stdout.write(`  → TopoJSON: ${sizeMB} MB\n`);
+
+  const subdir = layer === "eceg_secciones_2020" ? "secciones" : "municipios";
+  const storagePath = `${STORAGE_PREFIX_ECEG}/${subdir}/${estadoId}.topojson`;
+
+  if (dryRun) {
+    const outPath = path.join(os.tmpdir(), `geo_${layer}_${estadoId}.topojson`);
+    fs.writeFileSync(outPath, buf);
+    process.stdout.write(`  [dry-run] Written to ${outPath}\n`);
+  } else {
+    process.stdout.write(`  ↑ Uploading to ${storagePath}…\n`);
+    await uploadBuffer(app!, storagePath, buf);
+    process.stdout.write(`  ✓ Done\n`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // INEGI processing
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -978,6 +1069,7 @@ async function main(): Promise<void> {
   const estadoArg = estadoIdx >= 0 ? args[estadoIdx + 1]?.padStart(2, "0") : null;
 
   const inegiLayers = ["ageb_urbana", "ageb_rural"];
+  const ecegLayers  = ["eceg_secciones_2020", "eceg_municipios_2020"];
   const joinLayers  = ["spatial-join"];
 
   if (!layer) {
@@ -985,6 +1077,7 @@ async function main(): Promise<void> {
       "Usage: npx tsx scripts/geo-pipeline.ts --layer <layer> [--estado <id>] [--all-estados] [--upload] [--dry-run]\n" +
       "INE layers:   entidades, municipios, distritos_fed, distritos_loc, secciones\n" +
       "INEGI layers: ageb_urbana, ageb_rural\n" +
+      "ECEG layers:  eceg_secciones_2020, eceg_municipios_2020  (per-state only)\n" +
       "Join layers:  spatial-join  (enriches secciones + AGEBs with cross-system fields)\n"
     );
     process.exit(1);
@@ -1006,6 +1099,24 @@ async function main(): Promise<void> {
     }
     for (const id of estados) {
       await processEstadoSpatialJoin(id, dryRun, app);
+    }
+    return;
+  }
+
+  // ECEG per-state layers
+  if (ecegLayers.includes(layer)) {
+    const estados = allEstados ? ALL_ESTADO_IDS : estadoArg ? [estadoArg] : [];
+    if (estados.length === 0) {
+      process.stderr.write("Specify --estado <id> or --all-estados for ECEG layers.\n");
+      process.exit(1);
+    }
+    for (const id of estados) {
+      await processEcegEstadoLayer(
+        layer as "eceg_secciones_2020" | "eceg_municipios_2020",
+        id,
+        dryRun,
+        app
+      );
     }
     return;
   }

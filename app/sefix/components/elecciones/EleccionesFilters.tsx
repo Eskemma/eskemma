@@ -57,6 +57,10 @@ interface Props {
   hidePartidos?: boolean;
   /** When true, show the year as a static read-only badge instead of a select. */
   fixedAnio?: boolean;
+  /** When true, hide the Cargo select (used by Estadísticos Geoelectorales). */
+  hideCargo?: boolean;
+  /** Replaces the auto-derived scope label in the top bar. */
+  customScopeLabel?: string;
 }
 
 export default function EleccionesFilters({
@@ -71,6 +75,8 @@ export default function EleccionesFilters({
   hasExtranjero,
   hidePartidos = false,
   fixedAnio = false,
+  hideCargo = false,
+  customScopeLabel,
 }: Props) {
   const { opciones: distritos, isLoading: loadingDist } = useEleccionesDistritos(
     pendingAnio, pendingCargo, pendingEstado,
@@ -109,7 +115,8 @@ export default function EleccionesFilters({
 
   const geoScope = pendingEstado || "Nacional";
   const cargoScope = CARGO_DISPLAY_LABELS[pendingCargo] ?? pendingCargo.toUpperCase();
-  const scopeLabel = `${pendingAnio} — ${cargoScope} — ${geoScope}`;
+  const derivedScopeLabel = `${pendingAnio} — ${cargoScope} — ${geoScope}`;
+  const scopeLabel = customScopeLabel ?? derivedScopeLabel;
 
   return (
     <div className="p-4 bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 space-y-3">
@@ -154,19 +161,21 @@ export default function EleccionesFilters({
           )}
         </div>
 
-        <div className="flex flex-col gap-1 flex-1 sm:flex-none">
-          <label htmlFor="ef-cargo" className={LABEL_CLS}>Cargo</label>
-          <select
-            id="ef-cargo"
-            value={pendingCargo}
-            onChange={(e) => setCargo(e.target.value)}
-            className={SELECT_CLS}
-          >
-            {cargosDisponibles.map((c) => (
-              <option key={c} value={c}>{CARGO_CSV_LABELS[c] ?? c}</option>
-            ))}
-          </select>
-        </div>
+        {!hideCargo && (
+          <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+            <label htmlFor="ef-cargo" className={LABEL_CLS}>Cargo</label>
+            <select
+              id="ef-cargo"
+              value={pendingCargo}
+              onChange={(e) => setCargo(e.target.value)}
+              className={SELECT_CLS}
+            >
+              {cargosDisponibles.map((c) => (
+                <option key={c} value={c}>{CARGO_CSV_LABELS[c] ?? c}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
           <label htmlFor="ef-estado" className={LABEL_CLS}>Entidad federativa</label>
