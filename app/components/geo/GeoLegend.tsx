@@ -1,16 +1,38 @@
 import type { GeoColorRamp } from "@/types/geo.types";
-import { interpolateColor } from "@/lib/geo/colorUtils";
 
 interface GeoLegendProps {
   colorRamp: GeoColorRamp;
   label?: string;
   formatValue?: (v: number) => string;
+  compact?: boolean;
 }
 
-export function GeoLegend({ colorRamp, label, formatValue }: GeoLegendProps) {
+export function GeoLegend({ colorRamp, label, formatValue, compact = false }: GeoLegendProps) {
   const fmt = formatValue ?? ((v: number) => v.toLocaleString("es-MX"));
-  const steps = 5;
 
+  if (compact) {
+    return (
+      <div className="absolute bottom-6 right-3 z-[1000] rounded-md bg-white-eske/95 dark:bg-[#0D2035]/95 shadow-md border border-gray-eske-20 dark:border-white/10 p-1.5 w-[90px] min-w-0">
+        <div
+          className="h-1.5 w-full rounded"
+          style={{
+            background: `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorHigh})`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="flex justify-between mt-0.5">
+          <span className="text-[9px] text-black-eske-60 dark:text-black-eske-40 leading-none">
+            {fmt(colorRamp.min)}
+          </span>
+          <span className="text-[9px] text-black-eske-60 dark:text-black-eske-40 leading-none">
+            {fmt(colorRamp.max)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const steps = 5;
   return (
     <div className="absolute bottom-6 right-3 z-[1000] rounded-lg bg-white-eske/95 dark:bg-[#0D2035]/95 shadow-md border border-gray-eske-20 dark:border-white/10 p-3 min-w-[140px]">
       {label && (

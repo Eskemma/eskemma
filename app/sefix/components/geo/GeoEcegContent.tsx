@@ -17,6 +17,11 @@ import {
   type EcegGroup,
 } from "@/lib/sefix/ecegConstants";
 
+const SELECT_PILL_CLS =
+  "text-xs border border-gray-eske-30 dark:border-white/10 rounded px-2 py-0.5 " +
+  "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske cursor-pointer";
+
 export default function GeoEcegContent() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<EcegGroup>("demografia");
@@ -27,9 +32,9 @@ export default function GeoEcegContent() {
   const {
     pendingEstado, pendingCabecera, pendingMunicipio, pendingSecciones,
     pendingCargo, pendingPartidos, pendingTipo, pendingPrincipio,
-    pendingIncluirExtranjero, pendingAnio: _pendingAnio,
+    pendingIncluirExtranjero,
     committed, queryVersion, hasPending,
-    setAnio: _setAnio, setCargo, setEstado, setPartidos, setTipo, setPrincipio,
+    setCargo, setEstado, setPartidos, setTipo, setPrincipio,
     setCabecera, setMunicipio, setSecciones, setIncluirExtranjero,
     handleConsultar, handleRestablecer,
     cargosDisponibles, partidosDisponibles, tiposDisponibles, principiosDisponibles,
@@ -48,7 +53,6 @@ export default function GeoEcegContent() {
   const indicator = ECEG_INDICATOR_MAP[variable];
   const colorRamp = layers[0]?.colorRamp;
 
-  // Scope label (replaces election-specific label)
   const nivelLabel = !committed.estado
     ? "Nacional"
     : committed.cabecera || committed.municipio
@@ -57,7 +61,7 @@ export default function GeoEcegContent() {
   const scopeLabel = `ECEG 2020 — ${nivelLabel}`;
 
   const filterProps = {
-    pendingAnio: 2020,
+    pendingAnio: 2024, // Fix 2: año 2024 para que funcione el cascade de distritos
     pendingCargo,
     pendingEstado,
     pendingPartidos,
@@ -87,10 +91,84 @@ export default function GeoEcegContent() {
     hidePartidos: true,
     fixedAnio: true,
     hideCargo: true,
+    singleRow: true, // Fix 1: filtros en una sola fila
     customScopeLabel: scopeLabel,
   };
 
   const groupIndicators = ECEG_INDICATORS.filter((i) => i.group === activeGroup);
+  // Fix 4: separar default vs extra
+  const defaultIndicators = groupIndicators.filter((i) => i.showByDefault !== false);
+  const extraIndicators = groupIndicators.filter((i) => i.showByDefault === false);
+  const activeGroupLabel = ECEG_GROUPS.find((g) => g.id === activeGroup)?.label ?? activeGroup;
+
+  function handleGroupChange(groupId: EcegGroup) {
+    setActiveGroup(groupId);
+    const first = ECEG_INDICATORS.find((i) => i.group === groupId && i.showByDefault !== false);
+    if (first) setVariable(first.key);
+  }
+
+  // Extracted JSX reutilizado en desktop y en drawer mobile (Fix 7)
+  const indicatorSelector = (
+    <div className="space-y-2">
+      {/* Group tabs */}
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de indicadores">
+        {ECEG_GROUPS.map((g) => (
+          <button
+            key={g.id}
+            role="tab"
+            aria-selected={activeGroup === g.id}
+            onClick={() => handleGroupChange(g.id)}
+            className={[
+              "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
+              activeGroup === g.id
+                ? "bg-blue-eske text-white-eske"
+                : "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:text-blue-eske border border-gray-eske-20 dark:border-white/10",
+            ].join(" ")}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Indicator pills + dropdown extra */}
+      <div className="flex flex-wrap gap-1.5 items-center" role="radiogroup" aria-label="Indicador activo">
+        {defaultIndicators.map((ind) => (
+          <button
+            key={ind.key}
+            role="radio"
+            aria-checked={variable === ind.key}
+            onClick={() => setVariable(ind.key)}
+            className={[
+              "px-2 py-0.5 rounded text-xs transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
+              variable === ind.key
+                ? "bg-bluegreen-eske text-white-eske font-medium"
+                : "text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] underline underline-offset-2",
+            ].join(" ")}
+            title={ind.description}
+          >
+            {ind.label}{/* Fix 6: sin unidades */}
+          </button>
+        ))}
+
+        {/* Fix 4: dropdown para indicadores no-default */}
+        {extraIndicators.length > 0 && (
+          <select
+            value={extraIndicators.some((i) => i.key === variable) ? variable : ""}
+            onChange={(e) => { if (e.target.value) setVariable(e.target.value); }}
+            className={SELECT_PILL_CLS}
+            aria-label={`Más indicadores de ${activeGroupLabel}`}
+          >
+            <option value="">+ Más {activeGroupLabel}…</option>
+            {extraIndicators.map((i) => (
+              <option key={i.key} value={i.key}>{i.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4 pb-14 sm:pb-0">
@@ -111,7 +189,7 @@ export default function GeoEcegContent() {
         />
       </div>
 
-      {/* Mobile left drawer */}
+      {/* Mobile left drawer — Fix 7: incluye selector de indicadores */}
       <div
         className={[
           "fixed left-0 top-0 bottom-14 w-[min(85vw,320px)]",
@@ -131,11 +209,17 @@ export default function GeoEcegContent() {
             ✕
           </button>
         </div>
-        <div className="p-4">
+        <div className="p-4 space-y-4">
           <EleccionesFilters
             {...filterProps}
             onConsultar={() => { handleConsultar(); setLeftOpen(false); }}
           />
+          <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
+            <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] mb-2">
+              Indicador
+            </p>
+            {indicatorSelector}
+          </div>
         </div>
       </div>
 
@@ -166,61 +250,13 @@ export default function GeoEcegContent() {
           )}
         </div>
 
-        {/* Variable selector */}
-        <div className="bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3 space-y-2">
-          {/* Group tabs */}
-          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de indicadores">
-            {ECEG_GROUPS.map((g) => (
-              <button
-                key={g.id}
-                role="tab"
-                aria-selected={activeGroup === g.id}
-                onClick={() => {
-                  setActiveGroup(g.id);
-                  const first = ECEG_INDICATORS.find((i) => i.group === g.id);
-                  if (first) setVariable(first.key);
-                }}
-                className={[
-                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
-                  activeGroup === g.id
-                    ? "bg-blue-eske text-white-eske"
-                    : "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:text-blue-eske border border-gray-eske-20 dark:border-white/10",
-                ].join(" ")}
-              >
-                {g.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Indicator pills */}
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Indicador activo">
-            {groupIndicators.map((ind) => (
-              <button
-                key={ind.key}
-                role="radio"
-                aria-checked={variable === ind.key}
-                onClick={() => setVariable(ind.key)}
-                className={[
-                  "px-2 py-0.5 rounded text-xs transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
-                  variable === ind.key
-                    ? "bg-bluegreen-eske text-white-eske font-medium"
-                    : "text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] underline underline-offset-2",
-                ].join(" ")}
-                title={ind.description}
-              >
-                {ind.label}
-                {ind.unit && (
-                  <span className="ml-1 opacity-70">({ind.unit})</span>
-                )}
-              </button>
-            ))}
-          </div>
+        {/* Fix 7: selector de indicadores — visible solo en desktop */}
+        <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3">
+          {indicatorSelector}
         </div>
 
         {/* Map with legend overlay and loading spinner */}
-        <div className="relative">
+        <div className="relative isolate">
           <GeoVisualizador
             scope={scope}
             layers={layers}
@@ -228,15 +264,21 @@ export default function GeoEcegContent() {
             queryVersion={queryVersion}
           />
 
-          {/* Color ramp legend — shown inside the map when data is available */}
           {colorRamp && !isLoading && (
-            <GeoLegend
-              colorRamp={colorRamp}
-              label={indicator?.label}
-              formatValue={(v) =>
-                v.toLocaleString("es-MX", { maximumFractionDigits: 1 })
-              }
-            />
+            <>
+              <div className="sm:hidden">
+                <GeoLegend colorRamp={colorRamp} compact />
+              </div>
+              <div className="hidden sm:block">
+                <GeoLegend
+                  colorRamp={colorRamp}
+                  label={indicator?.label}
+                  formatValue={(v) =>
+                    v.toLocaleString("es-MX", { maximumFractionDigits: 1 })
+                  }
+                />
+              </div>
+            </>
           )}
 
           {isLoading && (

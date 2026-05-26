@@ -49,21 +49,35 @@ const ECEG_ESTADOS_DIR = path.resolve(
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX = "sefix/eceg_2020";
 
-// Curated indicators for V1 (subset of 229 ECEG columns)
+// Curated indicators — all 10 thematic groups
 const CURATED_COLUMNS = [
   // Demografía
-  "POBTOT", "POB0_14", "POB15_64", "POB65_MAS",
-  "P3YM_HLI", "POB_AFRO", "REL_H_M",
+  "POBTOT", "POB0_14", "POB15_64", "POB65_MAS", "P3YM_HLI", "POB_AFRO", "REL_H_M",
+  "POBMAS", "POBFEM", "P_60YMAS", "P_15A49_F", "P_18YMAS", "PROM_HNV", "POB_EDADNE", "PNACOE",
   // Educación
   "GRAPROES", "P15YM_AN",
-  // Economía
+  "P15YM_SE", "P18YM_PB", "P15PRI_IN", "P15PRI_CO", "P15SEC_IN", "P15SEC_CO", "P15A17A", "P18A24A",
+  // Economía y Empleo
   "PEA", "PDESOCUP", "PSINDER", "POCUPADA",
+  "PE_INAC", "PDER_SS", "PDER_IMSS", "PDER_ISTE", "PDER_ISTEE", "PDER_SEGP",
   // Vivienda
   "VPH_PISODT", "VPH_AGUADV", "VPH_SINRTV",
+  "VPH_S_ELEC", "VPH_DRENAJ", "VPH_NODREN", "VPH_EXCSA", "VPH_TINACO", "VPH_CISTER",
+  "VPH_1CUART", "VPH_NDEAED", "VPH_SNBIEN",
   // Conectividad
   "VPH_INTER", "VPH_CEL", "VPH_PC", "VPH_SINCIN",
+  "VPH_TELEF", "VPH_SINLTC", "VPH_SINTIC",
   // Hogar
   "TOTHOG", "VIVPAR_DES", "OCUPVIVPAR", "PRO_OCUP_C",
+  "HOGJEF_F", "HOGJEF_M", "VIVPAR_HAB", "TVIVPAR",
+  // Población Indígena y Afrodescendiente
+  "P3HLINHE", "PHOG_IND",
+  // Discapacidad y Salud
+  "PCON_DISC", "PCDISC_MOT", "PCDISC_VIS", "PCDISC_AUD", "PCDISC_MEN", "PCON_LIMI",
+  // Bienes Duraderos
+  "VPH_REFRI", "VPH_LAVAD", "VPH_AUTOM", "VPH_MOTO", "VPH_BICI", "VPH_TV",
+  // Religión
+  "PCATOLICA", "PRO_CRIEVA", "PSIN_RELIG",
 ] as const;
 
 type CuratedColumn = typeof CURATED_COLUMNS[number];
@@ -185,7 +199,7 @@ function buildSeccionesData(rows: EcegRow[]): Record<string, DataRecord> {
   return out;
 }
 
-const AVERAGE_COLS = new Set<string>(["GRAPROES", "REL_H_M", "OCUPVIVPAR", "PRO_OCUP_C"]);
+const AVERAGE_COLS = new Set<string>(["GRAPROES", "REL_H_M", "OCUPVIVPAR", "PRO_OCUP_C", "PROM_HNV"]);
 
 /**
  * Builds municipios JSON: { [CVE_ENT+CVE_MUN]: DataRecord }

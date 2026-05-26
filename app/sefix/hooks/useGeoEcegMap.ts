@@ -44,6 +44,7 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   const [dataKey, setDataKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const prevVersionRef = useRef(-1);
+  const prevVariableRef = useRef("");
 
   // Derive nivel from geographic scope (mirrors useGeoElectoralMap logic)
   const nivel: EcegNivel = !estado ? "nacional" : "municipios";
@@ -85,11 +86,14 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   }, [estado, cabecera, municipio, secciones, variable, nivelResolved]);
 
   useEffect(() => {
-    if (queryVersion === prevVersionRef.current) return;
+    const versionChanged = queryVersion !== prevVersionRef.current;
+    const variableChanged = variable !== prevVariableRef.current;
+    if (!versionChanged && !variableChanged) return;
     prevVersionRef.current = queryVersion;
+    prevVariableRef.current = variable;
     fetchData();
     return () => { abortRef.current?.abort(); };
-  }, [queryVersion, fetchData]);
+  }, [queryVersion, variable, fetchData]);
 
   // Geographic scope
   const scope: GeoScopeElectoral = (() => {

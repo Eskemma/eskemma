@@ -25,7 +25,10 @@ function sessionKey(tipo: GeoLayerTipo, estadoId?: string): string {
 }
 
 // Layer types that are stored per-state only (no national file)
-const PER_ESTADO_TIPOS: GeoLayerTipo[] = ["secciones", "ageb_urbana", "ageb_rural"];
+const PER_ESTADO_TIPOS: GeoLayerTipo[] = [
+  "secciones", "ageb_urbana", "ageb_rural",
+  "eceg_secciones_2020", "eceg_municipios_2020",
+];
 
 /**
  * Determines which Storage file to fetch:

@@ -61,6 +61,8 @@ interface Props {
   hideCargo?: boolean;
   /** Replaces the auto-derived scope label in the top bar. */
   customScopeLabel?: string;
+  /** When true, collapse all filter fields into one flex-wrap row (for ECEG mode). */
+  singleRow?: boolean;
 }
 
 export default function EleccionesFilters({
@@ -77,6 +79,7 @@ export default function EleccionesFilters({
   fixedAnio = false,
   hideCargo = false,
   customScopeLabel,
+  singleRow = false,
 }: Props) {
   const { opciones: distritos, isLoading: loadingDist } = useEleccionesDistritos(
     pendingAnio, pendingCargo, pendingEstado,
@@ -136,8 +139,98 @@ export default function EleccionesFilters({
         </button>
       </div>
 
+      {/* Fila única (modo ECEG): Año badge + Estado + Distrito + Municipio + Sección + Consultar */}
+      {singleRow && (
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
+          {fixedAnio && (
+            <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+              <label htmlFor="ef-anio-sr" className={LABEL_CLS}>Año</label>
+              <div
+                id="ef-anio-sr"
+                className={`${SELECT_CLS} bg-gray-eske-10 dark:bg-white/5 text-black-eske-60 dark:text-[#6D8294] cursor-default select-none`}
+                aria-label={`Año fijo: ${pendingAnio}`}
+              >
+                {pendingAnio}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+            <label htmlFor="ef-estado-sr" className={LABEL_CLS}>Entidad federativa</label>
+            <select
+              id="ef-estado-sr"
+              value={pendingEstado}
+              onChange={(e) => setEstado(e.target.value)}
+              className={SELECT_CLS}
+            >
+              <option value="">— Nacional —</option>
+              {ESTADOS_LIST.map((e) => (
+                <option key={e.key} value={e.nombre}>{e.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+            <label htmlFor="ef-cabecera-sr" className={isNacional ? LABEL_DISABLED_CLS : LABEL_CLS}>
+              Distrito{loadingDist && <span className="ml-1 text-[10px] text-red-eske">(Cargando…)</span>}
+            </label>
+            <select
+              id="ef-cabecera-sr"
+              value={pendingCabecera}
+              onChange={(e) => setCabecera(e.target.value)}
+              disabled={isNacional || loadingDist}
+              className={SELECT_CLS}
+            >
+              <option value="">Todos</option>
+              {distritos.map((d) => (
+                <option key={d.cve} value={d.cve}>{d.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+            <label htmlFor="ef-municipio-sr" className={!hasCabecera ? LABEL_DISABLED_CLS : LABEL_CLS}>
+              Municipio{loadingMun && <span className="ml-1 text-[10px] text-red-eske">(Cargando…)</span>}
+            </label>
+            <select
+              id="ef-municipio-sr"
+              value={pendingMunicipio}
+              onChange={(e) => setMunicipio(e.target.value)}
+              disabled={!hasCabecera || loadingMun}
+              className={SELECT_CLS}
+            >
+              <option value="">Todos</option>
+              {municipios.map((m) => (
+                <option key={m.cve} value={m.cve}>{m.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 sm:flex-none sm:min-w-[180px]">
+            <PartidosMultiSelect
+              id="ef-secciones-sr"
+              label={<>Sección{loadingSec && <span className="ml-1 text-red-eske">(Cargando…)</span>}</>}
+              options={seccionOptions}
+              selected={pendingSecciones.length > 0 ? pendingSecciones : ["Todas"]}
+              onChange={(v) => setSecciones(v.filter((x) => x !== "Todas"))}
+              disabled={!hasMunicipio || loadingSec}
+              placeholder="Buscar sección..."
+              todosLabel="Todas"
+            />
+          </div>
+          {hasPending && (
+            <div className="flex items-end flex-shrink-0">
+              <button
+                type="button"
+                onClick={onConsultar}
+                className="px-4 py-1.5 rounded-md text-sm font-medium bg-blue-eske text-white-eske hover:bg-blue-eske-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+                aria-label="Ejecutar consulta con los filtros seleccionados"
+              >
+                Consultar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Fila 1: Año, Cargo, Entidad federativa */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
+      <div className={`flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end${singleRow ? " hidden" : ""}`}>
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
           <label htmlFor="ef-anio" className={LABEL_CLS}>Año</label>
           {fixedAnio ? (
@@ -224,7 +317,7 @@ export default function EleccionesFilters({
       </div>
 
       {/* Fila 2: Distrito, Municipio, Sección + radios (condicional) + Partidos + Consultar */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
+      <div className={`flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end${singleRow ? " hidden" : ""}`}>
 
         {/* Distrito */}
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
