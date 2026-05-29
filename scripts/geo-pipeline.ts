@@ -622,9 +622,98 @@ function findEcegEstadoDir(estadoId: string): string | null {
 }
 
 /**
+ * Reads INE SECCION.shp for one state and returns a Map:
+ *   seccion_number → DISTRITO_FED (3-digit)
+ *
+ * Used to inject DISTRITO_FED into eceg_secciones_2020 features when the
+ * ECEG shapefile lacks the DISTRITO field.
+ */
+async function buildSecToDistMapFromINE(estadoDir: string): Promise<Map<number, string>> {
+  const estadoId  = path.basename(estadoDir).slice(0, 2);
+  const ineBase   = path.resolve(__dirname, "../info_geo_eske/mgs_2025_INE/estados");
+  if (!fs.existsSync(ineBase)) return new Map();
+  const ineMatch  = fs.readdirSync(ineBase).find((e) => e.startsWith(estadoId + "_"));
+  if (!ineMatch) return new Map();
+  const shpPath   = path.join(ineBase, ineMatch, "SECCION.shp");
+  if (!fs.existsSync(shpPath)) return new Map();
+
+  const map = new Map<number, string>();
+  const src = await shapefile.open(shpPath);
+  while (true) {
+    const result = await src.read();
+    if (result.done) break;
+    const p = result.value?.properties as Record<string, unknown>;
+    if (!p) continue;
+    const raw: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
+    const sec  = Number(raw["SECCION"]);
+    const dist = String(raw["DISTRITO_F"] ?? "").padStart(3, "0");
+    if (sec && dist && dist !== "000") map.set(sec, dist);
+  }
+  return map;
+}
+
+/**
+ * Reads SECCION.shp (ECEG or INE fallback) for one state and returns a map:
+ *   cveMun (3-digit) → majority DISTRITO_FED (3-digit)
+ *
+ * Most ECEG shapefiles lack the DISTRITO field; falls back to the INE
+ * electoral sections shapefile (mgs_2025_INE/estados) which always has DISTRITO_F.
+ */
+async function buildMunToMajDistMap(estadoDir: string): Promise<Map<string, string>> {
+  // Helper: aggregate mun→dist counts from a shapefile using normalized field lookup
+  async function aggregateFromShp(
+    shpPath: string,
+    distField: string
+  ): Promise<Map<string, string>> {
+    const distCount: Record<string, Record<string, number>> = {};
+    const src = await shapefile.open(shpPath);
+    while (true) {
+      const result = await src.read();
+      if (result.done) break;
+      const p = result.value?.properties as Record<string, unknown>;
+      if (!p) continue;
+      const raw: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
+      const mun  = String(raw["MUNICIPIO"] ?? "").padStart(3, "0");
+      const dist = String(raw[distField]   ?? "").padStart(3, "0");
+      if (!mun || !dist || dist === "000") continue;
+      if (!distCount[mun]) distCount[mun] = {};
+      distCount[mun][dist] = (distCount[mun][dist] ?? 0) + 1;
+    }
+    const out = new Map<string, string>();
+    for (const [mun, counts] of Object.entries(distCount)) {
+      out.set(mun, Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "000");
+    }
+    return out;
+  }
+
+  // 1. Try ECEG SECCION.shp (field "DISTRITO")
+  const ecegShp = path.join(estadoDir, "SECCION.shp");
+  if (fs.existsSync(ecegShp)) {
+    const map = await aggregateFromShp(ecegShp, "DISTRITO");
+    if (map.size > 0) return map;
+  }
+
+  // 2. Fall back to INE estados SECCION.shp (field "DISTRITO_F")
+  // estadoDir looks like ".../01_eceg_2020_aguascalientes" — extract the 2-digit prefix
+  const estadoId = path.basename(estadoDir).slice(0, 2);
+  const ineBase  = path.resolve(__dirname, "../info_geo_eske/mgs_2025_INE/estados");
+  if (!fs.existsSync(ineBase)) return new Map();
+  const ineMatch = fs.readdirSync(ineBase).find((e) => e.startsWith(estadoId + "_"));
+  if (!ineMatch) return new Map();
+  const ineShp = path.join(ineBase, ineMatch, "SECCION.shp");
+  if (!fs.existsSync(ineShp)) return new Map();
+  return aggregateFromShp(ineShp, "DISTRITO_F");
+}
+
+/**
  * Processes ECEG 2020 secciones or municipios for a single estado.
  * Reads SECCION.shp or MUNICIPIO.shp from the state's ECEG directory,
  * reprojects to WGS84, and uploads to Firebase Storage.
+ *
+ * For eceg_municipios_2020, injects a DISTRITO_FED property (majority district)
+ * derived from the companion SECCION.shp, enabling client-side district filtering.
  *
  * @param layer "eceg_secciones_2020" | "eceg_municipios_2020"
  */
@@ -651,6 +740,51 @@ async function processEcegEstadoLayer(
   process.stdout.write(`Estado ${estadoId} / ${layer}: reading ${shpPath}…\n`);
   const geojson = await readShp(shpPath, geojsonLayer);
   process.stdout.write(`  → ${geojson.features.length} features\n`);
+
+  // Inject DISTRITO_FED using INE sections as fallback when ECEG SHP lacks the field
+  if (layer === "eceg_municipios_2020") {
+    const munToMajDist = await buildMunToMajDistMap(estadoDir);
+    for (const feature of geojson.features) {
+      const cveMun = String(feature.properties["CVE_MUN"] ?? "");
+      feature.properties["DISTRITO_FED"] = munToMajDist.get(cveMun) ?? "000";
+    }
+  } else if (layer === "eceg_secciones_2020") {
+    // Inject DISTRITO_FED from INE fallback when ECEG SHP lacks the field
+    const needsDistInjection = geojson.features.some((f) => !f.properties["DISTRITO_FED"]);
+    if (needsDistInjection) {
+      const secToDistMap = await buildSecToDistMapFromINE(estadoDir);
+      for (const feature of geojson.features) {
+        if (!feature.properties["DISTRITO_FED"]) {
+          const secNum = parseInt(String(feature.properties["CVE_SECCION"] ?? ""), 10);
+          feature.properties["DISTRITO_FED"] = secToDistMap.get(secNum) ?? "000";
+        }
+      }
+    }
+    // Inject NOMGEO (municipality name) from MUNICIPIO.shp so that client-side
+    // filtering by municipality name (NOMGEO fallback in filterByScope) works for sections.
+    const munShpPath = path.join(estadoDir, "MUNICIPIO.shp");
+    if (fs.existsSync(munShpPath)) {
+      const nomgeoMap = new Map<string, string>();
+      const munSrc = await shapefile.open(munShpPath);
+      while (true) {
+        const r = await munSrc.read();
+        if (r.done) break;
+        const p = r.value?.properties as Record<string, unknown>;
+        if (!p) continue;
+        const raw: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
+        const cveMun = String(raw["MUNICIPIO"] ?? "").padStart(3, "0");
+        const nombre = String(raw["NOMBRE"] ?? "").trim();
+        if (cveMun && nombre) nomgeoMap.set(cveMun, nombre);
+      }
+      for (const feature of geojson.features) {
+        const cveMun = String(feature.properties["CVE_MUN"] ?? "");
+        if (cveMun && !feature.properties["NOMGEO"]) {
+          feature.properties["NOMGEO"] = nomgeoMap.get(cveMun) ?? "";
+        }
+      }
+    }
+  }
 
   if (geojson.features.length === 0) {
     process.stdout.write(`  [skip] No features for estado ${estadoId}\n`);

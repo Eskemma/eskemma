@@ -46,6 +46,12 @@ const ECEG_ESTADOS_DIR = path.resolve(
   __dirname,
   "../info_geo_eske/eceg_2020/ECEG_2020_estados"
 );
+// INE electoral sections (per-state) — used as fallback for district mapping
+// when ECEG shapefiles lack the DISTRITO field (most states only have MUNICIPIO+SECCION).
+const INE_ESTADOS_DIR = path.resolve(
+  __dirname,
+  "../info_geo_eske/mgs_2025_INE/estados"
+);
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX = "sefix/eceg_2020";
 
@@ -109,6 +115,17 @@ function findEcegEstadoDir(estadoId: string): string | null {
   return fs.statSync(fullPath).isDirectory() ? fullPath : null;
 }
 
+/** Finds the per-state directory in INE_ESTADOS_DIR by numeric prefix. */
+function findIneEstadoDir(estadoId: string): string | null {
+  if (!fs.existsSync(INE_ESTADOS_DIR)) return null;
+  const prefix = `${estadoId}_`;
+  const entries = fs.readdirSync(INE_ESTADOS_DIR);
+  const match = entries.find((e) => e.startsWith(prefix));
+  if (!match) return null;
+  const fullPath = path.join(INE_ESTADOS_DIR, match);
+  return fs.statSync(fullPath).isDirectory() ? fullPath : null;
+}
+
 /**
  * Reads SECCION.shp for one state and returns a Map:
  *   seccion_number → padded CVE_MUN (3-digit string)
@@ -132,6 +149,60 @@ async function buildSeccionMunMap(estadoId: string): Promise<Map<number, string>
     const sec = Number(p["SECCION"]);
     const mun = String(p["MUNICIPIO"] ?? "").padStart(3, "0");
     if (sec && mun) map.set(sec, mun);
+  }
+  return map;
+}
+
+/**
+ * Reads SECCION.shp for one state and returns a Map:
+ *   seccion_number → padded DISTRITO_FED (3-digit string)
+ *
+ * Most ECEG shapefiles only have MUNICIPIO+SECCION (no DISTRITO field).
+ * Falls back to INE electoral sections (mgs_2025_INE) which always have DISTRITO_F.
+ *
+ * @param estadoId zero-padded state ID e.g. "01"
+ */
+async function buildSeccionDistMap(estadoId: string): Promise<Map<number, string>> {
+  // 1. Try ECEG shapefile (field "DISTRITO", uppercase)
+  const ecegDir = findEcegEstadoDir(estadoId);
+  if (ecegDir) {
+    const shpPath = path.join(ecegDir, "SECCION.shp");
+    if (fs.existsSync(shpPath)) {
+      const map = new Map<number, string>();
+      const src = await shapefile.open(shpPath);
+      while (true) {
+        const result = await src.read();
+        if (result.done) break;
+        const p = result.value?.properties as Record<string, unknown>;
+        if (!p) continue;
+        const sec  = Number(p["SECCION"]);
+        const dist = String(p["DISTRITO"] ?? "").padStart(3, "0");
+        if (sec && dist && dist !== "000") map.set(sec, dist);
+      }
+      if (map.size > 0) return map;
+    }
+  }
+
+  // 2. Fall back to INE electoral sections (field "DISTRITO_F", may be lowercase)
+  const ineDir = findIneEstadoDir(estadoId);
+  if (!ineDir) return new Map();
+
+  const shpPath = path.join(ineDir, "SECCION.shp");
+  if (!fs.existsSync(shpPath)) return new Map();
+
+  const map = new Map<number, string>();
+  const src = await shapefile.open(shpPath);
+  while (true) {
+    const result = await src.read();
+    if (result.done) break;
+    const p = result.value?.properties as Record<string, unknown>;
+    if (!p) continue;
+    // Normalize keys to uppercase to handle lowercase field names
+    const raw: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
+    const sec  = Number(raw["SECCION"]);
+    const dist = String(raw["DISTRITO_F"] ?? "").padStart(3, "0");
+    if (sec && dist && dist !== "000") map.set(sec, dist);
   }
   return map;
 }
@@ -246,6 +317,51 @@ function buildMunicipiosData(
   return out;
 }
 
+/**
+ * Builds distritos JSON: { [CVE_ENT+CVE_DISTRITO]: DataRecord }
+ * Uses seccionDistMap (from SECCION.shp) to derive DISTRITO_FED for each row.
+ * Sums count-type indicators; averages ratio/index fields.
+ *
+ * @param seccionDistMap SECCION number → padded DISTRITO_FED (3-digit)
+ */
+function buildDistritosData(
+  rows: EcegRow[],
+  seccionDistMap: Map<number, string>
+): Record<string, DataRecord> {
+  const sums: Record<string, Record<string, number>> = {};
+  const counts: Record<string, Record<string, number>> = {};
+
+  for (const row of rows) {
+    if (row.SECCION == null) continue;
+    const cveDist = seccionDistMap.get(row.SECCION);
+    if (!cveDist) continue;
+
+    const key = String(row.ENTIDAD).padStart(2, "0") + cveDist;
+    if (!sums[key]) { sums[key] = {}; counts[key] = {}; }
+
+    for (const col of CURATED_COLUMNS) {
+      const v = row[col];
+      if (typeof v !== "number") continue;
+      sums[key][col] = (sums[key][col] ?? 0) + v;
+      counts[key][col] = (counts[key][col] ?? 0) + 1;
+    }
+  }
+
+  const out: Record<string, DataRecord> = {};
+  for (const key of Object.keys(sums)) {
+    const rec: DataRecord = {};
+    for (const col of CURATED_COLUMNS) {
+      const s = sums[key][col];
+      if (s == null) continue;
+      rec[col as CuratedColumn] = AVERAGE_COLS.has(col)
+        ? Math.round((s / counts[key][col]) * 100) / 100
+        : s;
+    }
+    out[key] = rec;
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Firebase
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,32 +426,45 @@ async function processEstado(
   const rows = readXlsx(xlsxPath);
   process.stdout.write(`  → ${rows.length} rows\n`);
 
-  // Build sección→municipio mapping from shapefile
-  const seccionMunMap = await buildSeccionMunMap(estadoId);
-  process.stdout.write(`  → ${seccionMunMap.size} sección→municipio pairs from SHP\n`);
+  // Build sección→municipio and sección→distrito mappings from shapefile
+  const [seccionMunMap, seccionDistMap] = await Promise.all([
+    buildSeccionMunMap(estadoId),
+    buildSeccionDistMap(estadoId),
+  ]);
+  process.stdout.write(
+    `  → ${seccionMunMap.size} sección→municipio, ${seccionDistMap.size} sección→distrito pairs\n`
+  );
 
   const seccionesData = buildSeccionesData(rows);
   const municipiosData = buildMunicipiosData(rows, seccionMunMap);
+  const distritosData  = buildDistritosData(rows, seccionDistMap);
   process.stdout.write(
     `  → ${Object.keys(seccionesData).length} secciones, ` +
-    `${Object.keys(municipiosData).length} municipios\n`
+    `${Object.keys(municipiosData).length} municipios, ` +
+    `${Object.keys(distritosData).length} distritos\n`
   );
 
-  const secPath = `${STORAGE_PREFIX}/secciones/${estadoId}.json`;
-  const munPath = `${STORAGE_PREFIX}/municipios/${estadoId}.json`;
+  const secPath  = `${STORAGE_PREFIX}/secciones/${estadoId}.json`;
+  const munPath  = `${STORAGE_PREFIX}/municipios/${estadoId}.json`;
+  const distPath = `${STORAGE_PREFIX}/distritos/${estadoId}.json`;
 
   if (dryRun) {
-    const secOut = path.join(os.tmpdir(), `eceg_secciones_${estadoId}.json`);
-    const munOut = path.join(os.tmpdir(), `eceg_municipios_${estadoId}.json`);
-    fs.writeFileSync(secOut, JSON.stringify(seccionesData));
-    fs.writeFileSync(munOut, JSON.stringify(municipiosData));
+    const secOut  = path.join(os.tmpdir(), `eceg_secciones_${estadoId}.json`);
+    const munOut  = path.join(os.tmpdir(), `eceg_municipios_${estadoId}.json`);
+    const distOut = path.join(os.tmpdir(), `eceg_distritos_${estadoId}.json`);
+    fs.writeFileSync(secOut,  JSON.stringify(seccionesData));
+    fs.writeFileSync(munOut,  JSON.stringify(municipiosData));
+    fs.writeFileSync(distOut, JSON.stringify(distritosData));
     process.stdout.write(`  [dry-run] → ${secOut}\n`);
     process.stdout.write(`  [dry-run] → ${munOut}\n`);
+    process.stdout.write(`  [dry-run] → ${distOut}\n`);
   } else {
     process.stdout.write(`  ↑ ${secPath}…\n`);
     await uploadJson(app!, secPath, seccionesData);
     process.stdout.write(`  ↑ ${munPath}…\n`);
     await uploadJson(app!, munPath, municipiosData);
+    process.stdout.write(`  ↑ ${distPath}…\n`);
+    await uploadJson(app!, distPath, distritosData);
     process.stdout.write(`  ✓ Done\n`);
   }
 

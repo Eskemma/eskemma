@@ -54,7 +54,7 @@ function resolveParams(
 }
 
 // Layer types that carry CVE_SECCION and can be filtered by sección
-const SECCION_FILTERABLE: GeoLayerTipo[] = ["secciones", "ageb_urbana", "ageb_rural"];
+const SECCION_FILTERABLE: GeoLayerTipo[] = ["secciones", "ageb_urbana", "ageb_rural", "eceg_secciones_2020"];
 
 /**
  * Filters a FeatureCollection by estado and/or district, depending on scope.
@@ -78,11 +78,15 @@ function filterByScope(
     );
   }
 
-  // Filter by municipio (used for secciones inside a specific municipio)
+  // Filter by municipio. When cve_municipio is a name string (ECEG context uses municipality
+  // display names), fall back to matching the NOMGEO property.
   if (cve_municipio) {
-    features = features.filter(
-      (f) => String(f.properties?.["CVE_MUN"] ?? "").padStart(3, "0") === cve_municipio.padStart(3, "0")
-    );
+    features = features.filter((f) => {
+      const cveMun = String(f.properties?.["CVE_MUN"] ?? "").padStart(3, "0");
+      if (cveMun === cve_municipio.padStart(3, "0")) return true;
+      const nomgeo = String(f.properties?.["NOMGEO"] ?? "").toUpperCase().trim();
+      return nomgeo.length > 0 && nomgeo === cve_municipio.toUpperCase().trim();
+    });
   }
 
   // Filter by district (mutually exclusive with municipio filter above)

@@ -1,14 +1,15 @@
 "use client";
 // app/sefix/components/geo/GeoEcegContent.tsx
 // Estadísticos Geoelectorales (ECEG 2020) choropleth map.
-// Reuses the same geographic filter panel as Visualización Geográfica.
+// Cascade: nacional → municipios del estado → secciones del municipio
+//          OR       → distritos del estado  → secciones del distrito
 import { useState, useCallback } from "react";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import { GeoVisualizador } from "@/app/components/geo/GeoVisualizador";
 import { GeoLegend } from "@/app/components/geo/GeoLegend";
 import { useGeoEcegMap } from "@/app/sefix/hooks/useGeoEcegMap";
-import { useEleccionesFilters } from "@/app/sefix/hooks/useEleccionesFilters";
-import EleccionesFilters from "../elecciones/EleccionesFilters";
+import { useGeoEcegFilters } from "@/app/sefix/hooks/useGeoEcegFilters";
+import GeoEcegFilters from "./GeoEcegFilters";
 import {
   ECEG_GROUPS,
   ECEG_INDICATORS,
@@ -16,6 +17,7 @@ import {
   DEFAULT_ECEG_VARIABLE,
   type EcegGroup,
 } from "@/lib/sefix/ecegConstants";
+import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
 
 const SELECT_PILL_CLS =
   "text-xs border border-gray-eske-30 dark:border-white/10 rounded px-2 py-0.5 " +
@@ -30,22 +32,36 @@ export default function GeoEcegContent() {
   useEscapeKey(leftOpen, useCallback(() => setLeftOpen(false), []));
 
   const {
-    pendingEstado, pendingCabecera, pendingMunicipio, pendingSecciones,
-    pendingCargo, pendingPartidos, pendingTipo, pendingPrincipio,
-    pendingIncluirExtranjero,
-    committed, queryVersion, hasPending,
-    setCargo, setEstado, setPartidos, setTipo, setPrincipio,
-    setCabecera, setMunicipio, setSecciones, setIncluirExtranjero,
-    handleConsultar, handleRestablecer,
-    cargosDisponibles, partidosDisponibles, tiposDisponibles, principiosDisponibles,
-    hasExtranjero,
-  } = useEleccionesFilters();
+    pendingEstado,
+    pendingMunicipioNombre,
+    pendingMunicipioCve,
+    pendingCabeceraCve,
+    pendingCabeceraLabel,
+    pendingSecciones,
+    pendingFilterMode,
+    committed,
+    municipioOptions,
+    distritoOptions,
+    seccionOptions,
+    municipioLoading,
+    distritoLoading,
+    seccionLoading,
+    setEstado,
+    setMunicipio,
+    setCabecera,
+    setSecciones,
+    handleConsultar,
+    handleRestablecer,
+    queryVersion,
+    hasPending,
+  } = useGeoEcegFilters();
 
   const { scope, layers, isLoading, error } = useGeoEcegMap({
     estado: committed.estado,
-    cabecera: committed.cabecera,
-    municipio: committed.municipio,
+    municipioNombre: committed.municipioNombre,
+    cabeceraCve: committed.cabeceraCve,
     secciones: committed.secciones,
+    filterMode: committed.filterMode,
     queryVersion,
     variable,
   });
@@ -53,50 +69,48 @@ export default function GeoEcegContent() {
   const indicator = ECEG_INDICATOR_MAP[variable];
   const colorRamp = layers[0]?.colorRamp;
 
-  const nivelLabel = !committed.estado
-    ? "Nacional"
-    : committed.cabecera || committed.municipio
-    ? `Secciones — ${committed.estado}`
-    : committed.estado;
+  // Scope label reflecting the active navigation level
+  const nivelLabel: string = (() => {
+    if (!committed.estado) return "Nacional";
+    if (committed.filterMode === "municipio") {
+      if (!committed.municipioNombre) return `Municipios — ${committed.estado}`;
+      if (committed.secciones.length > 0) return `Secciones de ${committed.municipioNombre}`;
+      return `${committed.municipioNombre} — ${committed.estado}`;
+    }
+    // distrito mode
+    if (!committed.cabeceraCve || committed.cabeceraCve === DISTRITO_TODOS) {
+      return `Distritos — ${committed.estado}`;
+    }
+    if (committed.secciones.length > 0) {
+      return `Secciones — Distrito ${committed.cabeceraCve} — ${committed.estado}`;
+    }
+    return `Distrito ${committed.cabeceraCve} — ${committed.estado}`;
+  })();
   const scopeLabel = `ECEG 2020 — ${nivelLabel}`;
 
   const filterProps = {
-    pendingAnio: 2024, // Fix 2: año 2024 para que funcione el cascade de distritos
-    pendingCargo,
     pendingEstado,
-    pendingPartidos,
-    pendingTipo,
-    pendingPrincipio,
-    pendingCabecera,
-    pendingMunicipio,
+    pendingMunicipioNombre,
+    pendingMunicipioCve,
+    pendingCabeceraCve,
+    pendingCabeceraLabel,
     pendingSecciones,
-    pendingIncluirExtranjero,
-    setAnio: () => {},
-    setCargo,
+    pendingFilterMode,
+    municipioOptions,
+    distritoOptions,
+    seccionOptions,
+    municipioLoading,
+    distritoLoading,
+    seccionLoading,
     setEstado,
-    setPartidos,
-    setTipo,
-    setPrincipio,
-    setCabecera,
     setMunicipio,
+    setCabecera,
     setSecciones,
-    setIncluirExtranjero,
-    hasPending,
     onRestablecer: handleRestablecer,
-    cargosDisponibles,
-    partidosDisponibles,
-    tiposDisponibles,
-    principiosDisponibles,
-    hasExtranjero,
-    hidePartidos: true,
-    fixedAnio: true,
-    hideCargo: true,
-    singleRow: true, // Fix 1: filtros en una sola fila
-    customScopeLabel: scopeLabel,
+    hasPending,
   };
 
   const groupIndicators = ECEG_INDICATORS.filter((i) => i.group === activeGroup);
-  // Fix 4: separar default vs extra
   const defaultIndicators = groupIndicators.filter((i) => i.showByDefault !== false);
   const extraIndicators = groupIndicators.filter((i) => i.showByDefault === false);
   const activeGroupLabel = ECEG_GROUPS.find((g) => g.id === activeGroup)?.label ?? activeGroup;
@@ -107,7 +121,6 @@ export default function GeoEcegContent() {
     if (first) setVariable(first.key);
   }
 
-  // Extracted JSX reutilizado en desktop y en drawer mobile (Fix 7)
   const indicatorSelector = (
     <div className="space-y-2">
       {/* Group tabs */}
@@ -131,7 +144,7 @@ export default function GeoEcegContent() {
         ))}
       </div>
 
-      {/* Indicator pills + dropdown extra */}
+      {/* Indicator pills + dropdown for extras */}
       <div className="flex flex-wrap gap-1.5 items-center" role="radiogroup" aria-label="Indicador activo">
         {defaultIndicators.map((ind) => (
           <button
@@ -148,11 +161,10 @@ export default function GeoEcegContent() {
             ].join(" ")}
             title={ind.description}
           >
-            {ind.label}{/* Fix 6: sin unidades */}
+            {ind.label}
           </button>
         ))}
 
-        {/* Fix 4: dropdown para indicadores no-default */}
         {extraIndicators.length > 0 && (
           <select
             value={extraIndicators.some((i) => i.key === variable) ? variable : ""}
@@ -182,14 +194,14 @@ export default function GeoEcegContent() {
       )}
 
       {/* Desktop filter bar */}
-      <div className="hidden sm:block">
-        <EleccionesFilters
+      <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3">
+        <GeoEcegFilters
           {...filterProps}
           onConsultar={handleConsultar}
         />
       </div>
 
-      {/* Mobile left drawer — Fix 7: incluye selector de indicadores */}
+      {/* Mobile left drawer */}
       <div
         className={[
           "fixed left-0 top-0 bottom-14 w-[min(85vw,320px)]",
@@ -210,7 +222,7 @@ export default function GeoEcegContent() {
           </button>
         </div>
         <div className="p-4 space-y-4">
-          <EleccionesFilters
+          <GeoEcegFilters
             {...filterProps}
             onConsultar={() => { handleConsultar(); setLeftOpen(false); }}
           />
@@ -235,7 +247,7 @@ export default function GeoEcegContent() {
           </p>
         </div>
 
-        {/* Scope + error */}
+        {/* Scope label + error */}
         <div className="text-center space-y-1">
           <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]">
             {scopeLabel}
@@ -250,7 +262,7 @@ export default function GeoEcegContent() {
           )}
         </div>
 
-        {/* Fix 7: selector de indicadores — visible solo en desktop */}
+        {/* Indicator selector — desktop only */}
         <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3">
           {indicatorSelector}
         </div>
@@ -263,6 +275,14 @@ export default function GeoEcegContent() {
             height="560px"
             queryVersion={queryVersion}
           />
+
+          {colorRamp && !isLoading && (
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none"
+              style={{ background: "rgba(0,0,0,0.06)", zIndex: 300 }}
+              aria-hidden="true"
+            />
+          )}
 
           {colorRamp && !isLoading && (
             <>

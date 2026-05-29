@@ -11,15 +11,15 @@ interface CacheEntry { data: Record<string, Record<string, number>>; expiresAt: 
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 
-type NivelParam = "nacional" | "municipios" | "secciones";
+type NivelParam = "nacional" | "distritos" | "municipios" | "secciones";
 
 function buildStoragePath(nivel: NivelParam, estadoId?: string): string | null {
   if (nivel === "nacional") return `${STORAGE_PREFIX}/national.json`;
   if (!estadoId) return null;
   const id = estadoId.padStart(2, "0");
-  return nivel === "secciones"
-    ? `${STORAGE_PREFIX}/secciones/${id}.json`
-    : `${STORAGE_PREFIX}/municipios/${id}.json`;
+  if (nivel === "distritos") return `${STORAGE_PREFIX}/distritos/${id}.json`;
+  if (nivel === "secciones") return `${STORAGE_PREFIX}/secciones/${id}.json`;
+  return `${STORAGE_PREFIX}/municipios/${id}.json`;
 }
 
 async function fetchFromStorage(
@@ -46,9 +46,9 @@ export async function GET(req: NextRequest) {
   const variable = searchParams.get("variable") ?? "";
   const estadoId = searchParams.get("estado_id") ?? undefined;
 
-  if (!["nacional", "municipios", "secciones"].includes(nivel)) {
+  if (!["nacional", "distritos", "municipios", "secciones"].includes(nivel)) {
     return NextResponse.json(
-      { error: "Invalid 'nivel'. Must be nacional, municipios, or secciones." },
+      { error: "Invalid 'nivel'. Must be nacional, distritos, municipios, or secciones." },
       { status: 400 }
     );
   }
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
   if (nivel !== "nacional" && !estadoId) {
     return NextResponse.json(
-      { error: "'estado_id' is required when nivel is municipios or secciones." },
+      { error: "'estado_id' is required when nivel is distritos, municipios, or secciones." },
       { status: 400 }
     );
   }

@@ -1,12 +1,18 @@
 "use client";
 // app/sefix/hooks/useGeoEcegMap.ts
 // Builds scope, layers, and colorRamp for the ECEG 2020 choropleth map.
+//
+// Cascade by filterMode:
+//   municipio mode: nacional → municipios del estado → secciones del municipio
+//   distrito mode:  nacional → distritos del estado  → secciones del distrito
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import {
   ECEG_INDICATOR_MAP,
   ECEG_COLOR_RAMPS,
 } from "@/lib/sefix/ecegConstants";
+import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
+import type { EcegFilterMode } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { GeoScopeElectoral, GeoLayerConfig, GeoLayerTipo } from "@/types/geo.types";
 
 function escapeHtml(s: string): string {
@@ -15,9 +21,10 @@ function escapeHtml(s: string): string {
 
 interface UseGeoEcegMapParams {
   estado: string;
-  cabecera: string;
-  municipio: string;
+  municipioNombre: string; // NOMGEO name — for filterByScope NOMGEO matching
+  cabeceraCve: string;     // DISTRITO_FED 3-digit, DISTRITO_TODOS sentinel, or ""
   secciones: string[];
+  filterMode: EcegFilterMode;
   queryVersion: number;
   variable: string;
 }
@@ -29,10 +36,10 @@ interface UseGeoEcegMapResult {
   error: string | null;
 }
 
-type EcegNivel = "nacional" | "municipios" | "secciones";
+type EcegNivel = "nacional" | "distritos" | "municipios" | "secciones";
 
 export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult {
-  const { estado, cabecera, municipio, secciones, queryVersion, variable } = params;
+  const { estado, municipioNombre, cabeceraCve, secciones, filterMode, queryVersion, variable } = params;
 
   const [ecegData, setEcegData] = useState<{
     data: Record<string, number>;
@@ -46,13 +53,67 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   const prevVersionRef = useRef(-1);
   const prevVariableRef = useRef("");
 
-  // Derive nivel from geographic scope (mirrors useGeoElectoralMap logic)
-  const nivel: EcegNivel = !estado ? "nacional" : "municipios";
-  // When a district or municipio is selected, show secciones
-  const nivelResolved: EcegNivel =
-    !estado ? "nacional"
-    : cabecera || municipio || secciones.length > 0 ? "secciones"
-    : "municipios";
+  // ── Cascade resolution ────────────────────────────────────────────────────
+
+  // Data level to fetch from the API
+  const nivelResolved: EcegNivel = (() => {
+    if (!estado) return "nacional";
+    if (filterMode === "municipio") {
+      return municipioNombre ? "secciones" : "municipios";
+    }
+    // filterMode === "distrito"
+    const hasSpecificDistrict = cabeceraCve && cabeceraCve !== DISTRITO_TODOS;
+    return hasSpecificDistrict ? "secciones" : "distritos";
+  })();
+
+  // Shape layer type to display
+  const tipoShape: GeoLayerTipo = (() => {
+    if (!estado) return "entidades";
+    if (filterMode === "municipio") {
+      return municipioNombre ? "eceg_secciones_2020" : "eceg_municipios_2020";
+    }
+    // filterMode === "distrito"
+    const hasSpecificDistrict = cabeceraCve && cabeceraCve !== DISTRITO_TODOS;
+    return hasSpecificDistrict ? "eceg_secciones_2020" : "distritos_fed";
+  })();
+
+  // Geographic scope for filterByScope (in useGeoShapes)
+  const scope: GeoScopeElectoral = (() => {
+    if (!estado) return { nivel: "nacional" };
+    const estado_id = ESTADO_CVE_MAP[estado];
+
+    if (filterMode === "municipio") {
+      if (!municipioNombre) {
+        // Case (b): all municipios of the state
+        return { nivel: "entidad", estado_id, estado_nombre: estado };
+      }
+      // Cases (c-e): sections of a specific municipio
+      return {
+        nivel: "municipio",
+        estado_id,
+        estado_nombre: estado,
+        cve_municipio: municipioNombre, // NOMGEO-based matching in filterByScope
+        ...(secciones.length > 0 && { cve_secciones: secciones }),
+      };
+    }
+
+    // filterMode === "distrito"
+    const hasSpecificDistrict = cabeceraCve && cabeceraCve !== DISTRITO_TODOS;
+    if (!hasSpecificDistrict) {
+      // Case (f): all districts of the state
+      return { nivel: "entidad", estado_id, estado_nombre: estado };
+    }
+    // Cases (g-i): sections of a specific district
+    return {
+      nivel: "distrito_fed",
+      estado_id,
+      estado_nombre: estado,
+      cve_distrito_fed: cabeceraCve,
+      ...(secciones.length > 0 && { cve_secciones: secciones }),
+    };
+  })();
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     if (!variable) return;
@@ -83,7 +144,7 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
     } finally {
       if (abortRef.current === controller) setIsLoading(false);
     }
-  }, [estado, cabecera, municipio, secciones, variable, nivelResolved]);
+  }, [estado, municipioNombre, cabeceraCve, secciones, variable, nivelResolved]);
 
   useEffect(() => {
     const versionChanged = queryVersion !== prevVersionRef.current;
@@ -95,38 +156,7 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
     return () => { abortRef.current?.abort(); };
   }, [queryVersion, variable, fetchData]);
 
-  // Geographic scope
-  const scope: GeoScopeElectoral = (() => {
-    if (!estado) return { nivel: "nacional" };
-    const estado_id = ESTADO_CVE_MAP[estado];
-    if (cabecera) {
-      const distMatch = cabecera.match(/^(\d{2})(\d+)/);
-      const cve_distrito_fed = distMatch ? distMatch[2].padStart(3, "0") : "";
-      return {
-        nivel: "distrito_fed",
-        estado_id,
-        estado_nombre: estado,
-        cve_distrito_fed,
-        ...(secciones.length > 0 && { cve_secciones: secciones }),
-      };
-    }
-    if (municipio) {
-      return {
-        nivel: "municipio",
-        estado_id,
-        estado_nombre: estado,
-        cve_municipio: municipio,
-      };
-    }
-    return { nivel: "entidad", estado_id, estado_nombre: estado };
-  })();
-
-  // Shape tipo based on nivel
-  const tipoShape: GeoLayerTipo = (() => {
-    if (!estado) return "entidades"; // national view uses existing INE entidades
-    if (nivelResolved === "secciones") return "eceg_secciones_2020";
-    return "eceg_municipios_2020";
-  })();
+  // ── Tooltip & layer config ────────────────────────────────────────────────
 
   const indicator = ECEG_INDICATOR_MAP[variable];
   const group = indicator?.group ?? "demografia";
@@ -148,24 +178,38 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
           }
         : undefined,
       fillColor: !ecegData ? "#e2e8f0" : undefined,
-      strokeColor: "#ffffff",
-      strokeWidth: 0.6,
+      strokeColor: "#1a1a1a",
+      strokeWidth: 0.8,
       fillOpacity: 0.82,
       version: dataKey,
       tooltip: (props) => {
         const cveEnt = String(props.CVE_ENT ?? "").padStart(2, "0");
+
+        // Compute the feature key that matches the data JSON keys
         let featureKey: string;
+        let nombre: string;
+
         if (tipoShape === "entidades") {
           featureKey = cveEnt;
+          nombre = escapeHtml(String(props.NOMBRE_ENT ?? featureKey));
         } else if (tipoShape === "eceg_municipios_2020") {
-          featureKey = cveEnt + String(props.CVE_MUN ?? "").padStart(3, "0");
+          const cveMun = String(props.CVE_MUN ?? "").padStart(3, "0");
+          featureKey = cveEnt + cveMun;
+          nombre = escapeHtml(String(props.NOMGEO ?? `Municipio ${cveMun}`));
+        } else if (tipoShape === "distritos_fed") {
+          const cveDist = String(props.DISTRITO_FED ?? "").padStart(3, "0");
+          featureKey = cveEnt + cveDist;
+          nombre = `Distrito ${escapeHtml(cveDist)}`;
         } else {
-          featureKey = cveEnt + String(props.CVE_SECCION ?? "").padStart(4, "0");
+          // eceg_secciones_2020
+          const cveSec = String(props.CVE_SECCION ?? "").padStart(4, "0");
+          featureKey = cveEnt + cveSec;
+          const nomgeo = escapeHtml(String(props.NOMGEO ?? ""));
+          nombre = nomgeo
+            ? `${nomgeo} — Sección ${escapeHtml(String(props.CVE_SECCION ?? ""))}`
+            : `Sección ${escapeHtml(String(props.CVE_SECCION ?? ""))}`;
         }
 
-        const nombre = escapeHtml(
-          String(props.NOMBRE_ENT ?? props.NOMGEO ?? props.CVE_SECCION ?? featureKey)
-        );
         const val = ecegData?.data[featureKey];
         const valStr =
           val != null
