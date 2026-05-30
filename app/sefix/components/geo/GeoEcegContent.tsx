@@ -194,7 +194,7 @@ export default function GeoEcegContent() {
       )}
 
       {/* Desktop filter bar */}
-      <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3">
+      <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-4">
         <GeoEcegFilters
           {...filterProps}
           onConsultar={handleConsultar}
@@ -274,6 +274,7 @@ export default function GeoEcegContent() {
             layers={layers}
             height="560px"
             queryVersion={queryVersion}
+            hideLegend
           />
 
           {colorRamp && !isLoading && (

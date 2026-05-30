@@ -251,6 +251,7 @@ export function GeoVisualizadorMap({
   className = "",
   queryVersion = 0,
   onFeatureClick,
+  hideLegend = false,
 }: GeoVisualizadorProps) {
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
 
@@ -305,7 +306,7 @@ export function GeoVisualizadorMap({
         ))}
       </MapContainer>
 
-      {legendLayer?.colorRamp && (
+      {!hideLegend && legendLayer?.colorRamp && (
         <GeoLegend colorRamp={legendLayer.colorRamp} label={legendLayer.id} />
       )}
     </div>

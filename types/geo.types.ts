@@ -99,6 +99,8 @@ export interface GeoVisualizadorProps {
   onFeatureClick?: (layerId: string, featureProps: Record<string, unknown>) => void;
   /** Called when the user drills down to a new scope by clicking. */
   onScopeChange?: (newScope: GeoScopeElectoral) => void;
+  /** Suppresses the built-in GeoLegend overlay so the parent can render its own. */
+  hideLegend?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

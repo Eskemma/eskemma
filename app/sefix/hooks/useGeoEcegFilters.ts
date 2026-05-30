@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { useGeoOptions } from "@/app/components/geo/hooks/useGeoOptions";
 import type { GeoOption } from "@/types/geo.types";
@@ -149,6 +149,13 @@ export function useGeoEcegFilters(): UseGeoEcegFiltersResult {
     setPending(INITIAL);
     setCommitted(INITIAL);
     setQueryVersion((v) => v + 1);
+  }, []);
+
+  // Trigger inicial: carga con valores por defecto (Nacional, filterMode="municipio")
+  // Mismo patrón que useEleccionesFilters.ts
+  useEffect(() => {
+    handleConsultar();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasPending =
