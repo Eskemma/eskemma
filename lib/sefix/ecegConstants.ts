@@ -74,7 +74,7 @@ export const ECEG_INDICATORS: EcegIndicator[] = [
   { key: "PCON_LIMI",  label: "Con alguna limitación",                  group: "salud", unit: "personas",  showByDefault: false },
 
   // ── Vivienda ─────────────────────────────────────────────────────────────────
-  { key: "VPH_AGUADV", label: "Viviendas sin agua disponible",          group: "vivienda", unit: "viviendas" },
+  { key: "VPH_AGUADV", label: "Con agua de la red pública",             group: "vivienda", unit: "viviendas" },
   { key: "VPH_S_ELEC", label: "Sin servicio de electricidad",           group: "vivienda", unit: "viviendas" },
   { key: "VPH_MOTO",   label: "Viviendas con motocicleta",              group: "vivienda", unit: "viviendas" },
   { key: "VPH_PISODT", label: "Viviendas con piso de tierra",           group: "vivienda", unit: "viviendas", showByDefault: false },
@@ -148,3 +148,44 @@ export const ECEG_COLOR_RAMPS: Record<EcegGroup, { low: string; high: string }> 
 };
 
 export const DEFAULT_ECEG_VARIABLE = "POBTOT";
+
+// Natural denominators for each indicator.
+// Indicators with no entry here are index/average values — shown as raw value, not %.
+export const ECEG_DENOMINATORS: Partial<Record<string, string>> = {
+  // Demografía → POBTOT
+  P3YM_HLI: "POBTOT", P3HLINHE: "POBTOT", PHOG_IND: "POBTOT",
+  POB_AFRO: "POBTOT", POB0_14: "POBTOT", POB15_64: "POBTOT",
+  POB65_MAS: "POBTOT", P_60YMAS: "POBTOT", P_15A49_F: "POBTOT",
+  P_18YMAS: "POBTOT", POBMAS: "POBTOT", POBFEM: "POBTOT",
+  PNACOE: "POBTOT",
+  // Educación → P_18YMAS (proxy 15+ años)
+  P15YM_SE: "P_18YMAS", P15YM_AN: "P_18YMAS", P18YM_PB: "P_18YMAS",
+  P15PRI_IN: "P_18YMAS", P15PRI_CO: "P_18YMAS",
+  P15SEC_IN: "P_18YMAS", P15SEC_CO: "P_18YMAS",
+  P15A17A: "P_18YMAS", P18A24A: "P_18YMAS",
+  // Economía/Empleo → PEA o P_18YMAS
+  PEA: "P_18YMAS", POCUPADA: "PEA", PDESOCUP: "PEA", PE_INAC: "P_18YMAS",
+  PDER_SS: "POBTOT", PDER_IMSS: "POBTOT", PDER_ISTE: "POBTOT",
+  PDER_ISTEE: "POBTOT", PDER_SEGP: "POBTOT",
+  // Salud → POBTOT
+  PSINDER: "POBTOT", PCON_DISC: "POBTOT", PCDISC_MOT: "POBTOT",
+  PCDISC_VIS: "POBTOT", PCDISC_AUD: "POBTOT", PCDISC_MEN: "POBTOT",
+  PCON_LIMI: "POBTOT",
+  // Vivienda → VIVPAR_HAB (excl. VPH_NDEAED → TVIVPAR)
+  VPH_AGUADV: "VIVPAR_HAB", VPH_S_ELEC: "VIVPAR_HAB", VPH_NODREN: "VIVPAR_HAB",
+  VPH_DRENAJ: "VIVPAR_HAB", VPH_EXCSA: "VIVPAR_HAB", VPH_PISODT: "VIVPAR_HAB",
+  VPH_1CUART: "VIVPAR_HAB", VPH_TINACO: "VIVPAR_HAB", VPH_CISTER: "VIVPAR_HAB",
+  VPH_SNBIEN: "VIVPAR_HAB", VPH_REFRI: "VIVPAR_HAB", VPH_LAVAD: "VIVPAR_HAB",
+  VPH_AUTOM: "VIVPAR_HAB", VPH_MOTO: "VIVPAR_HAB", VPH_BICI: "VIVPAR_HAB",
+  VPH_TV: "VIVPAR_HAB", VPH_NDEAED: "TVIVPAR",
+  // Conectividad → VIVPAR_HAB
+  VPH_INTER: "VIVPAR_HAB", VPH_CEL: "VIVPAR_HAB", VPH_PC: "VIVPAR_HAB",
+  VPH_TELEF: "VIVPAR_HAB", VPH_SINCIN: "VIVPAR_HAB", VPH_SINLTC: "VIVPAR_HAB",
+  VPH_SINRTV: "VIVPAR_HAB", VPH_SINTIC: "VIVPAR_HAB",
+  // Hogar
+  HOGJEF_F: "TOTHOG", HOGJEF_M: "TOTHOG", VIVPAR_DES: "TVIVPAR",
+  // Religión → POBTOT
+  PCATOLICA: "POBTOT", PRO_CRIEVA: "POBTOT", PSIN_RELIG: "POBTOT",
+  // Sin denominador (índices): GRAPROES REL_H_M OCUPVIVPAR PRO_OCUP_C PROM_HNV
+  //   TOTHOG VIVPAR_HAB TVIVPAR POBTOT — muestran valor absoluto con unidad
+};

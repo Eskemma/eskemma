@@ -98,7 +98,12 @@ export default function GeoEcegFilters({
       return;
     }
     const opt = distritoOptions.find((o) => o.cve === cve);
-    if (opt) setCabecera(opt.cve, opt.nombre);
+    if (opt) {
+      // Store display format "3102 PROGRESO" (same as dropdown choices)
+      const cityName = opt.nombre.includes("–") ? opt.nombre.split("–")[1].trim() : opt.nombre;
+      const prefix = `${estadoId}${opt.cve.slice(-2)}`;
+      setCabecera(opt.cve, `${prefix} ${cityName}`);
+    }
   }
 
   // Sección: add-and-pill via dropdown OR direct number entry
