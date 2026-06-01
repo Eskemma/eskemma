@@ -306,7 +306,7 @@ export default function GeoEcegContent() {
                   </div>
                   <div className="hidden sm:block">
                     <GeoLegend colorRamp={colorRamp} label={indicator?.label}
-                      formatValue={(v) => v.toLocaleString("es-MX", { maximumFractionDigits: 1 })} />
+                      formatValue={(v) => v.toLocaleString("es-MX", { maximumFractionDigits: 2 })} />
                   </div>
                 </>
               )}
@@ -328,7 +328,29 @@ export default function GeoEcegContent() {
 
           {/* ── Sidebar desktop (lg+) ────────────────────────────────── */}
           <aside className="hidden lg:block">
-            <div className="sticky top-4">{sidebarContent}</div>
+            <div className="sticky top-4 space-y-4">
+              {sidebarContent}
+              <div className="p-3 rounded-md border border-yellow-eske-30 dark:border-yellow-eske/20 bg-yellow-eske-10 dark:bg-yellow-eske/5">
+                <p className="text-[10px] font-semibold text-yellow-eske uppercase tracking-wide mb-1.5">
+                  Nota metodológica
+                </p>
+                <ul className="text-[11px] text-black-eske-40 dark:text-[#6D8294] leading-relaxed space-y-1.5 list-disc list-inside">
+                  <li>
+                    Algunos indicadores de vivienda y conectividad pueden mostrar valores cercanos
+                    o iguales al 100% debido a factores de ajuste estadístico del Censo 2020;
+                    los valores se acotan al 100% en la visualización.
+                  </li>
+                  <li>
+                    Los porcentajes de educación (15+) se calculan respecto a la población de
+                    18 años y más como denominador proxy de la población adulta.
+                  </li>
+                  <li>
+                    Algunas secciones pueden no mostrar datos en el mapa por discrepancias en
+                    los marcos geográficos del ECEG 2020.
+                  </li>
+                </ul>
+              </div>
+            </div>
           </aside>
         </div>
       </div>

@@ -15,19 +15,19 @@ function fmtNum(n: number, decimals = 1): string {
 }
 
 function fmtPct(n: number): string {
-  return n.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
+  return n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 }
 
-// Returns the noun phrase for the denominator (without leading "de").
-// Used in: "26.2% de {denomPhrase} {scopeSuffix}"
-function denomPhrase(denomKey: string): string {
+// Short unit label for the denominator — used when we show the absolute count inline.
+// "de {fmtNum(denominador)} {denomUnit} {scopeSuffix}"
+function denomUnit(denomKey: string): string {
   const map: Record<string, string> = {
-    POBTOT:     "la población total",
-    P_18YMAS:   "la población de 18 años y más",
-    PEA:        "la PEA",
-    VIVPAR_HAB: "las viviendas habitadas",
-    TVIVPAR:    "las viviendas particulares",
-    TOTHOG:     "los hogares",
+    POBTOT:     "personas",
+    P_18YMAS:   "hab. de 18 años y más",
+    PEA:        "personas en la PEA",
+    VIVPAR_HAB: "viviendas habitadas",
+    TVIVPAR:    "viviendas particulares",
+    TOTHOG:     "hogares",
   };
   return map[denomKey] ?? "";
 }
@@ -42,16 +42,23 @@ function formatNivel(
 ): string | null {
   if (!data) return null;
 
+  const unit = indicator.unit ?? "";
+  const unitPart = unit ? ` ${unit}` : "";
+
   if (denomKey && data.porcentaje !== null) {
-    const dp = denomPhrase(denomKey);
+    // Show absolute value + percentage with explicit denominator count for transparency
+    const absVal = fmtNum(data.numerador, 0);
+    const pct = fmtPct(data.porcentaje);
+    const du = denomUnit(denomKey);
     const scope = scopeSuffix ? ` ${scopeSuffix}` : "";
-    const denomPart = dp ? ` de ${dp}${scope}` : "";
-    return `${label}: <strong>${fmtPct(data.porcentaje)}</strong>${denomPart}`;
+    const denomStr = data.denominador !== null && du
+      ? `de ${fmtNum(data.denominador, 0)} ${du}${scope}`
+      : du ? `de ${du}${scope}` : scope.trim();
+    return `${label}: <strong>${absVal}${unitPart}</strong> (<strong>${pct}</strong> ${denomStr})`;
   }
 
-  // Index indicator — show raw value with unit
-  const unit = indicator.unit ?? "";
-  return `${label}: <strong>${fmtNum(data.valor, 2)}</strong>${unit ? ` ${unit}` : ""}`;
+  // Sin denominador: sólo valor con unidad (promedio, índice o conteo absoluto)
+  return `${label}: <strong>${fmtNum(data.valor, 2)}</strong>${unitPart}`;
 }
 
 /** Generates the scope text for block 2 (Alcance de la consulta). */
@@ -68,7 +75,7 @@ export function generateAlcanceEceg(committed: EcegCommitted): string {
     // distrito mode
     if (committed.cabeceraCve && committed.cabeceraCve !== DISTRITO_TODOS) {
       const distDisplay = committed.cabeceraLabel || `Distrito ${committed.cabeceraCve}`;
-      lines.push(`Distrito Federal: ${distDisplay}`);
+      lines.push(`Distrito Electoral Federal: ${distDisplay}`);
     } else {
       lines.push("Todos los distritos del estado");
     }

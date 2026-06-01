@@ -211,10 +211,10 @@ export default function GeoEcegFilters({
         |
       </div>
 
-      {/* ── Distrito Federal ─────────────────────────────────────────── */}
+      {/* ── Distrito Electoral Federal ───────────────────────────────── */}
       <div className="flex flex-col gap-0.5">
         <label className={LABEL_CLS} htmlFor="eceg-distrito">
-          Distrito Federal
+          Distrito Electoral Federal
         </label>
         <select
           id="eceg-distrito"

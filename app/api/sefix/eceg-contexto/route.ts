@@ -6,6 +6,17 @@ const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX = "sefix/eceg_2020";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
+// These 5 indicators are weighted averages, not additive sums.
+// Using the same list as eceg-data-pipeline.ts AVERAGE_COLS.
+const AVERAGE_COLS = new Set(["GRAPROES", "REL_H_M", "OCUPVIVPAR", "PRO_OCUP_C", "PROM_HNV"]);
+
+// Population weight to use for each average indicator.
+// OCUPVIVPAR / PRO_OCUP_C are per-dwelling averages → weight by VIVPAR_HAB.
+// All others are per-person averages → weight by POBTOT.
+function weightField(variable: string): string {
+  return variable === "OCUPVIVPAR" || variable === "PRO_OCUP_C" ? "VIVPAR_HAB" : "POBTOT";
+}
+
 interface CacheEntry { data: Record<string, Record<string, number>>; expiresAt: number }
 const cache = new Map<string, CacheEntry>();
 
@@ -23,19 +34,30 @@ async function fetchFile(path: string): Promise<Record<string, Record<string, nu
   return data;
 }
 
+type NivelResult = {
+  numerador: number;
+  denominador: number | null;
+  porcentaje: number | null;
+  valor: number;
+};
+
+function capPct(raw: number): number {
+  return Math.min(100, Math.round(raw * 10000) / 100);
+}
+
 function extract(
   data: Record<string, Record<string, number>>,
   key: string,
   variable: string,
   denominator: string | null
-): { numerador: number; denominador: number | null; porcentaje: number | null; valor: number } | null {
+): NivelResult | null {
   const rec = data[key];
   if (!rec) return null;
   const val = rec[variable];
   if (typeof val !== "number") return null;
-  const den = denominator ? rec[denominator] : null;
-  const pct = den && den > 0 ? Math.round((val / den) * 10000) / 100 : null;
-  return { numerador: val, denominador: den ?? null, porcentaje: pct, valor: val };
+  const den = denominator ? (rec[denominator] ?? null) : null;
+  const pct = typeof den === "number" && den > 0 ? capPct(val / den) : null;
+  return { numerador: val, denominador: den, porcentaje: pct, valor: val };
 }
 
 function sumRecords(
@@ -43,7 +65,27 @@ function sumRecords(
   keys: string[],
   variable: string,
   denominator: string | null
-): { numerador: number; denominador: number | null; porcentaje: number | null; valor: number } | null {
+): NivelResult | null {
+  // ── Average indicators: weighted mean ───────────────────────────────────────
+  if (AVERAGE_COLS.has(variable)) {
+    const wf = weightField(variable);
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const k of keys) {
+      const rec = data[k];
+      if (!rec) continue;
+      const v = rec[variable];
+      if (typeof v !== "number") continue;
+      const w = typeof rec[wf] === "number" ? (rec[wf] as number) : 1;
+      weightedSum += v * w;
+      totalWeight += w;
+    }
+    if (totalWeight === 0) return null;
+    const avg = Math.round((weightedSum / totalWeight) * 100) / 100;
+    return { numerador: avg, denominador: null, porcentaje: null, valor: avg };
+  }
+
+  // ── Count indicators: sum ───────────────────────────────────────────────────
   let num = 0;
   let den = 0;
   let found = false;
@@ -57,7 +99,7 @@ function sumRecords(
     if (denominator && typeof rec[denominator] === "number") den += rec[denominator] as number;
   }
   if (!found) return null;
-  const pct = denominator && den > 0 ? Math.round((num / den) * 10000) / 100 : null;
+  const pct = denominator && den > 0 ? capPct(num / den) : null;
   return { numerador: num, denominador: denominator ? den : null, porcentaje: pct, valor: num };
 }
 
@@ -73,12 +115,6 @@ export async function GET(req: NextRequest) {
 
   if (!variable) return NextResponse.json({ error: "variable is required" }, { status: 400 });
 
-  type NivelResult = {
-    numerador: number;
-    denominador: number | null;
-    porcentaje: number | null;
-    valor: number;
-  };
   const result: Record<string, NivelResult> = {};
 
   try {

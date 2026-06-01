@@ -77,7 +77,8 @@ export const ECEG_INDICATORS: EcegIndicator[] = [
   { key: "VPH_AGUADV", label: "Con agua de la red pública",             group: "vivienda", unit: "viviendas" },
   { key: "VPH_S_ELEC", label: "Sin servicio de electricidad",           group: "vivienda", unit: "viviendas" },
   { key: "VPH_MOTO",   label: "Viviendas con motocicleta",              group: "vivienda", unit: "viviendas" },
-  { key: "VPH_PISODT", label: "Viviendas con piso de tierra",           group: "vivienda", unit: "viviendas", showByDefault: false },
+  { key: "VPH_PISODT", label: "Viviendas con piso diferente a tierra",   group: "vivienda", unit: "viviendas", showByDefault: false },
+  { key: "VPH_PISOTI", label: "Viviendas con piso de tierra",           group: "vivienda", unit: "viviendas", showByDefault: false },
   { key: "VPH_DRENAJ", label: "Con drenaje",                            group: "vivienda", unit: "viviendas", showByDefault: false },
   { key: "VPH_NODREN", label: "Sin drenaje",                            group: "vivienda", unit: "viviendas", showByDefault: false },
   { key: "VPH_EXCSA",  label: "Con excusado / sanitario",               group: "vivienda", unit: "viviendas", showByDefault: false },
@@ -162,7 +163,7 @@ export const ECEG_DENOMINATORS: Partial<Record<string, string>> = {
   P15YM_SE: "P_18YMAS", P15YM_AN: "P_18YMAS", P18YM_PB: "P_18YMAS",
   P15PRI_IN: "P_18YMAS", P15PRI_CO: "P_18YMAS",
   P15SEC_IN: "P_18YMAS", P15SEC_CO: "P_18YMAS",
-  P15A17A: "P_18YMAS", P18A24A: "P_18YMAS",
+  // P15A17A y P18A24A se muestran como conteo absoluto (no existe denominador de cohorte exacto)
   // Economía/Empleo → PEA o P_18YMAS
   PEA: "P_18YMAS", POCUPADA: "PEA", PDESOCUP: "PEA", PE_INAC: "P_18YMAS",
   PDER_SS: "POBTOT", PDER_IMSS: "POBTOT", PDER_ISTE: "POBTOT",
@@ -174,6 +175,7 @@ export const ECEG_DENOMINATORS: Partial<Record<string, string>> = {
   // Vivienda → VIVPAR_HAB (excl. VPH_NDEAED → TVIVPAR)
   VPH_AGUADV: "VIVPAR_HAB", VPH_S_ELEC: "VIVPAR_HAB", VPH_NODREN: "VIVPAR_HAB",
   VPH_DRENAJ: "VIVPAR_HAB", VPH_EXCSA: "VIVPAR_HAB", VPH_PISODT: "VIVPAR_HAB",
+  VPH_PISOTI: "VIVPAR_HAB",
   VPH_1CUART: "VIVPAR_HAB", VPH_TINACO: "VIVPAR_HAB", VPH_CISTER: "VIVPAR_HAB",
   VPH_SNBIEN: "VIVPAR_HAB", VPH_REFRI: "VIVPAR_HAB", VPH_LAVAD: "VIVPAR_HAB",
   VPH_AUTOM: "VIVPAR_HAB", VPH_MOTO: "VIVPAR_HAB", VPH_BICI: "VIVPAR_HAB",
