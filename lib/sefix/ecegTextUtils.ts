@@ -10,17 +10,17 @@ function toTitle(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
-function fmtNum(n: number, decimals = 1): string {
+export function fmtNum(n: number, decimals = 1): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: decimals });
 }
 
-function fmtPct(n: number): string {
+export function fmtPct(n: number): string {
   return n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 }
 
 // Short unit label for the denominator — used when we show the absolute count inline.
 // "de {fmtNum(denominador)} {denomUnit} {scopeSuffix}"
-function denomUnit(denomKey: string): string {
+export function denomUnit(denomKey: string): string {
   const map: Record<string, string> = {
     POBTOT:     "personas",
     P_18YMAS:   "hab. de 18 años y más",
@@ -46,15 +46,16 @@ function formatNivel(
   const unitPart = unit ? ` ${unit}` : "";
 
   if (denomKey && data.porcentaje !== null) {
-    // Show absolute value + percentage with explicit denominator count for transparency
+    // "X de Y unidad del scope (Z%)" — unambiguous part/whole fraction
     const absVal = fmtNum(data.numerador, 0);
-    const pct = fmtPct(data.porcentaje);
-    const du = denomUnit(denomKey);
-    const scope = scopeSuffix ? ` ${scopeSuffix}` : "";
-    const denomStr = data.denominador !== null && du
-      ? `de ${fmtNum(data.denominador, 0)} ${du}${scope}`
-      : du ? `de ${du}${scope}` : scope.trim();
-    return `${label}: <strong>${absVal}${unitPart}</strong> (<strong>${pct}</strong> ${denomStr})`;
+    const pct    = fmtPct(data.porcentaje);
+    const du     = denomUnit(denomKey);
+    const scope  = scopeSuffix ? ` ${scopeSuffix}` : "";
+    if (data.denominador !== null && du) {
+      const denVal = fmtNum(data.denominador, 0);
+      return `${label}: <strong>${absVal}</strong> de <strong>${denVal}</strong> ${du}${scope} (<strong>${pct}</strong>)`;
+    }
+    return `${label}: <strong>${absVal}${unitPart}</strong> (<strong>${pct}</strong>${scope ? ` ${scope}` : ""})`;
   }
 
   // Sin denominador: sólo valor con unidad (promedio, índice o conteo absoluto)
@@ -88,6 +89,34 @@ export function generateAlcanceEceg(committed: EcegCommitted): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Generates a single HTML comparison line for use in Leaflet tooltip HTML strings.
+ * Format: "X de Y unidad (Z%)" for percentage indicators, or "X unidad" for indices.
+ * Returns a plain HTML string (no React).
+ */
+export function formatTooltipNivel(
+  data: EcegNivelData,
+  indicator: EcegIndicator,
+  denomKey: string | undefined
+): string {
+  const unit = indicator.unit ?? "";
+  const unitPart = unit ? ` ${unit}` : "";
+
+  if (denomKey && data.porcentaje !== null && data.denominador !== null) {
+    const du = denomUnit(denomKey);
+    const absVal = fmtNum(data.numerador, 0);
+    const denVal = fmtNum(data.denominador, 0);
+    const pct = fmtPct(data.porcentaje);
+    if (du) {
+      return `<strong>${absVal}</strong> de <strong>${denVal}</strong> ${du} (<strong>${pct}</strong>)`;
+    }
+    return `<strong>${absVal}${unitPart}</strong> (<strong>${pct}</strong>)`;
+  }
+
+  // Index / absolute count indicator
+  return `<strong>${fmtNum(data.valor, 2)}</strong>${unitPart}`;
 }
 
 /** Generates the comparative lines for block 3 (Análisis comparativo). */

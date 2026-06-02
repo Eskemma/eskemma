@@ -10,6 +10,7 @@ import { useGeoEcegFilters } from "@/app/sefix/hooks/useGeoEcegFilters";
 import { useGeoEcegContexto } from "@/app/sefix/hooks/useGeoEcegContexto";
 import GeoEcegFilters from "./GeoEcegFilters";
 import EcegDynamicText from "./EcegDynamicText";
+import EcegPerfilTable from "./EcegPerfilTable";
 import MobileBottomBar from "@/app/sefix/components/lne/MobileBottomBar";
 import {
   ECEG_GROUPS,
@@ -29,6 +30,7 @@ const SELECT_PILL_CLS =
 export default function GeoEcegContent() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<EcegGroup>("demografia");
   const [variable, setVariable] = useState(DEFAULT_ECEG_VARIABLE);
 
@@ -62,23 +64,27 @@ export default function GeoEcegContent() {
     hasPending,
   } = useGeoEcegFilters();
 
-  const { scope, layers, isLoading, error } = useGeoEcegMap({
-    estado: committed.estado,
-    municipioNombre: committed.municipioNombre,
-    cabeceraCve: committed.cabeceraCve,
-    secciones: committed.secciones,
-    filterMode: committed.filterMode,
-    queryVersion,
-    variable,
-  });
-
   const denominatorKey = ECEG_DENOMINATORS[variable];
 
+  // useGeoEcegContexto first — its result is passed to useGeoEcegMap for the tooltip comparativo
   const { contexto, isLoading: contextoLoading, error: contextoError } = useGeoEcegContexto({
     committed,
     variable,
     denominatorKey,
     queryVersion,
+  });
+
+  const { scope, layers, isLoading, error } = useGeoEcegMap({
+    estado: committed.estado,
+    municipioNombre: committed.municipioNombre,
+    cabeceraCve: committed.cabeceraCve,
+    cabeceraLabel: committed.cabeceraLabel,
+    secciones: committed.secciones,
+    filterMode: committed.filterMode,
+    queryVersion,
+    variable,
+    contexto,
+    denominatorKey,
   });
 
   const indicator = ECEG_INDICATOR_MAP[variable];
@@ -331,27 +337,45 @@ export default function GeoEcegContent() {
             <div className="sticky top-4 space-y-4">
               {sidebarContent}
               <div className="p-3 rounded-md border border-yellow-eske-30 dark:border-yellow-eske/20 bg-yellow-eske-10 dark:bg-yellow-eske/5">
-                <p className="text-[10px] font-semibold text-yellow-eske uppercase tracking-wide mb-1.5">
-                  Nota metodológica
-                </p>
-                <ul className="text-[11px] text-black-eske-40 dark:text-[#6D8294] leading-relaxed space-y-1.5 list-disc list-inside">
-                  <li>
-                    Algunos indicadores de vivienda y conectividad pueden mostrar valores cercanos
-                    o iguales al 100% debido a factores de ajuste estadístico del Censo 2020;
-                    los valores se acotan al 100% en la visualización.
-                  </li>
-                  <li>
-                    Los porcentajes de educación (15+) se calculan respecto a la población de
-                    18 años y más como denominador proxy de la población adulta.
-                  </li>
-                  <li>
-                    Algunas secciones pueden no mostrar datos en el mapa por discrepancias en
-                    los marcos geográficos del ECEG 2020.
-                  </li>
-                </ul>
+                <button
+                  type="button"
+                  onClick={() => setNoteOpen((v) => !v)}
+                  className="flex items-center justify-between w-full text-[10px] font-semibold text-bluegreen-eske dark:text-[#4791B3] uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded"
+                  aria-expanded={noteOpen}
+                >
+                  <span>Nota metodológica</span>
+                  <span
+                    aria-hidden="true"
+                    className={`text-xs transition-transform duration-200 ${noteOpen ? "rotate-180" : ""}`}
+                  >▾</span>
+                </button>
+                {noteOpen && (
+                  <ul className="mt-1.5 text-[11px] text-black-eske-40 dark:text-[#6D8294] leading-relaxed space-y-1.5 list-disc list-inside">
+                    <li>
+                      Algunos indicadores de vivienda y conectividad pueden mostrar valores cercanos
+                      o iguales al 100% debido a factores de ajuste estadístico del Censo 2020;
+                      los valores se acotan al 100% en la visualización.
+                    </li>
+                    <li>
+                      Los porcentajes de educación (15+) se calculan respecto a la población de
+                      18 años y más como denominador proxy de la población adulta.
+                    </li>
+                    <li>
+                      Algunas secciones pueden no mostrar datos en el mapa por discrepancias en
+                      los marcos geográficos del ECEG 2020.
+                    </li>
+                  </ul>
+                )}
               </div>
             </div>
           </aside>
+        </div>
+      </div>
+
+      {/* ── Perfil completo — tabla full-width debajo del mapa ────────── */}
+      <div className="px-4 sm:px-6">
+        <div className="bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-4">
+          <EcegPerfilTable committed={committed} queryVersion={queryVersion} />
         </div>
       </div>
 

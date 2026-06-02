@@ -14,19 +14,58 @@ import {
 import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { EcegFilterMode } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { GeoScopeElectoral, GeoLayerConfig, GeoLayerTipo } from "@/types/geo.types";
+import type { EcegContexto, EcegNivelData } from "@/app/sefix/hooks/useGeoEcegContexto";
+import { formatTooltipNivel } from "@/lib/sefix/ecegTextUtils";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function toTitleCase(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function getSuperiorData(
+  nivelResolved: EcegNivel,
+  filterMode: EcegFilterMode,
+  contexto: EcegContexto | null
+): EcegNivelData | undefined {
+  if (!contexto) return undefined;
+  if (nivelResolved === "secciones")
+    return filterMode === "municipio" ? contexto.municipio : contexto.distrito;
+  if (nivelResolved === "municipios" || nivelResolved === "distritos")
+    return contexto.estado;
+  return undefined;
+}
+
+function getSuperiorLabel(
+  nivelResolved: EcegNivel,
+  filterMode: EcegFilterMode,
+  estado: string,
+  municipioNombre: string,
+  cabeceraCve: string,
+  cabeceraLabel: string
+): string {
+  if (nivelResolved === "secciones") {
+    if (filterMode === "municipio") return toTitleCase(municipioNombre);
+    return cabeceraLabel || `Distrito ${cabeceraCve}`;
+  }
+  if (nivelResolved === "municipios" || nivelResolved === "distritos") return estado;
+  return "";
+}
+
 interface UseGeoEcegMapParams {
   estado: string;
-  municipioNombre: string; // NOMGEO name — for filterByScope NOMGEO matching
-  cabeceraCve: string;     // DISTRITO_FED 3-digit, DISTRITO_TODOS sentinel, or ""
+  municipioNombre: string;  // NOMGEO name — for filterByScope NOMGEO matching
+  cabeceraCve: string;      // DISTRITO_FED 3-digit, DISTRITO_TODOS sentinel, or ""
+  cabeceraLabel: string;    // distrito display name (e.g. "IZTAPALAPA")
   secciones: string[];
   filterMode: EcegFilterMode;
   queryVersion: number;
   variable: string;
+  contexto: EcegContexto | null;
+  denominatorKey: string | undefined;
 }
 
 interface UseGeoEcegMapResult {
@@ -39,7 +78,11 @@ interface UseGeoEcegMapResult {
 type EcegNivel = "nacional" | "distritos" | "municipios" | "secciones";
 
 export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult {
-  const { estado, municipioNombre, cabeceraCve, secciones, filterMode, queryVersion, variable } = params;
+  const {
+    estado, municipioNombre, cabeceraCve, cabeceraLabel,
+    secciones, filterMode, queryVersion, variable,
+    contexto, denominatorKey,
+  } = params;
 
   const [ecegData, setEcegData] = useState<{
     data: Record<string, number>;
@@ -49,9 +92,13 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataKey, setDataKey] = useState(0);
+  const [contextoKey, setContextoKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const prevVersionRef = useRef(-1);
   const prevVariableRef = useRef("");
+
+  // Increment contextoKey whenever contexto changes so Leaflet rebinds tooltips
+  useEffect(() => { setContextoKey((k) => k + 1); }, [contexto]);
 
   // ── Cascade resolution ────────────────────────────────────────────────────
 
@@ -181,7 +228,7 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
       strokeColor: "#1a1a1a",
       strokeWidth: 0.8,
       fillOpacity: 0.82,
-      version: dataKey,
+      version: dataKey + contextoKey,
       tooltip: (props) => {
         const cveEnt = String(props.CVE_ENT ?? "").padStart(2, "0");
 
@@ -218,10 +265,24 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
         const labelStr = escapeHtml(indicator?.label ?? variable);
         const unitStr = indicator?.unit ? escapeHtml(indicator.unit) : "";
 
-        return `<div style="background:#ffffff;border-radius:6px;padding:8px;font-family:system-ui,sans-serif;font-size:12px;min-width:160px;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
+        // Comparativo with the immediate superior geographic level
+        const superiorData = getSuperiorData(nivelResolved, filterMode, contexto);
+        const superiorLabel = getSuperiorLabel(
+          nivelResolved, filterMode, estado, municipioNombre, cabeceraCve, cabeceraLabel
+        );
+        const superiorHtml =
+          superiorData && indicator && superiorLabel
+            ? `<div style="border-top:1px solid #e2e8f0;margin-top:6px;padding-top:6px">
+                <p style="font-size:10px;color:#64748b;margin:0 0 2px">En ${escapeHtml(superiorLabel)}:</p>
+                <p style="font-size:11px;margin:0;color:#1e293b">${formatTooltipNivel(superiorData, indicator, denominatorKey)}</p>
+               </div>`
+            : "";
+
+        return `<div style="background:#ffffff;border-radius:6px;padding:8px;font-family:system-ui,sans-serif;font-size:12px;min-width:220px;max-width:360px;word-break:break-word;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
           <p style="font-weight:600;margin:0 0 4px;color:#0f172a;font-size:11px">${nombre}</p>
           <p style="margin:0;color:#334155">${labelStr}</p>
           <p style="margin:2px 0 0;font-weight:700;color:#0f172a">${valStr}${unitStr ? ` <span style="font-weight:400;color:#64748b">${unitStr}</span>` : ""}</p>
+          ${superiorHtml}
           <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">ECEG 2020 — INEGI</p>
         </div>`;
       },
