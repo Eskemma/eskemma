@@ -95,93 +95,100 @@ function sumRecords(
   return { numerador: num, denominador: denominator ? den : null, porcentaje: pct, valor: num };
 }
 
+export interface NivelData {
+  valor: number | null;
+  denominador: number | null;
+  porcentaje: number | null;
+}
+
 export interface EcegPerfilRow {
   variable: string;
   grupo: string;
   grupoLabel: string;
   label: string;
   unit: string;
-  localValor: number | null;
-  localDenominador: number | null;
-  localPorcentaje: number | null;
-  superiorValor: number | null;
-  superiorDenominador: number | null;
-  superiorPorcentaje: number | null;
+  nacional:  NivelData;
+  estado:    NivelData | null;
+  municipio: NivelData | null;
+  distrito:  NivelData | null;
+  seccion:   NivelData | null;
+}
+
+function toNivel(r: NivelResult | null): NivelData {
+  return {
+    valor:       r?.valor       ?? null,
+    denominador: r?.denominador ?? null,
+    porcentaje:  r?.porcentaje  ?? null,
+  };
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const estado_id    = searchParams.get("estado_id") ?? "";
-  const municipio_cve = searchParams.get("municipio_cve") ?? "";
-  const distrito_cve  = searchParams.get("distrito_cve") ?? "";
-  const seccionesRaw  = searchParams.get("secciones") ?? "";
-  const secciones     = seccionesRaw ? seccionesRaw.split(",").filter(Boolean) : [];
-  const download      = searchParams.get("download") === "true";
+  const estado_id      = searchParams.get("estado_id") ?? "";
+  const municipio_cve  = searchParams.get("municipio_cve") ?? "";
+  const distrito_cve   = searchParams.get("distrito_cve") ?? "";
+  const seccionesRaw   = searchParams.get("secciones") ?? "";
+  const secciones      = seccionesRaw ? seccionesRaw.split(",").filter(Boolean) : [];
+  const download       = searchParams.get("download") === "true";
   const scopeNameParam = searchParams.get("scope_name") ?? "";
+
+  const hasEstado    = !!estado_id;
+  const hasMunicipio = hasEstado && !!municipio_cve;
+  const hasDistrito  = hasEstado && !!distrito_cve && distrito_cve !== "TODOS";
+  const hasSeccion   = hasEstado && secciones.length > 0;
 
   try {
     const estadoKey = estado_id ? estado_id.padStart(2, "0") : "";
 
-    // Fetch all necessary files in parallel
     const national = await fetchFile(`${STORAGE_PREFIX}/national.json`);
-    let munData: Record<string, Record<string, number>> | null = null;
+    let munData:  Record<string, Record<string, number>> | null = null;
     let distData: Record<string, Record<string, number>> | null = null;
-    let secData: Record<string, Record<string, number>> | null = null;
+    let secData:  Record<string, Record<string, number>> | null = null;
 
     await Promise.all([
-      estadoKey && municipio_cve
+      hasMunicipio
         ? fetchFile(`${STORAGE_PREFIX}/municipios/${estadoKey}.json`).then(d => { munData = d; })
         : Promise.resolve(),
-      estadoKey && distrito_cve && distrito_cve !== "TODOS"
+      hasDistrito
         ? fetchFile(`${STORAGE_PREFIX}/distritos/${estadoKey}.json`).then(d => { distData = d; })
         : Promise.resolve(),
-      estadoKey && secciones.length > 0
+      hasSeccion
         ? fetchFile(`${STORAGE_PREFIX}/secciones/${estadoKey}.json`).then(d => { secData = d; })
         : Promise.resolve(),
     ]);
 
+    const allStateKeys = Object.keys(national);
+    const secKeys = secciones.map((s) => estadoKey + s.padStart(4, "0"));
+
     const rows: EcegPerfilRow[] = ECEG_INDICATORS.map((ind) => {
       const denomKey = ECEG_DENOMINATORS[ind.key] ?? null;
-      let local: NivelResult | null = null;
-      let superior: NivelResult | null = null;
 
-      if (secciones.length > 0 && secData) {
-        const secKeys = secciones.map((s) => estadoKey + s.padStart(4, "0"));
-        local = sumRecords(secData, secKeys, ind.key, denomKey);
-        if (municipio_cve && munData) {
-          superior = extract(munData, estadoKey + municipio_cve.padStart(3, "0"), ind.key, denomKey);
-        } else if (distrito_cve && distData) {
-          superior = extract(distData, estadoKey + distrito_cve.padStart(3, "0"), ind.key, denomKey);
-        } else if (estadoKey) {
-          superior = extract(national, estadoKey, ind.key, denomKey);
-        }
-      } else if (municipio_cve && munData) {
-        local = extract(munData, estadoKey + municipio_cve.padStart(3, "0"), ind.key, denomKey);
-        superior = extract(national, estadoKey, ind.key, denomKey);
-      } else if (distrito_cve && distData) {
-        local = extract(distData, estadoKey + distrito_cve.padStart(3, "0"), ind.key, denomKey);
-        superior = extract(national, estadoKey, ind.key, denomKey);
-      } else if (estadoKey) {
-        local = extract(national, estadoKey, ind.key, denomKey);
-        superior = sumRecords(national, Object.keys(national), ind.key, denomKey);
-      } else {
-        local = sumRecords(national, Object.keys(national), ind.key, denomKey);
-        superior = null;
-      }
+      const nacResult = sumRecords(national, allStateKeys, ind.key, denomKey);
+      const estResult = hasEstado
+        ? extract(national, estadoKey, ind.key, denomKey)
+        : null;
+      const munResult = hasMunicipio && munData
+        ? extract(munData, estadoKey + municipio_cve.padStart(3, "0"), ind.key, denomKey)
+        : null;
+      const distResult = hasDistrito && distData
+        ? extract(distData, estadoKey + distrito_cve.padStart(3, "0"), ind.key, denomKey)
+        : null;
+      const secResult = hasSeccion && secData
+        ? sumRecords(secData, secKeys, ind.key, denomKey)
+        : null;
 
       const grupoLabel = ECEG_GROUPS.find((g) => g.id === ind.group)?.label ?? ind.group;
       return {
-        variable: ind.key,
-        grupo: ind.group,
+        variable:  ind.key,
+        grupo:     ind.group,
         grupoLabel,
-        label: ind.label,
-        unit: ind.unit ?? "",
-        localValor:       local?.valor ?? null,
-        localDenominador: local?.denominador ?? null,
-        localPorcentaje:  local?.porcentaje ?? null,
-        superiorValor:       superior?.valor ?? null,
-        superiorDenominador: superior?.denominador ?? null,
-        superiorPorcentaje:  superior?.porcentaje ?? null,
+        label:     ind.label,
+        unit:      ind.unit ?? "",
+        nacional:  toNivel(nacResult),
+        estado:    hasEstado    ? toNivel(estResult)  : null,
+        municipio: hasMunicipio ? toNivel(munResult)  : null,
+        distrito:  hasDistrito  ? toNivel(distResult) : null,
+        seccion:   hasSeccion   ? toNivel(secResult)  : null,
       };
     });
 
@@ -189,27 +196,37 @@ export async function GET(req: NextRequest) {
       const today = new Date().toISOString().slice(0, 10);
       const safeName = scopeNameParam.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
       const filename = `eceg_perfil${safeName ? "_" + safeName : ""}_${today}.csv`;
-      const hasSup = rows.some((r) => r.superiorValor !== null);
+
+      type LevelKey = "nacional" | "estado" | "municipio" | "distrito" | "seccion";
+      const levels: { key: LevelKey; label: string }[] = [
+        { key: "nacional",  label: "Nacional" },
+        ...(hasEstado    ? [{ key: "estado"    as LevelKey, label: "Estatal" }]     : []),
+        ...(hasMunicipio ? [{ key: "municipio" as LevelKey, label: "Municipal" }]   : []),
+        ...(hasDistrito  ? [{ key: "distrito"  as LevelKey, label: "Distrital" }]   : []),
+        ...(hasSeccion   ? [{ key: "seccion"   as LevelKey, label: "Seccional" }]   : []),
+      ];
 
       const header = [
         "Grupo", "Indicador", "Clave", "Unidad",
-        "Valor local", "% local", "Denominador local",
-        ...(hasSup ? ["Valor superior", "% superior", "Denominador superior"] : []),
+        ...levels.flatMap(l => [`Total ${l.label}`, `Valor ${l.label}`, `% ${l.label}`]),
       ].join(",");
+
+      const isIndex = (variable: string) => !ECEG_DENOMINATORS[variable];
 
       const csvRows = rows.map((r) => [
         `"${r.grupoLabel}"`,
         `"${r.label.replace(/"/g, '""')}"`,
         r.variable,
         `"${r.unit}"`,
-        r.localValor !== null ? r.localValor : "",
-        r.localPorcentaje !== null ? r.localPorcentaje.toFixed(2) + "%" : "",
-        r.localDenominador !== null ? r.localDenominador : "",
-        ...(hasSup ? [
-          r.superiorValor !== null ? r.superiorValor : "",
-          r.superiorPorcentaje !== null ? r.superiorPorcentaje.toFixed(2) + "%" : "",
-          r.superiorDenominador !== null ? r.superiorDenominador : "",
-        ] : []),
+        ...levels.flatMap((l) => {
+          const d = r[l.key];
+          const dec = isIndex(r.variable) ? 2 : 0;
+          return [
+            d?.denominador != null ? d.denominador : "",
+            d?.valor       != null ? (isIndex(r.variable) ? d.valor.toFixed(dec) : Math.round(d.valor)) : "",
+            d?.porcentaje  != null ? d.porcentaje.toFixed(2) + "%" : "",
+          ];
+        }),
       ].join(","));
 
       const csv = [
