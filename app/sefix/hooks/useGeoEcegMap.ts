@@ -16,6 +16,7 @@ import type { EcegFilterMode } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { GeoScopeElectoral, GeoLayerConfig, GeoLayerTipo } from "@/types/geo.types";
 import type { EcegContexto, EcegNivelData } from "@/app/sefix/hooks/useGeoEcegContexto";
 import { formatTooltipNivel } from "@/lib/sefix/ecegTextUtils";
+import cabecerasMap from "@/lib/geo/cabeceras_fed.json";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -66,6 +67,7 @@ interface UseGeoEcegMapParams {
   variable: string;
   contexto: EcegContexto | null;
   denominatorKey: string | undefined;
+  divergentMode: boolean;
 }
 
 interface UseGeoEcegMapResult {
@@ -81,7 +83,7 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   const {
     estado, municipioNombre, cabeceraCve, cabeceraLabel,
     secciones, filterMode, queryVersion, variable,
-    contexto, denominatorKey,
+    contexto, denominatorKey, divergentMode,
   } = params;
 
   const [ecegData, setEcegData] = useState<{
@@ -209,21 +211,40 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
   const group = indicator?.group ?? "demografia";
   const rampColors = ECEG_COLOR_RAMPS[group];
 
+  // ── Divergent mode: transform raw data to deviations from mean ───────────
+  let layerData: Record<string, number> = ecegData?.data ?? {};
+  let layerColorRamp: import("@/types/geo.types").GeoColorRamp | undefined = ecegData
+    ? { min: ecegData.min, max: ecegData.max, colorLow: rampColors.low, colorHigh: rampColors.high, noDataColor: "#E2E8F0" }
+    : undefined;
+
+  if (divergentMode && ecegData && Object.keys(ecegData.data).length > 0) {
+    const vals = Object.values(ecegData.data).filter((v): v is number => typeof v === "number");
+    if (vals.length > 0) {
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const deviations: Record<string, number> = {};
+      for (const [k, v] of Object.entries(ecegData.data)) {
+        if (typeof v === "number") deviations[k] = v - mean;
+      }
+      const maxAbsDev = Math.max(...Object.values(deviations).map(Math.abs), 0.001);
+      layerData = deviations;
+      layerColorRamp = {
+        min: -maxAbsDev,
+        max:  maxAbsDev,
+        colorLow:  "#C0392B",
+        colorMid:  "#F8F9FA",
+        colorHigh: "#2471A3",
+        noDataColor: "#E2E8F0",
+      };
+    }
+  }
+
   const layers: GeoLayerConfig[] = [
     {
       id: "eceg",
       tipo: tipoShape,
       visible: true,
-      data: ecegData?.data ?? {},
-      colorRamp: ecegData
-        ? {
-            min: ecegData.min,
-            max: ecegData.max,
-            colorLow: rampColors.low,
-            colorHigh: rampColors.high,
-            noDataColor: "#E2E8F0",
-          }
-        : undefined,
+      data: layerData,
+      colorRamp: layerColorRamp,
       fillColor: !ecegData ? "#e2e8f0" : undefined,
       strokeColor: "#1a1a1a",
       strokeWidth: 0.8,
@@ -244,9 +265,14 @@ export function useGeoEcegMap(params: UseGeoEcegMapParams): UseGeoEcegMapResult 
           featureKey = cveEnt + cveMun;
           nombre = escapeHtml(String(props.NOMGEO ?? `Municipio ${cveMun}`));
         } else if (tipoShape === "distritos_fed") {
-          const cveDist = String(props.DISTRITO_FED ?? "").padStart(3, "0");
-          featureKey = cveEnt + cveDist;
-          nombre = `Distrito ${escapeHtml(cveDist)}`;
+          const cveDist   = String(props.DISTRITO_FED ?? "").padStart(3, "0");
+          featureKey      = cveEnt + cveDist;
+          const distNum   = cveDist.slice(-2);                    // "05"
+          const lookupKey = cveEnt + distNum;                     // "1405"
+          const cabecera  = (cabecerasMap as Record<string, string>)[lookupKey];
+          nombre = cabecera
+            ? `Distrito ${escapeHtml(lookupKey)} ${escapeHtml(cabecera)}`
+            : `Distrito ${escapeHtml(cveDist)}`;
         } else {
           // eceg_secciones_2020
           const cveSec = String(props.CVE_SECCION ?? "").padStart(4, "0");

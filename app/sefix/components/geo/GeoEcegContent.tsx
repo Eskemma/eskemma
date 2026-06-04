@@ -1,14 +1,14 @@
 "use client";
 // app/sefix/components/geo/GeoEcegContent.tsx
 // Layout: desktop lg:grid [main | 300px sidebar] — mobile: left drawer (filtros) + right drawer (análisis)
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import { GeoVisualizador } from "@/app/components/geo/GeoVisualizador";
 import { GeoLegend } from "@/app/components/geo/GeoLegend";
 import { useGeoEcegMap } from "@/app/sefix/hooks/useGeoEcegMap";
 import { useGeoEcegFilters } from "@/app/sefix/hooks/useGeoEcegFilters";
 import { useGeoEcegContexto } from "@/app/sefix/hooks/useGeoEcegContexto";
-import GeoEcegFilters from "./GeoEcegFilters";
+import GeoEcegFilters, { MODO_TOOLTIP } from "./GeoEcegFilters";
 import EcegDynamicText from "./EcegDynamicText";
 import EcegPerfilTable from "./EcegPerfilTable";
 import MobileBottomBar from "@/app/sefix/components/lne/MobileBottomBar";
@@ -31,13 +31,16 @@ export default function GeoEcegContent() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [mobileNoteOpen, setMobileNoteOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<EcegGroup>("demografia");
   const [variable, setVariable] = useState(DEFAULT_ECEG_VARIABLE);
+  const [divergentMode, setDivergentMode] = useState(false);
 
   useEscapeKey(leftOpen || rightOpen, useCallback(() => {
     setLeftOpen(false);
     setRightOpen(false);
   }, []));
+
 
   const {
     pendingEstado,
@@ -64,6 +67,9 @@ export default function GeoEcegContent() {
     hasPending,
   } = useGeoEcegFilters();
 
+  // Reset divergent mode when indicator or query version changes
+  useEffect(() => { setDivergentMode(false); }, [variable, queryVersion]);
+
   const denominatorKey = ECEG_DENOMINATORS[variable];
 
   // useGeoEcegContexto first — its result is passed to useGeoEcegMap for the tooltip comparativo
@@ -85,6 +91,7 @@ export default function GeoEcegContent() {
     variable,
     contexto,
     denominatorKey,
+    divergentMode,
   });
 
   const indicator = ECEG_INDICATOR_MAP[variable];
@@ -242,7 +249,12 @@ export default function GeoEcegContent() {
           </button>
         </div>
         <div className="p-4 space-y-4">
-          <GeoEcegFilters {...filterProps} onConsultar={() => { handleConsultar(); setLeftOpen(false); }} />
+          <GeoEcegFilters
+              {...filterProps}
+              onConsultar={() => { handleConsultar(); setLeftOpen(false); }}
+              divergentMode={divergentMode}
+              onToggleDivergent={() => setDivergentMode((v) => !v)}
+            />
           <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
             <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] mb-2">Indicador</p>
             {indicatorSelector}
@@ -267,6 +279,42 @@ export default function GeoEcegContent() {
           </button>
         </div>
         <div className="p-4">{sidebarContent}</div>
+        <div className="px-4 pb-4">
+          <div className="p-3 rounded-md border border-yellow-eske-30 dark:border-yellow-eske/20 bg-yellow-eske-20 dark:bg-yellow-eske/5">
+            <button
+              type="button"
+              onClick={() => setMobileNoteOpen((v) => !v)}
+              className="flex items-center justify-between w-full text-[10px] font-semibold text-bluegreen-eske dark:text-[#4791B3] uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded"
+              aria-expanded={mobileNoteOpen}
+            >
+              <span>Notas metodológicas</span>
+              <span aria-hidden="true" className={`text-xs transition-transform duration-200 ${mobileNoteOpen ? "rotate-180" : ""}`}>▾</span>
+            </button>
+            {mobileNoteOpen && (
+              <ul className="mt-1.5 text-[11px] text-black-eske-40 dark:text-[#6D8294] leading-relaxed space-y-1.5 list-disc list-inside">
+                <li>
+                  Algunos indicadores de vivienda y conectividad pueden mostrar valores cercanos
+                  o iguales al 100% debido a factores de ajuste estadístico del Censo 2020;
+                  los valores se acotan al 100% en la visualización.
+                </li>
+                <li>
+                  Los porcentajes de educación (15+) se calculan respecto a la población de
+                  18 años y más como denominador proxy de la población adulta.
+                </li>
+                <li>
+                  Algunas secciones pueden no mostrar datos en el mapa por discrepancias en
+                  los marcos geográficos del ECEG 2020.
+                </li>
+                <li>
+                  El <strong>modo estándar</strong> codifica la posición de cada área en la distribución
+                  de valores absolutos. El <strong>modo comparativo</strong> codifica la distancia relativa
+                  respecto a la media del territorio visible, permitiendo detectar heterogeneidad
+                  espacial incluso cuando el rango absoluto es estrecho.
+                </li>
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main content + sidebar (desktop) */}
@@ -294,7 +342,24 @@ export default function GeoEcegContent() {
             </div>
 
             <div className="hidden sm:block bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-3">
-              {indicatorSelector}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">{indicatorSelector}</div>
+                {/* Divergent mode toggle — desktop only, right-aligned */}
+                <button
+                  type="button"
+                  onClick={() => setDivergentMode((v) => !v)}
+                  aria-pressed={divergentMode}
+                  title={MODO_TOOLTIP}
+                  className={[
+                    "flex-shrink-0 text-xs px-2.5 py-1 rounded border transition-colors",
+                    divergentMode
+                      ? "bg-bluegreen-eske text-white-eske border-bluegreen-eske"
+                      : "border-gray-eske-30 dark:border-white/20 text-black-eske-60 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
+                  ].join(" ")}
+                >
+                  {divergentMode ? "● Modo comparativo" : "○ Modo comparativo"}
+                </button>
+              </div>
             </div>
 
             <div className="relative isolate">
@@ -311,8 +376,14 @@ export default function GeoEcegContent() {
                     <GeoLegend colorRamp={colorRamp} compact />
                   </div>
                   <div className="hidden sm:block">
-                    <GeoLegend colorRamp={colorRamp} label={indicator?.label}
-                      formatValue={(v) => v.toLocaleString("es-MX", { maximumFractionDigits: 2 })} />
+                    <GeoLegend
+                      colorRamp={colorRamp}
+                      label={divergentMode ? "Desviación de la media" : indicator?.label}
+                      formatValue={(v) => {
+                        const s = v.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+                        return divergentMode && v > 0 ? `+${s}` : s;
+                      }}
+                    />
                   </div>
                 </>
               )}
@@ -336,14 +407,14 @@ export default function GeoEcegContent() {
           <aside className="hidden lg:block">
             <div className="sticky top-4 space-y-4">
               {sidebarContent}
-              <div className="p-3 rounded-md border border-yellow-eske-30 dark:border-yellow-eske/20 bg-yellow-eske-10 dark:bg-yellow-eske/5">
+              <div className="p-3 rounded-md border border-yellow-eske-30 dark:border-yellow-eske/20 bg-yellow-eske-20 dark:bg-yellow-eske/5">
                 <button
                   type="button"
                   onClick={() => setNoteOpen((v) => !v)}
                   className="flex items-center justify-between w-full text-[10px] font-semibold text-bluegreen-eske dark:text-[#4791B3] uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded"
                   aria-expanded={noteOpen}
                 >
-                  <span>Nota metodológica</span>
+                  <span>Notas metodológicas</span>
                   <span
                     aria-hidden="true"
                     className={`text-xs transition-transform duration-200 ${noteOpen ? "rotate-180" : ""}`}
@@ -364,6 +435,12 @@ export default function GeoEcegContent() {
                       Algunas secciones pueden no mostrar datos en el mapa por discrepancias en
                       los marcos geográficos del ECEG 2020.
                     </li>
+                    <li>
+                      El <strong>modo estándar</strong> codifica la posición de cada área en la distribución
+                      de valores absolutos. El <strong>modo comparativo</strong> codifica la distancia relativa
+                      respecto a la media del territorio visible, permitiendo detectar heterogeneidad
+                      espacial incluso cuando el rango absoluto es estrecho.
+                    </li>
                   </ul>
                 )}
               </div>
@@ -372,8 +449,13 @@ export default function GeoEcegContent() {
         </div>
       </div>
 
+      {/* ── Separador visual mapa / tabla ───────────────────────────────── */}
+      <div className="px-4 sm:px-6 pt-2">
+        <hr className="border-t border-gray-eske-20 dark:border-white/10" />
+      </div>
+
       {/* ── Perfil completo — tabla full-width debajo del mapa ────────── */}
-      <div className="px-4 sm:px-6">
+      <div className="px-4 sm:px-6 mt-4">
         <div className="bg-gray-eske-10 dark:bg-[#0D1E2C] rounded-lg border border-gray-eske-20 dark:border-white/10 p-4">
           <EcegPerfilTable committed={committed} queryVersion={queryVersion} />
         </div>

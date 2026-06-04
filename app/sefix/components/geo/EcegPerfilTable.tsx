@@ -3,11 +3,11 @@
 // Full-profile ECEG indicator table with collapsible groups and dynamic level columns.
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { ECEG_GROUPS, ECEG_COLOR_RAMPS, ECEG_DENOMINATORS } from "@/lib/sefix/ecegConstants";
+import { ECEG_GROUPS, ECEG_DENOMINATORS } from "@/lib/sefix/ecegConstants";
 import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { EcegCommitted } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { EcegPerfilRow, NivelData } from "@/app/api/sefix/eceg-perfil/route";
-import type { EcegGroup } from "@/lib/sefix/ecegConstants";
+import { generateAlcanceEceg } from "@/lib/sefix/ecegTextUtils";
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 
@@ -26,6 +26,13 @@ function fmtPct(n: number | null): string {
   return n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 }
 
+// ── Table style constants (brand bluegreen — same as HistoricoPartidos) ────
+
+const TH_BASE = "px-2.5 py-1.5 font-semibold whitespace-nowrap bg-bluegreen-eske text-white-eske";
+const TH = `${TH_BASE} text-[10px] uppercase tracking-wide text-right`;
+const TH_LVL = `${TH_BASE} text-[11px] uppercase tracking-wide text-center border-b border-white/20`;
+const TD = "px-2.5 py-1.5 text-xs tabular-nums text-right whitespace-nowrap";
+
 // ── Level cell triplet ──────────────────────────────────────────────────────
 
 function LevelCells({ d, isIndex }: { d: NivelData | null; isIndex: boolean }) {
@@ -38,10 +45,6 @@ function LevelCells({ d, isIndex }: { d: NivelData | null; isIndex: boolean }) {
     </>
   );
 }
-
-const TH  = "px-2.5 py-1.5 text-[10px] font-semibold text-bluegreen-eske dark:text-[#4791B3] uppercase tracking-wide whitespace-nowrap text-right";
-const TD  = "px-2.5 py-1.5 text-xs tabular-nums text-right whitespace-nowrap";
-const TH2 = "px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap text-center border-b border-gray-eske-20 dark:border-white/10";
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -62,42 +65,27 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
   const prevKeyRef = useRef("");
 
   // ── Active levels ─────────────────────────────────────────────────────────
-  const showEstado    = !!committed.estado;
+  const showEstado = !!committed.estado;
   const showMunicipio = committed.filterMode === "municipio" && !!committed.municipioNombre;
-  const showDistrito  =
+  const showDistrito =
     committed.filterMode === "distrito" &&
     !!committed.cabeceraCve &&
     committed.cabeceraCve !== DISTRITO_TODOS;
   const showSeccion = committed.secciones.length > 0;
 
   const midLabel = showMunicipio ? "Municipal" : showDistrito ? "Distrital" : null;
-  const showMid  = !!(showMunicipio || showDistrito);
+  const showMid = !!(showMunicipio || showDistrito);
 
   const activeLevelCount =
-    1 + // nacional
+    1 +
     (showEstado ? 1 : 0) +
-    (showMid    ? 1 : 0) +
+    (showMid ? 1 : 0) +
     (showSeccion ? 1 : 0);
-  const fixedCols  = 2; // Indicador + Unidad
-  const totalCols  = fixedCols + activeLevelCount * 3;
+  const fixedCols = 2;
+  const totalCols = fixedCols + activeLevelCount * 3;
 
-  // ── Scope label for panel header ──────────────────────────────────────────
-  const scopeLabel: string = (() => {
-    if (!committed.estado) return "Nacional";
-    if (committed.secciones.length > 0) {
-      const n = committed.secciones.length;
-      return n === 1
-        ? `Sección ${parseInt(committed.secciones[0], 10)}`
-        : `${n} secciones`;
-    }
-    if (showMunicipio) {
-      const m = committed.municipioNombre;
-      return m.charAt(0).toUpperCase() + m.slice(1).toLowerCase();
-    }
-    if (showDistrito)
-      return committed.cabeceraLabel || `Distrito ${committed.cabeceraCve}`;
-    return committed.estado;
-  })();
+  // Scope text matching the sidebar "Alcance de la consulta"
+  const scopeText = generateAlcanceEceg(committed).replace(/\n/g, " — ");
 
   // ── Data fetch ────────────────────────────────────────────────────────────
   function buildParams(extra?: Record<string, string>) {
@@ -106,8 +94,7 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
     if (estadoId) qs.set("estado_id", estadoId);
     if (committed.filterMode === "municipio" && committed.municipioCve)
       qs.set("municipio_cve", committed.municipioCve);
-    if (showDistrito)
-      qs.set("distrito_cve", committed.cabeceraCve);
+    if (showDistrito) qs.set("distrito_cve", committed.cabeceraCve);
     if (committed.secciones.length > 0)
       qs.set("secciones", committed.secciones.join(","));
     return qs.toString();
@@ -145,32 +132,30 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
   }, [queryVersion, fetchData]);
 
   function handleDownload() {
-    const scopeName = scopeLabel.replace(/\s+/g, "_").slice(0, 40);
-    window.location.href = `/api/sefix/eceg-perfil?${buildParams({ download: "true", scope_name: scopeName })}`;
+    const safeName = scopeText.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    window.location.href = `/api/sefix/eceg-perfil?${buildParams({ download: "true", scope_name: safeName })}`;
   }
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  const mostrarTodos   = () => setOpenGroups(Object.fromEntries(ECEG_GROUPS.map((g) => [g.id, true])));
-  const colapsarTodos  = () => setOpenGroups(Object.fromEntries(ECEG_GROUPS.map((g) => [g.id, false])));
+  const mostrarTodos = () => setOpenGroups(Object.fromEntries(ECEG_GROUPS.map((g) => [g.id, true])));
+  const colapsarTodos = () => setOpenGroups(Object.fromEntries(ECEG_GROUPS.map((g) => [g.id, false])));
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
-      {/* Panel header */}
-      <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
-            Perfil ECEG 2020
-          </h3>
-          <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
-            {scopeLabel}
-            {rows.length > 0 && <> — {rows.length} indicadores</>}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
+      {/* Panel header — centered title + scope + group controls */}
+      <div className="mb-3 text-center">
+        <h3 className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
+          Perfil ECEG 2020
+        </h3>
+        <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">
+          {scopeText}
+          {rows.length > 0 && <span className="ml-1 opacity-60">({rows.length} indicadores)</span>}
+        </p>
+        <div className="flex justify-center gap-3 mt-2">
           <button
             type="button"
             onClick={mostrarTodos}
@@ -178,21 +163,13 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
           >
             Mostrar todos
           </button>
-          <span className="text-black-eske-30 dark:text-white/20 text-xs">|</span>
+          <span className="text-black-eske-30 dark:text-white/20 text-xs" aria-hidden="true">|</span>
           <button
             type="button"
             onClick={colapsarTodos}
             className="text-xs text-blue-eske hover:underline focus-visible:outline-none"
           >
             Colapsar todos
-          </button>
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={isLoading || rows.length === 0}
-            className="flex items-center gap-1.5 bg-blue-eske text-white-eske rounded px-3 py-1.5 text-xs font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske transition-opacity"
-          >
-            <span aria-hidden="true">↓</span> Descargar CSV
           </button>
         </div>
       </div>
@@ -214,45 +191,35 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
       {/* Table */}
       {!isLoading && !error && rows.length > 0 && (
         <div className="overflow-x-auto rounded-md border border-gray-eske-20 dark:border-white/10">
-          <table className="w-full text-xs border-collapse" style={{ minWidth: `${320 + activeLevelCount * 240}px` }}>
-            <thead className="bg-gray-eske-10 dark:bg-[#112230]">
+          <table
+            className="w-full text-xs border-collapse"
+            style={{ minWidth: `${320 + activeLevelCount * 240}px` }}
+          >
+            <thead>
               {/* Row 1: level group headers */}
               <tr>
                 <th className={`${TH} text-left`} rowSpan={2}>Indicador</th>
                 <th className={`${TH} text-left`} rowSpan={2}>Unidad</th>
-                <th className={`${TH2} text-bluegreen-eske dark:text-[#4791B3]`} colSpan={3}>
-                  Nacional
-                </th>
+                <th className={TH_LVL} colSpan={3}>Nacional</th>
                 {showEstado && (
-                  <th className={`${TH2} text-bluegreen-eske dark:text-[#4791B3] border-l border-gray-eske-20 dark:border-white/10`} colSpan={3}>
-                    Estatal
-                  </th>
+                  <th className={`${TH_LVL} border-l border-white/20`} colSpan={3}>Estatal</th>
                 )}
                 {showMid && midLabel && (
-                  <th className={`${TH2} text-bluegreen-eske dark:text-[#4791B3] border-l border-gray-eske-20 dark:border-white/10`} colSpan={3}>
-                    {midLabel}
-                  </th>
+                  <th className={`${TH_LVL} border-l border-white/20`} colSpan={3}>{midLabel}</th>
                 )}
                 {showSeccion && (
-                  <th className={`${TH2} text-bluegreen-eske dark:text-[#4791B3] border-l border-gray-eske-20 dark:border-white/10`} colSpan={3}>
-                    Seccional
-                  </th>
+                  <th className={`${TH_LVL} border-l border-white/20`} colSpan={3}>Seccional</th>
                 )}
               </tr>
               {/* Row 2: individual column headers */}
               <tr>
-                {[
-                  true,
-                  showEstado,
-                  showMid,
-                  showSeccion,
-                ].flatMap((show, lvlIdx) =>
+                {([true, showEstado, showMid, showSeccion] as boolean[]).flatMap((show, lvlIdx) =>
                   show
                     ? [
-                        <th key={`t${lvlIdx}`} className={`${TH} ${lvlIdx > 0 ? "border-l border-gray-eske-20 dark:border-white/10" : ""}`}>Total</th>,
-                        <th key={`v${lvlIdx}`} className={TH}>Valor</th>,
-                        <th key={`p${lvlIdx}`} className={TH}>%</th>,
-                      ]
+                      <th key={`t${lvlIdx}`} className={`${TH} ${lvlIdx > 0 ? "border-l border-white/20" : ""}`}>Total</th>,
+                      <th key={`v${lvlIdx}`} className={TH}>Valor</th>,
+                      <th key={`p${lvlIdx}`} className={TH}>%</th>,
+                    ]
                     : []
                 )}
               </tr>
@@ -261,23 +228,18 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
               {ECEG_GROUPS.map((grupo) => {
                 const groupRows = rows.filter((r) => r.grupo === grupo.id);
                 if (groupRows.length === 0) return null;
-                const ramp    = ECEG_COLOR_RAMPS[grupo.id as EcegGroup];
-                const bgLight = ramp?.low  ?? "#f1f5f9";
-                const textCol = ramp?.high ?? "#334155";
-                const isOpen  = openGroups[grupo.id] ?? false;
+                const isOpen = openGroups[grupo.id] ?? false;
 
                 return (
                   <React.Fragment key={grupo.id}>
-                    {/* Group header row */}
+                    {/* Group header row — brand bluegreen */}
                     <tr
                       onClick={() => toggleGroup(grupo.id)}
-                      className="cursor-pointer select-none"
-                      style={{ backgroundColor: bgLight }}
+                      className="cursor-pointer select-none bg-bluegreen-eske/70 dark:bg-bluegreen-eske/50 hover:bg-bluegreen-eske/90 dark:hover:bg-bluegreen-eske/70 text-white-eske"
                     >
                       <td
                         colSpan={totalCols}
                         className="px-3 py-1.5 font-semibold text-[11px] uppercase tracking-wide"
-                        style={{ color: textCol }}
                       >
                         <span
                           aria-hidden="true"
@@ -286,7 +248,7 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
                           ▾
                         </span>
                         {grupo.label}
-                        <span className="ml-2 font-normal normal-case text-[10px] opacity-60">
+                        <span className="ml-2 font-normal normal-case text-[10px] opacity-70">
                           ({groupRows.length} indicadores)
                         </span>
                       </td>
@@ -302,9 +264,9 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
                             className={[
                               "border-t border-gray-eske-10 dark:border-white/5",
                               i % 2 === 0
-                                ? "bg-white-eske dark:bg-transparent"
-                                : "bg-gray-eske-10/30 dark:bg-white/[0.02]",
-                              "hover:bg-blue-eske/5 dark:hover:bg-blue-eske/10 transition-colors",
+                                ? "bg-white-eske dark:bg-[#18324A]"
+                                : "bg-gray-eske-10 dark:bg-[#21425E]",
+                              "hover:bg-blue-eske-10 dark:hover:bg-white/5 transition-colors",
                             ].join(" ")}
                           >
                             <td className="px-2.5 py-1.5 text-xs text-black-eske dark:text-[#C7D6E0] min-w-[160px]">
@@ -313,27 +275,11 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
                             <td className="px-2.5 py-1.5 text-xs text-black-eske-50 dark:text-[#6D8294] whitespace-nowrap">
                               {row.unit || "—"}
                             </td>
-
-                            {/* Nacional */}
                             <LevelCells d={row.nacional} isIndex={isIndex} />
-
-                            {/* Estatal */}
-                            {showEstado && (
-                              <LevelCells d={row.estado} isIndex={isIndex} />
-                            )}
-
-                            {/* Municipal o Distrital */}
-                            {showMunicipio && (
-                              <LevelCells d={row.municipio} isIndex={isIndex} />
-                            )}
-                            {showDistrito && (
-                              <LevelCells d={row.distrito} isIndex={isIndex} />
-                            )}
-
-                            {/* Seccional */}
-                            {showSeccion && (
-                              <LevelCells d={row.seccion} isIndex={isIndex} />
-                            )}
+                            {showEstado && <LevelCells d={row.estado} isIndex={isIndex} />}
+                            {showMunicipio && <LevelCells d={row.municipio} isIndex={isIndex} />}
+                            {showDistrito && <LevelCells d={row.distrito} isIndex={isIndex} />}
+                            {showSeccion && <LevelCells d={row.seccion} isIndex={isIndex} />}
                           </tr>
                         );
                       })}
@@ -345,12 +291,27 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
         </div>
       )}
 
-      {/* Source note */}
+      {/* Footer: two centered lines + CSV button */}
       {!isLoading && rows.length > 0 && (
-        <p className="text-[11px] text-black-eske-40 dark:text-[#6D8294] mt-2 leading-relaxed">
-          Fuente: INEGI — Estadísticas Censales a Escalas Geoelectorales (ECEG 2020).
-          Los valores "—" indican indicadores de tipo índice o promedio sin denominador aplicable.
-        </p>
+        <div className="mt-3 space-y-1">
+          <p className="text-[11px] text-center text-black-eske-40 dark:text-[#6D8294] leading-relaxed">
+            Los valores &ldquo;—&rdquo; corresponden a indicadores de tipo índice o promedio sin denominador aplicable.
+          </p>
+          <p className="text-[11px] text-center text-black-eske-40 dark:text-[#6D8294]">
+            Fuente: INEGI — Estadísticas Censales a Escalas Geoelectorales (ECEG 2020).
+            Datos del Censo de Población y Vivienda 2020.
+          </p>
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isLoading || rows.length === 0}
+              className="bg-bluegreen-eske text-white-eske hover:bg-bluegreen-eske-40 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske transition-opacity"
+            >
+              Descargar CSV
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

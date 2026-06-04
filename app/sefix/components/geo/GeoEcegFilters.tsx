@@ -1,12 +1,94 @@
 "use client";
 // app/sefix/components/geo/GeoEcegFilters.tsx
 // Filter bar for Estadísticos Geoelectorales (ECEG 2020).
-// Visual style matches EleccionesFilters (text-sm, rounded-md, dark:bg-[#112230]).
-// Order: [ECEG 2020] [Entidad] [Municipio] [|] [Distrito] [Sección] [Consultar] [Restablecer]
+import { useState } from "react";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { EcegFilterMode } from "@/app/sefix/hooks/useGeoEcegFilters";
 import type { GeoOption } from "@/types/geo.types";
+
+export const MODO_TOOLTIP =
+  "Visualiza cada área según su distancia a la media del territorio visible. " +
+  "Azul = por encima de la media; rojo = por debajo. " +
+  "Detecta heterogeneidad espacial incluso cuando el rango absoluto es estrecho.";
+
+// Subcomponent for the action buttons row — includes the divergent mode toggle.
+// Separate component so it can hold local state for the mobile tooltip.
+function DivergentActions({
+  hasPending, onConsultar, onRestablecer, divergentMode, onToggleDivergent,
+}: {
+  hasPending: boolean;
+  onConsultar: () => void;
+  onRestablecer: () => void;
+  divergentMode?: boolean;
+  onToggleDivergent?: () => void;
+}) {
+  const [mobileTooltip, setMobileTooltip] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-3 flex-wrap">
+        {hasPending && (
+          <button
+            type="button"
+            onClick={onConsultar}
+            className={
+              "px-4 py-1.5 rounded-md text-sm font-medium transition-colors " +
+              "bg-blue-eske text-white-eske hover:bg-blue-eske-60 " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+            }
+            aria-label="Ejecutar consulta con los filtros seleccionados"
+          >
+            Consultar
+          </button>
+        )}
+        {onToggleDivergent && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onToggleDivergent}
+              aria-pressed={!!divergentMode}
+              className={[
+                "text-xs px-2.5 py-1 rounded border transition-colors",
+                divergentMode
+                  ? "bg-bluegreen-eske text-white-eske border-bluegreen-eske"
+                  : "border-gray-eske-30 dark:border-white/20 text-black-eske-60 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
+              ].join(" ")}
+            >
+              {divergentMode ? "● Modo comparativo" : "○ Modo comparativo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTooltip((v) => !v)}
+              aria-label="Información sobre el modo comparativo"
+              aria-expanded={mobileTooltip}
+              className="text-[13px] leading-none text-black-eske-40 dark:text-[#6D8294] hover:text-bluegreen-eske focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded"
+            >
+              ⓘ
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onRestablecer}
+          className={
+            "text-xs text-orange-eske hover:text-orange-eske-60 underline " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-eske rounded"
+          }
+          aria-label="Restablecer filtros a valores por defecto"
+        >
+          Restablecer
+        </button>
+      </div>
+      {/* Mobile tooltip — visible when button is long-pressed or tapped */}
+      {onToggleDivergent && mobileTooltip && (
+        <p className="text-[11px] text-black-eske-60 dark:text-[#9AAEBE] leading-relaxed bg-gray-eske-10 dark:bg-[#112230] rounded p-2 border border-gray-eske-20 dark:border-white/10">
+          {MODO_TOOLTIP}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const ESTADOS = Object.keys(ESTADO_CVE_MAP);
 
@@ -45,6 +127,9 @@ interface GeoEcegFiltersProps {
   onConsultar: () => void;
   onRestablecer: () => void;
   hasPending: boolean;
+  // Optional divergent mode (mobile only — desktop uses inline toggle in indicator selector)
+  divergentMode?: boolean;
+  onToggleDivergent?: () => void;
 }
 
 export default function GeoEcegFilters({
@@ -67,6 +152,8 @@ export default function GeoEcegFilters({
   onConsultar,
   onRestablecer,
   hasPending,
+  divergentMode,
+  onToggleDivergent,
 }: GeoEcegFiltersProps) {
   // Compute estado_id to build district labels like "1405 PUERTO VALLARTA"
   const estadoId = ESTADO_CVE_MAP[pendingEstado] ?? "";
@@ -338,36 +425,13 @@ export default function GeoEcegFilters({
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────── */}
-      <div className="flex items-end gap-3">
-        {/* Issue 4: Consultar solo aparece cuando hay cambios pendientes */}
-        {hasPending && (
-          <button
-            type="button"
-            onClick={onConsultar}
-            className={
-              "px-4 py-1.5 rounded-md text-sm font-medium transition-colors " +
-              "bg-blue-eske text-white-eske hover:bg-blue-eske-60 " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
-            }
-            aria-label="Ejecutar consulta con los filtros seleccionados"
-          >
-            Consultar
-          </button>
-        )}
-
-        {/* Issue 1: Restablecer como texto-link naranja (igual que EleccionesFilters) */}
-        <button
-          type="button"
-          onClick={onRestablecer}
-          className={
-            "text-xs text-orange-eske hover:text-orange-eske-60 underline " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-eske rounded"
-          }
-          aria-label="Restablecer filtros a valores por defecto"
-        >
-          Restablecer
-        </button>
-      </div>
+      <DivergentActions
+        hasPending={hasPending}
+        onConsultar={onConsultar}
+        onRestablecer={onRestablecer}
+        divergentMode={divergentMode}
+        onToggleDivergent={onToggleDivergent}
+      />
     </div>
   );
 }

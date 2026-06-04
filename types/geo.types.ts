@@ -51,6 +51,7 @@ export interface GeoColorRamp {
   max: number;
   colorLow: string;   // hex, e.g. "#EFF6FF"
   colorHigh: string;  // hex, e.g. "#1D4ED8"
+  colorMid?: string;  // hex, midpoint for divergent (red→white→blue) scales
   noDataColor?: string;
 }
 

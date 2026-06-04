@@ -16,15 +16,17 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
         <div
           className="h-1.5 w-full rounded"
           style={{
-            background: `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorHigh})`,
+            background: colorRamp.colorMid
+            ? `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorMid}, ${colorRamp.colorHigh})`
+            : `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorHigh})`,
           }}
           aria-hidden="true"
         />
         <div className="flex justify-between mt-0.5">
-          <span className="text-[9px] text-black-eske-60 dark:text-black-eske-40 leading-none">
+          <span className="text-[9px] text-black-eske-60 dark:text-[#C8D8E8] leading-none">
             {fmt(colorRamp.min)}
           </span>
-          <span className="text-[9px] text-black-eske-60 dark:text-black-eske-40 leading-none">
+          <span className="text-[9px] text-black-eske-60 dark:text-[#C8D8E8] leading-none">
             {fmt(colorRamp.max)}
           </span>
         </div>
@@ -36,14 +38,16 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
   return (
     <div className="absolute bottom-6 right-3 z-[1000] rounded-lg bg-white-eske/95 dark:bg-[#0D2035]/95 shadow-md border border-gray-eske-20 dark:border-white/10 p-3 min-w-[140px]">
       {label && (
-        <p className="text-xs font-semibold text-black-eske dark:text-black-eske-10 mb-2 leading-tight">
+        <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8] mb-2 leading-tight">
           {label}
         </p>
       )}
       <div
         className="h-3 w-full rounded"
         style={{
-          background: `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorHigh})`,
+          background: colorRamp.colorMid
+            ? `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorMid}, ${colorRamp.colorHigh})`
+            : `linear-gradient(to right, ${colorRamp.colorLow}, ${colorRamp.colorHigh})`,
         }}
         aria-hidden="true"
       />
@@ -54,7 +58,7 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
           return (
             <span
               key={i}
-              className="text-[10px] text-black-eske-60 dark:text-black-eske-40 leading-none"
+              className="text-[10px] text-black-eske-60 dark:text-[#C8D8E8] leading-none"
             >
               {fmt(val)}
             </span>
@@ -68,7 +72,7 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
             style={{ background: colorRamp.noDataColor }}
             aria-hidden="true"
           />
-          <span className="text-[10px] text-black-eske-60 dark:text-black-eske-40">Sin datos</span>
+          <span className="text-[10px] text-black-eske-60 dark:text-[#C8D8E8]">Sin datos</span>
         </div>
       )}
     </div>
