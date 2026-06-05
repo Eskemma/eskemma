@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import {
   useEleccionesFilters,
@@ -15,7 +15,7 @@ import HistoricoComparison from "./HistoricoComparison";
 import HistoricoPartidos from "./HistoricoPartidos";
 import EleccionesDataTable from "./EleccionesDataTable";
 import EleccionesDynamicText from "./EleccionesDynamicText";
-import { CARGO_DISPLAY_LABELS } from "@/lib/sefix/eleccionesConstants";
+import { CARGO_DISPLAY_LABELS, EXTRAORDINARY_ONLY_YEARS } from "@/lib/sefix/eleccionesConstants";
 
 const SOURCE = "Fuente: INE - Sistema de Consulta de la Estadística de las Elecciones Federales";
 
@@ -77,6 +77,16 @@ export default function EleccionesFedPanelContent() {
     queryVersion,
   });
 
+  // Exclude extraordinary-only years from the ordinary participation chart.
+  // Years like 2021-SEN (Nayarit) and 2023-SEN (Tamaulipas) only had extraordinary
+  // elections and would show near-zero participation in any national/state query.
+  const filteredAllYearsData = useMemo(() => {
+    if (committed.tipo === "EXTRAORDINARIA") return allYearsData;
+    const exclusives = EXTRAORDINARY_ONLY_YEARS[committed.cargo] ?? [];
+    if (!exclusives.length) return allYearsData;
+    return allYearsData.filter((d) => !exclusives.includes(d.anio));
+  }, [allYearsData, committed.cargo, committed.tipo]);
+
   const cargoLabel = CARGO_DISPLAY_LABELS[committed.cargo] ?? committed.cargo;
 
   // Scope completo: cargo — geo (año), incluyendo distrito/municipio/sección si aplica
@@ -95,7 +105,7 @@ export default function EleccionesFedPanelContent() {
   const chartScope = `${cargoLabel} — ${geoLabel} (${committed.anio})`;
 
   // Year range for historical chart title
-  const yearsInData = allYearsData.map((d) => d.anio).sort((a, b) => a - b);
+  const yearsInData = filteredAllYearsData.map((d) => d.anio).sort((a, b) => a - b);
   const historicoScope =
     yearsInData.length >= 2
       ? `Participación ciudadana ${yearsInData[0]} – ${yearsInData[yearsInData.length - 1]}`
@@ -257,10 +267,10 @@ export default function EleccionesFedPanelContent() {
                   scope={`${cargoLabel} — ${geoLabel}`}
                   scope2="todos los años disponibles"
                 />
-                {loadingHistorico || allYearsData.length === 0 ? (
+                {loadingHistorico || filteredAllYearsData.length === 0 ? (
                   <ChartSkeleton height={220} />
                 ) : (
-                  <HistoricoComparison data={allYearsData} />
+                  <HistoricoComparison data={filteredAllYearsData} />
                 )}
                 <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
               </div>

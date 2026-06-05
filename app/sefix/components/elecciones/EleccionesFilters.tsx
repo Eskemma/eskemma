@@ -1,4 +1,5 @@
 "use client";
+import { useId } from "react";
 import {
   AVAILABLE_YEARS,
   CARGO_CSV_LABELS,
@@ -81,6 +82,10 @@ export default function EleccionesFilters({
   customScopeLabel,
   singleRow = false,
 }: Props) {
+  // Unique prefix per instance so desktop and mobile radio groups don't share names.
+  // Two simultaneous <EleccionesFilters> with name="ef-tipo" confuse the browser into
+  // not painting the checked circle even when checked={true} is set correctly.
+  const uid = useId();
   const { opciones: distritos, isLoading: loadingDist } = useEleccionesDistritos(
     pendingAnio, pendingCargo, pendingEstado,
   );
@@ -386,7 +391,7 @@ export default function EleccionesFilters({
                 <label key={t} className={RADIO_CLS}>
                   <input
                     type="radio"
-                    name="ef-tipo"
+                    name={`${uid}-tipo`}
                     value={t}
                     checked={pendingTipo === t}
                     onChange={() => setTipo(t)}
@@ -406,7 +411,7 @@ export default function EleccionesFilters({
             <label className={RADIO_CLS + " cursor-default"}>
               <input
                 type="radio"
-                name="ef-tipo-locked"
+                name={`${uid}-tipo-locked`}
                 disabled
                 defaultChecked
                 aria-label="Tipo de elección: Extraordinaria (bloqueado)"
@@ -426,7 +431,7 @@ export default function EleccionesFilters({
                 <label key={p} className={RADIO_CLS}>
                   <input
                     type="radio"
-                    name="ef-principio"
+                    name={`${uid}-principio`}
                     value={p}
                     checked={pendingPrincipio === p}
                     onChange={() => setPrincipio(p)}

@@ -20,6 +20,7 @@ import {
   CARGO_CSV_LABELS,
   CARGO_DISPLAY_LABELS,
   VALID_COMBINATIONS,
+  EXTRAORDINARY_ONLY_YEARS,
 } from "@/lib/sefix/eleccionesConstants";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
 import type { EleccionesFilterParams, ResultadosChartData } from "@/types/sefix.types";
@@ -65,15 +66,20 @@ const BTN_EXTRANJERO_INACTIVE =
   "dark:hover:bg-transparent dark:hover:border-blue-eske dark:hover:text-blue-eske " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske";
 
-// Years that have ordinary elections (2023 only had extraordinary SEN)
-const ORDINARIA_YEARS = AVAILABLE_YEARS.filter((y) => y !== 2023);
+// Years that have at least one ordinary cargo (derived from EXTRAORDINARY_ONLY_YEARS)
+const ORDINARIA_YEARS = AVAILABLE_YEARS.filter((y) =>
+  (VALID_COMBINATIONS[String(y)] ?? []).some(
+    (cargo) => !(EXTRAORDINARY_ONLY_YEARS[cargo] ?? []).includes(y)
+  )
+);
 
-// Valid cargos for ordinary elections per year
-// 2021/SEN was extraordinary only (Nayarit), so only DIP counts for ordinaria
-const ORDINARIA_CARGOS: Record<string, string[]> = {
-  ...VALID_COMBINATIONS,
-  "2021": ["dip"],
-};
+// Valid cargos for ordinary elections per year (excludes exclusively-extraordinary cargos)
+const ORDINARIA_CARGOS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(VALID_COMBINATIONS).map(([year, cargos]) => [
+    year,
+    cargos.filter((cargo) => !(EXTRAORDINARY_ONLY_YEARS[cargo] ?? []).includes(Number(year))),
+  ])
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

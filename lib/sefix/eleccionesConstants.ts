@@ -45,6 +45,12 @@ export const SPECIAL_CASES = {
   CASE_2015_AGS_DIP: { year: 2015, cargo: "dip", estado: "AGUASCALIENTES" },
 } as const;
 
+/** Years where ALL elections for a given cargo are exclusively extraordinary.
+ *  Used to exclude these years from ordinary election charts. */
+export const EXTRAORDINARY_ONLY_YEARS: Record<string, number[]> = {
+  sen: [2021, 2023],
+};
+
 // ============================================================
 // MAPEO PARTIDOS/COALICIONES POR AÑO + CARGO
 // Clave: `${año}_${cargoKey}` (ej: "2024_dip")

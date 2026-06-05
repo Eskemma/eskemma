@@ -311,8 +311,9 @@ export async function getResultadosByEstado(
   let votosExtranjero = 0;
   let partidoHeaders: string[] = [];
 
+  const estadoSet = estadoNombre ? new Set(possibleCsvEstados(estadoNombre)) : null;
   const headers = await streamCsvRows(targetFile, (row) => {
-    if (estadoNombre && row.estado !== estadoNombre) return;
+    if (estadoSet && !estadoSet.has(row.estado?.trim() ?? "")) return;
 
     // Skip aggregate rows, but keep "VOTO EN EL EXTRANJERO" rows (seccion=0, municipio especial)
     const rowSeccion = row.seccion?.trim();
@@ -1919,6 +1920,7 @@ export async function getEleccionesMetadata(
   const isVotoExtrajeroCabecera = cabecera?.toUpperCase().includes("VOTO EN EL EXTRANJERO") ?? false;
   // Normalize to electoral CSV name (only ESTADO DE MEXICO → "MEXICO"; others unchanged)
   const csvEstado = estadoNombre && !isVotoExtranjeroEstado ? toElectoralEstado(estadoNombre) : estadoNombre;
+  const csvEstadoSet = csvEstado && !isVotoExtranjeroEstado ? new Set(possibleCsvEstados(csvEstado)) : null;
   // Cache key uses normalized name so stale entries from pre-fix code don't mask results
   const cacheKey = `elec:meta:${anio}:${cargoKey}:${csvEstado ?? "NAC"}:${cabecera ?? ""}`;
   const cached = getCached<EleccionesMetadata>(cacheKey);
@@ -1938,7 +1940,7 @@ export async function getEleccionesMetadata(
       hasExtranjero = true;
       // Collect tipos from extranjero rows when the query targets extranjero data
       if (isVotoExtranjeroEstado || isVotoExtrajeroCabecera) {
-        if (estadoNombre && !isVotoExtranjeroEstado && row.estado !== csvEstado) return;
+        if (csvEstadoSet && !csvEstadoSet.has(row.estado?.trim() ?? "")) return;
         if (isVotoExtrajeroCabecera && row.cabecera?.trim() !== cabecera) return;
         if (row.tipo) tipos.add(row.tipo.trim().toUpperCase());
         if (row.principio) principios.add(row.principio.trim().toUpperCase());
@@ -1947,7 +1949,7 @@ export async function getEleccionesMetadata(
     }
     // Skip regular rows when the query is purely for extranjero scope
     if (isVotoExtranjeroEstado || isVotoExtrajeroCabecera) return;
-    if (estadoNombre && row.estado !== csvEstado) return;
+    if (csvEstadoSet && !csvEstadoSet.has(row.estado?.trim() ?? "")) return;
     if (cabecera && row.cabecera?.trim() !== cabecera) return;
     if (row.tipo) tipos.add(row.tipo.trim().toUpperCase());
     if (row.principio) principios.add(row.principio.trim().toUpperCase());
@@ -1975,6 +1977,7 @@ export async function getEleccionesGeo(
   // Normalize to CSV name (e.g. "ESTADO DE MEXICO" → "MEXICO", "COAHUILA" → "COAHUILA DE ZARAGOZA")
   // Normalize to electoral CSV name (only ESTADO DE MEXICO → "MEXICO"; others unchanged)
   const csvEstado = isExtranjeroEstado ? estadoNombre : toElectoralEstado(estadoNombre);
+  const csvEstadoSet = isExtranjeroEstado ? null : new Set(possibleCsvEstados(csvEstado));
   // Cache key uses the normalized name so stale entries from pre-fix code don't mask results
   const cacheKey = `elec:geo:${nivel}:${anio}:${cargoKey}:${csvEstado}:${cabecera ?? ""}:${municipio ?? ""}`;
   const cached = getCached<GeoEleccionesOpcion[]>(cacheKey);
@@ -2001,7 +2004,7 @@ export async function getEleccionesGeo(
       return;
     }
 
-    if (row.estado !== csvEstado) return;
+    if (csvEstadoSet && !csvEstadoSet.has(row.estado?.trim() ?? "")) return;
 
     // For distritos: include extranjero cabecera for this state
     if (nivel === "distritos" && isExtranjero) {
@@ -2076,6 +2079,7 @@ export async function getResultadosFiltered(params: {
     : (isNacional ? null : resolveEstadoName(estadoInput));
   // Normalize to electoral CSV name (only ESTADO DE MEXICO → "MEXICO"; others unchanged)
   const estadoNombre = estadoNombreResolved ? toElectoralEstado(estadoNombreResolved) : null;
+  const estadoSet = estadoNombre ? new Set(possibleCsvEstados(estadoNombre)) : null;
   if (!isVotoExtranjeroFiltro && !isNacional && !estadoNombre) return null;
 
   const cargoKey = CARGO_TO_KEY[cargoInput.toLowerCase()] ?? "dip";
@@ -2142,7 +2146,7 @@ export async function getResultadosFiltered(params: {
     votosNac += tvSafe; lneNac += lneSafe;
 
     // Apply estado filter (isVotoExtranjeroFiltro already handled above)
-    if (estadoNombre && rowEstado !== estadoNombre) return;
+    if (estadoSet && !estadoSet.has(rowEstado ?? "")) return;
 
     // Accumulate state-level totals (after estado filter, before tipo/principio/geo)
     votosEst += tvSafe; lneEst += lneSafe;
@@ -2318,13 +2322,14 @@ export async function getEleccionesTablaRows(params: {
 
   // Normalize to electoral CSV name (only ESTADO DE MEXICO → "MEXICO"; others unchanged)
   const csvEstadoNombre = estadoNombre ? toElectoralEstado(estadoNombre) : estadoNombre;
+  const estadoSet = csvEstadoNombre ? new Set(possibleCsvEstados(csvEstadoNombre)) : null;
 
   const allRows: EleccionesTablaRow[] = [];
 
   await streamCsvRows(path, (row) => {
     const rowSeccion = row.seccion?.trim();
     if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
-    if (csvEstadoNombre && row.estado?.trim() !== csvEstadoNombre) return;
+    if (estadoSet && !estadoSet.has(row.estado?.trim() ?? "")) return;
     if (tipoEleccion && tipoEleccion !== "AMBAS" && row.tipo?.trim().toUpperCase() !== tipoEleccion) return;
     if (principio && row.principio?.trim().toUpperCase() !== principio) return;
     if (cabecera && row.cabecera?.trim() !== cabecera) return;
@@ -2958,6 +2963,7 @@ export async function getGanadorPorFeature(params: {
   const { nivel, cargo, anio, estadoNombre, cveDistrito, municipio } = params;
 
   const csvEstado = estadoNombre ? toElectoralEstado(estadoNombre) : undefined;
+  const csvEstadoSet = csvEstado ? new Set(possibleCsvEstados(csvEstado)) : null;
   const cacheKey = `geo-ganador:${nivel}:${cargo}:${anio}:${csvEstado ?? "NAC"}:${cveDistrito ?? ""}:${municipio ?? ""}`;
   const cached = getCached<Record<string, GanadorFeature>>(cacheKey);
   if (cached) return cached;
@@ -2982,7 +2988,7 @@ export async function getGanadorPorFeature(params: {
     if (row.tipo?.trim().toUpperCase() !== "ORDINARIA") return;
     if (row.principio?.trim().toUpperCase() !== "MAYORIA RELATIVA") return;
 
-    if (csvEstado && row.estado?.trim() !== csvEstado) return;
+    if (csvEstadoSet && !csvEstadoSet.has(row.estado?.trim() ?? "")) return;
     // cveDistrito is the full cabecera string (e.g. "1405 PUERTO VALLARTA")
     if (cveDistrito && row.cabecera?.trim() !== cveDistrito) return;
     if (municipio && row.municipio?.trim() !== municipio) return;
