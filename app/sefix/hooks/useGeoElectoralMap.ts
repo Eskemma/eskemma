@@ -38,7 +38,7 @@ function formatVotos(n: number): string {
   return n.toLocaleString("es-MX");
 }
 
-function buildTooltip(label: string, ganador: GanadorFeature): string {
+function buildTooltip(label: string, ganador: GanadorFeature, isExtranjero = false): string {
   const medals = ["1°", "2°", "3°"];
   const rows = ganador.top3
     .map((t, i) => {
@@ -55,10 +55,11 @@ function buildTooltip(label: string, ganador: GanadorFeature): string {
     })
     .join("");
 
-  return `<div style="background:#ffffff;border-radius:6px;padding:8px 4px 4px;font-family:system-ui,sans-serif;font-size:12px;min-width:180px;max-width:240px;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
+  return `<div style="background:#ffffff;border-radius:6px;padding:8px 4px 4px;font-family:system-ui,sans-serif;font-size:12px;min-width:180px;max-width:240px;width:240px;box-shadow:0 2px 8px rgba(0,0,0,0.12);box-sizing:border-box">
     <p style="font-weight:600;margin:0 0 5px;color:#0f172a;font-size:11px;line-height:1.3">${escapeHtml(label)}</p>
     <table style="border-collapse:collapse;width:100%">${rows}</table>
     <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">Total: ${formatVotos(ganador.totalVotos)} votos</p>
+    ${isExtranjero ? `<p style="font-size:10px;color:#94a3b8;margin:6px 0 0;padding-top:5px;border-top:1px solid #e2e8f0;font-style:italic;white-space:normal;line-height:1.4">El voto en el extranjero sólo está disponible a nivel estatal.</p>` : ""}
   </div>`;
 }
 
@@ -74,8 +75,12 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
   const prevVersionRef = useRef(-1);
 
   const fetchGanadores = useCallback(async () => {
+    const isExtranjeroNacional = estado === "VOTO EN EL EXTRANJERO";
+    const isExtranjeroEstado = !isExtranjeroNacional && /\bEXTRANJERO\b/i.test(cabecera);
+    const isExtranjeroMode = isExtranjeroNacional || isExtranjeroEstado;
+
     let nivel: "entidades" | "distritos_fed" | "secciones";
-    if (!estado) {
+    if (!estado || isExtranjeroMode) {
       nivel = "entidades";
     } else if (cabecera) {
       nivel = "secciones";
@@ -117,11 +122,15 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
     return () => { abortRef.current?.abort(); };
   }, [queryVersion, fetchGanadores]);
 
+  const isExtranjeroNacional = estado === "VOTO EN EL EXTRANJERO";
+  const isExtranjeroEstado = !isExtranjeroNacional && /\bEXTRANJERO\b/i.test(cabecera);
+  const isExtranjeroMode = isExtranjeroNacional || isExtranjeroEstado;
+
   // Scope geográfico derivado de los filtros
   const scope: GeoScopeElectoral = (() => {
-    if (!estado) return { nivel: "nacional" };
+    if (!estado || isExtranjeroNacional) return { nivel: "nacional" };
     const estado_id = ESTADO_CVE_MAP[estado];
-    if (cabecera) {
+    if (cabecera && !isExtranjeroEstado) {
       // cabecera format: "SSDDD NAME" where SS=estado(2 digits), DDD=district number
       // e.g. "1405 PUERTO VALLARTA" → SS="14", DDD="05" → cve_distrito_fed="005"
       const distMatch = cabecera.match(/^(\d{2})(\d+)/);
@@ -134,12 +143,13 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
         ...(secciones.length > 0 && { cve_secciones: secciones }),
       };
     }
+    // Estado only (distritos view) OR isExtranjeroEstado (show that state's entity polygon)
     return { nivel: "entidad", estado_id, estado_nombre: estado };
   })();
 
   // Tipo de shape a mostrar según el scope
   const tipoShape: GeoLayerTipo = (() => {
-    if (!estado) return "entidades";
+    if (!estado || isExtranjeroMode) return "entidades";
     if (cabecera) return "secciones";
     return "distritos_fed";
   })();
@@ -170,7 +180,7 @@ export function useGeoElectoralMap(params: GeoElectoralParams): GeoElectoralResu
         else featureKey = cveEnt + String(props.CVE_SECCION ?? "").padStart(4, "0");
         const g = ganadores[featureKey];
         if (!g) return `<span style="font-size:12px;color:#64748b">${escapeHtml(featureKey)}</span>`;
-        return buildTooltip(g.label, g);
+        return buildTooltip(g.label, g, isExtranjeroMode);
       },
     },
   ];

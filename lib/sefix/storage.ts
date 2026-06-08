@@ -2962,9 +2962,19 @@ export async function getGanadorPorFeature(params: {
 }): Promise<Record<string, GanadorFeature>> {
   const { nivel, cargo, anio, estadoNombre, cveDistrito, municipio } = params;
 
-  const csvEstado = estadoNombre ? toElectoralEstado(estadoNombre) : undefined;
+  // Detect foreign-vote mode: either the "estado" is the special extranjero sentinel,
+  // or the cabecera follows the "XX00 VOTO EXTRANJERO" pattern (state-level foreign vote).
+  const isExtranjeroNacional = estadoNombre?.toUpperCase() === "VOTO EN EL EXTRANJERO";
+  const isExtranjeroEstado = !isExtranjeroNacional && !!cveDistrito &&
+    /\bEXTRANJERO\b/i.test(cveDistrito);
+  const isExtranjeroMode = isExtranjeroNacional || isExtranjeroEstado;
+
+  // For extranjero nacional mode we don't filter by state; for the rest we do.
+  const csvEstado = (!isExtranjeroNacional && estadoNombre)
+    ? toElectoralEstado(estadoNombre)
+    : undefined;
   const csvEstadoSet = csvEstado ? new Set(possibleCsvEstados(csvEstado)) : null;
-  const cacheKey = `geo-ganador:${nivel}:${cargo}:${anio}:${csvEstado ?? "NAC"}:${cveDistrito ?? ""}:${municipio ?? ""}`;
+  const cacheKey = `geo-ganador:${isExtranjeroMode ? "ext:" : ""}${nivel}:${cargo}:${anio}:${csvEstado ?? (isExtranjeroNacional ? "EXT-NAC" : "NAC")}:${cveDistrito ?? ""}:${municipio ?? ""}`;
   const cached = getCached<Record<string, GanadorFeature>>(cacheKey);
   if (cached) return cached;
 
@@ -2981,16 +2991,24 @@ export async function getGanadorPorFeature(params: {
 
   await streamCsvRows(path, (row) => {
     const rowSeccion = row.seccion?.trim();
-    if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
-
     const rowMunUpper = row.municipio?.trim().toUpperCase();
-    if (rowMunUpper === "VOTO EN EL EXTRANJERO") return;
+    const isExtranjeroRow = rowMunUpper === "VOTO EN EL EXTRANJERO";
+
+    if (isExtranjeroMode) {
+      // Foreign-vote mode: only process extranjero rows (seccion=00, municipio especial)
+      if (!isExtranjeroRow) return;
+    } else {
+      // Normal mode: skip aggregate rows (seccion=0/00) and foreign-vote rows
+      if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
+      if (isExtranjeroRow) return;
+    }
+
     if (row.tipo?.trim().toUpperCase() !== "ORDINARIA") return;
     if (row.principio?.trim().toUpperCase() !== "MAYORIA RELATIVA") return;
 
     if (csvEstadoSet && !csvEstadoSet.has(row.estado?.trim() ?? "")) return;
-    // cveDistrito is the full cabecera string (e.g. "1405 PUERTO VALLARTA")
-    if (cveDistrito && row.cabecera?.trim() !== cveDistrito) return;
+    // In extranjero mode, cveDistrito is the mode signal ("1400 VOTO EXTRANJERO"), not a row filter.
+    if (!isExtranjeroMode && cveDistrito && row.cabecera?.trim() !== cveDistrito) return;
     if (municipio && row.municipio?.trim() !== municipio) return;
 
     const cveEnt = (row.cve_estado ?? "").trim().padStart(2, "0");
