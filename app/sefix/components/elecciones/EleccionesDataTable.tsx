@@ -93,7 +93,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Columnas a mostrar
-  const fixedCols = ["anio", "cargo", "estado", "cabecera", "municipio", "seccion", "tipo", "principio"];
+  const fixedCols = ["anio", "cargo", "tipo", "principio", "estado", "cabecera", "municipio", "seccion"];
   const partidoCols = rows.length > 0
     ? Object.keys(rows[0]).filter((k) => !fixedCols.includes(k) && !["total_votos", "lne", "part_ciud"].includes(k))
     : [];
@@ -160,8 +160,10 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={allCols.length} className="px-3 py-8 text-center text-black-eske-60 dark:text-[#6D8294]">
-                  Cargando…
+                <td colSpan={allCols.length} className="py-10">
+                  <span className="block pl-4 sm:pl-48 text-red-eske dark:text-red-eske-30 text-xs font-medium">
+                    Cargando…
+                  </span>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (

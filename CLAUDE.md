@@ -374,6 +374,11 @@ Ver `types/subscription.types.ts` → `PLAN_FEATURES` para detalles completos.
    solicitado antes de retornar datos.
 4. Nunca `dangerouslySetInnerHTML` sin sanitizar con DOMPurify.
 5. Las cookies de sesión son HTTP-only — nunca accederlas desde JS cliente.
+6. Nunca ejecutar comandos que impriman valores de variables de entorno o
+   credenciales en el output: `cat .env`, `grep .env`, `echo $VAR`, `printenv`,
+   ni variantes. Para verificar que una variable existe, usar:
+   `[ -n "$VAR" ] && echo "OK" || echo "FALTA"` — solo confirma presencia,
+   nunca revela el valor.
 
 ---
 

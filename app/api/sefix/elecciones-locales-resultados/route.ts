@@ -28,13 +28,19 @@ export async function GET(request: NextRequest) {
     // Años disponibles para un estado dado (cascade estado → años)
     if (searchParams.has("available_years")) {
       const years = await getResultadosLocalesAvailableYears(estado);
-      return NextResponse.json({ availableYears: years });
+      return NextResponse.json(
+        { availableYears: years },
+        { headers: { "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600" } }
+      );
     }
 
     // Años disponibles para un cargo dado (para gráfica histórica G3)
     if (searchParams.has("years_for_cargo")) {
       const years = await getResultadosLocalesYearsForCargo(cargo);
-      return NextResponse.json({ availableYears: years });
+      return NextResponse.json(
+        { availableYears: years },
+        { headers: { "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600" } }
+      );
     }
 
     const tipoEleccion = searchParams.get("tipo") ?? undefined;
@@ -84,7 +90,10 @@ export async function GET(request: NextRequest) {
             r !== null
         )
         .sort((a, b) => a.anio - b.anio);
-      return NextResponse.json({ resultados });
+      return NextResponse.json(
+        { resultados },
+        { headers: { "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600" } }
+      );
     }
 
     if (!anioParam) {
@@ -118,7 +127,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ resultados });
+    return NextResponse.json(
+      { resultados },
+      { headers: { "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600" } }
+    );
   } catch (error) {
     console.error("[sefix/elecciones-locales-resultados] Error:", error);
     return NextResponse.json(

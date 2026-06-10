@@ -2325,8 +2325,17 @@ export async function getEleccionesTablaRows(params: {
   const estadoSet = csvEstadoNombre ? new Set(possibleCsvEstados(csvEstadoNombre)) : null;
 
   const allRows: EleccionesTablaRow[] = [];
+  let colsToAdd: string[] | null = null;
+  const colTotals: Record<string, number> = {};
 
-  await streamCsvRows(path, (row) => {
+  await streamCsvRows(path, (row, headers) => {
+    if (colsToAdd === null) {
+      const allPartidoCols = headers.filter(
+        (h) => !RESULTS_META_COLS.has(h.toLowerCase())
+      );
+      colsToAdd = columnas ?? allPartidoCols;
+    }
+
     const rowSeccion = row.seccion?.trim();
     if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
     if (estadoSet && !estadoSet.has(row.estado?.trim() ?? "")) return;
@@ -2350,15 +2359,28 @@ export async function getEleccionesTablaRows(params: {
       part_ciud: parseFloat(row.part_ciud ?? "0") || 0,
     };
 
-    // Add partido columns
-    for (const col of (columnas ?? [])) {
-      if (!RESULTS_META_COLS.has(col)) {
-        tableRow[col] = parseInt(row[col] ?? "0") || 0;
-      }
+    for (const col of (colsToAdd ?? [])) {
+      const v = parseInt(row[col] ?? "0") || 0;
+      tableRow[col] = v;
+      if (v > 0) colTotals[col] = (colTotals[col] ?? 0) + v;
     }
 
     allRows.push(tableRow);
   });
+
+  // Prune partido columns with zero votes across all filtered rows (only when auto-detected)
+  if (columnas === undefined && colsToAdd !== null) {
+    const detectedCols: string[] = colsToAdd;
+    const zeroCols = detectedCols.filter((c) => !colTotals[c]);
+    if (zeroCols.length > 0) {
+      const zeroSet = new Set<string>(zeroCols);
+      for (const tableRow of allRows) {
+        for (const col of zeroSet) {
+          delete (tableRow as Record<string, unknown>)[col];
+        }
+      }
+    }
+  }
 
   const total = allRows.length;
 
@@ -2892,9 +2914,18 @@ export async function getEleccionesLocalesTablaRows(params: {
     : null;
 
   const allRows: EleccionesTablaRow[] = [];
+  let colsToAdd: string[] | null = null;
+  const colTotals: Record<string, number> = {};
 
   const csvEstados = possibleCsvEstados(estadoNombre);
-  await streamCsvRows(path, (row) => {
+  await streamCsvRows(path, (row, headers) => {
+    if (colsToAdd === null) {
+      const allPartidoCols = headers.filter(
+        (h) => !RESULTS_META_COLS_LOC.has(h.toLowerCase())
+      );
+      colsToAdd = columnas ?? allPartidoCols;
+    }
+
     const rowSeccion = row.seccion?.trim();
     if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
     if (!csvEstados.includes(row.estado?.trim() ?? "")) return;
@@ -2918,14 +2949,28 @@ export async function getEleccionesLocalesTablaRows(params: {
       part_ciud: parseFloat(row.part_ciud ?? "0") || 0,
     };
 
-    for (const col of (columnas ?? [])) {
-      if (!RESULTS_META_COLS_LOC.has(col)) {
-        tableRow[col] = parseInt(row[col] ?? "0") || 0;
-      }
+    for (const col of (colsToAdd ?? [])) {
+      const v = parseInt(row[col] ?? "0") || 0;
+      tableRow[col] = v;
+      if (v > 0) colTotals[col] = (colTotals[col] ?? 0) + v;
     }
 
     allRows.push(tableRow);
   });
+
+  // Prune partido columns with zero votes across all filtered rows (only when auto-detected)
+  if (columnas === undefined && colsToAdd !== null) {
+    const detectedCols: string[] = colsToAdd;
+    const zeroCols = detectedCols.filter((c) => !colTotals[c]);
+    if (zeroCols.length > 0) {
+      const zeroSet = new Set<string>(zeroCols);
+      for (const tableRow of allRows) {
+        for (const col of zeroSet) {
+          delete (tableRow as Record<string, unknown>)[col];
+        }
+      }
+    }
+  }
 
   const total = allRows.length;
   if (page !== undefined && pageSize !== undefined) {

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (download) {
-      const fixedCols = ["anio", "cargo", "estado", "cabecera", "municipio", "seccion", "tipo", "principio"];
+      const fixedCols = ["anio", "cargo", "tipo", "principio", "estado", "cabecera", "municipio", "seccion"];
       const metaCols = ["total_votos", "lne", "part_ciud"];
       const partidoCols =
         partidos.includes("Todos") || partidos.length === 0

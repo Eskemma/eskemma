@@ -257,7 +257,7 @@ export default function EleccionesLocalesPanelContent() {
 
               {/* Tabla de datos */}
               <div>
-                <SectionHeader title="Tabla de Datos" scope={data ? chartScope : undefined} />
+                <SectionHeader title="Tabla de votos por partido, coalición o candidatura" scope={data ? chartScope : undefined} />
                 <EleccionesLocalesDataTable committed={committed} queryVersion={queryVersion} />
               </div>
 

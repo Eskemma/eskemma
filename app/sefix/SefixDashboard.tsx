@@ -11,6 +11,7 @@ import EleccionesLocalesPanel from "./components/EleccionesLocalesPanel";
 import GeoElectoralMapPanel from "./components/geo/GeoElectoralMapPanel";
 import GeoEcegPanel from "./components/geo/GeoEcegPanel";
 import UnderConstructionPage from "@/app/components/UnderConstructionPage";
+import { SefixFeedbackBanner } from "./components/SefixFeedbackBanner";
 
 interface SefixDashboardProps {
   role: UserRole | null;
@@ -39,6 +40,7 @@ export default function SefixDashboard({ role: _role }: SefixDashboardProps) {
           <UnderConstructionPage title="Otros Estadísticos" />
         </section>
       )}
+      <SefixFeedbackBanner />
     </main>
   );
 }

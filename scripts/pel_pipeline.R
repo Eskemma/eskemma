@@ -123,7 +123,12 @@ columnas_partido <- function(cols) {
     idx_nreg <- which(cols_up %in% c("NUM_VOTOS_NULOS", "NUM_VOTOS_VALIDOS"))
   }
   if (length(idx_cas) == 0 || length(idx_nreg) == 0) return(character(0))
-  cols[(idx_cas[1] + 1):(idx_nreg[1] - 1)]
+  raw_cols <- cols[(idx_cas[1] + 1):(idx_nreg[1] - 1)]
+  # Excluir columnas de conteo/control que no son partidos (ej. 2024+)
+  excluir <- toupper(c("ACTAS_CASILLA-MEC", "ACTA_CASILLA-MEC",
+                       "NUM_VOTOS_VALIDOS",
+                       "NUM_VOTOS_VALIDOS_MR", "NUM_VOTOS_VALIDOS_RP"))
+  raw_cols[!toupper(raw_cols) %in% excluir]
 }
 
 # Elimina todas las secuencias BOM (EF BB BF) de un vector de bytes crudos.
