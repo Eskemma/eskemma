@@ -4,6 +4,7 @@ import { adminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { createInterface } from "readline";
 import { PARTIDOS_MAPPING } from "@/lib/sefix/eleccionesConstants";
+import { PARTIDOS_MAPPING_LOC } from "@/lib/sefix/eleccionesLocalesConstants";
 
 const BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 
@@ -31,6 +32,9 @@ const rowsCache = new Map<string, { rows: Record<string, string>[]; headers: str
 
 // Deduplicates concurrent downloads of the same file — only one HTTP fetch runs at a time.
 const ongoingDownloads = new Map<string, Promise<{ rows: Record<string, string>[]; headers: string[] }>>();
+
+// Deduplicates concurrent Storage listing calls for the same prefix.
+const pendingListFiles = new Map<string, Promise<string[]>>();
 
 // ==========================================
 // LECTURA STREAMING DE CSV
@@ -105,19 +109,33 @@ async function streamCsvRows(
   return headers;
 }
 
-/** Lista los archivos CSV en un prefijo de Storage (con caché) */
+/** Lista los archivos CSV en un prefijo de Storage (con caché y deduplicación). */
 export async function listStorageFiles(prefix: string): Promise<string[]> {
   const cacheKey = `list:${prefix}`;
   const cached = getCached<string[]>(cacheKey);
   if (cached) return cached;
 
-  const [files] = await getBucket().getFiles({ prefix });
-  const paths = files
-    .map((f) => f.name)
-    .filter((n) => n.endsWith(".csv") && !n.endsWith("/"));
+  // Deduplication: concurrent calls for the same prefix share one Firebase API call.
+  const pending = pendingListFiles.get(prefix);
+  if (pending) return pending;
 
-  setCache(cacheKey, paths);
-  return paths;
+  const promise = getBucket()
+    .getFiles({ prefix })
+    .then(([files]) => {
+      const paths = files
+        .map((f) => f.name)
+        .filter((n) => n.endsWith(".csv") && !n.endsWith("/"));
+      setCache(cacheKey, paths);
+      pendingListFiles.delete(prefix);
+      return paths;
+    })
+    .catch((e) => {
+      pendingListFiles.delete(prefix);
+      throw e;
+    });
+
+  pendingListFiles.set(prefix, promise);
+  return promise;
 }
 
 // ==========================================
@@ -2647,28 +2665,19 @@ export async function getEleccionesLocalesPartidos(
 ): Promise<string[]> {
   const locKeys = getLocKeys(estadoNombre);
   if (!locKeys.length) return [];
-  const path = await resolveEleccionesLocalesPath(anio, cargoKey, locKeys);
-  if (!path) return [];
 
   const cacheKey = `elec_loc:partidos:${anio}:${cargoKey}:${estadoNombre}`;
   const cached = getCached<string[]>(cacheKey);
   if (cached) return cached;
 
-  const fileStream = getBucket().file(path).createReadStream();
-  const rl = createInterface({ input: fileStream, crlfDelay: Infinity });
+  const path = await resolveEleccionesLocalesPath(anio, cargoKey, locKeys);
+  if (!path) return [];
 
   let result: string[] = [];
-  for await (const line of rl) {
-    if (!line.trim()) continue;
-    const headers = line.split(",").map((h) => {
-      const t = h.trim();
-      return t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
-    });
-    result = headers.filter((h) => !LOC_FIXED_COLS.has(h.toLowerCase()));
-    break;
-  }
-  rl.close();
-  fileStream.destroy();
+  await streamCsvRows(path, (_row, headers) => {
+    if (result.length === 0)
+      result = headers.filter((h) => !LOC_FIXED_COLS.has(h.toLowerCase()));
+  });
 
   setCache(cacheKey, result);
   return result;
@@ -3093,6 +3102,92 @@ export async function getGanadorPorFeature(params: {
     const sorted = [...votos.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
+    const totalVotos = [...votos.values()].reduce((s, v) => s + v, 0);
+    result[featureKey] = {
+      ganador: sorted[0][0],
+      top3: sorted.map(([partido, v]) => ({
+        partido,
+        votos: v,
+        pct: totalVotos > 0 ? Math.round((v / totalVotos) * 1000) / 10 : 0,
+      })),
+      totalVotos,
+      label,
+    };
+  }
+
+  setCache(cacheKey, result);
+  return result;
+}
+
+/** Returns the winning party (top-3) per geographic feature for local elections choropleth. */
+export async function getGanadorPorFeatureLoc(params: {
+  nivel: "municipios" | "secciones";
+  cargo: string;
+  anio: number;
+  estadoNombre: string;
+  cabecera?: string;
+  municipio?: string;
+}): Promise<Record<string, GanadorFeature>> {
+  const { nivel, cargo, anio, estadoNombre, cabecera, municipio } = params;
+
+  const cacheKey = `geo-loc-ganador:${nivel}:${cargo}:${anio}:${estadoNombre}:${cabecera ?? ""}:${municipio ?? ""}`;
+  const cached = getCached<Record<string, GanadorFeature>>(cacheKey);
+  if (cached) return cached;
+
+  const locKeys = getLocKeys(estadoNombre);
+  if (!locKeys.length) return {};
+
+  const path = await resolveEleccionesLocalesPath(anio, cargo, locKeys);
+  if (!path) return {};
+
+  const validPartidoCols = new Set(
+    (PARTIDOS_MAPPING_LOC[`${anio}_${cargo}`] ?? []).filter(
+      (c) => !LOC_FIXED_COLS.has(c.toLowerCase())
+    )
+  );
+
+  const csvEstados = new Set(possibleCsvEstados(estadoNombre));
+  const acum = new Map<string, { votos: Map<string, number>; label: string }>();
+
+  await streamCsvRows(path, (row) => {
+    const rowSeccion = row.seccion?.trim();
+    if (!rowSeccion || rowSeccion === "0" || rowSeccion === "00") return;
+    if (row.tipo?.trim().toUpperCase() !== "ORDINARIA") return;
+    if (row.principio?.trim().toUpperCase() !== "MAYORIA RELATIVA") return;
+    if (!csvEstados.has(row.estado?.trim() ?? "")) return;
+    if (cabecera && row.cabecera?.trim() !== cabecera) return;
+    if (municipio && row.municipio?.trim() !== municipio) return;
+
+    const cveEnt = (row.cve_estado ?? "").trim().padStart(2, "0");
+    const cveMun = (row.cve_mun ?? "").trim().padStart(3, "0");
+    const secPad = rowSeccion.padStart(4, "0");
+
+    let featureKey: string;
+    let label: string;
+    if (nivel === "municipios") {
+      featureKey = cveEnt + cveMun;
+      label = row.municipio?.trim() ?? featureKey;
+    } else {
+      featureKey = cveEnt + secPad;
+      label = `Sección ${rowSeccion} · ${row.municipio?.trim() ?? row.estado?.trim() ?? ""}`;
+    }
+
+    if (!acum.has(featureKey)) {
+      acum.set(featureKey, { votos: new Map(), label });
+    }
+    const entry = acum.get(featureKey)!;
+
+    for (const col of validPartidoCols) {
+      const n = parseInt(row[col] ?? "0") || 0;
+      if (n <= 0) continue;
+      entry.votos.set(col, (entry.votos.get(col) ?? 0) + n);
+    }
+  });
+
+  const result: Record<string, GanadorFeature> = {};
+  for (const [featureKey, { votos, label }] of acum) {
+    if (votos.size === 0) continue;
+    const sorted = [...votos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
     const totalVotos = [...votos.values()].reduce((s, v) => s + v, 0);
     result[featureKey] = {
       ganador: sorted[0][0],

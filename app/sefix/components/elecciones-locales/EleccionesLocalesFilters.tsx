@@ -56,6 +56,8 @@ interface Props {
   loadingPartidos: boolean;
   tiposDisponibles: string[];
   principiosDisponibles: string[];
+  hidePartidos?: boolean;
+  fixedAnio?: boolean;
 }
 
 export default function EleccionesLocalesFilters({
@@ -67,6 +69,8 @@ export default function EleccionesLocalesFilters({
   availableYears, loadingYears,
   cargosDisponibles, loadingCargos,
   partidosDisponibles, loadingPartidos, tiposDisponibles, principiosDisponibles,
+  hidePartidos = false,
+  fixedAnio = false,
 }: Props) {
   const { opciones: distritos, isLoading: loadingDist } = useLocalesDistritos(
     pendingAnio, pendingCargo, pendingEstado,
@@ -135,25 +139,27 @@ export default function EleccionesLocalesFilters({
           </select>
         </div>
 
-        <div className="flex flex-col gap-1 flex-1 sm:flex-none">
-          <label htmlFor="loc-anio" className={LABEL_CLS}>
-            Año{loadingYears && <span className="ml-1 text-[10px] text-red-eske">(Cargando…)</span>}
-          </label>
-          <select
-            id="loc-anio"
-            value={pendingAnio}
-            onChange={(e) => setAnio(parseInt(e.target.value))}
-            disabled={availableYears.length === 0}
-            className={SELECT_CLS}
-          >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-            {availableYears.length === 0 && (
-              <option value={pendingAnio}>{pendingAnio}</option>
-            )}
-          </select>
-        </div>
+        {!fixedAnio && (
+          <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+            <label htmlFor="loc-anio" className={LABEL_CLS}>
+              Año{loadingYears && <span className="ml-1 text-[10px] text-red-eske">(Cargando…)</span>}
+            </label>
+            <select
+              id="loc-anio"
+              value={pendingAnio}
+              onChange={(e) => setAnio(parseInt(e.target.value))}
+              disabled={availableYears.length === 0}
+              className={SELECT_CLS}
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+              {availableYears.length === 0 && (
+                <option value={pendingAnio}>{pendingAnio}</option>
+              )}
+            </select>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1 flex-1 sm:flex-none">
           <label htmlFor="loc-cargo" className={LABEL_CLS}>
@@ -282,17 +288,19 @@ export default function EleccionesLocalesFilters({
         )}
 
         {/* Partidos */}
-        <div className="flex-1 sm:flex-none sm:min-w-[200px]">
-          <PartidosMultiSelect
-            id="loc-partidos"
-            label={<>Partidos{loadingPartidos && <span className="ml-1 text-red-eske">(Cargando…)</span>}</>}
-            options={partidoOptions}
-            selected={pendingPartidos}
-            onChange={setPartidos}
-            placeholder="Buscar partido..."
-            todosLabel="Todos"
-          />
-        </div>
+        {!hidePartidos && (
+          <div className="flex-1 sm:flex-none sm:min-w-[200px]">
+            <PartidosMultiSelect
+              id="loc-partidos"
+              label={<>Partidos{loadingPartidos && <span className="ml-1 text-red-eske">(Cargando…)</span>}</>}
+              options={partidoOptions}
+              selected={pendingPartidos}
+              onChange={setPartidos}
+              placeholder="Buscar partido..."
+              todosLabel="Todos"
+            />
+          </div>
+        )}
 
         {hasPending && (
           <div className="flex items-end flex-shrink-0">

@@ -150,6 +150,47 @@ export function useLocalesSecciones(
 }
 
 // ============================================================
+// HOOK PARA SCOPE GEOGRÁFICO (secciones por distrito/municipio)
+// Diferencia vs useLocalesSecciones: no requiere municipio;
+// activa el fetch cuando hay cabecera OR municipio. Exclusivo
+// para el mapa coroplético — no afecta la UI de "Elecciones Locales".
+// ============================================================
+
+export function useLocalesSeccionesForGeo(
+  anio: number,
+  cargo: string,
+  estado: string,
+  cabecera: string,
+  municipio: string,
+): { secciones: string[]; isLoading: boolean } {
+  const [secciones, setSecciones] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!estado || !cargo || (!cabecera && !municipio)) {
+      setSecciones([]);
+      return;
+    }
+    setIsLoading(true);
+    const qs = new URLSearchParams({ nivel: "secciones", anio: String(anio), cargo, estado });
+    if (cabecera)  qs.set("cabecera", cabecera);
+    if (municipio) qs.set("municipio", municipio);
+    let cancelled = false;
+    fetch(`${BASE}?${qs}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setSecciones((data.opciones ?? []).map((o: GeoEleccionesOpcion) => o.cve));
+      })
+      .catch(() => { if (!cancelled) setSecciones([]); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [anio, cargo, estado, cabecera, municipio]);
+
+  return { secciones, isLoading };
+}
+
+// ============================================================
 // HOOK DE PARTIDOS DISPONIBLES (dinámico por estado+año+cargo)
 // ============================================================
 

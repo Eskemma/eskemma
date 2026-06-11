@@ -4,13 +4,13 @@
 // Follows the same pattern as LnePanel (Vista Histórica / Vista Semanal).
 import { useState } from "react";
 import GeoElectoralMapContent from "./GeoElectoralMapContent";
-import UnderConstructionPage from "@/app/components/UnderConstructionPage";
+import GeoElectoralMapContentLoc from "./GeoElectoralMapContentLoc";
 
 type GeoSubView = "federales" | "locales";
 
 const TOOLTIP_CONFIG: Record<GeoSubView, { text: string; bg: string }> = {
   federales: { text: "Mapa coroplético de resultados electorales federales 2024", bg: "#CCE4F7" },
-  locales:   { text: "Próximamente: resultados electorales locales 2024", bg: "#FFF2CC" },
+  locales:   { text: "Mapa coroplético de resultados electorales locales 2024", bg: "#D5E8D4" },
 };
 
 export default function GeoElectoralMapPanel() {
@@ -65,11 +65,7 @@ export default function GeoElectoralMapPanel() {
 
       {/* Content */}
       {subView === "federales" && <GeoElectoralMapContent />}
-      {subView === "locales" && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
-          <UnderConstructionPage title="Elecciones Locales 2024" />
-        </div>
-      )}
+      {subView === "locales" && <GeoElectoralMapContentLoc />}
     </section>
   );
 }
