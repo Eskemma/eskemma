@@ -21,7 +21,7 @@ type EntitySeriesData = Record<string, { nacional: Record<string, number>[]; ext
 const entitySeriesCache = new Map<string, EntitySeriesData>();
 
 function parseCsv(text: string): Record<string, string>[] {
-  const lines = text.trim().split(/\r?\n/);
+  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim() !== "");
   if (lines.length < 2) return [];
   const headers = lines[0].split(",").map((h) => h.trim());
   return lines.slice(1).map((line) => {
@@ -146,13 +146,14 @@ export async function GET(request: NextRequest) {
         }
         return { fecha: fecha ?? "", ...nums };
       });
+      // Sin corte → datos "latest", se revalidan en background para detectar nuevos cortes.
+      // Con corte específico → datos inmutables, cache larga.
+      const cc = corte
+        ? "public, max-age=1800, stale-while-revalidate=3600"
+        : "public, max-age=0, stale-while-revalidate=600";
       return NextResponse.json(
         { serie, availableFechas },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600",
-          },
-        }
+        { headers: { "Cache-Control": cc } }
       );
     }
 
@@ -169,13 +170,15 @@ export async function GET(request: NextRequest) {
       if (!isNaN(n)) data[k] = n;
     }
 
+    // Sin corte → "latest": max-age=0 + stale-while-revalidate para detectar nuevos cortes.
+    // Con corte específico → datos inmutables: cache larga.
+    const cacheControl = corte
+      ? "public, max-age=1800, stale-while-revalidate=3600"
+      : "public, max-age=0, stale-while-revalidate=600";
+
     return NextResponse.json(
       { data, fecha: fecha ?? "", availableFechas },
-      {
-        headers: {
-          "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600",
-        },
-      }
+      { headers: { "Cache-Control": cacheControl } }
     );
   } catch (error) {
     console.error("[serie-semanal] Error:", error);

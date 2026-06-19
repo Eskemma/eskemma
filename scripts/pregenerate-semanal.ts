@@ -5,12 +5,14 @@
  * Offline script: uploads pre-processed semanal files to Firebase Storage.
  *
  * Usage:
+ *   npx tsx scripts/pregenerate-semanal.ts --upload-raw      # upload raw semanal CSVs to semanal/
+ *   npx tsx scripts/pregenerate-semanal.ts --update-series  # append new date row to data/series files
  *   npx tsx scripts/pregenerate-semanal.ts --series         # upload series CSVs to semanal_series/
  *   npx tsx scripts/pregenerate-semanal.ts --geo            # build + upload geo.json
  *   npx tsx scripts/pregenerate-semanal.ts --agg            # build + upload aggregate JSONs per state
  *   npx tsx scripts/pregenerate-semanal.ts --entity-series  # build + upload entity time-series JSONs
  *   npx tsx scripts/pregenerate-semanal.ts --section-series # build + upload section-level series JSONs
- *   npx tsx scripts/pregenerate-semanal.ts --all            # all five actions
+ *   npx tsx scripts/pregenerate-semanal.ts --all            # all seven actions
  *
  * Input files (local):
  *   data/series/serie_{nacional|extranjero}_{edad|sexo|origen}.csv  → pre-aggregated weekly series
@@ -135,7 +137,10 @@ async function streamLocal(
     const trimmed = line.trim();
     if (!trimmed) continue;
     if (isFirst) {
-      headers = trimmed.split(",").map((h) => h.trim());
+      headers = trimmed.split(",").map((h) => {
+        const t = h.trim();
+        return t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
+      });
       isFirst = false;
       continue;
     }
@@ -291,7 +296,11 @@ async function buildAndUploadAgg(app: App): Promise<void> {
       if (!nombreRaw || nombreRaw === "NA" || !cveEnt || cveEnt === "NA") return;
 
       const nombre  = normalizeEntidadName(nombreRaw);
-      const isExt   = row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO");
+      // Detect extranjero rows via cabecera_distrital (section-level CSVs like edad/origen)
+      // OR via nombre_entidad (state-level CSVs like sexo that lack cabecera_distrital).
+      const isExt   =
+        row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO") ||
+        row.nombre_entidad?.toUpperCase().includes("RESIDENTES EXTRANJERO");
 
       if (!output.por_entidad[nombre]) {
         output.por_entidad[nombre] = { nacional: {}, extranjero: {} };
@@ -448,10 +457,14 @@ function computeDerivedSemanalRow(
     for (const r of RANGOS_EDAD_KEYS) {
       let pad = 0, lst = 0;
       for (const sx of SEXOS) {
-        const pv = parseFloat(row[`padron_${r}_${sx}`] ?? "0");
-        const lv = parseFloat(row[`lista_${r}_${sx}`]  ?? "0");
+        // Alias: CSV may use "nobinario" instead of "no_binario"
+        const csvSx = (sx === "no_binario" && row[`padron_${r}_${sx}`] === undefined)
+          ? "nobinario" : sx;
+        const pv = parseFloat(row[`padron_${r}_${csvSx}`] ?? "0");
+        const lv = parseFloat(row[`lista_${r}_${csvSx}`]  ?? "0");
         if (!isNaN(pv)) pad += pv;
         if (!isNaN(lv)) lst += lv;
+        // Always store under canonical key (sx), so "no_binario" is consistent
         if (!isNaN(pv) && pv > 0) result[`padron_${r}_${sx}`] = pv;
         if (!isNaN(lv) && lv > 0) result[`lista_${r}_${sx}`]  = lv;
       }
@@ -581,50 +594,229 @@ async function buildAndUploadSectionSeries(app: App): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
+// Step 0a: Upload raw semanal CSVs to Storage
+// ─────────────────────────────────────────────
+
+async function uploadRawSemanalFiles(app: App): Promise<void> {
+  const bucket = getStorage(app).bucket(STORAGE_BUCKET);
+  const files = fs.readdirSync(SEMANAL_DIR).filter((f) => f.endsWith(".csv")).sort();
+  if (files.length === 0) {
+    console.warn("  [upload-raw] No CSV files found in", SEMANAL_DIR);
+    return;
+  }
+  for (const filename of files) {
+    const localPath   = path.join(SEMANAL_DIR, filename);
+    const storagePath = `sefix/pdln/semanal/${filename}`;
+    console.log(`  Uploading ${filename} → ${storagePath}`);
+    await bucket.upload(localPath, {
+      destination: storagePath,
+      metadata: { contentType: "text/csv" },
+    });
+  }
+  console.log(`  ✓ Uploaded ${files.length} raw semanal CSVs`);
+}
+
+// ─────────────────────────────────────────────
+// Step 0b: Update data/series/ with the latest date row
+// ─────────────────────────────────────────────
+
+const SERIE_EDAD_COLS = [
+  "18", "19", "20_24", "25_29", "30_34", "35_39",
+  "40_44", "45_49", "50_54", "55_59", "60_64", "65_y_mas",
+] as const;
+
+function readSerieLastDate(serieFile: string): string {
+  if (!fs.existsSync(serieFile)) return "";
+  const content = fs.readFileSync(serieFile, "utf-8");
+  const lines   = content.trim().split("\n").filter(Boolean);
+  if (lines.length < 2) return "";
+  return lines[lines.length - 1].split(",")[0].trim();
+}
+
+async function updateSeriesFiles(): Promise<void> {
+  // Build row builders — defined once, reused across all files
+  const buildEdadRow = (agg: Record<string, number>): string => {
+    const vals: number[] = [];
+    let padTotal = 0;
+    let lstTotal = 0;
+    for (const r of SERIE_EDAD_COLS) {
+      // Alias: CSV may use "nobinario" instead of "no_binario"
+      const padNB = agg[`padron_${r}_no_binario`] ?? agg[`padron_${r}_nobinario`] ?? 0;
+      const lstNB = agg[`lista_${r}_no_binario`]  ?? agg[`lista_${r}_nobinario`]  ?? 0;
+      const pad   = (agg[`padron_${r}_hombres`] ?? 0) + (agg[`padron_${r}_mujeres`] ?? 0) + padNB;
+      const lst   = (agg[`lista_${r}_hombres`]  ?? 0) + (agg[`lista_${r}_mujeres`]  ?? 0) + lstNB;
+      vals.push(pad, lst);
+      padTotal += pad;
+      lstTotal += lst;
+    }
+    vals.push(padTotal, lstTotal);
+    return vals.join(",");
+  };
+
+  const buildSexoRow = (agg: Record<string, number>): string => {
+    const cols = [
+      "padron_hombres", "padron_mujeres", "padron_no_binario",
+      "lista_hombres",  "lista_mujeres",  "lista_no_binario",
+    ];
+    return cols.map((c) => agg[c] ?? 0).join(",");
+  };
+
+  const buildOrigenRow = (serieFile: string, agg: Record<string, number>): string => {
+    // DERFE releases may rename columns (e.g. ln_cdmx → ln_distrito_federal).
+    // Map known aliases so series columns always resolve to a value.
+    const COL_ALIASES: Record<string, string> = {
+      ln_cdmx:  "ln_distrito_federal",
+      pad_cdmx: "pad_distrito_federal",
+    };
+    const lookup = (col: string): number =>
+      agg[col] ?? agg[COL_ALIASES[col] ?? ""] ?? 0;
+    const headers = fs.readFileSync(serieFile, "utf-8").split("\n")[0].split(",");
+    return headers
+      .slice(1) // skip "fecha"
+      .map((col) => lookup(col.trim()))
+      .join(",");
+  };
+
+  for (const tipo of TIPOS) {
+    const files = fs.readdirSync(SEMANAL_DIR)
+      .filter((f) => f.endsWith(`_${tipo}.csv`))
+      .sort(); // alphabetical = chronological
+
+    if (files.length === 0) { console.warn(`  [update-series] No _${tipo}.csv found, skipping`); continue; }
+
+    const nacFile = path.join(SERIES_DIR, `serie_nacional_${tipo}.csv`);
+    const extFile = path.join(SERIES_DIR, `serie_extranjero_${tipo}.csv`);
+
+    // Collect all dates already present in both series files
+    const existingDates = new Set<string>();
+    for (const sf of [nacFile, extFile]) {
+      if (!fs.existsSync(sf)) continue;
+      const lines = fs.readFileSync(sf, "utf-8").trim().split(/\r?\n/).filter(Boolean).slice(1);
+      for (const line of lines) {
+        const d = line.split(",")[0].trim();
+        if (d) existingDates.add(d);
+      }
+    }
+
+    // Process every file in chronological order — skip already-present dates
+    for (const filename of files) {
+      const csvPath = path.join(SEMANAL_DIR, filename);
+      const fecha   = fechaFromFilename(csvPath);
+      if (!fecha) continue;
+
+      if (existingDates.has(fecha)) {
+        console.log(`  [update-series] ${tipo}: ${fecha} already present, skipping`);
+        continue;
+      }
+
+      console.log(`  [update-series] ${tipo}: processing ${fecha} (${filename})`);
+
+      const nacAgg: Record<string, number> = {};
+      const extAgg: Record<string, number> = {};
+
+      await streamLocal(csvPath, (row) => {
+        const nombreRaw = row.nombre_entidad?.trim();
+        const cveEnt    = row.cve_entidad?.trim();
+        if (!nombreRaw || nombreRaw === "NA" || !cveEnt || cveEnt === "NA") return;
+
+        const isExt = row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO");
+        const target = isExt ? extAgg : nacAgg;
+
+        for (const [col, val] of Object.entries(row)) {
+          if (SKIP_COLS.has(col)) continue;
+          const num = parseFloat(val);
+          if (isNaN(num)) continue;
+          target[col] = (target[col] ?? 0) + num;
+        }
+      });
+
+      for (const [serieFile, agg] of [[nacFile, nacAgg], [extFile, extAgg]] as const) {
+        let rowData: string;
+        if (tipo === "edad") {
+          rowData = buildEdadRow(agg);
+        } else if (tipo === "sexo") {
+          rowData = buildSexoRow(agg);
+        } else {
+          rowData = buildOrigenRow(serieFile, agg);
+        }
+
+        // Ensure exactly one newline between the existing last row and the new row.
+        const existing = fs.readFileSync(serieFile, "utf-8");
+        const sep = existing.endsWith("\n") ? "" : "\n";
+        fs.appendFileSync(serieFile, `${sep}${fecha},${rowData}\n`, "utf-8");
+        console.log(`    ✓ Appended ${fecha} to ${path.basename(serieFile)}`);
+      }
+
+      existingDates.add(fecha);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
 
 async function main() {
   const args = process.argv.slice(2);
+  const doUploadRaw     = args.includes("--upload-raw")     || args.includes("--all");
+  const doUpdateSeries  = args.includes("--update-series")  || args.includes("--all");
   const doSeries        = args.includes("--series")         || args.includes("--all");
   const doGeo           = args.includes("--geo")            || args.includes("--all");
   const doAgg           = args.includes("--agg")            || args.includes("--all");
   const doEntitySeries  = args.includes("--entity-series")  || args.includes("--all");
   const doSectionSeries = args.includes("--section-series") || args.includes("--all");
 
-  if (!doSeries && !doGeo && !doAgg && !doEntitySeries && !doSectionSeries) {
+  if (!doUploadRaw && !doUpdateSeries && !doSeries && !doGeo && !doAgg && !doEntitySeries && !doSectionSeries) {
     console.error(
-      "Usage: npx tsx scripts/pregenerate-semanal.ts [--series] [--geo] [--agg] [--entity-series] [--section-series] [--all]"
+      "Usage: npx tsx scripts/pregenerate-semanal.ts [--upload-raw] [--update-series] [--series] [--geo] [--agg] [--entity-series] [--section-series] [--all]"
     );
     process.exit(1);
+  }
+
+  // --update-series reads local files only — Firebase not needed
+  if (doUpdateSeries && !doUploadRaw && !doSeries && !doGeo && !doAgg && !doEntitySeries && !doSectionSeries) {
+    console.log("[0b/7] Updating series files locally…");
+    await updateSeriesFiles();
+    console.log("\n✅ Done.");
+    return;
   }
 
   console.log("Initializing Firebase…");
   const app = initFirebase();
   console.log(`✓ Firebase connected (bucket: ${STORAGE_BUCKET})\n`);
 
+  if (doUpdateSeries) {
+    console.log("[0b/7] Updating series files locally…");
+    await updateSeriesFiles();
+  }
+
+  if (doUploadRaw) {
+    console.log("\n[0a/7] Uploading raw semanal CSVs…");
+    await uploadRawSemanalFiles(app);
+  }
+
   if (doSeries) {
-    console.log("[1/5] Uploading series CSVs…");
+    console.log("\n[1/7] Uploading series CSVs…");
     await uploadSeriesFiles(app);
   }
 
   if (doGeo) {
-    console.log("\n[2/5] Building geo.json…");
+    console.log("\n[2/7] Building geo.json…");
     await buildAndUploadGeo(app);
   }
 
   if (doAgg) {
-    console.log("\n[3/5] Building aggregate JSONs…");
+    console.log("\n[3/7] Building aggregate JSONs…");
     await buildAndUploadAgg(app);
   }
 
   if (doEntitySeries) {
-    console.log("\n[4/5] Building entity time-series JSONs…");
+    console.log("\n[4/7] Building entity time-series JSONs…");
     await buildAndUploadEntitySeries(app);
   }
 
   if (doSectionSeries) {
-    console.log("\n[5/5] Building section-level series JSONs…");
+    console.log("\n[5/7] Building section-level series JSONs…");
     await buildAndUploadSectionSeries(app);
   }
 

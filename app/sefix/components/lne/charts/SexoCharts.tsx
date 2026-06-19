@@ -173,8 +173,9 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
   const tickFill   = isDark ? "#C7D6E0" : "var(--color-black-eske-10)";
   const legendStyle = { fontSize: 12, ...(isDark ? { color: "#C7D6E0" } : {}) };
 
-  const colH = coloresH(ambito, isDark);
-  const colM = coloresM(ambito, isDark);
+  const colH   = coloresH(ambito, isDark);
+  const colM   = coloresM(ambito, isDark);
+  const colNB  = isDark ? COL_NB_DARK : COL_NB;
 
   const chartData = RANGOS.map((r) => ({
     age: RANGOS_LABELS[r],
@@ -182,13 +183,67 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
     mujeres: data[`lista_${r}_mujeres`] ?? 0,
   }));
 
+  const totalPadNB = RANGOS.reduce((s, r) => s + (data[`padron_${r}_no_binario`] ?? data[`padron_${r}_nobinario`] ?? 0), 0);
+  const totalLnNB  = RANGOS.reduce((s, r) => s + (data[`lista_${r}_no_binario`]  ?? data[`lista_${r}_nobinario`]  ?? 0), 0);
+  const hasNBs1    = totalPadNB > 0 || totalLnNB > 0;
+  const [s1NbHovered, setS1NbHovered] = useState(false);
+
+  const nbPerRango = RANGOS.map((r) => ({
+    label: RANGOS_LABELS[r],
+    pad: (data[`padron_${r}_no_binario`] ?? data[`padron_${r}_nobinario`] ?? 0) as number,
+    lne: (data[`lista_${r}_no_binario`]  ?? data[`lista_${r}_nobinario`]  ?? 0) as number,
+  }));
+
   return (
+    <div className="relative">
+      {hasNBs1 && (
+        <div
+          className="absolute top-2 left-16 z-10"
+          onMouseEnter={() => setS1NbHovered(true)}
+          onMouseLeave={() => setS1NbHovered(false)}
+        >
+          <div
+            className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+            aria-label="Datos No Binario"
+          >
+            <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
+            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+              Padrón: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalPadNB)}</span>
+            </p>
+            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+              LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalLnNB)}</span>
+            </p>
+          </div>
+          {s1NbHovered && (
+            <div
+              className="absolute top-full left-0 mt-1 w-56 bg-white-eske dark:bg-[#18324A] border border-gray-eske-20 dark:border-white/10 rounded-md shadow-lg p-3 text-xs"
+              style={{ zIndex: 40 }}
+            >
+              <p className="font-semibold text-black-eske dark:text-[#EAF2F8] mb-1 border-b border-gray-eske-20 dark:border-white/10 pb-1">
+                No Binario — por rango de edad
+              </p>
+              <div className="grid grid-cols-3 gap-x-2 text-black-eske-60 dark:text-[#9AAEBE] mb-1">
+                <span />
+                <span className="font-semibold">Padrón</span>
+                <span className="font-semibold">LNE</span>
+              </div>
+              {nbPerRango.map(({ label, pad, lne }) => (
+                <div key={label} className="grid grid-cols-3 gap-x-2 text-black-eske-60 dark:text-[#9AAEBE]">
+                  <span>{label}</span>
+                  <span className="text-black-eske dark:text-[#EAF2F8]">{FMT.format(pad)}</span>
+                  <span className="text-black-eske dark:text-[#EAF2F8]">{FMT.format(lne)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     <ResponsiveContainer width="100%" height={360}>
       <BarChart
         data={chartData}
         layout="vertical"
         stackOffset="sign"
-        margin={{ top: 8, right: 20, left: 8, bottom: 0 }}
+        margin={{ top: hasNBs1 ? 56 : 8, right: 20, left: 8, bottom: 0 }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal={false} />
         <XAxis
@@ -249,6 +304,7 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
         <Bar dataKey="mujeres" fill={colM} radius={[0, 3, 3, 0]} stackId="a" />
       </BarChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -266,12 +322,11 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
   const colNB = isDark ? COL_NB_DARK : COL_NB;
 
   const SEXOS_S2 = [
-    { key: "hombres",    label: "Hombres",    color: colH  },
-    { key: "mujeres",    label: "Mujeres",    color: colM  },
-    { key: "no_binario", label: "No Binario", color: colNB },
+    { key: "hombres", label: "Hombres", color: colH },
+    { key: "mujeres", label: "Mujeres", color: colM },
   ];
 
-  const [activos, setActivos] = useState(new Set(["hombres", "mujeres", "no_binario"]));
+  const [activos, setActivos] = useState(new Set(["hombres", "mujeres"]));
 
   function toggle(key: string) {
     setActivos((prev) => {
@@ -292,6 +347,13 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
     return row;
   });
 
+  const totalLnNBS2  = GRUPOS.reduce((s, g) => s + g.rangos.reduce((ss, r) => ss + (data[`lista_${r}_no_binario`]  ?? data[`lista_${r}_nobinario`]  ?? 0), 0), 0);
+  const [s2NbHovered, setS2NbHovered] = useState(false);
+  const nbPerGrupo = GRUPOS.map((g) => ({
+    label: g.id === "jovenes" ? "Jóvenes" : g.id === "adultos" ? "Adultos" : "Mayores",
+    lne: g.rangos.reduce((s, r) => s + ((data[`lista_${r}_no_binario`] ?? data[`lista_${r}_nobinario`] ?? 0) as number), 0),
+  }));
+
   return (
     <div>
       <div className="mb-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] p-3">
@@ -310,15 +372,49 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
           ))}
           <button
             type="button"
-            onClick={() => setActivos(new Set(["hombres", "mujeres", "no_binario"]))}
-            className="ml-auto px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
+            onClick={() => setActivos(new Set(["hombres", "mujeres"]))}
+            className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
           >
             ↺ Restablecer
           </button>
         </div>
       </div>
+      <div className="relative">
+        {totalLnNBS2 > 0 && (
+          <div
+            className="absolute top-2 right-0 z-10"
+            onMouseEnter={() => setS2NbHovered(true)}
+            onMouseLeave={() => setS2NbHovered(false)}
+          >
+            <div
+              className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+              aria-label="Datos No Binario"
+            >
+              <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
+              <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+                LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalLnNBS2)}</span>
+              </p>
+            </div>
+            {s2NbHovered && (
+              <div
+                className="absolute top-full right-0 mt-1 w-44 bg-white-eske dark:bg-[#18324A] border border-gray-eske-20 dark:border-white/10 rounded-md shadow-lg p-3 text-xs"
+                style={{ zIndex: 40 }}
+              >
+                <p className="font-semibold text-black-eske dark:text-[#EAF2F8] mb-1 border-b border-gray-eske-20 dark:border-white/10 pb-1">
+                  No Binario — por grupo etario
+                </p>
+                {nbPerGrupo.map(({ label, lne }) => (
+                  <div key={label} className="flex justify-between text-black-eske-60 dark:text-[#9AAEBE]">
+                    <span>{label}</span>
+                    <span className="font-medium text-black-eske dark:text-[#EAF2F8] ml-3">{FMT.format(lne)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        <BarChart data={chartData} margin={{ top: totalLnNBS2 > 0 ? 56 : 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
           <XAxis dataKey="grupo" tick={{ fontSize: 11, fill: tickFill }} />
           <YAxis
@@ -338,6 +434,7 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
           ))}
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

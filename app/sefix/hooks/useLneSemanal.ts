@@ -82,6 +82,8 @@ export function useLneSemanal(
 
         const p = new URLSearchParams({ tipo, ambito });
         if (corte) p.set("corte", corte);
+        // _v bypasses HTTP cache when queryVersion increments (e.g. user clicks Consultar)
+        if (queryVersion) p.set("_v", String(queryVersion));
         url = `/api/sefix/serie-semanal?${p}`;
       }
 

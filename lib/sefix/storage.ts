@@ -1346,15 +1346,23 @@ export async function getSemanalAgregado(
   await streamCsvRows(targetPath, (row) => {
     const cve = row.cve_entidad?.trim();
     if (!cve || cve.toUpperCase() === "NA") return;
-    if (derfeEntidad && row.nombre_entidad !== derfeEntidad) return;
+
+    // RESIDENTES EXTRANJERO aggregate rows must always pass through so they
+    // contribute to the extranjero accumulator even when an entity filter is active.
+    const isResidenteExt =
+      row.nombre_entidad?.toUpperCase() === "RESIDENTES EXTRANJERO" ||
+      row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO");
+
+    if (derfeEntidad && row.nombre_entidad !== derfeEntidad && !isResidenteExt) return;
 
     // Skip aggregate/subtotal rows (district or state totals) which have no
     // valid section number. Including them alongside section-level rows causes
-    // double-counting (each section value would appear twice).
+    // double-counting. Exception: extranjero aggregate rows (seccion=0) must
+    // be included since they are the only source of extranjero data.
     const sec = row.seccion?.trim();
-    if (!sec || sec === "0" || sec === "00") return;
+    if (!isResidenteExt && (!sec || sec === "0" || sec === "00")) return;
 
-    const isExt = row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO");
+    const isExt = isResidenteExt;
     const target = isExt ? extranjero : nacional;
 
     for (const [col, val] of Object.entries(row)) {
@@ -1820,10 +1828,10 @@ export async function getSemanalTablaRows(params: {
     rows = RANGOS.map((r) => {
       const lH = (data[`lista_${r}_hombres`]    as number) ?? 0;
       const lM = (data[`lista_${r}_mujeres`]    as number) ?? 0;
-      const lN = (data[`lista_${r}_no_binario`] as number) ?? 0;
+      const lN = ((data[`lista_${r}_no_binario`]  as number) ?? (data[`lista_${r}_nobinario`]  as number) ?? 0);
       const pH = (data[`padron_${r}_hombres`]   as number) ?? 0;
       const pM = (data[`padron_${r}_mujeres`]   as number) ?? 0;
-      const pN = (data[`padron_${r}_no_binario`] as number) ?? 0;
+      const pN = ((data[`padron_${r}_no_binario`] as number) ?? (data[`padron_${r}_nobinario`] as number) ?? 0);
       return {
         rango:       ETIQ_R[r] ?? r,
         padron_h:    pH,
