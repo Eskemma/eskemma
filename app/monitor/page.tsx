@@ -3,10 +3,15 @@ import { Metadata } from "next";
 import MonitorHeroSection from "./MonitorHeroSection";
 import AppCard from "../components/monitor/AppCard";
 
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
+
 export const metadata: Metadata = {
   title: "Monitor — Inteligencia de Contexto | Eskemma",
   description:
     "Suite de herramientas de monitoreo y análisis de contexto político, económico y social para consultores y equipos de campaña.",
+  alternates: {
+    canonical: `${SITE_URL}/monitor`,
+  },
 };
 
 // ──────────────────────────────────────────────

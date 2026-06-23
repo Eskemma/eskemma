@@ -1,7 +1,7 @@
 // lib/seo.ts
 import { PostData } from "@/types/post.types";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://eskemma.com";
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
 const SITE_NAME = "El Baúl de Fouché - Eskemma";
 const DEFAULT_IMAGE = `${SITE_URL}/images/blog-default.jpg`;
 
@@ -36,7 +36,6 @@ export function generatePostSEO(post: PostData): SEOData {
     image,
     url,
     type: "article",
-    keywords: post.keywords,
     author: post.author?.displayName || "Eskemma",
     publishedTime: post.createdAt.toISOString(),
     modifiedTime: post.updatedAt.toISOString(),

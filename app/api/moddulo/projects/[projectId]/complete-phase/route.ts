@@ -50,6 +50,11 @@ export async function POST(
       updates[`phases.${phaseId}.reportText`] = reportText;
     }
 
+    if (phaseId === "proposito") {
+      updates.fasesCompletadas = FieldValue.arrayUnion(1);
+      updates.faseActual = 2;
+    }
+
     await adminDb.collection("moddulo_projects").doc(projectId).update(updates);
 
     return NextResponse.json({ success: true, nextPhase });

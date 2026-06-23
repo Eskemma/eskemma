@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
     };
   }
 
-  // Permitir indexación en producción
+  // Permitir indexación en producción (rutas autenticadas bloqueadas)
   return {
     rules: [
       {
@@ -23,19 +23,26 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: [
           '/api/',
-          '/blog/admin/',
           '/admin/',
+          '/blog/admin/',
           '/_next/',
           '/private/',
+          // Rutas de trabajo autenticado — no indexables
+          '/moddulo/proyecto/',
+          '/monitor/centinela/',
+          '/sefix/dashboard/',
         ],
       },
       {
         userAgent: 'Googlebot',
         allow: '/',
         disallow: [
-          '/blog/admin/',
           '/api/',
           '/admin/',
+          '/blog/admin/',
+          '/moddulo/proyecto/',
+          '/monitor/centinela/',
+          '/sefix/dashboard/',
         ],
       },
     ],

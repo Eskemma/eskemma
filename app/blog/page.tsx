@@ -14,28 +14,16 @@ import FoucheHeroSection from "./FoucheHeroSection";
 import Pagination from "../components/componentsBlog/Pagination";
 import Sidebar from "../components/componentsBlog/Sidebar";
 import BlogContent from "./BlogContent";
+import { generateBlogListStructuredData } from "@/lib/seo";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
 
 export const dynamic = 'force-dynamic';
 
-// ✅ Metadata estática para SEO
 export const metadata: Metadata = {
   title: "El Baúl de Fouché - Blog de Comunicación Política | Eskemma",
   description:
     "Artículos sobre estrategia electoral, comunicación política, análisis de datos y campañas políticas. Contenido profesional para consultores y equipos de campaña en México.",
-  keywords: [
-    "comunicación política",
-    "estrategia electoral",
-    "campañas políticas",
-    "análisis electoral",
-    "consultoría política",
-    "marketing político",
-    "México",
-    "elecciones",
-    "propaganda política",
-    "estrategia de campaña",
-  ],
   authors: [{ name: "Eskemma" }],
   openGraph: {
     title: "El Baúl de Fouché - Blog de Comunicación Política",
@@ -66,41 +54,6 @@ export const metadata: Metadata = {
     canonical: `${SITE_URL}/blog`,
   },
 };
-
-/* 🚀 PARA PRODUCCIÓN: Descomentar y ajustar estas líneas cuando publiques
-export const metadata: Metadata = {
-  title: "El Baúl de Fouché - Blog de Comunicación Política | Eskemma",
-  description: "Artículos sobre estrategia electoral, comunicación política, análisis de datos y campañas políticas. Contenido profesional para consultores y equipos de campaña en México.",
-  keywords: [...],
-  authors: [{ name: "Eskemma" }],
-  openGraph: {
-    title: "El Baúl de Fouché - Blog de Comunicación Política",
-    description: "Artículos profesionales sobre estrategia electoral y comunicación política en México.",
-    url: "https://eskemma.com/blog",
-    siteName: "El Baúl de Fouché - Eskemma",
-    images: [
-      {
-        url: "https://eskemma.com/images/blog-hero.jpg",
-        width: 1200,
-        height: 630,
-        alt: "El Baúl de Fouché - Blog de Comunicación Política",
-      },
-    ],
-    locale: "es_MX",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "El Baúl de Fouché - Blog de Comunicación Política",
-    description: "Artículos profesionales sobre estrategia electoral y comunicación política en México.",
-    images: ["https://eskemma.com/images/blog-hero.jpg"],
-    creator: "@tu_handle_real",
-  },
-  alternates: {
-    canonical: "https://eskemma.com/blog",
-  },
-};
-*/
 
 interface BlogPageProps {
   searchParams: Promise<{
@@ -177,8 +130,16 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
     const resolvedPosts = await Promise.all(publishedPosts);
 
+    const blogListStructuredData = generateBlogListStructuredData(
+      sortedPosts.filter((p) => p.id !== undefined) as import("@/types/post.types").PostData[]
+    );
+
     return (
       <main className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(blogListStructuredData) }}
+        />
         {/* Hero Section */}
         <FoucheHeroSection />
 

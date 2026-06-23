@@ -125,10 +125,13 @@ function ProjectCard({ project }: { project: ModduloProject }) {
     archived: "Archivado",
   };
 
+  const borderColor = project.color ?? "#026988";
+
   return (
     <Link
       href={`/moddulo/proyecto/${project.id}/${project.currentPhase}`}
       className="block bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-5 hover:border-bluegreen-eske/40 hover:shadow-sm transition-all"
+      style={{ borderLeft: `4px solid ${borderColor}` }}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">

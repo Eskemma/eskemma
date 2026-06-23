@@ -81,6 +81,8 @@ export async function createProject(
     lastAccessedAt: now,
   };
 
+  data.color = input.color ?? "#026988";
+
   if (input.centinelaProjectId) {
     data.centinelaProjectId = input.centinelaProjectId;
   }

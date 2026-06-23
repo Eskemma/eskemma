@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next';
 import { getAllPostIds } from '@/lib/posts';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://eskemma.com';
 
   try {
     // Obtener todos los posts publicados
@@ -75,6 +75,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'yearly' as const,
         priority: 0.5,
       },
+      {
+        url: `${baseUrl}/faq`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      },
+      {
+        url: `${baseUrl}/politica-de-privacidad`,
+        lastModified: new Date(),
+        changeFrequency: 'yearly' as const,
+        priority: 0.3,
+      },
+      {
+        url: `${baseUrl}/condiciones-de-uso`,
+        lastModified: new Date(),
+        changeFrequency: 'yearly' as const,
+        priority: 0.3,
+      },
+      {
+        url: `${baseUrl}/politica-de-cookies`,
+        lastModified: new Date(),
+        changeFrequency: 'yearly' as const,
+        priority: 0.3,
+      },
     ];
 
     // Combinar todas las URLs
@@ -82,7 +106,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch (error) {
     console.error('Error generando sitemap:', error);
     
-    // Retornar solo URLs estáticas si falla la obtención de posts
+    // Retornar URLs mínimas si falla la obtención de posts
     return [
       {
         url: baseUrl,

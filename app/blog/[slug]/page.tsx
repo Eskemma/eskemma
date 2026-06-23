@@ -1,5 +1,6 @@
 // app/blog/[slug]/page.tsx
 import { Metadata } from "next";
+import { notFound } from "next/navigation";
 import {
   getPostData,
   getAdjacentPosts,
@@ -8,7 +9,8 @@ import {
   getRelatedPosts,
 } from "@/lib/posts";
 import { getResourcesByCategory } from "@/lib/resources";
-import { generatePostSEO, generateArticleStructuredData } from "@/lib/seo";
+import { generatePostSEO, generateArticleStructuredData, generateBreadcrumbStructuredData } from "@/lib/seo";
+import Breadcrumb from "@/app/components/Breadcrumb";
 import Link from "next/link";
 import SanitizedContent from "../../components/componentsBlog/SanitizedContent";
 import { PostData } from "@/types/post.types";
@@ -45,7 +47,6 @@ export async function generateMetadata({
   return {
     title: seoData.title,
     description: seoData.description,
-    keywords: seoData.keywords,
     authors: [{ name: seoData.author || "Eskemma" }],
     openGraph: {
       title: seoData.title,
@@ -90,29 +91,7 @@ export default async function PostPage({
 
   const postData = await getPostData(slug);
 
-  if (!postData) {
-    return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center bg-gray-eske-10 dark:bg-[#0B1620]"
-        role="alert"
-        aria-live="assertive"
-      >
-        <h1 className="text-3xl font-bold text-red-500 mb-4">
-          Post no encontrado
-        </h1>
-        <p className="text-lg text-gray-600 dark:text-[#9AAEBE]">
-          No se pudo encontrar el post con slug: {slug}
-        </p>
-        <Link
-          href="/blog"
-          className="mt-6 px-6 py-3 bg-bluegreen-eske text-white rounded-lg hover:bg-bluegreen-eske-70 transition-colors font-semibold focus-ring-primary"
-          aria-label="Volver a la página principal del blog"
-        >
-          Volver al blog
-        </Link>
-      </div>
-    );
-  }
+  if (!postData) notFound();
 
   console.log("Datos del post recibidos:", postData);
 
@@ -182,6 +161,11 @@ export default async function PostPage({
     validatedPostData,
     seoData
   );
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData([
+    { name: "Inicio", url: "/" },
+    { name: "Blog", url: "/blog" },
+    { name: validatedPostData.title, url: `/blog/${validatedPostData.slug}` },
+  ]);
 
   return (
     <>
@@ -189,6 +173,10 @@ export default async function PostPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
       />
 
       <main className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620] py-8 px-4 sm:px-6 lg:px-8">
@@ -201,6 +189,13 @@ export default async function PostPage({
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Columna principal - Contenido del post */}
             <div className="flex-1 lg:w-2/3">
+              <Breadcrumb
+                items={[
+                  { label: "Inicio", href: "/" },
+                  { label: "Blog", href: "/blog" },
+                  { label: validatedPostData.title },
+                ]}
+              />
               <BackToButton />
 
               <article

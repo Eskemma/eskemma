@@ -21,6 +21,9 @@ function NuevoProyectoContent() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<ProjectType | null>(null);
+  const [color, setColor] = useState("#026988");
+  const [showCustomColor, setShowCustomColor] = useState(false);
+  const [customHex, setCustomHex] = useState("");
 
   // Centinela integration — query params
   const centinelaProjectId = searchParams.get("centinelaProjectId");
@@ -56,6 +59,7 @@ function NuevoProyectoContent() {
           type,
           name: name.trim(),
           description: description.trim(),
+          color,
           centinelaProjectId: fromCentinela ? centinelaProjectId : undefined,
         }),
         credentials: "include",
@@ -189,6 +193,74 @@ function NuevoProyectoContent() {
               />
             </div>
 
+            {/* Color del proyecto */}
+            <div className="mb-6">
+              <p className="text-sm font-medium text-black-eske-10 dark:text-[#C7D6E0] mb-3">
+                Color del proyecto
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {["#026988", "#248cc1", "#ffa366", "#649941", "#ffd14a", "#d10f3f", "#474747"].map((hex) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => { setColor(hex); setShowCustomColor(false); }}
+                    aria-label={`Color ${hex}`}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                      color === hex && !showCustomColor
+                        ? "border-black-eske dark:border-white-eske scale-110"
+                        : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+                {/* Botón "+" para color libre */}
+                <button
+                  type="button"
+                  onClick={() => setShowCustomColor((v) => !v)}
+                  aria-label="Color personalizado"
+                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors ${
+                    showCustomColor
+                      ? "border-bluegreen-eske bg-bluegreen-eske/10 text-bluegreen-eske"
+                      : "border-gray-eske-20 dark:border-white/20 text-gray-eske-50 dark:text-[#9AAEBE] hover:border-gray-eske-40"
+                  }`}
+                >
+                  +
+                </button>
+                {/* Vista previa del color seleccionado */}
+                <div
+                  className="w-6 h-6 rounded-full border border-gray-eske-20 dark:border-white/10 ml-1"
+                  style={{ backgroundColor: color }}
+                  aria-hidden="true"
+                />
+              </div>
+              {showCustomColor && (
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => { setColor(e.target.value); setCustomHex(e.target.value); }}
+                    className="w-10 h-10 rounded cursor-pointer border border-gray-eske-20"
+                    aria-label="Selector de color"
+                  />
+                  <input
+                    type="text"
+                    value={customHex || color}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCustomHex(v);
+                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) setColor(v);
+                    }}
+                    placeholder="#026988"
+                    maxLength={7}
+                    className="w-28 px-3 py-1.5 rounded border border-gray-eske-20 dark:border-white/10
+                      bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] text-sm
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske/30"
+                  />
+                  <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">Hex</span>
+                </div>
+              )}
+            </div>
+
             {/* Tipo de proyecto */}
             <div className="mb-6">
               <p className="text-sm font-medium text-black-eske-10 dark:text-[#C7D6E0] mb-3">
@@ -255,6 +327,15 @@ function NuevoProyectoContent() {
                 <p className="text-gray-eske-50 dark:text-[#9AAEBE] text-xs mt-0.5">
                   {type && PROJECT_TYPE_DESCRIPTIONS[type]}
                 </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Color</span>
+                <div
+                  className="w-5 h-5 rounded-full border border-gray-eske-20 dark:border-white/10"
+                  style={{ backgroundColor: color }}
+                  aria-label={`Color: ${color}`}
+                />
+                <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">{color}</span>
               </div>
               {description && (
                 <div>

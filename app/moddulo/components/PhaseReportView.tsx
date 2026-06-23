@@ -1,11 +1,11 @@
 // app/moddulo/components/PhaseReportView.tsx
 "use client";
 
-import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { PhaseId } from "@/types/moddulo.types";
+import type { PhaseId, Dictamen, XPCTO } from "@/types/moddulo.types";
 import { PHASE_NAMES } from "@/types/moddulo.types";
+import { evaluarCriterios, getCriterioDeficiencia } from "@/lib/moddulo/criterios";
 
 interface PhaseReportViewProps {
   phaseId: PhaseId;
@@ -15,11 +15,15 @@ interface PhaseReportViewProps {
   isCompleted?: boolean;
   onStartEdit?: () => void;
   className?: string;
+  /** Dictamen de Coherencia XPCTO — solo F1 */
+  dictamen?: Dictamen | null;
+  /** Variables XPCTO actuales — solo F1 */
+  xpcto?: Partial<XPCTO> | null;
 }
 
 function getReportLabel(phaseId: PhaseId): string {
   const labels: Partial<Record<PhaseId, string>> = {
-    proposito: "Resumen de Propósito",
+    proposito: "Reporte de Propósito F1",
     exploracion: "Resultado Exploratorio",
     investigacion: "Reporte de Investigación",
     diagnostico: "Dictamen Diagnóstico",
@@ -54,28 +58,201 @@ function getFooterText(phaseId: PhaseId): string {
   return texts[phaseId] ?? `Documento de referencia — ${PHASE_NAMES[phaseId]}.`;
 }
 
+// ==========================================
+// SECCIÓN A — DICTAMEN DE COHERENCIA XPCTO
+// ==========================================
+
+function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }) {
+  return (
+    <div className="mt-6 pt-5 border-t border-gray-eske-20 dark:border-white/10">
+      <h2 className="text-sm font-bold text-black-eske dark:text-[#EAF2F8] mb-4 flex items-center gap-2">
+        <span className="w-5 h-5 rounded-full bg-bluegreen-eske/20 text-bluegreen-eske text-xs flex items-center justify-center font-bold shrink-0">A</span>
+        Dictamen de Coherencia XPCTO
+      </h2>
+      {!dictamen?.cruces?.length ? (
+        <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] italic">
+          Dictamen no disponible. Genera el reporte para calcularlo.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {dictamen.cruces.map((cruce) => (
+            <div
+              key={cruce.id}
+              className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-4 bg-gray-eske-10/40 dark:bg-[#112230]/40"
+            >
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 mt-0.5">
+                  {cruce.veredicto === "coherente" ? (
+                    <svg className="w-5 h-5 text-green-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Coherente">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Requiere ajuste">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs font-bold text-bluegreen-eske dark:text-[#6BA4C6]">{cruce.etiqueta}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      cruce.veredicto === "coherente"
+                        ? "bg-green-eske/15 text-green-eske"
+                        : "bg-yellow-eske/20 text-yellow-eske"
+                    }`}>
+                      {cruce.veredicto === "coherente" ? "Coherente" : "Requiere ajuste"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] italic mb-2">{cruce.pregunta}</p>
+                  <p className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] leading-relaxed">{cruce.argumentacion}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// SECCIÓN B — CRITERIOS DE SUFICIENCIA
+// ==========================================
+
+function CriteriosSection({
+  xpcto,
+  dictamen,
+  isCompleted,
+}: {
+  xpcto: Partial<XPCTO> | null | undefined;
+  dictamen: Dictamen | null | undefined;
+  isCompleted: boolean;
+}) {
+  const criterios = evaluarCriterios(xpcto, dictamen, isCompleted);
+
+  return (
+    <div className="mt-6 pt-5 border-t border-gray-eske-20 dark:border-white/10">
+      <h2 className="text-sm font-bold text-black-eske dark:text-[#EAF2F8] mb-4 flex items-center gap-2">
+        <span className="w-5 h-5 rounded-full bg-bluegreen-eske/20 text-bluegreen-eske text-xs flex items-center justify-center font-bold shrink-0">B</span>
+        Panel de Criterios de Suficiencia
+      </h2>
+      <div className="space-y-2">
+        {criterios.map((c) => (
+          <div
+            key={c.id}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-eske-10/40 dark:bg-[#112230]/40 border border-gray-eske-20/60 dark:border-white/5"
+          >
+            <span className="shrink-0 text-xs text-gray-eske-40 dark:text-[#6D8294] w-4 text-right">{c.id}</span>
+            <span className="flex-1 text-sm text-gray-eske-70 dark:text-[#C7D6E0]">{c.nombre}</span>
+            <span className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded ${
+              c.nivel === "Prioritario"
+                ? "bg-bluegreen-eske/10 text-bluegreen-eske"
+                : "bg-gray-eske-20 text-gray-eske-60 dark:text-[#9AAEBE]"
+            }`}>
+              {c.nivel}
+            </span>
+            <span className={`shrink-0 text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full ${
+              c.estado === "resuelto"
+                ? "bg-green-eske/15 text-green-eske"
+                : c.nivel === "Prioritario"
+                  ? "bg-red-eske/15 text-red-eske"
+                  : "bg-yellow-eske/20 text-yellow-eske"
+            }`}>
+              {c.estado === "resuelto" ? (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Resuelto
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" /></svg>
+                  Pendiente
+                </>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// SECCIÓN C — REGISTRO DE DEFICIENCIAS ACTIVAS (RDA)
+// ==========================================
+
+function RDASection({
+  xpcto,
+  dictamen,
+  isCompleted,
+}: {
+  xpcto: Partial<XPCTO> | null | undefined;
+  dictamen: Dictamen | null | undefined;
+  isCompleted: boolean;
+}) {
+  const criterios = evaluarCriterios(xpcto, dictamen, isCompleted);
+  const pendientes = criterios.filter((c) => c.estado === "pendiente");
+
+  if (!pendientes.length) return null;
+
+  return (
+    <div className="mt-6 pt-5 border-t border-gray-eske-20 dark:border-white/10">
+      <h2 className="text-sm font-bold text-black-eske dark:text-[#EAF2F8] mb-4 flex items-center gap-2">
+        <span className="w-5 h-5 rounded-full bg-red-eske/20 text-red-eske text-xs flex items-center justify-center font-bold shrink-0">C</span>
+        Registro de Deficiencias Activas (RDA)
+      </h2>
+      <div className="space-y-3">
+        {pendientes.map((c) => {
+          const def = getCriterioDeficiencia(c.id);
+          return (
+            <div
+              key={c.id}
+              className={`rounded-lg border p-4 ${
+                c.nivel === "Prioritario"
+                  ? "border-red-eske/30 bg-red-eske/5"
+                  : "border-yellow-eske/30 bg-yellow-eske/5"
+              }`}
+            >
+              <p className={`text-xs font-bold mb-1 ${c.nivel === "Prioritario" ? "text-red-eske" : "text-yellow-eske"}`}>
+                Criterio {c.id} — {c.nombre}
+              </p>
+              <p className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] mb-2">{def.descripcion}</p>
+              <p className="text-xs text-bluegreen-eske dark:text-[#6BA4C6] font-medium">
+                ↳ {def.rutaResolucion}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
+
 export default function PhaseReportView({
   phaseId,
   reportText,
   isCompleted = true,
   onStartEdit,
   className = "",
+  dictamen,
+  xpcto,
 }: PhaseReportViewProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Si no hay reporte guardado, mostrar estado vacío con opción de volver al chat
   if (!reportText) {
     return (
       <div className={`flex flex-col bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 overflow-hidden ${className}`}>
         <div className="shrink-0 px-4 py-3 border-b border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230]/50 flex items-center gap-2">
-          <svg className="w-4 h-4 text-gray-eske-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-gray-eske-40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <span className="text-sm font-semibold text-gray-eske-60 dark:text-[#9AAEBE]">Reporte de {PHASE_NAMES[phaseId]}</span>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <div className="w-14 h-14 rounded-full bg-gray-eske-10 dark:bg-[#112230] flex items-center justify-center mb-4">
-            <svg className="w-7 h-7 text-gray-eske-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-7 h-7 text-gray-eske-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
@@ -102,20 +279,15 @@ export default function PhaseReportView({
       <div className="shrink-0 px-4 py-3 border-b border-gray-eske-20 dark:border-white/10 flex items-center justify-between bg-green-50 dark:bg-green-900/20">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <span className="text-sm font-semibold text-green-800 dark:text-green-300">{getReportLabel(phaseId)}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {isGenerating && (
-            <div className="w-4 h-4 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" />
-          )}
-          <span className="text-xs text-green-600 font-medium">
-            {isCompleted ? "Fase completada" : "Borrador generado"}
-          </span>
-        </div>
+        <span className="text-xs text-green-600 font-medium">
+          {isCompleted ? "Fase completada" : "Borrador generado"}
+        </span>
       </div>
 
       {/* Contenido del reporte — scrollable */}
@@ -171,7 +343,7 @@ export default function PhaseReportView({
         </div>
 
         {/* Banner de siguiente paso — solo cuando la fase aún no está cerrada */}
-        {!isCompleted && (() => {
+        {!isCompleted && phaseId !== "proposito" && (() => {
           const { action, next } = getNextStep(phaseId);
           return (
             <div className="mt-5 p-4 bg-bluegreen-eske/5 border border-bluegreen-eske/25 rounded-lg">
@@ -185,6 +357,15 @@ export default function PhaseReportView({
             </div>
           );
         })()}
+
+        {/* Secciones del EPP — solo para F1 Propósito */}
+        {phaseId === "proposito" && (
+          <>
+            <DictamenSection dictamen={dictamen} />
+            <CriteriosSection xpcto={xpcto} dictamen={dictamen} isCompleted={isCompleted} />
+            <RDASection xpcto={xpcto} dictamen={dictamen} isCompleted={isCompleted} />
+          </>
+        )}
       </div>
 
       {/* Footer */}

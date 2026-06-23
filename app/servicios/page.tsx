@@ -1,7 +1,18 @@
 // app/servicios/page.tsx
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
+
+export const metadata: Metadata = {
+  title: "Nuestros Servicios | Eskemma",
+  description:
+    "Descubre Moddulo, Sefix, Centinela y los cursos especializados de Eskemma: soluciones con IA para profesionalizar tu consultoría política y campañas electorales en México.",
+  alternates: {
+    canonical: `${SITE_URL}/servicios`,
+  },
+};
 
 export default function ServiciosPage() {
   return (

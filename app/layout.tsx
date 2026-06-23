@@ -7,6 +7,7 @@ import { ReactNode } from "react";
 import "./globals.css";
 import Layout from "./components/Layout";
 import ClientOnlyBanner from "./components/legal/ClientOnlyBanner";
+import { generateOrganizationStructuredData } from "@/lib/seo";
 
 // Configura Arimo como fuente primaria
 const arimo = Arimo({
@@ -63,17 +64,6 @@ export const metadata: Metadata = {
     description: 'Plataforma integral para campañas políticas',
   },
 
-  // Otros metadatos
-  keywords: [
-    'consultoría política',
-    'campañas electorales',
-    "campaña electoral",
-    'análisis electoral',
-    'datos electorales',
-    'México',
-    'estrategia electoral',
-    'estrategia política',
-  ],
 };
 
 export default function RootLayout({
@@ -88,6 +78,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('eskemma:theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();` }} />
         {/* Leaflet CSS — imported as static asset to avoid Tailwind v4 CSS scanner conflict */}
         <link rel="stylesheet" href="/leaflet.css" />
+        {/* Organization schema global */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(generateOrganizationStructuredData()) }}
+        />
       </head>
       <body
         className={`${arimo.variable} ${ptSans.variable} ${philosopher.variable} min-h-screen`}

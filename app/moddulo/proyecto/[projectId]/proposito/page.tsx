@@ -7,7 +7,7 @@ import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
 import { detectRisks } from "@/lib/moddulo/risks";
-import type { XPCTO, ProjectType, ChatMessage, PhaseId } from "@/types/moddulo.types";
+import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
 // ==========================================
@@ -55,7 +55,10 @@ export default function PropositoPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [dictamen, setDictamen] = useState<Dictamen | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const prevFormComplete = useRef(false);
+  const preEditModeRef = useRef<PageMode>("active");
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
 
   // Cargar proyecto al montar
@@ -97,11 +100,31 @@ export default function PropositoPage() {
 
         // Detectar si la fase está completada
         const phaseStatus = p.phases?.proposito?.status;
-        if (phaseStatus === "completed") {
-          setMode("completed");
-          const savedReport = p.phases?.proposito?.reportText;
-          if (savedReport) setReportText(savedReport);
+        if (phaseStatus === "completed") setMode("completed");
+
+        // Cargar reportText (siempre, no solo cuando está completada)
+        // Detectar el caso legacy donde se almacenó el JSON completo como reportText
+        const savedDictamen = p.phases?.proposito?.dictamen as Dictamen | undefined;
+        const rawSavedReport = p.phases?.proposito?.reportText as string | undefined;
+        if (rawSavedReport) {
+          try {
+            let jsonToParse = rawSavedReport.trim();
+            const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+            if (fenceMatch) jsonToParse = fenceMatch[1].trim();
+            const maybeJson = JSON.parse(jsonToParse) as { reportText?: string; dictamen?: Dictamen };
+            if (maybeJson?.reportText && typeof maybeJson.reportText === "string") {
+              setReportText(maybeJson.reportText);
+              if (!savedDictamen && maybeJson.dictamen) setDictamen(maybeJson.dictamen);
+            } else {
+              setReportText(rawSavedReport);
+            }
+          } catch {
+            setReportText(rawSavedReport);
+          }
         }
+
+        // Cargar dictamen si existe en Firestore por separado
+        if (savedDictamen) setDictamen(savedDictamen);
       })
       .catch((err) => console.error("[proposito] fetch error:", err))
       .finally(() => setIsLoaded(true));
@@ -201,6 +224,7 @@ export default function PropositoPage() {
       });
       if (!r.ok) return null;
       const data = await r.json();
+      if (data.dictamen) setDictamen(data.dictamen);
       return data.reportText ?? null;
     } catch {
       return null;
@@ -239,20 +263,25 @@ export default function PropositoPage() {
 
   // Entrar a modo edición
   const handleStartEdit = () => {
+    preEditModeRef.current = mode;
     setEditForm({ ...form });
     setMode("editing");
+    setShowReport(true);  // el reporte permanece visible durante la edición
   };
 
-  // Cancelar edición
+  // Cancelar edición sin guardar
   const handleCancelEdit = () => {
-    setMode("completed");
+    setMode(preEditModeRef.current);
+    setShowReport(true);
+    setSaveStatus("idle");
   };
 
   // Guardar cambios del modo edición
   const handleSaveEdit = async () => {
     setIsSaving(true);
     try {
-      await fetch(`/api/moddulo/projects/${projectId}`, {
+      // 1. Guardar XPCTO en Firestore inmediatamente (operación rápida)
+      const saveRes = await fetch(`/api/moddulo/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -266,26 +295,36 @@ export default function PropositoPage() {
           } satisfies Partial<XPCTO>,
         }),
       });
+
+      if (!saveRes.ok) throw new Error("save failed");
+
       setForm({ ...editForm });
       setLastSaved(new Date());
+      setSaveStatus("saved");
 
-      // Regenerar reporte automáticamente con las nuevas variables
-      const newReport = await generateReport(editForm);
-      if (newReport) {
-        setReportText(newReport);
-        setShowReport(true);  // mostrar el reporte actualizado
-      }
-
-      // Verificar back-propagation
-      const affected = await checkBackPropagation(projectId);
-      if (affected.length > 0) {
-        setPropagationWarning(affected);
-      } else {
-        setMode("completed");
-      }
-    } catch {/* silencioso */} finally {
+      // 2. Volver al modo previo inmediatamente — el usuario ve el reporte (todavía el antiguo)
+      setMode(preEditModeRef.current);
+      setShowReport(true);
+    } catch {
+      setSaveStatus("error");
+      setIsSaving(false);
+      setTimeout(() => setSaveStatus("idle"), 3000);
+      return;
+    } finally {
       setIsSaving(false);
     }
+
+    // 3. Regenerar reporte en segundo plano (operación lenta — Claude)
+    // El usuario ya ve el feedback de guardado y el reporte anterior mientras espera
+    const snapshot = { ...editForm };
+    const newReport = await generateReport(snapshot);
+    if (newReport) setReportText(newReport);
+
+    // 4. Verificar back-propagation
+    const affected = await checkBackPropagation(projectId);
+    if (affected.length > 0) setPropagationWarning(affected);
+
+    setTimeout(() => setSaveStatus("idle"), 3000);
   };
 
   // Detectar cuando se completa el formulario por primera vez en modo activo
@@ -346,85 +385,77 @@ export default function PropositoPage() {
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] hidden sm:block">
-              {isSaving ? "Guardando..." : lastSaved ? `✓ ${lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}
+            <span className="text-xs hidden sm:block">
+              {saveStatus === "saved" ? (
+                <span className="text-green-eske font-medium">✓ Cambios guardados</span>
+              ) : saveStatus === "error" ? (
+                <span className="text-red-eske font-medium">✗ Error al guardar</span>
+              ) : isSaving ? (
+                <span className="text-gray-eske-40 dark:text-[#6D8294]">Guardando...</span>
+              ) : lastSaved ? (
+                <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
+              ) : null}
             </span>
             <DownloadButton form={form} reportText={reportText} chatMessages={chatMessages} />
           </div>
         </div>
 
-        {/* Fila 2: botones — siempre visibles, compactos en mobile */}
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {/* Ver / Generar Resumen */}
-          {(formComplete || mode === "completed" || mode === "editing") && (
-            <button
-              onClick={handleVerResumen}
-              disabled={isGeneratingReport}
-              className="flex items-center gap-1 px-2.5 py-1.5 border border-bluegreen-eske text-bluegreen-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-40"
-            >
-              {isGeneratingReport ? (
-                <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" /> Generando</>
-              ) : reportText ? "Ver Resumen" : "Generar Resumen"}
-            </button>
-          )}
+        {/* Fila 2: 3 botones según estado del EPP */}
+        {(() => {
+          const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
+          const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
+          const headerState: "en_progreso" | "lista" | "editando" =
+            mode === "editing" ? "editando" :
+            (formComplete && reportText !== null) ? "lista" :
+            "en_progreso";
 
-          {/* Modo activo */}
-          {mode === "active" && (<>
-            <button
-              onClick={handleStartEdit}
-              disabled={!formComplete}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              Editar variables
-            </button>
-            <button
-              onClick={() => setShowReview(true)}
-              disabled={!formComplete}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              Cerrar Fase 1
-            </button>
-          </>)}
+          return (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {/* Botón 1: Reporte F1 / Cancelar */}
+              {headerState === "editando" ? (
+                <button onClick={handleCancelEdit} className={btnBase}>Cancelar</button>
+              ) : (
+                <button
+                  onClick={handleVerResumen}
+                  disabled={headerState === "en_progreso" || isGeneratingReport}
+                  className={`${btnBase} flex items-center gap-1`}
+                >
+                  {isGeneratingReport ? (
+                    <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden="true" /> Generando</>
+                  ) : "Reporte F1"}
+                </button>
+              )}
 
-          {/* Modo completado */}
-          {mode === "completed" && (<>
-            <button
-              onClick={handleStartEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
-            >
-              Editar variables
-            </button>
-            <button
-              onClick={() => setShowReview(true)}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors"
-            >
-              Cerrar Fase 1
-            </button>
-          </>)}
+              {/* Botón 2: Editar variables / Guardar cambios */}
+              {headerState === "editando" ? (
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSaving}
+                  className={btnBase}
+                >
+                  {isSaving ? "Guardando..." : "Guardar cambios"}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartEdit}
+                  disabled={headerState === "en_progreso"}
+                  className={btnBase}
+                >
+                  Editar variables
+                </button>
+              )}
 
-          {/* Modo edición */}
-          {mode === "editing" && (<>
-            <button
-              onClick={handleCancelEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveEdit}
-              disabled={isSaving}
-              className="px-2.5 py-1.5 border border-bluegreen-eske text-bluegreen-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-40"
-            >
-              {isSaving ? "Guardando..." : "Guardar cambios"}
-            </button>
-            <button
-              onClick={() => setShowReview(true)}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors"
-            >
-              Cerrar Fase 1
-            </button>
-          </>)}
-        </div>
+              {/* Botón 3: Cerrar Fase 1 */}
+              <button
+                onClick={() => setShowReview(true)}
+                disabled={headerState !== "lista"}
+                className={headerState === "lista" ? btnClose : `${btnBase} border-bluegreen-eske-60`}
+              >
+                Cerrar Fase 1
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ===== TABS MOBILE (solo < lg) ===== */}
@@ -437,17 +468,21 @@ export default function PropositoPage() {
               : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
           }`}
         >
-          {showReport || mode === "completed" ? "📋 Resumen" : "💬 Chat"}
+          {showReport || mode === "completed" || mode === "editing" ? "📋 Reporte F1" : "💬 Chat"}
         </button>
         <button
-          onClick={() => setMobileTab("form")}
+          onClick={() => mode === "editing" && setMobileTab("form")}
+          disabled={mode !== "editing"}
           className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
-            mobileTab === "form"
+            mobileTab === "form" && mode === "editing"
               ? "border-bluegreen-eske text-bluegreen-eske"
-              : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+              : mode !== "editing"
+                ? "border-transparent text-gray-eske-40 dark:text-[#6D8294] opacity-50 cursor-not-allowed"
+                : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
           }`}
         >
-          📝 Formulario XPCTO
+          📝 Variables XPCTO
+          {mode !== "editing" && <span className="ml-1 opacity-60">(solo lectura)</span>}
         </button>
       </div>
 
@@ -456,14 +491,15 @@ export default function PropositoPage() {
 
         {/* Columna izquierda: chat / reporte — visible en mobile solo si tab=chat */}
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
-          {showReport || mode === "completed" ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {showReport && mode !== "completed" && (
+          {showReport || mode === "completed" || mode === "editing" ? (
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+              {/* "Volver al chat" solo en modo activo (no en editing, no en completed) */}
+              {showReport && mode === "active" && (
                 <button
                   onClick={() => setShowReport(false)}
                   className="shrink-0 mb-3 flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                   Volver al chat
@@ -473,9 +509,21 @@ export default function PropositoPage() {
                 phaseId="proposito"
                 reportText={reportText}
                 projectId={projectId}
-                onStartEdit={handleStartEdit}
+                isCompleted={mode === "completed"}
+                onStartEdit={mode !== "editing" ? handleStartEdit : undefined}
+                dictamen={dictamen}
+                xpcto={form}
                 className="flex-1 overflow-hidden"
               />
+              {/* Overlay de regeneración del reporte tras guardar cambios */}
+              {isGeneratingReport && mode !== "editing" && (
+                <div className="absolute inset-0 bg-white-eske/80 dark:bg-[#18324A]/80 flex items-center justify-center rounded-xl">
+                  <div className="flex items-center gap-3 bg-white-eske dark:bg-[#18324A] rounded-lg px-4 py-3 shadow-md border border-gray-eske-20 dark:border-white/10">
+                    <div className="w-4 h-4 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden="true" />
+                    <span className="text-sm text-bluegreen-eske font-medium">Actualizando Reporte F1…</span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <ModduloChat
@@ -490,7 +538,9 @@ export default function PropositoPage() {
         </div>
 
         {/* Columna derecha: formulario XPCTO — visible en mobile solo si tab=form */}
-        <div className={`flex-col w-full lg:w-80 xl:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-gray-eske-20 dark:border-white/10 overflow-y-auto bg-gray-eske-10/50 dark:bg-[#112230] p-3 sm:p-4 ${mobileTab === "form" ? "flex" : "hidden lg:block"}`}>
+        <div className={`flex-col w-full lg:w-80 xl:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-gray-eske-20 dark:border-white/10 overflow-y-auto bg-gray-eske-10/50 dark:bg-[#112230] p-3 sm:p-4 transition-opacity ${
+          mode !== "editing" ? "opacity-50 pointer-events-none select-none" : ""
+        } ${mobileTab === "form" ? "flex" : "hidden lg:block"}`}>
           <XPCTOFormPanel
             form={mode === "editing" ? editForm : form}
             onChange={mode === "editing" ? setEditForm : (mode === "active" ? setForm : () => {})}

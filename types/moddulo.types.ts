@@ -166,6 +166,35 @@ export interface PhaseReport {
 }
 
 // ==========================================
+// DICTAMEN DE COHERENCIA XPCTO (F1)
+// ==========================================
+
+export interface DictamenCruce {
+  id: number;
+  etiqueta: string;
+  pregunta: string;
+  veredicto: "coherente" | "requiere_ajuste";
+  argumentacion: string;
+}
+
+export interface Dictamen {
+  cruces: DictamenCruce[];
+}
+
+// ==========================================
+// CRITERIOS DE SUFICIENCIA (F1)
+// ==========================================
+
+export type EstadoCriterio = "resuelto" | "pendiente";
+
+export interface CriterioSuficiencia {
+  id: number;
+  nombre: string;
+  nivel: "Prioritario" | "Con advertencia";
+  estado: EstadoCriterio;
+}
+
+// ==========================================
 // ESTADO DE FASE
 // ==========================================
 
@@ -177,6 +206,8 @@ export interface PhaseState {
   report?: PhaseReport;
   // Texto completo del reporte diagnóstico generado por Claude (markdown)
   reportText?: string;
+  // Dictamen de Coherencia XPCTO (solo F1)
+  dictamen?: Dictamen;
 }
 
 // ==========================================
@@ -205,6 +236,9 @@ export interface ModduloProject {
   type: ProjectType;
   name: string;
   description?: string;
+  color?: string;            // Hex del color del proyecto, ej. "#026988"
+  fasesCompletadas?: number[]; // Array de números de fase completadas, ej. [1, 2]
+  faseActual?: number;       // Número de fase actual (1-9), alternativo a currentPhase
   xpcto: XPCTO;
   currentPhase: PhaseId;
   phases: Record<PhaseId, PhaseState>;
@@ -227,12 +261,13 @@ export interface CreateProjectInput {
   type: ProjectType;
   name: string;
   description?: string;
+  color?: string;
   xpcto?: Partial<XPCTO>;
   centinelaProjectId?: string;
 }
 
 export type UpdateProjectInput = Partial<
-  Pick<ModduloProject, "name" | "description" | "xpcto" | "status" | "settings">
+  Pick<ModduloProject, "name" | "description" | "color" | "xpcto" | "status" | "settings">
 >;
 
 // ==========================================

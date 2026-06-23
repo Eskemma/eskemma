@@ -5,7 +5,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
-import type { PhaseId, XPCTO } from "@/types/moddulo.types";
+import type { PhaseId, XPCTO, Dictamen } from "@/types/moddulo.types";
 
 interface GenerateReportBody {
   phaseId: PhaseId;
@@ -36,23 +36,59 @@ export async function POST(
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096,
+      max_tokens: 6000,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const reportText = response.content
+    const rawText = response.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { type: "text"; text: string }).text)
       .join("");
 
-    // Guardar en Firestore
+    // For proposito: Claude returns JSON with {reportText, dictamen}
+    if (phaseId === "proposito") {
+      let reportText = rawText;
+      let dictamen: Dictamen | null = null;
+
+      try {
+        // Strip markdown code fences that Claude sometimes adds despite instructions
+        let jsonToParse = rawText.trim();
+        const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+        if (fenceMatch) jsonToParse = fenceMatch[1].trim();
+
+        const parsed = JSON.parse(jsonToParse) as { reportText: string; dictamen: Dictamen };
+        if (parsed.reportText && typeof parsed.reportText === "string") {
+          reportText = parsed.reportText;
+        }
+        dictamen = parsed.dictamen ?? null;
+      } catch {
+        // Fallback: treat entire response as reportText, no dictamen
+        reportText = rawText;
+      }
+
+      const firestoreUpdates: Record<string, unknown> = {
+        [`phases.${phaseId}.reportText`]: reportText,
+        [`phases.${phaseId}.reportGeneratedAt`]: new Date().toISOString(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (dictamen) {
+        firestoreUpdates[`phases.${phaseId}.dictamen`] = dictamen;
+      }
+
+      await adminDb.collection("moddulo_projects").doc(projectId).update(firestoreUpdates);
+
+      return NextResponse.json({ reportText, dictamen });
+    }
+
+    // Other phases: plain text report
     await adminDb.collection("moddulo_projects").doc(projectId).update({
-      [`phases.${phaseId}.reportText`]: reportText,
+      [`phases.${phaseId}.reportText`]: rawText,
       [`phases.${phaseId}.reportGeneratedAt`]: new Date().toISOString(),
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ reportText });
+    return NextResponse.json({ reportText: rawText });
   } catch (error) {
     console.error("[generate-report] Error:", error);
     return NextResponse.json({ error: "Error al generar el reporte" }, { status: 500 });
@@ -69,10 +105,11 @@ function buildReportPrompt(
     return `Genera un resumen diagnóstico de la fase ${phaseId} del proyecto "${projectName}". Fecha: ${fecha}.`;
   }
 
-  return `Eres Moddulo, el copiloto estratégico de Eskemma. Genera el REPORTE DIAGNÓSTICO COMPLETO de la Fase 1 — Propósito para el siguiente proyecto.
+  return `Eres Moddulo, el copiloto estratégico de Eskemma. Tu tarea es generar el REPORTE DIAGNÓSTICO COMPLETO de la Fase 1 — Propósito y el DICTAMEN DE COHERENCIA XPCTO para el siguiente proyecto.
 
 Proyecto: ${projectName}
 Fecha: ${fecha}
+Tipo de proyecto: ${xpcto && "tipo" in xpcto ? String((xpcto as Record<string, unknown>).tipo) : "No especificado"}
 
 VARIABLES XPCTO DEFINIDAS:
 - X (Hito): ${xpcto.hito ?? "No definido"}
@@ -84,7 +121,56 @@ VARIABLES XPCTO DEFINIDAS:
 - T (Tiempo): Fecha límite ${xpcto.tiempo?.fechaLimite ?? "No definida"} (${xpcto.tiempo?.duracionMeses ?? 0} meses desde hoy)
 - O (Justificación): ${xpcto.justificacion ?? "No definida"}
 
-Genera el reporte con exactamente esta estructura:
+INSTRUCCIÓN CRÍTICA: Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin bloques de código markdown. El JSON debe tener exactamente dos campos: "reportText" (string con el reporte en markdown) y "dictamen" (objeto con los 5 cruces de validación).
+
+Formato requerido:
+{
+  "reportText": "...(markdown del reporte)...",
+  "dictamen": {
+    "cruces": [
+      {
+        "id": 1,
+        "etiqueta": "Cruce 1 · X ↔ T",
+        "pregunta": "¿El hito es alcanzable en el tiempo disponible?",
+        "veredicto": "coherente",
+        "argumentacion": "..."
+      },
+      {
+        "id": 2,
+        "etiqueta": "Cruce 2 · X ↔ C",
+        "pregunta": "¿Las capacidades son suficientes para la magnitud del hito?",
+        "veredicto": "coherente",
+        "argumentacion": "..."
+      },
+      {
+        "id": 3,
+        "etiqueta": "Cruce 3 · P ↔ O",
+        "pregunta": "¿La autoridad moral del sujeto es coherente con la justificación?",
+        "veredicto": "coherente",
+        "argumentacion": "..."
+      },
+      {
+        "id": 4,
+        "etiqueta": "Cruce 4 · O ↔ X",
+        "pregunta": "¿El propósito superior justifica el esfuerzo del hito?",
+        "veredicto": "coherente",
+        "argumentacion": "..."
+      },
+      {
+        "id": 5,
+        "etiqueta": "Cruce 5 · XPCTO ↔ Tipo",
+        "pregunta": "¿Las variables son consistentes con el tipo de proyecto?",
+        "veredicto": "coherente",
+        "argumentacion": "..."
+      }
+    ]
+  }
+}
+
+Los valores de "veredicto" deben ser exactamente "coherente" o "requiere_ajuste".
+La "argumentacion" de cada cruce debe ser específica al proyecto, entre 2 y 4 oraciones.
+
+El campo "reportText" debe contener este reporte en markdown:
 
 # REPORTE DIAGNÓSTICO — FASE 1: PROPÓSITO
 ## ${projectName}
@@ -153,5 +239,5 @@ Genera el reporte con exactamente esta estructura:
 
 [3-5 puntos concretos sobre qué debe atenderse en Exploración, Investigación y Diagnóstico basándose en las fortalezas y riesgos identificados en el XPCTO]
 
-Sé preciso, directo y estratégico. No uses frases genéricas. Basa cada análisis en los datos específicos del proyecto.`;
+Sé preciso, directo y estratégico. No uses frases genéricas. Basa cada análisis en los datos específicos del proyecto. Recuerda: responde ÚNICAMENTE con el objeto JSON, sin ningún texto adicional.`;
 }
