@@ -1,20 +1,13 @@
 // app/HomeClient.tsx
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Button from "./components/Button";
 import PropAnimation from "./components/componentsHome/PropAnimation";
 import TeamModal from "./components/componentsHome/TeamModal";
-import ScheduleDate from "./components/componentsHome/ScheduleDate";
-import ResponseDate from "./components/componentsHome/ReponseDate";
 import BenefitsSection from "./components/componentsHome/BenefitsSection";
-import SuscriptionBasicModal from "./components/componentsHome/SuscriptionBasicModal";
-import SuscriptionPremiumModal from "./components/componentsHome/SuscriptionPremiumModal";
-import SuscriptionProfessionalModal from "./components/componentsHome/SuscriptionProfessioinalModal";
-import SuscriptionResponseModal from "./components/componentsHome/SucriptionResponseModal";
 import FaqSection from "./components/componentsHome/FaqSection";
+import PropuestaInteractiva from "./components/componentsHome/PropuestaInteractiva";
+import VideoPresentation from "./components/componentsHome/VideoPresentation";
+import PlanesInteractivos from "./components/componentsHome/PlanesInteractivos";
 import { BlogPost } from "@/types/post.types";
 
 interface HomeClientProps {
@@ -22,39 +15,6 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ blogPosts }: HomeClientProps) {
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    dateTime: "",
-  });
-
-  const [isBasicSuscriptionModalOpen, setIsBasicSuscriptionModalOpen] =
-    useState(false);
-  const [isPremiumSuscriptionModalOpen, setIsPremiumSuscriptionModalOpen] =
-    useState(false);
-  const [isProfessionalSuscriptionModalOpen, setIsProfessionalSuscriptionModalOpen] =
-    useState(false);
-  const [isResponseSuscriptionModalOpen, setIsResponseSuscriptionModalOpen] =
-    useState(false);
-
-  // ✅ NUEVO: Estado para controlar carga del video
-  const [isVideoLoading, setIsVideoLoading] = useState(true);
-
-  const userName = "Usuario";
-
-  // ✅ NUEVO: Timeout de seguridad - Si el video no carga en 10s, oculta spinner
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (isVideoLoading) {
-        setIsVideoLoading(false);
-      }
-    }, 10000); // 10 segundos
-
-    return () => clearTimeout(timeout);
-  }, [isVideoLoading]);
-
   return (
     <main className="min-h-screen overflow-x-hidden w-full">
       {/* Hero Section */}
@@ -123,7 +83,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   key={post.id}
                   className="flex flex-col items-center text-center bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 min-h-full dark:bg-[#18324A] dark:border dark:border-white/10"
                 >
-                  {/* Imagen */}
                   {post.featureImage && (
                     <div className="relative w-full h-48 max-sm:h-32 rounded-lg overflow-hidden mb-4 max-sm:mb-2">
                       <Image
@@ -136,7 +95,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     </div>
                   )}
 
-                  {/* Título - con flex-grow para ocupar espacio variable */}
                   <h3 className="text-xl max-sm:text-base text-bluegreen-eske-60 font-semibold mb-2 max-sm:mb-1 hover:text-bluegreen-eske transition-colors duration-300 grow-0 dark:text-[#6BA4C6] dark:hover:text-[#EAF2F8]">
                     <Link
                       href={`/blog/${post.slug}`}
@@ -146,12 +104,10 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     </Link>
                   </h3>
 
-                  {/* Contenido - con flex-grow para ocupar espacio variable */}
                   <p className="text-[16px] max-sm:text-sm font-light text-gray-eske-90 mb-4 max-sm:mb-2 line-clamp-3 grow dark:text-[#9AAEBE]">
                     {post.content.substring(0, 160)}...
                   </p>
 
-                  {/* Fecha y autor */}
                   <div className="flex justify-between w-full text-sm max-sm:text-xs text-gray-700 mb-4 max-sm:mb-2 px-2 max-sm:px-1 dark:text-[#9AAEBE]">
                     <time
                       className="text-gray-eske-60"
@@ -168,7 +124,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     </span>
                   </div>
 
-                  {/* Botón - con mt-auto para empujarlo al fondo */}
                   <div className="mt-auto w-full max-w-50">
                     <Link
                       href={`/blog/${post.slug}`}
@@ -198,7 +153,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-sm:gap-4">
-            {/* Card 1 */}
             <div className="flex flex-col items-center text-center min-h-full">
               <video
                 autoPlay
@@ -217,8 +171,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 <br className="max-sm:hidden" />
                 en las elecciones federales de México 2006-2021
               </p>
-
-              {/* Wrapper del botón con mt-auto para empujarlo al fondo */}
               <div className="mt-auto w-full max-w-62.5">
                 <Link
                   href="/monitor"
@@ -229,7 +181,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               </div>
             </div>
 
-            {/* Card 2 */}
             <div className="flex flex-col items-center text-center min-h-full">
               <video
                 autoPlay
@@ -248,8 +199,6 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 <br className="max-sm:hidden" />
                 elecciones presidenciales en México?
               </p>
-
-              {/* Wrapper del botón con mt-auto para empujarlo al fondo */}
               <div className="mt-auto w-full max-w-62.5">
                 <Link
                   href="/monitor"
@@ -283,8 +232,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
             <p className="text-[18px] max-sm:text-base font-light mb-4 max-sm:mb-3 leading-relaxed">
               <span className="block">Nunca es demasiado pronto.</span>
               <span className="block">Comencemos a planear tu estrategia.</span>
-            </p> 
-
+            </p>
             <p className="text-[18px] max-sm:text-base font-light mb-12 max-sm:mb-3 leading-relaxed">
               <span className="mt-6 block">
                 Podemos colaborar desde ahora con una{" "}
@@ -292,96 +240,32 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <span className="block">asesoría gratuita de 30 minutos.</span>
             </p>
 
-            {/* Botón "AGENDAR ASESORÍA GRATUITA" */}
-            <div className="text-center mt-6 max-w-75 mx-auto">
-              <Button
-                label="AGENDAR ASESORÍA GRATUITA"
-                variant="secondary"
-                onClick={() => setIsScheduleModalOpen(true)}
-              />
-            </div>
-
-            {/* Modal de Agendar Asesoría */}
-            <ScheduleDate
-              isOpen={isScheduleModalOpen}
-              onClose={() => setIsScheduleModalOpen(false)}
-              onSubmitSuccess={(data) => {
-                setFormData(data);
-                setIsScheduleModalOpen(false);
-                setIsResponseModalOpen(true);
-              }}
-            />
-
-            {/* Modal de Confirmación */}
-            {isResponseModalOpen && (
-              <ResponseDate
-                isOpen={isResponseModalOpen}
-                onClose={() => setIsResponseModalOpen(false)}
-                fullName={formData.fullName}
-                email={formData.email}
-                dateTime={formData.dateTime}
-              />
-            )}
+            {/* Client Island: botón + modales de agenda */}
+            <PropuestaInteractiva />
           </div>
         </div>
       </section>
 
-      {/* Sobre Nosotros Section - CON SPINNER DE CARGA */}
+      {/* Sobre Nosotros Section */}
       <section
         className="bg-white-eske py-12 max-sm:py-8 px-4 sm:px-6 md:px-8 dark:bg-[#0B1620]"
         aria-labelledby="about-heading"
       >
         <div className="w-[90%] mx-auto max-w-7xl text-center">
-          {/* Subtítulo */}
           <h2
             id="about-heading"
             className="text-3xl max-sm:text-xl font-bold text-bluegreen-eske mb-6 max-sm:mb-4 dark:text-[#6BA4C6]"
           >
             Sobre nosotros
           </h2>
-
-          {/* Párrafo Principal */}
           <p className="text-xl max-sm:text-base font-normal text-black-eske mb-6 max-sm:mb-4 dark:text-[#C7D6E0]">
             Nuestro propósito es profesionalizar la vida pública.
           </p>
 
-          {/* Recuadro para el Video - CON SPINNER */}
-          <div className="relative w-full max-w-170 mx-auto overflow-hidden shadow-lg mb-8 max-sm:mb-6 rounded-lg bg-black">
-            {isVideoLoading && (
-              <div
-                className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-black"
-                aria-live="polite"
-              >
-                {/* Spinner animado */}
-                <div className="w-12 h-12 max-sm:w-10 max-sm:h-10 border-4 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin"></div>
+          {/* Client Island: iframe con spinner */}
+          <VideoPresentation />
 
-                {/* Texto de carga (oculto para lectores de pantalla) */}
-                <span className="sr-only">Cargando video de presentación</span>
-
-                {/* Texto visible (opcional) */}
-                <p className="mt-4 text-white-eske text-sm max-sm:text-xs font-light">
-                  Cargando video...
-                </p>
-              </div>
-            )}
-
-            <div className="relative aspect-video w-full overflow-hidden">
-              <iframe
-                src="https://drive.google.com/file/d/1b8qZHWHYyID5Q-PN26pEbhCUySrilivE/preview"
-                title="Video de presentación de Eskemma - Sobre nosotros"
-                className="video-iframe absolute left-0 w-full border-none"
-                style={{
-                  opacity: isVideoLoading ? 0 : 1,
-                  transition: "opacity 0.5s ease",
-                }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                onLoad={() => setIsVideoLoading(false)}
-              ></iframe>
-            </div>
-          </div>
-
-          {/* Modal de Equipo */}
+          {/* TeamModal gestiona su propio estado internamente */}
           <TeamModal />
         </div>
       </section>
@@ -389,7 +273,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
       {/* Sección - Beneficios */}
       <BenefitsSection />
 
-      {/* Sección - Testimonios - OPTIMIZADA CON ALTERNANCIA MOBILE */}
+      {/* Sección - Testimonios */}
       <section
         className="bg-gray-eske-10 min-h-150 max-sm:min-h-100 py-20 max-sm:py-12 px-4 sm:px-6 md:px-8 dark:bg-[#112230]"
         aria-labelledby="testimonials-heading"
@@ -402,14 +286,9 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
             ¿Qué opinan nuestros clientes?
           </h2>
 
-          {/* Contenedor de Testimonios */}
-          <div className="space-y-12 max-sm:space-y-8">           
-
-            {/* Testimonio 1 - MOBILE: IZQUIERDA */}
+          <div className="space-y-12 max-sm:space-y-8">
             <figure className="flex flex-col sm:flex-row items-center max-sm:items-start sm:items-start sm:space-x-8 space-y-4 sm:space-y-0">
-              {/* Avatar + Datos - Desktop: columna centrada, Mobile: fila alineada izquierda */}
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-1.jpg"
@@ -420,36 +299,19 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     aria-hidden="true"
                   />
                 </div>
-
-                {/* Datos de la persona */}
                 <div className="text-center sm:text-center max-sm:text-left">
-                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">
-                    Carmen Arriaga
-                  </p>
-                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">
-                    Regidora
-                  </p>
-                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">
-                    @carriaganl
-                  </p>
+                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">Carmen Arriaga</p>
+                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">Regidora</p>
+                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@carriaganl</p>
                 </div>
               </div>
-
-              {/* Texto del testimonio - Mobile: izquierda, Desktop: izquierda */}
               <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>
-                  "Cuando pensé que no había nada más que hacer en mi
-                  candidatura decidí utilizar el <em>Moddulo</em> de Eskemma.
-                  Descubrí que había muchas opciones para competir con fuerza."
-                </p>
+                <p>"Cuando pensé que no había nada más que hacer en mi candidatura decidí utilizar el <em>Moddulo</em> de Eskemma. Descubrí que había muchas opciones para competir con fuerza."</p>
               </blockquote>
             </figure>
 
-            {/* Testimonio 2 - MOBILE: DERECHA */}
             <figure className="flex flex-col sm:flex-row-reverse items-center max-sm:items-end sm:items-start sm:space-x-reverse sm:space-x-8 space-y-4 sm:space-y-0">
-              {/* Avatar + Datos - Desktop: columna centrada, Mobile: fila alineada derecha */}
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-orange-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-2.jpg"
@@ -460,36 +322,19 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     aria-hidden="true"
                   />
                 </div>
-
-                {/* Datos de la persona */}
                 <div className="text-center sm:text-center max-sm:text-left">
-                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">
-                    Sergio Hernández
-                  </p>
-                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">
-                    Analista
-                  </p>
-                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">
-                    @sergehernan33
-                  </p>
+                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">Sergio Hernández</p>
+                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">Analista</p>
+                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@sergehernan33</p>
                 </div>
               </div>
-
-              {/* Texto del testimonio - Mobile: derecha, Desktop: derecha */}
               <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>
-                  "En los cursos de comunicación política siempre hablan de
-                  estrategia, pero hasta ahora sé cómo hacerlo en territorio, no
-                  sólo en teoría."
-                </p>
+                <p>"En los cursos de comunicación política siempre hablan de estrategia, pero hasta ahora sé cómo hacerlo en territorio, no sólo en teoría."</p>
               </blockquote>
             </figure>
 
-            {/* Testimonio 3 - MOBILE: IZQUIERDA */}
             <figure className="flex flex-col sm:flex-row items-center max-sm:items-start sm:items-start sm:space-x-8 space-y-4 sm:space-y-0">
-              {/* Avatar + Datos - Desktop: columna centrada, Mobile: fila alineada izquierda */}
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-3.jpg"
@@ -500,36 +345,19 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     aria-hidden="true"
                   />
                 </div>
-
-                {/* Datos de la persona */}
                 <div className="text-center sm:text-center max-sm:text-left">
-                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">
-                    Juan Carlos Montañez L.
-                  </p>
-                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">
-                    Candidato diputado local
-                  </p>
-                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">
-                    @JCMontañez
-                  </p>
+                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">Juan Carlos Montañez L.</p>
+                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">Candidato diputado local</p>
+                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@JCMontañez</p>
                 </div>
               </div>
-
-              {/* Texto del testimonio - Mobile: izquierda, Desktop: izquierda */}
               <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>
-                  "Con su ayuda logré analizar mejor la información y saber cómo
-                  aventajar a los otros partidos. Lo mejor es que lo hice yo
-                  mismo y me ahorré una lana."
-                </p>
+                <p>"Con su ayuda logré analizar mejor la información y saber cómo aventajar a los otros partidos. Lo mejor es que lo hice yo mismo y me ahorré una lana."</p>
               </blockquote>
             </figure>
 
-            {/* Testimonio 4 - MOBILE: DERECHA */}
             <figure className="flex flex-col sm:flex-row-reverse items-center max-sm:items-end sm:items-start sm:space-x-reverse sm:space-x-8 space-y-4 sm:space-y-0">
-              {/* Avatar + Datos - Desktop: columna centrada, Mobile: fila alineada derecha */}
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-4.jpg"
@@ -540,295 +368,22 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     aria-hidden="true"
                   />
                 </div>
-
-                {/* Datos de la persona */}
                 <div className="text-center sm:text-center max-sm:text-left">
-                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">
-                    Martha T. Sepúlveda
-                  </p>
-                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">
-                    Concejal
-                  </p>
-                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">
-                    @mtsepulvedaCDMX
-                  </p>
+                  <p className="text-[12px] max-sm:text-[12px] font-semibold text-bluegreen-eske leading-tight dark:text-[#4791B3]">Martha T. Sepúlveda</p>
+                  <p className="text-[12px] max-sm:text-[11px] text-gray-eske-90 leading-tight mt-0.5 dark:text-[#9AAEBE]">Concejal</p>
+                  <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@mtsepulvedaCDMX</p>
                 </div>
               </div>
-
-              {/* Texto del testimonio - Mobile: derecha, Desktop: derecha */}
               <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>
-                  "Pensé que estos servicios sólo eran para grandes campañas.
-                  Participé en una elección local en 2024 y pude utilizar mucha
-                  de la ayuda que me brindaron."
-                </p>
+                <p>"Pensé que estos servicios sólo eran para grandes campañas. Participé en una elección local en 2024 y pude utilizar mucha de la ayuda que me brindaron."</p>
               </blockquote>
             </figure>
           </div>
         </div>
       </section>
 
-      {/* Sección - Planes de suscripción */}
-      <section
-        id="suscripciones"
-        className="bg-white-eske min-h-200 py-18 max-sm:py-12 px-4 sm:px-6 md:px-8 dark:bg-[#0B1620]"
-        aria-labelledby="subscriptions-heading"
-      >
-        <div className="w-[90%] mx-auto max-w-7xl">
-          {/* Título de la Sección */}
-          <h2
-            id="subscriptions-heading"
-            className="text-3xl max-sm:text-xl font-bold text-center text-bluegreen-eske mb-6 max-sm:mb-4 dark:text-[#6BA4C6]"
-          >
-            Selecciona el mejor plan para tu proyecto político
-          </h2>
-
-          {/* Párrafo Descriptivo */}
-          <p className="mt-12 max-sm:mt-6 text-2xl max-sm:text-lg font-light text-center text-black-eske mb-24 max-sm:mb-12 max-w-150 mx-auto dark:text-[#C7D6E0]">
-            <span>Suscríbete y accede al</span>
-            <br />
-            <span>ecosistema digital de Eskemma</span>
-          </p>
-
-          {/* Contenedor de las Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-sm:gap-6">
-            {/* Card 1 - Sólo un producto (Plan Básico) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-2 sm:order-1">
-              {/* Encabezado con fondo white-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-white-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-black-eske text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap dark:bg-[#21425E] dark:text-[#EAF2F8] dark:border-white/20"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite IA Básica
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Básico
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Para 1 persona</p>                   
-                  <p className="mt-4 max-sm:mt-2 text-[16px] text-center max-sm:text-[9px]">
-                    <strong>Ideal para candidatos locales y equipos pequeños.</strong>
-                  </p>
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-[9px]">
-                    <strong>Obtienes:</strong>
-                  </p>
-                  <p>
-                    Acceso a versiones básicas de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 8 Apps Estándar</p>
-                  <p>Soporte por email</p>
-                  <p>Almacenamiento de 5 GB</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <Image
-                      src="/icons/mx.webp"
-                      alt="México"
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 2,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="primary"
-                    onClick={() => setIsBasicSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-
-            {/* Card 2 - Todo Eskemma (Plan Premium) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-1 sm:order-2">
-              {/* Encabezado con fondo black-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-black-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-white-eske text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite Avanzada con IA
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Premium
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Hasta 5 personas</p> 
-                  <p className="mt-4 max-sm:mt-2 text-[16px] text-center max-sm:text-[9px]">
-                    <strong>Ideal para equipos de 5-15 personas</strong>
-                  </p>                 
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
-                    <strong>Obtienes Plan Básico +</strong></p>
-                  <p>
-                    Acceso a versiones Premium de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 16 Apps Avanzadas</p>
-                  <p>Soporte por email / chat</p>
-                  <p>Capacitación grupal online (1 sesión)</p>
-                  <p>Almacenamiento de 50 GB</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <Image
-                      src="/icons/mx.webp"
-                      alt="México"
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 5,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="secondary"
-                    onClick={() => setIsPremiumSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-
-            {/* Card 3 - Trabajo colaborativo (Plan Grupal) */}
-            <article className="bg-white-eske rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 max-sm:p-4 text-center relative overflow-visible w-full max-w-87.5 mx-auto flex flex-col dark:bg-[#18324A] dark:border dark:border-white/10 order-3 sm:order-3">
-              {/* Encabezado con fondo white-eske */}
-              <div
-                className="absolute -top-3.75 left-1/2 transform -translate-x-1/2 bg-white-eske px-6 max-sm:px-4 py-2 max-sm:py-1 border border-bluegreen-eske text-black text-[14px] max-sm:text-xs font-medium z-10 whitespace-nowrap dark:bg-[#21425E] dark:text-[#EAF2F8] dark:border-white/20"
-                style={{ boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)" }}
-                aria-hidden="true"
-              >
-                Suite Completa con IA
-              </div>
-
-              {/* Contenido de la card */}
-              <div className="flex flex-col grow">
-                {/* Título del Plan */}
-                <h3 className="text-xl max-sm:text-lg font-semibold text-bluegreen-eske mt-6 max-sm:mt-4 mb-4 max-sm:mb-3 dark:text-[#6BA4C6]">
-                  Plan Profesional
-                </h3>
-
-                {/* Detalles del Plan */}
-                <div className="text-left text-[16px] max-sm:text-sm text-black-eske space-y-2 max-sm:space-y-1 grow dark:text-[#C7D6E0]">
-                  <p className="text-center">Mensual | Usuarios ilimitados</p>
-                  <p className="mt-4 max-sm:mt-2 text-center text-[16px] max-sm:text-sm">
-                    <strong>Ideal para equipos de 15-50+ personas</strong>
-                  </p>
-                  <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
-                    <strong>Obtienes Plan Premium +</strong>
-                  </p>
-                  <p>
-                    Acceso a versiones profesionales de cursos online, Sefix  y
-                    Monitor
-                  </p>
-                  <p>Moddulo con 25 Apps Avanzadas</p>
-                  <p>Soporte por teléfono, email y chat</p>
-                  <p>Capacitación personalizada</p>
-                  <p>Consultoría estratégica (4 hrs/mes incluidas)</p>
-                  <p>Almacenamiento ilimitado</p>
-                </div>
-
-                {/* Bandera y Precio */}
-                <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                  {/* Bandera */}
-                  <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <Image
-                      src="/icons/mx.webp"
-                      alt="México"
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  {/* Precio */}
-                  <p className="text-[16px] max-sm:text-sm font-bold text-black-eske dark:text-[#C7D6E0]">
-                    $ 9,899 MX / mes
-                  </p>
-                </div>
-
-                {/* Botón Suscribirme */}
-                <div className="mt-auto">
-                  <Button
-                    label="SUSCRIBIRME"
-                    variant="primary"
-                    onClick={() => setIsProfessionalSuscriptionModalOpen(true)}
-                  />
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* MODALES */}
-      {/* Modal de Suscripción (Plan Básico) */}
-      <SuscriptionBasicModal
-        isOpen={isBasicSuscriptionModalOpen}
-        onClose={() => setIsBasicSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsBasicSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Suscripción (Plan Premium) */}
-      <SuscriptionPremiumModal
-        isOpen={isPremiumSuscriptionModalOpen}
-        onClose={() => setIsPremiumSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsPremiumSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Suscripción (Plan Grupal) */}
-      <SuscriptionProfessionalModal
-        isOpen={isProfessionalSuscriptionModalOpen}
-        onClose={() => setIsProfessionalSuscriptionModalOpen(false)}
-        onPaymentSuccess={() => {
-          setIsProfessionalSuscriptionModalOpen(false);
-          setIsResponseSuscriptionModalOpen(true);
-        }}
-      />
-
-      {/* Modal de Respuesta después de la suscripción */}
-      <SuscriptionResponseModal
-        isOpen={isResponseSuscriptionModalOpen}
-        onClose={() => setIsResponseSuscriptionModalOpen(false)}
-        userName={userName}
-      />
+      {/* Client Island: sección completa de suscripciones */}
+      <PlanesInteractivos />
 
       {/* Sección - FAQ */}
       <FaqSection />
@@ -854,150 +409,54 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/moddulo"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-60 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Moddulo.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Moddulo_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Moddulo
-              </span>
+              <Image src="/icons/icon_Moddulo.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Moddulo_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">Moddulo</span>
             </Link>
 
             <Link
               href="/sefix"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Sefix.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Sefix_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Sefix
-              </span>
+              <Image src="/icons/icon_Sefix.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Sefix_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">Sefix</span>
             </Link>
 
             <Link
               href="/servicios"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Consultoria.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Consultoría_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Servicios
-              </span>
+              <Image src="/icons/icon_Consultoria.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Consultoría_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">Servicios</span>
             </Link>
 
             <Link
               href="/cursos"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Cursos.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Cursos_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                Cursos
-              </span>
+              <Image src="/icons/icon_Cursos.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Cursos_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">Cursos</span>
             </Link>
 
             <Link
               href="/monitor"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Monitor.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Monitor_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">
-                Monitor
-              </span>
+              <Image src="/icons/icon_Monitor.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Monitor_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">Monitor</span>
             </Link>
 
             <Link
               href="/blog"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-60 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image
-                src="/icons/icon_Blog.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
-              />
-              <Image
-                src="/icons/icons_dark_mode/icon_Blog_wd.svg"
-                alt=""
-                aria-hidden="true"
-                width={128}
-                height={128}
-                className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
-              />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
-                El baúl de Fouché
-              </span>
+              <Image src="/icons/icon_Blog.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Blog_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">El baúl de Fouché</span>
             </Link>
           </nav>
         </div>
