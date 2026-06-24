@@ -125,11 +125,15 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 >
                   {/* Imagen */}
                   {post.featureImage && (
-                    <img
-                      src={post.featureImage}
-                      alt={`Imagen destacada: ${post.title}`}
-                      className="w-full h-48 max-sm:h-32 object-cover rounded-lg mb-4 max-sm:mb-2"
-                    />
+                    <div className="relative w-full h-48 max-sm:h-32 rounded-lg overflow-hidden mb-4 max-sm:mb-2">
+                      <Image
+                        src={post.featureImage}
+                        alt={`Imagen destacada: ${post.title}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                    </div>
                   )}
 
                   {/* Título - con flex-grow para ocupar espacio variable */}
@@ -196,14 +200,18 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-sm:gap-4">
             {/* Card 1 */}
             <div className="flex flex-col items-center text-center min-h-full">
-              <Image
-                src="/images/part_comparativa_circuns.gif"
-                alt="Gráfica animada de participación electoral por circunscripción en México 2006-2021"
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
                 width={600}
                 height={338}
                 className="w-full h-auto object-contain rounded-lg mb-4 max-sm:mb-2"
-                unoptimized={true}
-              />
+                aria-label="Gráfica animada de participación electoral por circunscripción en México 2006-2021"
+              >
+                <source src="/images/part_comparativa_circuns.mp4" type="video/mp4" />
+              </video>
               <p className="text-[16px] max-sm:text-sm text-gray mb-4 max-sm:mb-2 grow dark:text-[#9AAEBE]">
                 Participación electoral por circunscripción{" "}
                 <br className="max-sm:hidden" />
@@ -223,14 +231,18 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
 
             {/* Card 2 */}
             <div className="flex flex-col items-center text-center min-h-full">
-              <Image
-                src="/images/part_tipo_eleccion.gif"
-                alt="Gráfica animada de participación electoral por tipo de elección en México"
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
                 width={600}
                 height={338}
                 className="w-full h-auto object-contain rounded-lg mb-4 max-sm:mb-2"
-                unoptimized={true}
-              />
+                aria-label="Gráfica animada de participación electoral por tipo de elección en México"
+              >
+                <source src="/images/part_tipo_eleccion.mp4" type="video/mp4" />
+              </video>
               <p className="text-[16px] max-sm:text-sm text-gray mb-4 max-sm:mb-2 grow dark:text-[#9AAEBE]">
                 ¿Por qué la participación electoral aumenta en las{" "}
                 <br className="max-sm:hidden" />
@@ -357,32 +369,15 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <iframe
                 src="https://drive.google.com/file/d/1b8qZHWHYyID5Q-PN26pEbhCUySrilivE/preview"
                 title="Video de presentación de Eskemma - Sobre nosotros"
-                className="absolute left-0 w-full video-iframe"
+                className="video-iframe absolute left-0 w-full border-none"
+                style={{
+                  opacity: isVideoLoading ? 0 : 1,
+                  transition: "opacity 0.5s ease",
+                }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-                // ✅ Cuando el iframe carga, oculta el spinner
                 onLoad={() => setIsVideoLoading(false)}
               ></iframe>
-
-              <style jsx>{`
-                /* Desktop: Sin cambios (valores originales) */
-                .video-iframe {
-                  top: 0;
-                  height: 100%;
-                  border: none;
-                  /* Fade-in suave del video */
-                  opacity: ${isVideoLoading ? 0 : 1};
-                  transition: opacity 0.5s ease;
-                }
-
-                /* Mobile: Valores adaptativos con clamp() */
-                @media (max-width: 640px) {
-                  .video-iframe {
-                    height: clamp(130%, 135%, 140%);
-                    top: clamp(-20%, -17.5%, -15%);
-                  }
-                }
-              `}</style>
             </div>
           </div>
 
@@ -416,9 +411,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
                 {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-60 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src="https://untitledui.com/images/avatars/brianna-ware"
+                  <Image
+                    src="/images/testimonial-1.jpg"
                     alt=""
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                     aria-hidden="true"
                   />
@@ -454,9 +451,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
                 {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-orange-60 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src="https://untitledui.com/images/avatars/drew-cano"
+                  <Image
+                    src="/images/testimonial-2.jpg"
                     alt=""
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                     aria-hidden="true"
                   />
@@ -492,9 +491,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
                 {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-60 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src="https://untitledui.com/images/avatars/ethan-valdez"
+                  <Image
+                    src="/images/testimonial-3.jpg"
                     alt=""
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                     aria-hidden="true"
                   />
@@ -530,9 +531,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
                 {/* Avatar */}
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-60 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src="https://untitledui.com/images/avatars/ava-bentley"
+                  <Image
+                    src="/images/testimonial-4.jpg"
                     alt=""
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                     aria-hidden="true"
                   />
@@ -629,9 +632,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
                   {/* Bandera */}
                   <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
+                    <Image
+                      src="/icons/mx.webp"
                       alt="México"
+                      width={32}
+                      height={32}
                       className="w-full h-full object-cover rounded-full"
                     />
                   </div>
@@ -692,9 +697,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
                   {/* Bandera */}
                   <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
+                    <Image
+                      src="/icons/mx.webp"
                       alt="México"
+                      width={32}
+                      height={32}
                       className="w-full h-full object-cover rounded-full"
                     />
                   </div>
@@ -757,9 +764,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                 <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
                   {/* Bandera */}
                   <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
-                    <img
-                      src="https://www.banderas-mundo.es/data/flags/w1160/mx.webp"
+                    <Image
+                      src="/icons/mx.webp"
                       alt="México"
+                      width={32}
+                      height={32}
                       className="w-full h-full object-cover rounded-full"
                     />
                   </div>
@@ -845,16 +854,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/moddulo"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-60 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Moddulo.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Moddulo_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
@@ -866,16 +879,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/sefix"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Sefix.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Sefix_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
@@ -887,16 +904,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/servicios"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Consultoria.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Consultoría_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
@@ -908,16 +929,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/cursos"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Cursos.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Cursos_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">
@@ -929,16 +954,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/monitor"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Monitor.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Monitor_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">
@@ -950,16 +979,20 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/blog"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-60 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <img
+              <Image
                 src="/icons/icon_Blog.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden"
               />
-              <img
+              <Image
                 src="/icons/icons_dark_mode/icon_Blog_wd.svg"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={128}
                 className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block"
               />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-60 dark:text-[#4791B3]">

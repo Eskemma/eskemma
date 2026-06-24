@@ -377,6 +377,19 @@ textarea:focus-visible,
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Video iframe del home: compensación del UI de Google Drive en mobile */
+.video-iframe {
+  top: 0;
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  .video-iframe {
+    height: 135%;
+    top: -17.5%;
+  }
+}
+
 /* Mejora de hover para cards de Moddulo */
 .hover\:scale-110:hover {
   transform: scale(1.1);

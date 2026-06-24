@@ -31,11 +31,21 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Headers de seguridad y SEO
+  // Headers de seguridad, SEO y caché
   async headers() {
     const isProduction = process.env.NEXT_PUBLIC_ENVIRONMENT === 'production';
-    
+
     return [
+      {
+        // Caché de larga duración para assets estáticos de /public/
+        source: '/:path(icons|images)/:file*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
       {
         // Headers globales para todas las rutas
         source: '/:path*',
