@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getPhaseSystemPrompt } from "@/lib/ai/phases/prompts";
-import { appendChatMessage } from "@/lib/moddulo/project";
+import { appendChatMessage, getProject } from "@/lib/moddulo/project";
+import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PhaseId, ChatRequest } from "@/types/moddulo.types";
@@ -37,8 +38,36 @@ export async function POST(
       );
     }
 
-    // Construir mensajes para Claude — inyectar XPCTO como contexto fundacional si está disponible
-    const systemPrompt = getPhaseSystemPrompt(phaseId as PhaseId, currentFormData, xpctoContext);
+    // Fetch project to get type and phase data for knowledge injection
+    const project = await getProject(projectId, session.uid);
+    if (!project) {
+      return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+    }
+
+    // KPIs confirmed in F6 — used in F7 and F8
+    const kpisSeleccionados =
+      (project.phases?.tactica?.data?.kpisSeleccionados as string[] | undefined) ?? undefined;
+
+    // Knowledge context is prepended to the phase system prompt
+    const knowledgeContext = await buildPhaseContext({
+      phaseId: phaseId as PhaseId,
+      projectType: project.type,
+      maniobra:
+        (project.phases?.diagnostico?.data?.maniobra as string | undefined) ?? undefined,
+      kpisSeleccionados,
+    });
+
+    const baseSystemPrompt = getPhaseSystemPrompt(phaseId as PhaseId, currentFormData, xpctoContext);
+    const systemPrompt = knowledgeContext
+      ? `${knowledgeContext}\n\n${baseSystemPrompt}`
+      : baseSystemPrompt;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`=== KNOWLEDGE CONTEXT F${phaseId} ===`);
+      console.log("Longitud del contexto:", knowledgeContext.length, "caracteres");
+      console.log("Preview (primeros 500 chars):", knowledgeContext.substring(0, 500));
+      console.log("=== FIN KNOWLEDGE CONTEXT ===");
+    }
 
     const messages: { role: "user" | "assistant"; content: string }[] = [
       // Historial previo de la conversación

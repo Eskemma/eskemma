@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
@@ -34,9 +35,15 @@ export async function POST(
 
     const prompt = buildReportPrompt(phaseId, xpcto, projectName ?? project.name, fecha);
 
+    const knowledgeContext = await buildPhaseContext({
+      phaseId,
+      projectType: project.type,
+    });
+
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 6000,
+      ...(knowledgeContext ? { system: knowledgeContext } : {}),
       messages: [{ role: "user", content: prompt }],
     });
 
