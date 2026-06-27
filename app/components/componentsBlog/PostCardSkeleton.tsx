@@ -1,5 +1,4 @@
 // app/components/componentsBlog/PostCardSkeleton.tsx
-"use client";
 
 export default function PostCardSkeleton() {
   return (

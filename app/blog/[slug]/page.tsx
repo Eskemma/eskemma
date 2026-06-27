@@ -1,4 +1,6 @@
 // app/blog/[slug]/page.tsx
+export const revalidate = 86400; // 24h — revalida artículos editados en Firestore sin redeploy
+
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {

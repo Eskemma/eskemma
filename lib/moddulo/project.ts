@@ -83,8 +83,8 @@ export async function createProject(
 
   data.color = input.color ?? "#026988";
 
-  if (input.centinelaProjectId) {
-    data.centinelaProjectId = input.centinelaProjectId;
+  if (input.pestelProjectId) {
+    data.pestelProjectId = input.pestelProjectId;
   }
 
   const ref = await adminDb.collection(COLLECTION).add(data);

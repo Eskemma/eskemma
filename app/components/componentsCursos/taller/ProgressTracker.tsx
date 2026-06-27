@@ -4,7 +4,6 @@
 // Muestra el avance del usuario en el taller
 // ============================================================
 
-"use client";
 
 import { TALLER_MODULES } from "@/lib/cursos/taller/diagnostico-electoral/config";
 import type { UserWorkshopProgress } from "@/types/firestore.types";

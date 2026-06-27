@@ -334,33 +334,33 @@ service cloud.firestore {
                     resource.data.userId == request.auth.uid;
     }
 
-    // ========== CENTINELA: Configuraciones de Monitoreo (legacy) ==========
-    match /centinela_configs/{configId} {
+    // ========== PESTEL: Configuraciones de Monitoreo (legacy) ==========
+    match /pestel_configs/{configId} {
       allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.userId;
     }
 
-    // ========== CENTINELA: Proyectos V2 ==========
-    match /centinela_projects/{projectId} {
+    // ========== PESTEL: Proyectos V2 ==========
+    match /pestel_projects/{projectId} {
       allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.userId;
     }
 
-    // ========== CENTINELA: Config de Variables PEST-L (E3) ==========
+    // ========== PESTEL: Config de Variables PEST-L (E3) ==========
     // Written by API route (Admin SDK). Readable only by owner.
-    match /centinela_variable_configs/{projectId} {
+    match /pestel_variable_configs/{projectId} {
       allow read: if request.auth != null
         && resource.data.projectId == projectId;
       allow write: if false;
     }
 
-    // ========== CENTINELA: Análisis V2 ==========
+    // ========== PESTEL: Análisis V2 ==========
     // Written by Cloud Functions (Admin SDK). Readable/updatable by owner.
-    match /centinela_analyses/{analysisId} {
+    match /pestel_analyses/{analysisId} {
       allow read: if request.auth != null
         && resource.data.userId == request.auth.uid;
       // Allow updating: bias acknowledgement (E5), human adjustments (E6), approval (E6)
@@ -374,10 +374,10 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
-    // ========== CENTINELA: Alertas V2 (E8) ==========
+    // ========== PESTEL: Alertas V2 (E8) ==========
     // Flat collection. Written by Cloud Functions; readable by project owner.
     // Client can only mark as read (readAt field).
-    match /centinela_alerts/{alertId} {
+    match /pestel_alerts/{alertId} {
       allow read: if request.auth != null
         && resource.data.userId == request.auth.uid;
       allow update: if request.auth != null
@@ -387,8 +387,8 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
-    // ========== CENTINELA: Fuentes manuales de datos (E4) ==========
-    match /centinela_data_sources/{docId} {
+    // ========== PESTEL: Fuentes manuales de datos (E4) ==========
+    match /pestel_data_sources/{docId} {
       allow read: if request.auth != null
         && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null
@@ -397,24 +397,24 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
-    // ========== CENTINELA: Feeds PEST-L (legacy V1) ==========
+    // ========== PESTEL: Feeds PEST-L (legacy V1) ==========
     // Lectura: solo el dueño. Escritura: exclusiva de Cloud Functions (Admin SDK).
-    match /centinela_feeds/{feedId} {
+    match /pestel_feeds/{feedId} {
       allow read: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow write: if false;
     }
 
-    // ========== CENTINELA: Jobs de Scraping ==========
-    match /centinela_jobs/{jobId} {
+    // ========== PESTEL: Jobs de Scraping ==========
+    match /pestel_jobs/{jobId} {
       allow read: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow write: if false;
     }
 
-    // ========== CENTINELA: Alertas ==========
+    // ========== PESTEL: Alertas ==========
     // El usuario solo puede marcar su alerta como leída (campo readAt).
-    match /centinela_alerts/{userId}/items/{alertId} {
+    match /pestel_alerts/{userId}/items/{alertId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null
         && request.auth.uid == userId
@@ -423,9 +423,9 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
-    // ========== CENTINELA: Datos Crudos de Scraping ==========
+    // ========== PESTEL: Datos Crudos de Scraping ==========
     // Escritura exclusiva del Admin SDK (Cloud Functions). Lectura solo para el dueño.
-    match /centinela_raw_articles/{docId} {
+    match /pestel_raw_articles/{docId} {
       allow read: if request.auth != null
         && resource.data.userId == request.auth.uid;
       allow write: if false;

@@ -23,11 +23,11 @@ const Footer = () => {
               <ul className="flex space-x-4 max-sm:space-x-3 mt-4 md:mt-0">
                 <li>
                   <a
-                    href="https://twitter.com/eskemma"
+                    href="https://x.com/eskemmapol"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
-                    aria-label="Visitar nuestro Twitter (se abre en nueva ventana)"
+                    aria-label="Visitar nuestro X (se abre en nueva ventana)"
                   >
                     <img
                       src="/icons/twitter.svg"
@@ -55,7 +55,7 @@ const Footer = () => {
                 </li>
                 <li>
                   <a
-                    href="https://www.youtube.com/@eskemma"
+                    href="https://www.youtube.com/@eskemmaPol"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
@@ -71,7 +71,7 @@ const Footer = () => {
                 </li>
                 <li>
                   <a
-                    href="https://www.tiktok.com/@eskemma"
+                    href="https://www.tiktok.com/@eskemmapol"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
@@ -87,7 +87,7 @@ const Footer = () => {
                 </li>
                 <li>
                   <a
-                    href="https://www.facebook.com/eskemma"
+                    href="https://www.facebook.com/eskemmaPol"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
@@ -103,14 +103,14 @@ const Footer = () => {
                 </li>
                 <li>
                   <a
-                    href="https://www.instagram.com/eskemma"
+                    href="https://www.quora.com/profile/Eskemma"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
-                    aria-label="Visitar nuestro Instagram (se abre en nueva ventana)"
+                    aria-label="Visitar nuestro Quora (se abre en nueva ventana)"
                   >
                     <img
-                      src="/icons/instagram.svg"
+                      src="/icons/quora.svg"
                       alt=""
                       className="w-12 h-12 max-sm:w-9 max-sm:h-9"
                       aria-hidden="true"
@@ -194,10 +194,10 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      href="/monitor"
+                      href="/centinela"
                       className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
                     >
-                      Monitor
+                      Centinela
                     </Link>
                   </li>
                   <li>

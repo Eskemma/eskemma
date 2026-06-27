@@ -1,5 +1,4 @@
 // app/components/componentsBlog/PostCardList.tsx
-"use client";
 
 import Link from "next/link";
 import { getCategoryColor, getCategoryLabel } from "@/lib/constants/categories";

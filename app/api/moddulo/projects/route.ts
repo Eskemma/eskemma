@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const body = await request.json();
-    const { type, name, description, color, centinelaProjectId } = body;
+    const { type, name, description, color, pestelProjectId } = body;
 
     if (!type || !name) {
       return NextResponse.json(
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       description,
       color: typeof color === "string" && color.trim() ? color.trim() : "#026988",
-      centinelaProjectId: typeof centinelaProjectId === "string" ? centinelaProjectId : undefined,
+      pestelProjectId: typeof pestelProjectId === "string" ? pestelProjectId : undefined,
     };
     const project = await createProject(session.uid, input);
 

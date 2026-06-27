@@ -24,7 +24,7 @@ y de gestión política.
 | Módulo | Ruta | Descripción | Estado |
 |--------|------|-------------|--------|
 | **Moddulo** | `/moddulo` | Gestión de proyectos políticos con IA en 9 fases secuenciales | ✅ Activo |
-| **Monitor / Centinela** | `/monitor/centinela` | Análisis PEST-L en tiempo real con IA | 🔄 En desarrollo |
+| **Centinela / PESTEL** | `/centinela/pestel` | Análisis PEST-L en tiempo real con IA | 🔄 En desarrollo |
 | **Cursos** | `/cursos` | Talleres y cursos interactivos de consultoría | ✅ Activo |
 | **SEFIX** | `/sefix` | Dashboard de estadísticas electorales y padrón nominal | ✅ Activo |
 | **Blog** | `/blog` | El Baúl de Fouché — contenido editorial político | ✅ Activo |
@@ -42,7 +42,7 @@ estrategia → tactica → gerencia → seguimiento → evaluacion
 Cada fase tiene un chat contextual con Claude Sonnet 4.6 vía streaming SSE. El consultor
 interactúa con la IA como un asistente que conoce el proyecto completo.
 
-### Monitor / Centinela
+### Centinela / PESTEL
 Sistema de inteligencia política en tiempo real basado en la metodología PEST-L
 (Político, Económico, Social, Tecnológico, Legal). Raúl diseñó un proceso de 8 etapas
 donde la IA analiza fuentes de datos mixtas (automáticas + manuales) y produce
@@ -89,7 +89,7 @@ SaaS (Software as a Service) con modelo freemium y planes por suscripción mensu
 |------|-----------|-------------------|
 | Freemium | $0 | Blog, Redactor limitado |
 | Basic | $2,899/mes | + Cursos, SEFIX |
-| Premium | $5,899/mes | + Monitor (Centinela), Moddulo |
+| Premium | $5,899/mes | + Centinela (PESTEL), Moddulo |
 | Professional | $9,899/mes | + API, white label |
 
 ---

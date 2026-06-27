@@ -65,7 +65,7 @@ export default function CondicionesDeUso() {
               <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
                 <li>El sitio web de Eskemma (www.eskemma.com)</li>
                 <li>
-                  Las herramientas digitales (Sefix, Moddulo, Monitor, y otras
+                  Las herramientas digitales (Sefix, Moddulo, Centinela, y otras
                   que se incorporen)
                 </li>
                 <li>
@@ -274,7 +274,7 @@ export default function CondicionesDeUso() {
                   <li>Textos, artículos, tutoriales y guías</li>
                   <li>Diseños gráficos, logos, marcas y elementos visuales</li>
                   <li>Software, código fuente, algoritmos y bases de datos</li>
-                  <li>Metodologías y frameworks (Sefix, Moddulo, Monitor)</li>
+                  <li>Metodologías y frameworks (Sefix, Moddulo, Centinela)</li>
                   <li>Vídeos, imágenes, iconos y recursos multimedia</li>
                 </ul>
               </div>

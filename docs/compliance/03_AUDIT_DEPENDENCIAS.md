@@ -47,7 +47,7 @@ El código propietario de Eskemma no está sujeto a restricciones copyleft.
 | `isomorphic-dompurify` | ^2.26.0 | Apache 2.0 | DOMPurify en SSR | 🟢 OK |
 | `nodemailer` | ^7.0.10 | MIT | Envío de email transaccional | 🟢 OK |
 | `resend` | ^6.3.0 | MIT | API de email (Resend) | 🟢 OK |
-| `puppeteer` | ^24.36.0 | Apache 2.0 | Scraping web para Centinela | 🟡 Vulns en cadena |
+| `puppeteer` | ^24.36.0 | Apache 2.0 | Scraping web para PESTEL | 🟡 Vulns en cadena |
 | `date-fns` | ^4.1.0 | MIT | Utilidades de fecha | 🟢 OK |
 | `react-markdown` | ^10.1.0 | MIT | Renderizado de Markdown en React | 🟢 OK |
 | `remark` | ^15.0.1 | MIT | Procesamiento de Markdown | 🟢 OK |
@@ -87,7 +87,7 @@ El código propietario de Eskemma no está sujeto a restricciones copyleft.
 ## Cloud Functions — Dependencias Adicionales
 
 Las Cloud Functions tienen su propio `package.json` en `/functions/` con
-dependencias adicionales para el scraping y procesamiento de Centinela:
+dependencias adicionales para el scraping y procesamiento de PESTEL:
 
 | Paquete | Licencia | Propósito |
 |---------|----------|-----------|
@@ -124,7 +124,7 @@ Las 22 vulnerabilidades de severidad alta provienen principalmente de:
    - Corrección: `npm audit fix --force` (requiere downgrade a `firebase-admin@10.3.0`, que
      es incompatible con la versión actual de firebase-functions)
 
-2. **Cadena `puppeteer`** (scrapers de Centinela en Cloud Functions):
+2. **Cadena `puppeteer`** (scrapers de PESTEL en Cloud Functions):
    - Afectan descarga del binario de Chrome y comunicaciones internas
    - Los scrapers corren en Cloud Functions, no en Vercel/cliente
 

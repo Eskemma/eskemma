@@ -108,8 +108,8 @@ match /rae_versions/{doc} {
 
 ```
 moddulo_projects/         ← proyectos de Moddulo (ya existe)
-centinela_feeds/          ← feeds de Centinela (ya existe)
-centinela_configs/        ← configuración de Centinela (ya existe)
+pestel_feeds/          ← feeds de PESTEL (ya existe)
+pestel_configs/        ← configuración de PESTEL (ya existe)
 users/                    ← perfiles de usuario (confirmar nombre real con AuthContext)
 ```
 
@@ -158,8 +158,8 @@ El esquema detallado de cada colección está en `firestore-schema.ts`.
 /moddulo/proyecto/[id]/evaluacion    ← F9 (esqueleto)
 /moddulo/proyecto/[id]/miembros      ← gestión de colaboradores (nueva)
 
-/monitor/centinela        ← ya existe, renombrado como Centinela
-/monitor/centinela/[id]   ← ya existe
+/centinela/pestel        ← ya existe, renombrado como PESTEL
+/centinela/pestel/[id]   ← ya existe
 
 /sefix                    ← ya existe (si aplica)
 ```
@@ -279,9 +279,9 @@ El script para RPF, MEC, MVP, FODA y KPIs es análogo.
   Para JSX con valores inline, usar los hex exactos del kit de prototipado.
 - **Navegación**: siempre `<Link>` de Next.js. Nunca `router.push` en botones de
   navegación principal ni `onClick` que reemplace un enlace.
-- **Producto Centinela**: en todo el código nuevo, el producto se llama "Centinela".
-  Nunca "Monitor" en strings visibles al usuario. Las colecciones de Firestore
-  existentes (`centinela_feeds`, etc.) ya usan el nombre correcto.
+- **Producto PESTEL**: en todo el código nuevo, el producto se llama "PESTEL".
+  Nunca "Centinela" en strings visibles al usuario. Las colecciones de Firestore
+  existentes (`pestel_feeds`, etc.) ya usan el nombre correcto.
 - **Server Components por defecto**: `"use client"` solo cuando hay interactividad
   real (estado, eventos de usuario, hooks). Los componentes de datos son Server.
 - **Variables de entorno**: nunca hardcodear keys. Usar `.env.local` en desarrollo.
@@ -292,7 +292,7 @@ El script para RPF, MEC, MVP, FODA y KPIs es análogo.
 
 - El sistema de autenticación existente (AuthContext, Firebase Auth config).
 - Las colecciones de Firestore existentes (solo se extienden con campos opcionales).
-- Las rutas de Centinela ya implementadas.
+- Las rutas de PESTEL ya implementadas.
 - El cliente de Claude en `lib/ai/claude.ts` (solo se extiende si es necesario).
-- Las Cloud Functions de Centinela ya desplegadas.
+- Las Cloud Functions de PESTEL ya desplegadas.
 - Cualquier componente global del sitio (Header, Footer, layout principal).

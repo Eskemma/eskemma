@@ -27,11 +27,26 @@ export const metadata: Metadata = {
   title: "Cursos y Talleres | Eskemma",
   description: "Formación práctica para profesionales de la comunicación política y el análisis electoral.",
   openGraph: {
-    title: "Cursos y Talleres Eskemma",
+    title: "Cursos y Talleres | Eskemma",
+    description: "Formación práctica para profesionales de la comunicación política y el análisis electoral.",
     url: `${SITE_URL}/cursos`,
-    images: [{ url: `${SITE_URL}/images/cursos-hero.jpg` }],
+    siteName: "Eskemma",
     locale: "es_MX",
     type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/images/blog-hero.jpg`,
+        width: 1200,
+        height: 630,
+        alt: "Cursos y Talleres de Comunicación Política — Eskemma",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cursos y Talleres | Eskemma",
+    description: "Formación práctica para profesionales de la comunicación política y el análisis electoral.",
+    images: [`${SITE_URL}/images/blog-hero.jpg`],
   },
 };
 
@@ -81,7 +96,7 @@ export default async function CursosPage({ searchParams }: CursosPageProps) {
 
     return (
       <main className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
-        {/* Hero Section — Unificado con Moddulo/Monitor */}
+        {/* Hero Section — Unificado con Moddulo/Centinela */}
         <CoursesHeroSection />
 
         {/* Sección de Contenido con Sidebar — Unificado con Blog */}

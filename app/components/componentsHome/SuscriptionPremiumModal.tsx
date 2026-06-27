@@ -95,7 +95,7 @@ export default function SuscriptionPremiumModal({
             </p>
             <ul className="list-disc pl-6 max-sm:pl-5 text-[16px] max-sm:text-sm text-black-eske space-y-1 max-sm:space-y-0.5">
               <li>Todo Plan Básico</li>
-              <li>Acceso a versiones Premium de Cursos online, Sefix y Monitor</li>
+              <li>Acceso a versiones Premium de Cursos online, Sefix y Centinela</li>
               <li>Acceso a 16 apps avanzadas con IA de Moddulo</li>
               <li>Soporte por email / chat</li>
               <li>Capacitación grupal online (1 sesión)</li>

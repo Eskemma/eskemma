@@ -173,7 +173,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               </p>
               <div className="mt-auto w-full max-w-62.5">
                 <Link
-                  href="/monitor"
+                  href="/centinela"
                   className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
                 >
                   Consultar información →
@@ -201,7 +201,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               </p>
               <div className="mt-auto w-full max-w-62.5">
                 <Link
-                  href="/monitor"
+                  href="/centinela"
                   className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
                 >
                   Consultar información →
@@ -442,12 +442,12 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
             </Link>
 
             <Link
-              href="/monitor"
+              href="/centinela"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
               <Image src="/icons/icon_Monitor.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
               <Image src="/icons/icons_dark_mode/icon_Monitor_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
-              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">Monitor</span>
+              <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">Centinela</span>
             </Link>
 
             <Link

@@ -304,12 +304,12 @@ const Header = () => {
                 </li>
                 <li role="none">
                   <a
-                    href="/monitor"
+                    href="/centinela"
                     role="menuitem"
                     className="block px-4 max-sm:px-3 py-2 rounded hover:bg-blue-eske hover:text-white hover:font-bold transition-colors duration-300 focus-ring-primary dark:hover:bg-[#4791B3] dark:hover:text-[#EAF2F8]"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    MONITOR
+                    CENTINELA
                   </a>
                 </li>
                 <li role="none">

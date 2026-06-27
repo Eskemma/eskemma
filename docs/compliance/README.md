@@ -26,7 +26,7 @@ Documentación de software asistido por IA para registro ante INDAUTOR
 | Archivo | Módulo |
 |---------|--------|
 | [MODULOS/moddulo.md](MODULOS/moddulo.md) | Gestión de proyectos políticos (9 fases + chat Claude) |
-| [MODULOS/centinela.md](MODULOS/centinela.md) | Análisis PEST-L en tiempo real (E1-E5 + Cloud Functions) |
+| [MODULOS/pestel.md](MODULOS/pestel.md) | Análisis PEST-L en tiempo real (E1-E5 + Cloud Functions) |
 | [MODULOS/sefix.md](MODULOS/sefix.md) | Dashboard electoral (padrón + lista nominal, pre-generación) |
 | [MODULOS/cursos.md](MODULOS/cursos.md) | Talleres interactivos de consultoría política |
 | [MODULOS/blog.md](MODULOS/blog.md) | El Baúl de Fouché — contenido editorial |

@@ -14,7 +14,7 @@
 │                    ESKEMMA PLATFORM                          │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │ Moddulo  │  │Centinela │  │  SEFIX   │  │  Cursos  │  │
+│  │ Moddulo  │  │PESTEL │  │  SEFIX   │  │  Cursos  │  │
 │  │(9 fases) │  │(PEST-L)  │  │(Electoral│  │(Talleres)│  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  │
 │       │              │              │              │         │
@@ -32,7 +32,7 @@
 │                                                             │
 │  ┌──────────────────┐    ┌───────────────────────────────┐  │
 │  │  Cloud Functions │    │   Anthropic Claude Sonnet 4.6 │  │
-│  │  (Centinela IA)  │    │   (Moddulo Chat + Centinela)  │  │
+│  │  (PESTEL IA)  │    │   (Moddulo Chat + PESTEL)  │  │
 │  └──────────────────┘    └───────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 
@@ -94,7 +94,7 @@ defecto y Client Components declarados explícitamente con `"use client"`.
 - Firestore tipado con interfaces en `types/firestore.types.ts`
 - Facilita la supervisión de código generado con IA (los errores de tipo son detectados antes)
 
-**Impacto:** Archivos de tipos en `/types/`: `centinela.types.ts`, `moddulo.types.ts`,
+**Impacto:** Archivos de tipos en `/types/`: `pestel.types.ts`, `moddulo.types.ts`,
 `firestore.types.ts`, `session.types.ts`, `subscription.types.ts`.
 
 ---
@@ -137,15 +137,15 @@ del dato político.
 - Tiempo real out-of-the-box sin necesidad de WebSockets custom
 - Escalado automático para picos de tráfico en períodos electorales
 
-**Colecciones principales:** `users`, `moddulo_projects`, `centinela_projects`,
-`centinela_analyses`, `centinela_jobs`, `posts`, `centinela_variable_configs`,
-`centinela_data_sources`, `centinela_raw_articles`, `centinela_alerts`, `notifications`.
+**Colecciones principales:** `users`, `moddulo_projects`, `pestel_projects`,
+`pestel_analyses`, `pestel_jobs`, `posts`, `pestel_variable_configs`,
+`pestel_data_sources`, `pestel_raw_articles`, `pestel_alerts`, `notifications`.
 
 ---
 
-### DA-5: Cloud Functions Gen2 para Centinela
+### DA-5: Cloud Functions Gen2 para PESTEL
 
-**Decisión:** Procesamiento IA de Centinela en Cloud Functions Node.js Gen2, separado
+**Decisión:** Procesamiento IA de PESTEL en Cloud Functions Node.js Gen2, separado
 del servidor Next.js.
 
 **Quién:** Raúl diseñó esta separación para evitar timeouts en Vercel.
@@ -156,7 +156,7 @@ del servidor Next.js.
 - Cloud Functions Gen2 pueden ejecutarse hasta 60 minutos
 - Arquitectura fire-and-forget: Next.js lanza la función y el cliente hace polling
 
-**Archivos:** `functions/src/centinela/` (build separado con su propio package.json)
+**Archivos:** `functions/src/pestel/` (build separado con su propio package.json)
 
 ---
 
@@ -167,7 +167,7 @@ del servidor Next.js.
 **Quién:** Raúl seleccionó Claude sobre GPT-4 y otros modelos por su desempeño en
 análisis de texto político en español y su contexto de 200k tokens.
 
-**Uso en Centinela:**
+**Uso en PESTEL:**
 - 5 llamadas paralelas (una por dimensión PEST-L: P, E, S, T, L)
 - 1 llamada adicional para cadenas de impacto
 - Detección de sesgos: determinística (sin IA) — decisión de Raúl
@@ -253,13 +253,13 @@ Usuario → Login form → Firebase signIn → getIdToken
 → Session cookie HTTP-only → AuthContext.tsx (cliente)
 ```
 
-### Flujo de Análisis Centinela
+### Flujo de Análisis PESTEL
 ```
 Wizard E1-E3 → E4 Datos (semáforo cobertura)
 → Trigger análisis → Cloud Function scrapeAndAnalyze
 → 4 scrapers paralelos → generateAnalysisV2
 → 5 llamadas Claude paralelas (PEST-L)
-→ Guarda centinela_analyses → Frontend detecta "completed"
+→ Guarda pestel_analyses → Frontend detecta "completed"
 ```
 
 ### Flujo de Chat Moddulo

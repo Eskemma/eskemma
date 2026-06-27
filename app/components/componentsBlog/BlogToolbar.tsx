@@ -2,6 +2,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants/categories";
 import { useState, useEffect } from "react";
 import ViewToggle, { ViewMode } from "./ViewToggle";
@@ -251,13 +252,13 @@ export default function BlogToolbar({ onViewChange }: BlogToolbarProps) {
             </span>
           )}
 
-          <button
-            onClick={() => router.push("/blog")}
+          <Link
+            href="/blog"
             className="text-xs text-gray-600 dark:text-[#9AAEBE] hover:text-bluegreen-eske dark:hover:text-[#4791B3] underline focus-ring-primary rounded"
             aria-label="Limpiar todos los filtros"
           >
             Limpiar todos
-          </button>
+          </Link>
         </div>
       )}
     </div>

@@ -1,5 +1,4 @@
 // app/components/componentsCursos/listado/FeaturedCourse.tsx
-"use client";
 
 import Link from "next/link";
 

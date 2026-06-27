@@ -4,7 +4,6 @@
 // Muestra los cursos en formato de cuadrícula
 // ============================================================
 
-"use client";
 
 import type { CourseCardItem } from "@/types/course.types";
 import type { UserRole } from "@/types/subscription.types";

@@ -263,7 +263,7 @@ export interface CreateProjectInput {
   description?: string;
   color?: string;
   xpcto?: Partial<XPCTO>;
-  centinelaProjectId?: string;
+  pestelProjectId?: string;
 }
 
 export type UpdateProjectInput = Partial<

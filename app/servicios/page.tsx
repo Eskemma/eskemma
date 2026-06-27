@@ -8,9 +8,33 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
 export const metadata: Metadata = {
   title: "Nuestros Servicios | Eskemma",
   description:
-    "Descubre Moddulo, Sefix, Centinela y los cursos especializados de Eskemma: soluciones con IA para profesionalizar tu consultoría política y campañas electorales en México.",
+    "Descubre Moddulo, Sefix, PESTEL y los cursos especializados de Eskemma: soluciones con IA para profesionalizar tu consultoría política y campañas electorales en México.",
   alternates: {
     canonical: `${SITE_URL}/servicios`,
+  },
+  openGraph: {
+    title: "Nuestros Servicios | Eskemma",
+    description:
+      "Moddulo, Sefix, PESTEL y cursos especializados: soluciones con IA para consultoría política y campañas electorales en México.",
+    url: `${SITE_URL}/servicios`,
+    siteName: "Eskemma",
+    locale: "es_MX",
+    type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/images/blog-hero.jpg`,
+        width: 1200,
+        height: 630,
+        alt: "Servicios de Consultoría Política con IA — Eskemma",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nuestros Servicios | Eskemma",
+    description:
+      "Moddulo, Sefix, PESTEL y cursos especializados: soluciones con IA para consultoría política en México.",
+    images: [`${SITE_URL}/images/blog-hero.jpg`],
   },
 };
 

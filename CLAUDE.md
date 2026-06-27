@@ -10,7 +10,7 @@ Contexto e instrucciones para el desarrollo del proyecto.
 - Responder siempre en **español**
 - Código y comentarios técnicos en **inglés**
 - Formato de commits obligatorio: `YY-MM-DD. <descripción>`
-  - Ejemplo: `26-03-27. feat(centinela): refactorizar trigger a fire-and-forget`
+  - Ejemplo: `26-03-27. feat(pestel): refactorizar trigger a fire-and-forget`
 
 ---
 
@@ -22,7 +22,7 @@ equipos de campaña y funcionarios públicos en México.
 | Ruta | Módulo | Estado |
 |------|--------|--------|
 | `/moddulo` | Moddulo — gestión de proyectos políticos con IA (9 fases) | Activo |
-| `/monitor/centinela` | Centinela — análisis PEST-L en tiempo real | En desarrollo |
+| `/centinela/pestel` | PESTEL — análisis PEST-L en tiempo real | En desarrollo |
 | `/cursos` | Talleres y cursos interactivos | Activo |
 | `/sefix` | Dashboard electoral (Shiny embebido) | Activo |
 | `/blog` | El Baúl de Fouché | Activo |
@@ -103,6 +103,65 @@ de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.
 
 ---
 
+## SEO — Estándar de Construcción (Vertiente B)
+
+**Aplica a toda `page.tsx` y componente nuevo o modificado.**
+Spec completo: `docs/specs/seo-tecnico.md`
+
+### Workflow obligatorio
+
+Antes de escribir o modificar cualquier código para una página o componente:
+
+1. Leer `docs/specs/seo-tecnico.md` (o la sección relevante si ya se leyó en la sesión).
+2. Identificar qué secciones aplican a esa pieza concreta.
+3. Aplicar la **Vertiente B** desde el primer borrador — no como ajuste posterior.
+4. **Antes de entregar el código final**, declarar en lista breve qué secciones se aplicaron y cómo.
+
+### Qué sección aplica a qué tipo de pieza
+
+| Sección | Aplica a |
+|---------|---------|
+| 1.3 meta robots | Toda `page.tsx` — declarar política de indexación explícita |
+| 1.7 canonical | Páginas filtrables, paginadas o con variantes de URL |
+| 1.8 `notFound()` | Flujos donde el usuario puede llegar a contenido inexistente |
+| 2.3 breadcrumbs | Páginas dentro de jerarquías (`/blog/`, `/moddulo/`, `/cursos/`) |
+| 2.5 semántica HTML | Todo componente con contenido textual — etiquetas H1-H6 reales |
+| 3.1 title | Toda `page.tsx` — único por página, keyword cerca del inicio |
+| 3.2 description | Páginas de alto valor — manual; nunca genérica repetida |
+| 3.4 H1 | Exactamente un `<h1>` por `page.tsx`; ningún componente reutilizable incluye su propio H1 |
+| 3.6 alt text | Todo `<Image>` — descriptivo y específico |
+| 4.1-4.2 rendimiento | Evaluar ISR / SSG vs SSR por tipo de contenido |
+| 5.1 Server Components | Contenido de la página como Server Component por defecto |
+| 5.3 `<Link>` | Navegación interna con `<Link>`, nunca `<button onClick={router.push}>` |
+| 6.1 schema | Artículos (BlogPosting), listas (Blog), FAQ, Organization, Breadcrumb |
+| 7.2 Open Graph | Toda `page.tsx` — `openGraph` con `images` (1200×630) y bloque `twitter` |
+
+### Metadata mínima para toda `page.tsx`
+
+```tsx
+export const metadata: Metadata = {
+  title: "Título único con keyword — Eskemma",
+  description: "Descripción manual en páginas de alto valor",
+  robots: { index: true, follow: true },
+  alternates: { canonical: `${SITE_URL}/ruta` },
+  openGraph: {
+    title: "...", description: "...",
+    url: `${SITE_URL}/ruta`, siteName: "Eskemma",
+    locale: "es_MX", type: "website",
+    images: [{ url: "...", width: 1200, height: 630, alt: "..." }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "...", description: "...", images: ["..."],
+  },
+};
+```
+
+**Imagen OG placeholder:** `${SITE_URL}/images/blog-hero.jpg` (1200×630, existe en `public/images/`)
+hasta que haya imagen OG corporativa diseñada.
+
+---
+
 ## Accesibilidad (WCAG AA — no negociable)
 
 - `aria-hidden="true"` en íconos decorativos
@@ -123,26 +182,26 @@ de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.
 │   ├── api/                          # 39 API route handlers
 │   │   ├── auth/session/             # POST/DELETE/GET sesiones
 │   │   ├── moddulo/                  # CRUD proyectos + chat SSE
-│   │   └── monitor/centinela/        # config, feed, trigger, status
+│   │   └── centinela/pestel/        # config, feed, trigger, status
 │   ├── components/
-│   │   ├── monitor/centinela/dashboard/  # RiskVectorWidget, PESTLPanel
+│   │   ├── centinela/pestel/dashboard/  # RiskVectorWidget, PESTLPanel
 │   │   └── moddulo/
-│   ├── monitor/centinela/
+│   ├── centinela/pestel/
 │   │   ├── page.tsx                  # Hub (lista de análisis)
 │   │   └── analisis/[id]/page.tsx    # Vista individual PEST-L
 │   └── moddulo/proyecto/[projectId]/[phaseId]/
 ├── lib/
 │   ├── ai/claude.ts                  # Instancia Anthropic
 │   ├── server/                       # Utilidades solo servidor
-│   └── monitor/centinela/            # Lógica Centinela
+│   └── centinela/pestel/            # Lógica PESTEL
 ├── types/
-│   ├── centinela.types.ts
+│   ├── pestel.types.ts
 │   ├── moddulo.types.ts
 │   ├── firestore.types.ts
 │   ├── session.types.ts
 │   └── subscription.types.ts
 ├── context/AuthContext.tsx
-├── functions/src/centinela/          # Cloud Functions (build separado)
+├── functions/src/pestel/          # Cloud Functions (build separado)
 │   ├── scrapeAndAnalyze.ts           # HTTP CF principal
 │   ├── scheduledMonitor.ts           # Cron cada 6 horas
 │   ├── generateFeed.ts               # Orquestador PEST-L
@@ -196,15 +255,15 @@ firebase functions:secrets:set BANXICO_TOKEN
 | `moddulo_projects` | Proyectos Moddulo con historial de chat por fase |
 | `moddulo_redactor_projects` | Proyectos del Redactor |
 | `moddulo_redactor_generations` | Historial de generaciones |
-| `centinela_configs` | Configuraciones legacy (V1) — solo lectura |
-| `centinela_feeds` | Resultados PEST-L V1 legacy (`vigente: true/false`) |
-| `centinela_projects` | Proyectos V2 con tipo, nombre, horizonte, etapa |
-| `centinela_variable_configs` | Config variables PEST-L por proyecto (E3) |
-| `centinela_analyses` | Resultados PEST-L V2 (`PestlAnalysisV2`) |
-| `centinela_data_sources` | Datos manuales cargados en E4 |
-| `centinela_jobs` | Estado de jobs (`pending/running/completed/failed`) |
-| `centinela_raw_articles` | Artículos crudos del scraper |
-| `centinela_alerts` | Alertas por umbral de riesgo |
+| `pestel_configs` | Configuraciones legacy (V1) — solo lectura |
+| `pestel_feeds` | Resultados PEST-L V1 legacy (`vigente: true/false`) |
+| `pestel_projects` | Proyectos V2 con tipo, nombre, horizonte, etapa |
+| `pestel_variable_configs` | Config variables PEST-L por proyecto (E3) |
+| `pestel_analyses` | Resultados PEST-L V2 (`PestlAnalysisV2`) |
+| `pestel_data_sources` | Datos manuales cargados en E4 |
+| `pestel_jobs` | Estado de jobs (`pending/running/completed/failed`) |
+| `pestel_raw_articles` | Artículos crudos del scraper |
+| `pestel_alerts` | Alertas por umbral de riesgo |
 | `notifications` | Notificaciones in-app |
 | `newsletter_subscribers` | Suscriptores |
 | `resources` | Recursos descargables |
@@ -215,34 +274,34 @@ en memoria cuando el volumen es pequeño (< 100 docs por usuario).
 
 ---
 
-## Centinela — Arquitectura y Estado
+## PESTEL — Arquitectura y Estado
 
 ### Flujo completo V2 (activo)
 
 ```
-Wizard E1-E3: usuario crea centinela_projects + centinela_variable_configs
+Wizard E1-E3: usuario crea pestel_projects + pestel_variable_configs
   ↓
 E4 /datos: agrega fuentes manuales → semáforo cobertura
-  → POST /api/monitor/centinela/project/[id]/data-source
-  → GET  /api/monitor/centinela/project/[id]/coverage
+  → POST /api/centinela/pestel/project/[id]/data-source
+  → GET  /api/centinela/pestel/project/[id]/coverage
   ↓
 Botón "Ejecutar análisis IA" (habilitado solo si ningún 🔴 en semáforo)
-  → POST /api/monitor/centinela/trigger { projectId }
-  → Pre-crea job (status: "pending") en centinela_jobs
+  → POST /api/centinela/pestel/trigger { projectId }
+  → Pre-crea job (status: "pending") en pestel_jobs
   → Llama scrapeAndAnalyze CF sin esperar (fire-and-forget)
   → Retorna { jobId } inmediatamente
   ↓
-Frontend polling a /api/monitor/centinela/status?jobId=
+Frontend polling a /api/centinela/pestel/status?jobId=
   ↓
 Cloud Function scrapeAndAnalyze (V2 path):
   → Ejecuta 4 scrapers en paralelo (Promise.allSettled)
-  → Guarda artículos crudos en centinela_raw_articles
+  → Guarda artículos crudos en pestel_raw_articles
   → Llama generateAnalysisV2:
       → 5 llamadas paralelas a Claude (una por dimensión P/E/S/T/L)
       → 1 llamada adicional para cadenas de impacto
       → Detección de sesgos determinística (sin Claude)
       → Calcula globalConfidence ponderado
-      → Guarda centinela_analyses (PestlAnalysisV2)
+      → Guarda pestel_analyses (PestlAnalysisV2)
   → Actualiza job (status: "completed", analysisId)
   ↓
 Frontend detecta "completed" → carga análisis → muestra E5
@@ -251,10 +310,10 @@ Frontend detecta "completed" → carga análisis → muestra E5
 ### Páginas V2
 
 ```
-/monitor/centinela                           Hub (centinela_projects)
-/monitor/centinela/nuevo                     Wizard E1-E3
-/monitor/centinela/[projectId]/datos         E4 — semáforo + carga manual
-/monitor/centinela/[projectId]/analisis      E5 — resultados IA (PESTLPanelV2)
+/centinela/pestel                           Hub (pestel_projects)
+/centinela/pestel/nuevo                     Wizard E1-E3
+/centinela/pestel/[projectId]/datos         E4 — semáforo + carga manual
+/centinela/pestel/[projectId]/analisis      E5 — resultados IA (PESTLPanelV2)
 ```
 
 ### Estado de fases
@@ -271,28 +330,28 @@ Frontend detecta "completed" → carga análisis → muestra E5
 
 ### Especificaciones funcionales
 
-Las decisiones de UX y metodología de Centinela están en `_docs/specs/centinela/`.
-**Leer la spec del módulo antes de desarrollar cualquier componente de Centinela.**
+Las decisiones de UX y metodología de PESTEL están en `_docs/specs/pestel/`.
+**Leer la spec del módulo antes de desarrollar cualquier componente de PESTEL.**
 
 | Archivo | Módulo |
 |---------|--------|
-| `_docs/specs/centinela/00_contexto_metodologico.md` | Por qué existe Centinela, lógica PEST-L |
-| `_docs/specs/centinela/01_onboarding.md` | Configuración del proyecto (tipo, equipo, horizonte) |
-| `_docs/specs/centinela/02_territorio.md` | Definición geográfica, institucional, electoral |
-| `_docs/specs/centinela/03_variables.md` | Variables PEST-L por tipo de proyecto, pesos, indicadores |
-| `_docs/specs/centinela/04_datos.md` | Recolección modo mixto, semáforo de cobertura |
-| `_docs/specs/centinela/05_procesamiento_ia.md` | Capas de análisis, prompts base, detección de sesgos |
-| `_docs/specs/centinela/06_interpretacion.md` | Matriz impacto/probabilidad, human-in-the-loop |
-| `_docs/specs/centinela/07_informes.md` | Formatos de salida, scorecard, escenarios |
-| `_docs/specs/centinela/08_monitoreo.md` | Dashboard, alertas, modo crisis |
-| `_docs/specs/centinela/data_model.md` | Entidades TypeScript compartidas |
+| `_docs/specs/pestel/00_contexto_metodologico.md` | Por qué existe PESTEL, lógica PEST-L |
+| `_docs/specs/pestel/01_onboarding.md` | Configuración del proyecto (tipo, equipo, horizonte) |
+| `_docs/specs/pestel/02_territorio.md` | Definición geográfica, institucional, electoral |
+| `_docs/specs/pestel/03_variables.md` | Variables PEST-L por tipo de proyecto, pesos, indicadores |
+| `_docs/specs/pestel/04_datos.md` | Recolección modo mixto, semáforo de cobertura |
+| `_docs/specs/pestel/05_procesamiento_ia.md` | Capas de análisis, prompts base, detección de sesgos |
+| `_docs/specs/pestel/06_interpretacion.md` | Matriz impacto/probabilidad, human-in-the-loop |
+| `_docs/specs/pestel/07_informes.md` | Formatos de salida, scorecard, escenarios |
+| `_docs/specs/pestel/08_monitoreo.md` | Dashboard, alertas, modo crisis |
+| `_docs/specs/pestel/data_model.md` | Entidades TypeScript compartidas |
 
 ### Decisiones metodológicas no negociables
 
 Estas decisiones complementan las reglas técnicas ya documentadas arriba.
 No propongas alternativas sin consultar primero.
 
-1. **Human-in-the-loop obligatorio.** Ningún output de IA en Centinela es
+1. **Human-in-the-loop obligatorio.** Ningún output de IA en PESTEL es
    definitivo hasta validación explícita del usuario. La IA clasifica y
    propone; el analista decide. Aplica especialmente a la Etapa 6
    (interpretación) y a cualquier reclasificación de factores PEST-L.
@@ -300,14 +359,14 @@ No propongas alternativas sin consultar primero.
 2. **Variables por tipo de proyecto.** Cada tipo de proyecto (electoral,
    gubernamental, legislativo, ciudadano) activa un conjunto distinto de
    variables PEST-L por defecto. Estos conjuntos están definidos en
-   `_docs/specs/centinela/03_variables.md` — no inventarlos en código.
+   `_docs/specs/pestel/03_variables.md` — no inventarlos en código.
 
 3. **Detección de sesgos en Etapa 5.** El procesamiento IA debe detectar
    y reportar: sesgo urbano, sesgo etario digital, sobrerepresentación de
    fuentes digitales sin validación de campo, y contradicciones entre datos
    oficiales y percepción ciudadana. No es un feature opcional.
 
-4. **Modo mixto de datos por defecto.** Centinela combina siempre fuentes
+4. **Modo mixto de datos por defecto.** PESTEL combina siempre fuentes
    automáticas (APIs, scraping) con carga manual del equipo. No existe un
    modo "solo automático".
 
@@ -315,7 +374,7 @@ No propongas alternativas sin consultar primero.
    dimensión PEST-L debe mostrarse desde la Etapa 4 y mantenerse visible
    en las Etapas 5 y 6. Un análisis no avanza si alguna dimensión está en rojo.
 
-### Principios de diseño de Centinela
+### Principios de diseño de PESTEL
 
 Estos principios rigen las decisiones de UX y arquitectura del sistema. No
 son negociables y aplican a todas las etapas, incluyendo las futuras E6-E8.
@@ -327,10 +386,10 @@ son negociables y aplican a todas las etapas, incluyendo las futuras E6-E8.
 
 2. **Trazabilidad.** Cada análisis debe poder reconstruirse: qué artículos
    se usaron, qué variables estaban activas, qué fecha. Los documentos
-   `centinela_analyses` conservan el `jobId` de origen que apunta al
-   documento `centinela_raw_articles` con los datos crudos.
+   `pestel_analyses` conservan el `jobId` de origen que apunta al
+   documento `pestel_raw_articles` con los datos crudos.
 
-3. **Colaborador estratégico, no oráculo.** Centinela propone; el analista
+3. **Colaborador estratégico, no oráculo.** PESTEL propone; el analista
    decide. Los outputs de IA son insumos para el juicio profesional, no
    recomendaciones definitivas. Ningún output es definitivo sin validación
    explícita del usuario (E6 human-in-the-loop).
@@ -347,7 +406,7 @@ estrategia → tactica → gerencia → seguimiento → evaluacion
 ```
 
 - Chat con Claude vía **streaming SSE** en `/api/moddulo/chat/[phaseId]`
-- En la fase `exploracion` (F2), Moddulo debe consumir Centinela para
+- En la fase `exploracion` (F2), Moddulo debe consumir PESTEL para
   generar el análisis PEST-L del territorio del proyecto.
 
 ---
@@ -358,7 +417,7 @@ estrategia → tactica → gerencia → seguimiento → evaluacion
 |-----|------|-----------|------------------|
 | `user` | freemium | $0 | Blog, Redactor limitado |
 | `basic` | basic | $2,899/mes | + Cursos, Sefix |
-| `premium` | premium | $5,899/mes | + Monitor, Moddulo |
+| `premium` | premium | $5,899/mes | + Centinela, Moddulo |
 | `professional` | professional | $9,899/mes | + API, white label |
 
 Ver `types/subscription.types.ts` → `PLAN_FEATURES` para detalles completos.
@@ -441,8 +500,8 @@ firebase functions:log
 
 | Archivo | Contenido |
 |---------|-----------|
-| `_docs/centinela-engineering-plan.md` | Plan de ingeniería detallado de Centinela |
-| `_docs/specs/centinela/` | Especificaciones funcionales de Centinela (9 archivos) |
+| `_docs/pestel-engineering-plan.md` | Plan de ingeniería detallado de PESTEL |
+| `_docs/specs/pestel/` | Especificaciones funcionales de PESTEL (9 archivos) |
 
 ---
 
@@ -450,9 +509,9 @@ firebase functions:log
 
 | Fecha | Sprint | Resultado |
 |-------|--------|-----------|
-| 26-03-24 | Fase 0 Monitor | Base del hub Monitor, homepage fixes |
-| 26-03-25 | Centinela F1+F2 | Scraping + clasificación PEST-L completados |
-| 26-03-26 | Centinela F3 inicio | 1ª versión UI dashboard Centinela |
-| 26-03-27 | Centinela F3 cont. | Hub multi-territorio + página análisis individual |
-| 26-03-27 | Centinela rediseño E1-E5 | Rediseño completo alineado con specs: wizard E1-E3, semáforo E4, análisis por dimensión E5, tipos V2, nuevas colecciones Firestore |
-| 26-03-28 | Centinela correcciones post-E5 | Persistencia análisis (latest-analysis endpoint), fix economicData INEGI/Banxico→Claude, contexto legal LGIPE/INE, citación fuentes, integración Sefix (datos electorales dim-P), semáforo amarillo texto negro, principios de diseño en CLAUDE.md |
+| 26-03-24 | Fase 0 Centinela | Base del hub Centinela, homepage fixes |
+| 26-03-25 | PESTEL F1+F2 | Scraping + clasificación PEST-L completados |
+| 26-03-26 | PESTEL F3 inicio | 1ª versión UI dashboard PESTEL |
+| 26-03-27 | PESTEL F3 cont. | Hub multi-territorio + página análisis individual |
+| 26-03-27 | PESTEL rediseño E1-E5 | Rediseño completo alineado con specs: wizard E1-E3, semáforo E4, análisis por dimensión E5, tipos V2, nuevas colecciones Firestore |
+| 26-03-28 | PESTEL correcciones post-E5 | Persistencia análisis (latest-analysis endpoint), fix economicData INEGI/Banxico→Claude, contexto legal LGIPE/INE, citación fuentes, integración Sefix (datos electorales dim-P), semáforo amarillo texto negro, principios de diseño en CLAUDE.md |

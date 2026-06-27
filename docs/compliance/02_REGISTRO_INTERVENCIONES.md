@@ -63,11 +63,11 @@ componentes nuevos".
 **Fecha:** Sprint de integración IA (~2024-2025)  
 **Prompt/instrucción:** Raúl seleccionó Claude Sonnet 4.6 (Anthropic) sobre otros
 modelos después de evaluar desempeño en análisis político en español.  
-**Intervención humana:** Raúl diseñó los prompts base para Centinela (PEST-L) y para
+**Intervención humana:** Raúl diseñó los prompts base para PESTEL (PEST-L) y para
 el chat de Moddulo. Raúl supervisó los outputs y ajustó los prompts para mejorar la
 precisión metodológica. Raúl decidió separar la detección de sesgos como proceso
 determinístico (sin IA) para garantizar reproducibilidad.  
-**Archivos resultantes:** `lib/ai/claude.ts`, `functions/src/centinela/classifier/claudePESTL.ts`.
+**Archivos resultantes:** `lib/ai/claude.ts`, `functions/src/pestel/classifier/claudePESTL.ts`.
 
 ---
 
@@ -99,10 +99,10 @@ los componentes afectados y creó los hooks `useFocusTrap` y `useEscapeKey`.
 
 ---
 
-### DG-07: Separación de Cloud Functions para Centinela
+### DG-07: Separación de Cloud Functions para PESTEL
 
 **Quién:** Raúl Sánchez Salgado  
-**Fecha:** Sprint de arquitectura Centinela (~2025)  
+**Fecha:** Sprint de arquitectura PESTEL (~2025)  
 **Prompt/instrucción:** Raúl identificó que el análisis PEST-L requería más tiempo
 del permitido por Vercel y diseñó la arquitectura fire-and-forget con polling.  
 **Intervención humana:** Raúl decidió mover el procesamiento pesado de IA a Cloud
@@ -157,31 +157,31 @@ manejaba correctamente el cierre del stream en errores de red. Raúl corrigió
 el manejo de errores y el cierre del ReadableStream.  
 **Archivos:** `app/api/moddulo/chat/[phaseId]/route.ts`.
 
-#### MOD-03: Integración Centinela → Moddulo (F2)
+#### MOD-03: Integración PESTEL → Moddulo (F2)
 
 **Quién:** Raúl Sánchez Salgado  
 **Decisión:** Raúl diseñó que la fase de Exploración (F2) de Moddulo consuma
-datos de Centinela para generar el análisis PEST-L del territorio del proyecto.  
+datos de PESTEL para generar el análisis PEST-L del territorio del proyecto.  
 **Estado:** ⏳ Pendiente de implementación.
 
 ---
 
-### Módulo: Centinela
+### Módulo: PESTEL
 
 #### CEN-01: Metodología PEST-L Adaptada a Política Mexicana
 
 **Quién:** Raúl Sánchez Salgado  
 **Decisión:** Raúl adaptó la metodología PEST-L estándar al contexto político mexicano,
 añadiendo la dimensión Legal con énfasis en LGIPE, INE y legislación electoral.  
-**Intervención:** Raúl revisó las 9 especificaciones funcionales en `_docs/specs/centinela/`
+**Intervención:** Raúl revisó las 9 especificaciones funcionales en `_docs/specs/pestel/`
 y las actualizó para reflejar las particularidades del sistema político mexicano
 (procesos electorales, instituciones, calendario político).  
-**Archivos:** `_docs/specs/centinela/` (9 archivos de spec).
+**Archivos:** `_docs/specs/pestel/` (9 archivos de spec).
 
 #### CEN-02: Human-in-the-Loop Obligatorio
 
 **Quién:** Raúl Sánchez Salgado  
-**Decisión:** Raúl estableció que ningún output de IA en Centinela es definitivo
+**Decisión:** Raúl estableció que ningún output de IA en PESTEL es definitivo
 sin validación explícita del usuario. Esta regla es metodológicamente no negociable.  
 **Intervención:** Raúl rechazó una propuesta inicial donde los factores PEST-L podían
 reclasificarse automáticamente. Raúl especificó que la reclasificación debe requerir
@@ -198,7 +198,7 @@ sea un proceso determinístico — no IA.
 **Intervención:** Raúl rechazó la propuesta de usar Claude para detectar sesgos
 por falta de reproducibilidad. Raúl especificó los 4 tipos de sesgo a detectar
 y las condiciones exactas que los activan.  
-**Archivos:** `functions/src/centinela/risk/vectorCalculator.ts`.
+**Archivos:** `functions/src/pestel/risk/vectorCalculator.ts`.
 
 #### CEN-04: Semáforo de Cobertura de Datos
 
@@ -208,7 +208,7 @@ como indicador visible y bloqueador de avance cuando hay dimensión en rojo.
 **Intervención:** Raúl identificó que el semáforo mostraba texto blanco sobre fondo
 amarillo (baja accesibilidad). Raúl corrigió el componente para usar texto negro
 en el estado amarillo.  
-**Archivos:** Componente de semáforo en `app/monitor/centinela/`.
+**Archivos:** Componente de semáforo en `app/centinela/pestel/`.
 
 #### CEN-05: Arquitectura de Análisis Paralelo
 
@@ -217,7 +217,7 @@ en el estado amarillo.
 + 1 cadenas de impacto) como `Promise.allSettled` para tolerancia a fallos parciales.  
 **Intervención:** Raúl especificó que si una dimensión falla, las demás deben
 seguir procesándose y el resultado debe marcarse como parcial (no cancelarse).  
-**Archivos:** `functions/src/centinela/generateFeed.ts`.
+**Archivos:** `functions/src/pestel/generateFeed.ts`.
 
 ---
 
@@ -290,7 +290,7 @@ visualmente del resto de la plataforma y darle personalidad editorial propia.
 | ID | Módulo | Problema | Solución | Responsable | Fecha |
 |----|--------|----------|----------|-------------|-------|
 | CUR-01 | Auth | JWT en memoria cliente → riesgo XSS | Migración a session cookie HTTP-only | Raúl | 2024-2025 |
-| CUR-02 | Centinela | Semáforo amarillo con texto blanco (baja accesibilidad) | Texto negro en estado amarillo | Raúl | 26-03-28 |
+| CUR-02 | PESTEL | Semáforo amarillo con texto blanco (baja accesibilidad) | Texto negro en estado amarillo | Raúl | 26-03-28 |
 | CUR-03 | API routes | Falta de verificación de sesión en ~39 routes | Adición de `getSessionFromRequest()` | Raúl | 2025 |
 | CUR-04 | SEFIX | Carga histórica geo: 5-15 minutos (timeout) | Pre-generación offline + JSON columnar | Raúl | 2026-04-10 |
 | CUR-05 | SEFIX | Punto puente duplicado en G1 (proyección) | Eliminación del bridge point del dataset | Raúl | 2026-04 |

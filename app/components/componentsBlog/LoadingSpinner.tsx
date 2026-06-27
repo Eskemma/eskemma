@@ -1,5 +1,4 @@
 // app/components/componentsBlog/LoadingSpinner.tsx
-"use client";
 
 interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";

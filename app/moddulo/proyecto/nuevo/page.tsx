@@ -25,22 +25,22 @@ function NuevoProyectoContent() {
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [customHex, setCustomHex] = useState("");
 
-  // Centinela integration — query params
-  const centinelaProjectId = searchParams.get("centinelaProjectId");
-  const centinelaProjectName = searchParams.get("centinelaProjectName");
-  const centinelaProjectType = searchParams.get("centinelaProjectType") as ProjectType | null;
-  const fromCentinela = searchParams.get("from") === "centinela" && !!centinelaProjectId;
+  // PESTEL integration — query params
+  const pestelProjectId = searchParams.get("pestelProjectId");
+  const pestelProjectName = searchParams.get("pestelProjectName");
+  const pestelProjectType = searchParams.get("pestelProjectType") as ProjectType | null;
+  const fromPESTEL = searchParams.get("from") === "pestel" && !!pestelProjectId;
 
-  // Pre-fill if coming from Centinela
+  // Pre-fill if coming from PESTEL
   useEffect(() => {
-    if (fromCentinela) {
-      if (centinelaProjectName) setName(centinelaProjectName);
+    if (fromPESTEL) {
+      if (pestelProjectName) setName(pestelProjectName);
       const validTypes: ProjectType[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];
-      if (centinelaProjectType && validTypes.includes(centinelaProjectType)) {
-        setType(centinelaProjectType);
+      if (pestelProjectType && validTypes.includes(pestelProjectType)) {
+        setType(pestelProjectType);
       }
     }
-  }, [fromCentinela, centinelaProjectName, centinelaProjectType]);
+  }, [fromPESTEL, pestelProjectName, pestelProjectType]);
 
   const projectTypes: ProjectType[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];
   const canAdvanceStep1 = name.trim().length >= 3 && type !== null;
@@ -60,7 +60,7 @@ function NuevoProyectoContent() {
           name: name.trim(),
           description: description.trim(),
           color,
-          centinelaProjectId: fromCentinela ? centinelaProjectId : undefined,
+          pestelProjectId: fromPESTEL ? pestelProjectId : undefined,
         }),
         credentials: "include",
       });
@@ -100,18 +100,18 @@ function NuevoProyectoContent() {
       </div>
 
       <div className="max-w-2xl mx-auto p-6">
-        {/* Banner Centinela */}
-        {fromCentinela && (
+        {/* Banner PESTEL */}
+        {fromPESTEL && (
           <div className="mb-6 flex items-start gap-3 bg-bluegreen-eske/10 border border-bluegreen-eske/30
             rounded-xl px-4 py-3">
             <span className="text-lg shrink-0" aria-hidden="true">🛡️</span>
             <div>
               <p className="text-sm font-semibold text-bluegreen-eske-60">
-                Proyecto vinculado a Centinela
+                Proyecto vinculado a PESTEL
               </p>
               <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
                 El análisis PEST-L de{" "}
-                <strong>{centinelaProjectName ?? "tu proyecto Centinela"}</strong>{" "}
+                <strong>{pestelProjectName ?? "tu proyecto PESTEL"}</strong>{" "}
                 estará disponible para importar en la Fase 2 — Exploración.
               </p>
             </div>
@@ -170,7 +170,7 @@ function NuevoProyectoContent() {
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske/30
                   focus-visible:border-bluegreen-eske bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] text-sm"
                 maxLength={100}
-                autoFocus={!fromCentinela}
+                autoFocus={!fromPESTEL}
               />
               <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-1">{name.length}/100</p>
             </div>
@@ -343,11 +343,11 @@ function NuevoProyectoContent() {
                   <p className="text-black-eske-10 dark:text-[#C7D6E0] text-sm mt-0.5">{description}</p>
                 </div>
               )}
-              {fromCentinela && (
+              {fromPESTEL && (
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Vinculado a Centinela</span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Vinculado a PESTEL</span>
                   <p className="text-bluegreen-eske text-sm font-medium mt-0.5">
-                    🛡️ {centinelaProjectName ?? centinelaProjectId}
+                    🛡️ {pestelProjectName ?? pestelProjectId}
                   </p>
                 </div>
               )}

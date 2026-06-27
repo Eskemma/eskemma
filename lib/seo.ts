@@ -3,7 +3,7 @@ import { PostData } from "@/types/post.types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
 const SITE_NAME = "El Baúl de Fouché - Eskemma";
-const DEFAULT_IMAGE = `${SITE_URL}/images/blog-default.jpg`;
+const DEFAULT_IMAGE = `${SITE_URL}/images/blog-hero.jpg`;
 
 export interface SEOData {
   title: string;
@@ -89,7 +89,7 @@ export function generateCategorySEO(
 export function generateArticleStructuredData(post: PostData, seoData: SEOData) {
   return {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "BlogPosting",
     headline: seoData.title,
     description: seoData.description,
     image: {
@@ -104,10 +104,10 @@ export function generateArticleStructuredData(post: PostData, seoData: SEOData) 
     },
     publisher: {
       "@type": "Organization",
-      name: SITE_NAME,
+      name: "Eskemma",
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/images/logo.png`,
+        url: `${SITE_URL}/images/esk_log_cwm.png`,
       },
     },
     datePublished: seoData.publishedTime,
@@ -137,15 +137,16 @@ export function generateOrganizationStructuredData() {
     name: "Eskemma",
     alternateName: "El Baúl de Fouché",
     url: SITE_URL,
-    logo: `${SITE_URL}/images/logo.png`,
+    logo: `${SITE_URL}/images/esk_log_cwm.png`,
     description:
       "Plataforma especializada en comunicación política, estrategia electoral y análisis de datos políticos en México.",
     sameAs: [
-      // ✅ Agregar tus redes sociales aquí
-      "https://twitter.com/eskemma",
-      "https://facebook.com/eskemma",
+      "https://x.com/eskemmapol",
+      "https://www.facebook.com/eskemmaPol",
       "https://linkedin.com/company/eskemma",
-      "https://instagram.com/eskemma",
+      "https://www.youtube.com/@eskemmaPol",
+      "https://www.tiktok.com/@eskemmapol",
+      "https://www.quora.com/profile/Eskemma",
     ],
   };
 }
@@ -189,6 +190,27 @@ export function generateBlogListStructuredData(posts: PostData[]) {
       author: {
         "@type": "Person",
         name: post.author?.displayName || "Eskemma",
+      },
+    })),
+  };
+}
+
+/**
+ * Genera JSON-LD FAQPage para secciones de preguntas frecuentes
+ * Habilita rich results de acordeón en SERPs de Google
+ */
+export function generateFAQStructuredData(
+  items: Array<{ question: string; answer: string }>
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
       },
     })),
   };

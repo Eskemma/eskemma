@@ -4,7 +4,6 @@
 // Inspirada en PostCardList.tsx pero para cursos
 // ============================================================
 
-"use client";
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";

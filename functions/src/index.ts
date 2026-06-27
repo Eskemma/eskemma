@@ -1,9 +1,9 @@
 // functions/src/index.ts
 
-// ── Centinela ──────────────────────────────────────────────────────────────
-export {scrapeAndAnalyze} from "./centinela/scrapeAndAnalyze";
-export {scheduledMonitor} from "./centinela/scheduledMonitor";
-export {feedSync} from "./centinela/feedSync";
+// ── PESTEL ──────────────────────────────────────────────────────────────
+export {scrapeAndAnalyze} from "./pestel/scrapeAndAnalyze";
+export {scheduledMonitor} from "./pestel/scheduledMonitor";
+export {feedSync} from "./pestel/feedSync";
 
 // ── Core ───────────────────────────────────────────────────────────────────
 import {

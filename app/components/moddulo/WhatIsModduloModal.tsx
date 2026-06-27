@@ -152,7 +152,7 @@ export default function WhatIsModduloModal({ isOpen, onClose }: WhatIsModduloMod
                   </p>
                   <ul className="text-xs max-sm:text-[11px] text-gray-eske-80 dark:text-[#9AAEBE] space-y-1">
                     <li>• Sala de Crisis</li>
-                    <li>• Monitor de Redes Avanzado</li>
+                    <li>• Centinela de Redes Avanzado</li>
                     <li>• Territorio Digital y más</li>
                   </ul>
                 </div>

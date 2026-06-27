@@ -100,7 +100,7 @@ export default function SuscriptionBasicModal({
             </p>
             <ul className="list-disc pl-6 max-sm:pl-5 text-[16px] max-sm:text-sm text-black-eske space-y-1 max-sm:space-y-0.5">
               <li>
-                Acceso a versiones básicas de Cursos online, Sefix y Monitor
+                Acceso a versiones básicas de Cursos online, Sefix y Centinela
               </li>
               <li>Acceso a 8 apps estándar con IA de Moddulo</li>
               <li>Soporte por email</li>

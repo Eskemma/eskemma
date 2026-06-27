@@ -1,5 +1,4 @@
 // app/components/componentsBlog/PostsLoadingGrid.tsx
-"use client";
 
 import PostCardSkeleton from "./PostCardSkeleton";
 

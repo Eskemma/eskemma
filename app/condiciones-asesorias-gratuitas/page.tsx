@@ -113,7 +113,7 @@ export default function CondicionesAsesoriasGratuitas() {
               <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
                 <li>
                   <strong>Orientación inicial:</strong> Resolver dudas generales
-                  sobre nuestras herramientas (Sefix, Moddulo, Monitor)
+                  sobre nuestras herramientas (Sefix, Moddulo, Centinela)
                 </li>
                 <li>
                   <strong>Consulta exploratoria:</strong> Evaluar si nuestros

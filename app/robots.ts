@@ -29,7 +29,7 @@ export default function robots(): MetadataRoute.Robots {
           '/private/',
           // Rutas de trabajo autenticado — no indexables
           '/moddulo/proyecto/',
-          '/monitor/centinela/',
+          '/centinela/pestel/',
           '/sefix/dashboard/',
         ],
       },
@@ -41,7 +41,7 @@ export default function robots(): MetadataRoute.Robots {
           '/admin/',
           '/blog/admin/',
           '/moddulo/proyecto/',
-          '/monitor/centinela/',
+          '/centinela/pestel/',
           '/sefix/dashboard/',
         ],
       },

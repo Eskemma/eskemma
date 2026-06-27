@@ -7,6 +7,31 @@ import Image from "next/image";
 import { useAuth } from "../../context/AuthContext";
 import ScheduleDate from "../components/componentsHome/ScheduleDate";
 import Button from "../components/Button";
+import { generateFAQStructuredData } from "@/lib/seo";
+
+const FAQ_SCHEMA_ITEMS = [
+  { question: "¿Qué es Eskemma y cómo puede ayudarme en mi proyecto político?", answer: "Eskemma es un ecosistema digital diseñado para impulsar tu proyecto político con tecnología y datos estratégicos. Te acompañamos en el diseño, ejecución y evaluación de tu estrategia, ofreciéndote soluciones personalizadas para que logres tus objetivos con mayor eficacia y confianza." },
+  { question: "¿Por qué debería elegir Eskemma en lugar de otras opciones gratuitas o tradicionales?", answer: "Aunque existen recursos gratuitos, Eskemma te ofrece información procesada, actualizada y herramientas digitales fáciles de usar, diseñadas para el éxito de tu proyecto político. Esto te permite ahorrar tiempo, dinero y esfuerzo, evitando la improvisación y actuando con estrategia." },
+  { question: "¿Cómo garantizan que las herramientas y datos sean útiles para mi contexto político?", answer: "Nuestras herramientas están basadas en metodologías probadas y adaptadas a las necesidades de políticos y militantes en Iberoamérica. Además, ofrecemos acompañamiento personalizado para que puedas aplicar los recursos a tu entorno específico." },
+  { question: "¿Qué tipo de proyectos políticos pueden beneficiarse de Eskemma?", answer: "Desde campañas locales hasta proyectos estatales o nacionales, Eskemma es útil para candidatos, equipos de campaña, militantes y organizaciones sociales o políticas que buscan profesionalizar su estrategia de comunicación política y maximizar su impacto." },
+  { question: "¿Qué herramientas incluye Eskemma y cómo puedo acceder a ellas?", answer: "Eskemma ofrece herramientas como Sefix (bases de datos y dashboards para análisis político-electoral) y Moddulo (para diseñar tu estrategia política y evaluar su impacto). Puedes acceder a versiones freemium para probar su utilidad antes de suscribirte." },
+  { question: "¿Necesito conocimientos técnicos para usar las herramientas de Eskemma?", answer: "No. Nuestras herramientas están diseñadas para ser intuitivas y fáciles de usar. Además, ofrecemos tutoriales y soporte técnico para que puedas sacarle el máximo provecho sin complicaciones." },
+  { question: "¿Puedo probar las herramientas antes de comprar?", answer: "Sí. Ofrecemos versiones de prueba gratuitas de Sefix y Moddulo, para que puedas explorar su funcionalidad y decidir con confianza." },
+  { question: "¿Cuáles son los planes de suscripción disponibles y qué incluyen?", answer: "Ofrecemos planes mensuales y anuales (individual o grupal), con acceso a herramientas, datos, asesorías y recursos exclusivos. Puedes comparar los planes en nuestra sección de Suscripciones y elegir el que mejor se adapte a tu presupuesto y necesidades." },
+  { question: "¿Puedo pagar en cuotas o mensualidades?", answer: "Sí. En México, puedes pagar a 12 meses sin intereses con tarjetas de crédito. Para otros países, contáctanos o escríbenos a teamsupport@eskemma.com para evaluar opciones de pago flexibles." },
+  { question: "¿El cobro de la suscripción es automático?", answer: "Sí, pero si hay algún problema con el pago, te notificaremos de inmediato. Usamos pasarelas de pago seguras y no almacenamos tus datos financieros." },
+  { question: "¿Qué pasa si quiero cancelar mi suscripción?", answer: "Puedes cancelar en cualquier momento desde tu panel de usuario. Si tienes dudas, nuestro equipo de soporte está disponible para ayudarte." },
+  { question: "¿Mis datos personales están seguros con Eskemma?", answer: "Sí. Cumplimos con la Ley de Datos Personales y utilizamos protocolos de seguridad avanzados para proteger tu información. Puedes consultar nuestra Política de Privacidad para más detalles." },
+  { question: "¿Puedo compartir mi cuenta con otras personas?", answer: "Las cuentas individuales son personales. Si necesitas acceso para un equipo, te recomendamos nuestro plan Grupal, diseñado para equipos de trabajo." },
+  { question: "¿Cómo maneja Eskemma la confidencialidad de la información de mis proyectos políticos?", answer: "Tu información es confidencial y solo será utilizada para mejorar tu experiencia en la plataforma. No compartimos datos con terceros sin tu consentimiento." },
+  { question: "¿Qué tipo de soporte ofrecen si tengo dudas o problemas técnicos?", answer: "Ofrecemos soporte técnico 24/7 a través de nuestro formulario de contacto, WhatsApp y redes sociales. También contamos con tutoriales y guías para resolver dudas comunes. Puedes escribirnos directamente a teamsupport@eskemma.com" },
+  { question: "¿Puedo recibir asesoría personalizada para mi proyecto político?", answer: "Sí. Ofrecemos asesorías por hora o paquetes de acompañamiento. Puedes agendar una sesión gratuita para explorar cómo podemos ayudarte." },
+  { question: "¿Por qué debería pagar por información si hay recursos gratuitos disponibles?", answer: "Eskemma no solo te ofrece información, sino datos procesados, herramientas prácticas y acompañamiento experto para que puedas aplicarlos de manera efectiva. La diferencia está en el ahorro de tiempo, la precisión y el impacto en tu proyecto." },
+  { question: "¿Cómo sé que Eskemma es la mejor opción para mi proyecto político?", answer: "Eskemma está respaldado por años de experiencia en proyectos políticos en Iberoamérica. Nuestros clientes han logrado ventajas competitivas gracias a nuestras herramientas y metodologías." },
+  { question: "¿Qué pasa si no veo resultados inmediatos?", answer: "La estrategia política es un proceso, pero con nuestras herramientas podrás identificar oportunidades y tomar decisiones basadas en evidencia desde el primer día. Te acompañamos para que veas resultados tangibles en el corto y mediano plazo." },
+  { question: "¿Cómo funciona el proceso de compra y activación de mi cuenta?", answer: "El proceso es sencillo: elige tu plan, completa el pago con tarjeta o Stripe, y tu cuenta se activará de inmediato. Si pagas con depósito o transferencia, la activación puede tardar hasta 24 horas." },
+  { question: "¿Qué medios de pago aceptan?", answer: "Aceptamos tarjetas de crédito/débito (Visa, MasterCard), Stripe y pagos offline en algunos países." },
+];
 
 // ✅ Tipos actualizados para soportar múltiples CTAs
 interface FaqCTA {
@@ -391,8 +416,14 @@ export default function FaqPage() {
     );
   };
 
+  const faqSchema = generateFAQStructuredData(FAQ_SCHEMA_ITEMS);
+
   return (
     <main className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       {/* Hero Section - HOMOLOGADO CON SERVICIOS */}
       <section className="relative min-h-[200px] max-sm:min-h-[150px] w-full flex items-center justify-center bg-bluegreen-eske overflow-hidden">
         <Image

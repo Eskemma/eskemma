@@ -1,5 +1,4 @@
 // app/components/componentsCursos/listado/CoursesHeroSection.tsx
-"use client";
 
 import Image from "next/image";
 

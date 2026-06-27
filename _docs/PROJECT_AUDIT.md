@@ -13,7 +13,7 @@ eskemma/
 │   │   ├── auth/session/            # POST / DELETE / GET — sesiones HTTP-only
 │   │   ├── admin/                   # Moderación, claims, stats (solo admins)
 │   │   ├── moddulo/                 # CRUD proyectos + chat SSE con Claude
-│   │   ├── monitor/centinela/       # config · feed · status · trigger
+│   │   ├── centinela/pestel/       # config · feed · status · trigger
 │   │   ├── posts/                   # Blog CRUD + comentarios + likes + vistas
 │   │   ├── newsletter/              # Suscripción, confirmación, baja
 │   │   ├── notifications/           # Notificaciones in-app
@@ -30,7 +30,7 @@ eskemma/
 │   │   ├── componentsCursos/        # CourseCard, ProgressTracker…
 │   │   ├── componentsHome/          # Hero, secciones de homepage
 │   │   ├── moddulo/                 # Modales, selectors, redactor
-│   │   └── monitor/centinela/
+│   │   └── centinela/pestel/
 │   │       ├── config/TerritorioSelector.tsx    ✅ implementado
 │   │       ├── dashboard/RiskVectorWidget.tsx   ✅ implementado
 │   │       ├── dashboard/PESTLPanel.tsx         ✅ implementado
@@ -41,9 +41,9 @@ eskemma/
 │   │   ├── useFocusTrap.ts          # Trampa de foco para modales (a11y)
 │   │   └── useEscapeKey.ts          # Tecla Escape para modales/dropdowns
 │   │
-│   ├── monitor/
-│   │   ├── page.tsx                 # Hub Monitor — catálogo de apps
-│   │   └── centinela/
+│   ├── centinela/
+│   │   ├── page.tsx                 # Hub Centinela — catálogo de apps
+│   │   └── pestel/
 │   │       ├── page.tsx             # ✅ Hub multi-territorio
 │   │       ├── analisis/[id]/       # ✅ Vista individual PEST-L
 │   │       ├── configurar/page.tsx  # ⚠️ UnderConstruction (redundante con hub)
@@ -66,14 +66,14 @@ eskemma/
 │   ├── firebase-admin.ts            # Admin SDK (adminAuth, adminDb)
 │   ├── ai/claude.ts                 # Instancia Anthropic
 │   ├── server/                      # Helpers solo-servidor
-│   ├── monitor/centinela/           # Scrapers/classifier (Next.js side — sin uso activo)
+│   ├── centinela/pestel/           # Scrapers/classifier (Next.js side — sin uso activo)
 │   ├── moddulo/                     # Lógica fases, prompts, risks
 │   ├── redactor/                    # Validación, proyectos, knowledge base
 │   ├── cursos/                      # Lógica talleres
 │   └── email.ts / emailService.ts
 │
 ├── types/                           # TypeScript strict — interfaces Firestore
-│   ├── centinela.types.ts
+│   ├── pestel.types.ts
 │   ├── moddulo.types.ts
 │   ├── firestore.types.ts
 │   ├── session.types.ts
@@ -84,7 +84,7 @@ eskemma/
 │
 ├── context/AuthContext.tsx          # useAuth() — estado de sesión en cliente
 │
-├── functions/src/centinela/         # Firebase Cloud Functions (Node 22)
+├── functions/src/pestel/         # Firebase Cloud Functions (Node 22)
 │   ├── scrapeAndAnalyze.ts          # HTTP CF: scraping + análisis PEST-L
 │   ├── scheduledMonitor.ts          # Cron 6h: dispara análisis automáticos
 │   ├── generateFeed.ts              # Orquestador interno PEST-L
@@ -190,9 +190,9 @@ eskemma/
 - Exportación de proyectos a DOCX
 - Generación de reporte por fase
 - Redactor: generación de contenido (freemium limitado, premium ilimitado)
-- **Pendiente**: fase `exploracion` (F2) debe usar Centinela para PEST-L automático
+- **Pendiente**: fase `exploracion` (F2) debe usar PESTEL para PEST-L automático
 
-### Centinela — Monitor PEST-L ✅ Backend completo / UI en curso
+### PESTEL — Centinela PEST-L ✅ Backend completo / UI en curso
 Ver sección 4 (módulos en construcción).
 
 ### Autenticación y Sesiones ✅ Completo
@@ -227,7 +227,7 @@ Ver sección 4 (módulos en construcción).
 
 ## 4. Módulos en Construcción o Incompletos
 
-### Centinela — UI (Fase 3 en curso)
+### PESTEL — UI (Fase 3 en curso)
 
 | Componente/Ruta | Estado | Nota |
 |----------------|--------|------|
@@ -240,15 +240,15 @@ Ver sección 4 (módulos en construcción).
 | `configurar/page.tsx` | ⚠️ UnderConstruction | Redundante con el hub; podría eliminarse |
 | `export/page.tsx` | ⚠️ UnderConstruction | Espera `MatrizExporter` |
 
-### Moddulo F2 — Integración con Centinela ⚠️ Pendiente
+### Moddulo F2 — Integración con PESTEL ⚠️ Pendiente
 - La página `exploracion/page.tsx` existe y tiene la estructura PEST-L
-- Falta el botón/flujo "Importar Centinela" que consuma el feed vigente
+- Falta el botón/flujo "Importar PESTEL" que consuma el feed vigente
 - El tipo `ExplorationForm.pestl` en `moddulo.types.ts` ya define la estructura
 - Hay un `feedSync.ts` en Cloud Functions pero sin confirmar si orquesta esto
 
 ### Exportación de Análisis PEST-L ⚠️ Pendiente
 - `MatrizExporter.tsx` es un placeholder
-- No hay endpoint de exportación para Centinela
+- No hay endpoint de exportación para PESTEL
 
 ### Redactor — Knowledge Base ⚠️ Parcial
 - Existe `lib/redactor/knowledge/countries/mexico/` pero no está claro si está completa
@@ -268,7 +268,7 @@ Ver sección 4 (módulos en construcción).
 - Componentes: `PascalCase` (`RiskVectorWidget.tsx`)
 - Hooks: `camelCase` con prefijo `use` (`useFocusTrap`)
 - API routes: siempre `route.ts` dentro de carpeta con el nombre del endpoint
-- Tipos: `PascalCase` con sufijo descriptivo (`CentinelaFeed`, `SessionPayload`)
+- Tipos: `PascalCase` con sufijo descriptivo (`PESTELFeed`, `SessionPayload`)
 - Variables de estado: `camelCase` descriptivo (`isAnalyzing`, `loadingFeed`)
 
 ### Manejo de Estado
@@ -276,7 +276,7 @@ Ver sección 4 (módulos en construcción).
 - Efectos de carga con `useEffect` + fetch directo a API routes propias
 - Sin SWR ni React Query (oportunidad de mejora)
 - Context solo para AuthContext (scope global)
-- Polling manual con `setInterval` (en Centinela para jobs)
+- Polling manual con `setInterval` (en PESTEL para jobs)
 
 ### Llamadas a API
 - Siempre a rutas propias (`/api/...`), nunca directo a Firestore desde el cliente
@@ -347,7 +347,7 @@ userId, name, configuration, stats
 isActive, isArchived, createdAt, updatedAt
 ```
 
-#### `centinela_configs/{configId}` — PERMANENTE
+#### `pestel_configs/{configId}` — PERMANENTE
 ```
 userId, modo ("ciudadano"|"gubernamental"), isActive
 territorio { nivel, estado?, municipio?, nombre }
@@ -355,7 +355,7 @@ alertas { vectorRiesgoUmbral, notificarEmail, notificarInApp }
 createdAt, updatedAt
 ```
 
-#### `centinela_feeds/{feedId}` — PERMANENTE, núcleo del producto
+#### `pestel_feeds/{feedId}` — PERMANENTE, núcleo del producto
 ```
 configId, userId, territorio, vigente (bool), generadoEn
 pestl {
@@ -367,13 +367,13 @@ vectorRiesgo (0-100), indicePresionSocial (0-100), indiceClimaInversion (0-100)
 syncedToModdulo (bool)
 ```
 
-#### `centinela_jobs/{jobId}` — Temporal/Debug
+#### `pestel_jobs/{jobId}` — Temporal/Debug
 ```
 configId, userId, status ("pending"|"running"|"completed"|"failed")
 startedAt, completedAt?, error?, feedId?, rawDataId?
 ```
 
-#### `centinela_raw_articles/{jobId}` — Temporal
+#### `pestel_raw_articles/{jobId}` — Temporal
 ```
 jobId, configId, userId, territorio
 articles[], economicData { inegi[], banxico[] }
@@ -402,14 +402,14 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 
 | API | Propósito | Autenticación | Dónde se usa |
 |-----|-----------|--------------|-------------|
-| **Anthropic Claude Sonnet 4.6** | Chat Moddulo (SSE) + clasificación PEST-L Centinela | API key en `.env` y Firebase Secret | `lib/ai/claude.ts`, `functions/src/centinela/classifier/` |
+| **Anthropic Claude Sonnet 4.6** | Chat Moddulo (SSE) + clasificación PEST-L PESTEL | API key en `.env` y Firebase Secret | `lib/ai/claude.ts`, `functions/src/pestel/classifier/` |
 | **Firebase Auth** | Autenticación de usuarios | SDK key pública + Admin SDK privado | `lib/firebase-admin.ts`, `context/AuthContext.tsx` |
 | **Firestore** | Base de datos principal | Admin SDK | Toda la app |
 | **Firebase Storage** | Imágenes, avatares, assets | Admin SDK | Posts, cursos, sefix |
-| **Google News RSS** | Noticias por territorio | Sin auth (feed público) | `functions/src/centinela/scrapers/googleNewsRSS.ts` |
-| **DOF RSS** | Diario Oficial de la Federación | Sin auth (feed público) | `functions/src/centinela/scrapers/dof.ts` |
-| **INEGI BIE API** | Indicadores económicos | Token en Firebase Secret | `functions/src/centinela/scrapers/inegi.ts` |
-| **Banxico SIE API** | Series financieras | Token en Firebase Secret | `functions/src/centinela/scrapers/banxico.ts` |
+| **Google News RSS** | Noticias por territorio | Sin auth (feed público) | `functions/src/pestel/scrapers/googleNewsRSS.ts` |
+| **DOF RSS** | Diario Oficial de la Federación | Sin auth (feed público) | `functions/src/pestel/scrapers/dof.ts` |
+| **INEGI BIE API** | Indicadores económicos | Token en Firebase Secret | `functions/src/pestel/scrapers/inegi.ts` |
+| **Banxico SIE API** | Series financieras | Token en Firebase Secret | `functions/src/pestel/scrapers/banxico.ts` |
 | **Resend** | Emails transaccionales | API key en `.env` | `lib/emailService.ts` |
 | **Gmail SMTP** | Fallback de emails | App password en `.env` | `lib/emailService.ts` via Nodemailer |
 | **Shiny (shinyapps.io)** | Dashboard electoral Sefix | Sin auth (iframe público) | `app/sefix/page.tsx` |
@@ -434,8 +434,8 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 - Los planes están definidos con precios pero el cobro no existe.
 - **Riesgo**: los usuarios pueden asignarse cualquier plan sin pagar.
 
-**3. Integración Centinela ↔ Moddulo F2 pendiente**
-- La fase `exploracion` de Moddulo debería consumir el feed vigente de Centinela.
+**3. Integración PESTEL ↔ Moddulo F2 pendiente**
+- La fase `exploracion` de Moddulo debería consumir el feed vigente de PESTEL.
 - Actualmente, el usuario rellena el PEST-L manualmente en F2.
 - Esto es una feature core prometida del producto.
 
@@ -447,7 +447,7 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 - Impacto: latencia innecesaria + llamadas redundantes a Firestore.
 
 **5. Páginas placeholder activas en rutas públicas**
-- `/monitor/centinela/configurar` y `/monitor/centinela/export` son
+- `/centinela/pestel/configurar` y `/centinela/pestel/export` son
   `UnderConstructionPage` accesibles por URL directa.
 - Deberían redirigir al hub o no estar en el router hasta implementarse.
 
@@ -456,8 +456,8 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 - Si se usan en una demo o producción, se ven rotos.
 
 **7. Doble definición de lógica de scrapers**
-- Existe `lib/monitor/centinela/scraper/` (Next.js side) y
-  `functions/src/centinela/scrapers/` (Cloud Functions).
+- Existe `lib/centinela/pestel/scraper/` (Next.js side) y
+  `functions/src/pestel/scrapers/` (Cloud Functions).
 - La versión en `lib/` no tiene uso activo. Genera confusión sobre cuál es
   la fuente de verdad.
 
@@ -471,7 +471,7 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
   muchos configs/feeds, puede ser costoso.
 - Documentado, pero hay que monitorearlo.
 
-**10. `centinela_raw_articles` crece sin límite**
+**10. `pestel_raw_articles` crece sin límite**
 - Cada análisis genera un documento nuevo de artículos crudos.
 - No hay TTL ni proceso de limpieza implementado.
 - Impacto en costos de Firestore a mediano plazo.
@@ -480,7 +480,7 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 
 **11. Rate limiting ausente en APIs**
 - Ninguna route tiene rate limiting.
-- Un usuario podría disparar Centinela 100 veces seguidas, generando
+- Un usuario podría disparar PESTEL 100 veces seguidas, generando
   costos en Claude y Firestore.
 - Solución: middleware de rate limit por `userId` o `IP`.
 
@@ -510,8 +510,8 @@ Queries con `where(A) + orderBy(B)` donde `A ≠ B` requieren índice compuesto.
 | Cursos | ✅ Funcional (1 curso publicado) |
 | Sefix | ✅ Funcional (dependencia externa) |
 | Moddulo — Proyectos | ✅ Arquitectura completa, algunos flujos por pulir |
-| Centinela — Backend | ✅ Completo y en producción |
-| Centinela — UI | 🔄 Hub y análisis individual implementados; export y charts pendientes |
-| Centinela ↔ Moddulo F2 | ⏳ Pendiente — feature core no implementada |
+| PESTEL — Backend | ✅ Completo y en producción |
+| PESTEL — UI | 🔄 Hub y análisis individual implementados; export y charts pendientes |
+| PESTEL ↔ Moddulo F2 | ⏳ Pendiente — feature core no implementada |
 | Suscripciones / Cobro | ⚠️ Estructura sin backend de pagos |
 | Exportación PDF | ⚠️ Puppeteer problemático en Vercel |

@@ -28,7 +28,7 @@ Raúl diseñó la secuencia de fases como un proceso consultivo estructurado:
 
 ```
 F1: propósito      → Definición del objetivo del proyecto
-F2: exploración    → Análisis de contexto y territorio (consume Centinela)
+F2: exploración    → Análisis de contexto y territorio (consume PESTEL)
 F3: investigación  → Recopilación de datos e inteligencia
 F4: diagnóstico    → Análisis de situación actual
 F5: estrategia     → Definición de posicionamiento y objetivos
@@ -70,7 +70,7 @@ Raúl identificó y corrigió el manejo de errores al cierre del ReadableStream.
 
 1. **9 fases secuenciales** — basadas en metodología de consultoría política de Raúl
 2. **Contexto acumulado** — cada fase hereda el contexto de fases anteriores
-3. **Integración con Centinela en F2** — la exploración consume datos PEST-L del territorio
+3. **Integración con PESTEL en F2** — la exploración consume datos PEST-L del territorio
 4. **Streaming SSE** — Raúl requirió que la respuesta de IA se muestre en tiempo real
 
 ---
@@ -81,7 +81,7 @@ Raúl identificó y corrigió el manejo de errores al cierre del ReadableStream.
 |---------|--------|
 | 9 fases con chat Claude SSE | ✅ Activo |
 | Persistencia historial en Firestore | ✅ Activo |
-| Integración Centinela → F2 | ⏳ Pendiente |
+| Integración PESTEL → F2 | ⏳ Pendiente |
 | Export de proyecto completo | ⏳ Pendiente |
 
 ---

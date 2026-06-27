@@ -38,7 +38,7 @@ plantillas legales en `/docs/compliance/`.
 - `docs/compliance/03_AUDIT_DEPENDENCIAS.md` — auditoría de dependencias y licencias
 - `docs/compliance/04_CHANGELOG_COMPLIANCE.md` — este archivo
 - `docs/compliance/MODULOS/moddulo.md`
-- `docs/compliance/MODULOS/centinela.md`
+- `docs/compliance/MODULOS/pestel.md`
 - `docs/compliance/MODULOS/sefix.md`
 - `docs/compliance/MODULOS/cursos.md`
 - `docs/compliance/MODULOS/blog.md`
@@ -91,14 +91,14 @@ de análisis (consistente con la capacidad del sistema Shiny original).
 
 ---
 
-## Sesión 2026-03-31 — App Centinela Vinculada con F2 en Moddulo
+## Sesión 2026-03-31 — App PESTEL Vinculada con F2 en Moddulo
 
-**Raúl:** Diseño de integración Centinela → Moddulo  
+**Raúl:** Diseño de integración PESTEL → Moddulo  
 **Claude Code:** Implementación asistida
 
 ### Trabajo realizado
 
-Raúl completó la versión 1 de la app Centinela (Cloud Function `scrapeAndAnalyze`
+Raúl completó la versión 1 de la app PESTEL (Cloud Function `scrapeAndAnalyze`
 vinculada con la fase de Exploración F2 de Moddulo).
 
 **Componentes completados:**
@@ -109,24 +109,24 @@ vinculada con la fase de Exploración F2 de Moddulo).
 
 ---
 
-## Sesiones 2026-03-24 a 2026-03-29 — Centinela E1-E5
+## Sesiones 2026-03-24 a 2026-03-29 — PESTEL E1-E5
 
 **Raúl:** Diseño metodológico y de producto  
 **Claude Code:** Implementación asistida
 
 ### Trabajo realizado (resumen)
 
-Serie de sesiones donde Raúl diseñó e implementó las etapas E1 a E5 de Centinela:
+Serie de sesiones donde Raúl diseñó e implementó las etapas E1 a E5 de PESTEL:
 
 | Fecha | Sprint | Resultado |
 |-------|--------|-----------|
-| 26-03-24 | Fase 0 Monitor | Base del hub Monitor, homepage fixes |
-| 26-03-25 | Centinela F1+F2 | Scraping + clasificación PEST-L completados |
-| 26-03-26 | Centinela F3 inicio | 1ª versión UI dashboard Centinela |
-| 26-03-27 | Centinela F3 cont. | Hub multi-territorio + página análisis individual |
-| 26-03-27 | Centinela rediseño E1-E5 | Rediseño completo alineado con specs |
-| 26-03-28 | Centinela correcciones | Persistencia análisis, integración SEFIX, accesibilidad |
-| 26-03-29 | Centinela E6-E8 avance | Avance en etapas de interpretación |
+| 26-03-24 | Fase 0 Centinela | Base del hub Centinela, homepage fixes |
+| 26-03-25 | PESTEL F1+F2 | Scraping + clasificación PEST-L completados |
+| 26-03-26 | PESTEL F3 inicio | 1ª versión UI dashboard PESTEL |
+| 26-03-27 | PESTEL F3 cont. | Hub multi-territorio + página análisis individual |
+| 26-03-27 | PESTEL rediseño E1-E5 | Rediseño completo alineado con specs |
+| 26-03-28 | PESTEL correcciones | Persistencia análisis, integración SEFIX, accesibilidad |
+| 26-03-29 | PESTEL E6-E8 avance | Avance en etapas de interpretación |
 
 **Decisiones metodológicas clave de Raúl en este período:**
 - Adaptación de PEST-L al contexto político mexicano (LGIPE, INE, LGIPE)
@@ -166,7 +166,7 @@ Creó los hooks `useFocusTrap` y `useEscapeKey`.
 
 ### Sprint de Cloud Functions
 
-Raúl decidió mover el procesamiento de IA de Centinela a Cloud Functions Gen2
+Raúl decidió mover el procesamiento de IA de PESTEL a Cloud Functions Gen2
 para superar los límites de timeout de Vercel.
 
 ### Auditoría de seguridad API routes
@@ -181,10 +181,10 @@ que faltaban verificación de sesión.
 | Sesión | Trabajo | Estado |
 |--------|---------|--------|
 | 2026-04-10 | Ejecución del script `pregenerate-sefix.ts` | ⏳ Pendiente |
-| Futuras | E6 Centinela (interpretación + drag-drop) | ⏳ No iniciado |
-| Futuras | E7 Centinela (informes) | ⏳ No iniciado |
-| Futuras | E8 Centinela (monitoreo + alertas) | ⏳ No iniciado |
-| Futuras | Integración Centinela → Moddulo F2 | ⏳ No iniciado |
+| Futuras | E6 PESTEL (interpretación + drag-drop) | ⏳ No iniciado |
+| Futuras | E7 PESTEL (informes) | ⏳ No iniciado |
+| Futuras | E8 PESTEL (monitoreo + alertas) | ⏳ No iniciado |
+| Futuras | Integración PESTEL → Moddulo F2 | ⏳ No iniciado |
 
 ---
 

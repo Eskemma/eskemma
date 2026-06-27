@@ -21,12 +21,21 @@ export const metadata: Metadata = {
     siteName: "Eskemma",
     locale: "es_MX",
     type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/images/blog-hero.jpg`,
+        width: 1200,
+        height: 630,
+        alt: "Eskemma — Plataforma de Consultoría Política con IA",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Eskemma — Plataforma de Consultoría Política con IA",
     description:
       "Herramientas avanzadas para consultores y equipos de campaña en México.",
+    images: [`${SITE_URL}/images/blog-hero.jpg`],
   },
   alternates: {
     canonical: SITE_URL,

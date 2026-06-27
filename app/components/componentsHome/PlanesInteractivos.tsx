@@ -65,7 +65,7 @@ export default function PlanesInteractivos() {
                 <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-[9px]">
                   <strong>Obtienes:</strong>
                 </p>
-                <p>Acceso a versiones básicas de cursos online, Sefix y Monitor</p>
+                <p>Acceso a versiones básicas de cursos online, Sefix y Centinela</p>
                 <p>Moddulo con 8 Apps Estándar</p>
                 <p>Soporte por email</p>
                 <p>Almacenamiento de 5 GB</p>
@@ -118,7 +118,7 @@ export default function PlanesInteractivos() {
                 <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
                   <strong>Obtienes Plan Básico +</strong>
                 </p>
-                <p>Acceso a versiones Premium de cursos online, Sefix y Monitor</p>
+                <p>Acceso a versiones Premium de cursos online, Sefix y Centinela</p>
                 <p>Moddulo con 16 Apps Avanzadas</p>
                 <p>Soporte por email / chat</p>
                 <p>Capacitación grupal online (1 sesión)</p>
@@ -172,7 +172,7 @@ export default function PlanesInteractivos() {
                 <p className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm">
                   <strong>Obtienes Plan Premium +</strong>
                 </p>
-                <p>Acceso a versiones profesionales de cursos online, Sefix y Monitor</p>
+                <p>Acceso a versiones profesionales de cursos online, Sefix y Centinela</p>
                 <p>Moddulo con 25 Apps Avanzadas</p>
                 <p>Soporte por teléfono, email y chat</p>
                 <p>Capacitación personalizada</p>

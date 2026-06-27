@@ -23,11 +23,11 @@ Eskemma es UN SOLO PROYECTO con múltiples secciones/módulos.
 NO es:
 - Moddulo como proyecto separado
 - SEFIX como proyecto separado
-- Monitor como proyecto separado
+- Centinela como proyecto separado
 
 ES:
 - Un proyecto monorepo
-- Estructura: /apps/moddulo, /apps/sefix, /apps/monitor, etc.
+- Estructura: /apps/moddulo, /apps/sefix, /apps/centinela, etc.
 - Un único package.json en la raíz
 - Una única documentación de compliance
 - Una única fuente de verdad
@@ -94,7 +94,7 @@ Archivos presentes:
 ✓ README.md
 
 Estructura de /docs/compliance/:
-✓ /MODULOS/ (con: moddulo.md, sefix.md, monitor.md, cursos.md, recursos.md, sitio.md)
+✓ /MODULOS/ (con: moddulo.md, sefix.md, centinela.md, cursos.md, recursos.md, sitio.md)
 ✓ /MANUALES/
 ✓ /LEGAL/
 
@@ -116,7 +116,7 @@ Estado: 🟢 OK / 🟡 Revisar / 🔴 PROBLEMA
 OPCIÓN A: Si es trabajo en un módulo existente
 ---
 "Entendido. Voy a:
-1. Desarrollar feature/fix en /apps/[moddulo/sefix/monitor/etc.]
+1. Desarrollar feature/fix en /apps/[moddulo/sefix/centinela/etc.]
 2. Actualizar /docs/compliance/MODULOS/[modulo].md con cambios
 3. Si hay nuevas dependencias, actualizar 03_AUDIT_DEPENDENCIAS.md
 4. Registrar en 02_REGISTRO_INTERVENCIONES.md si hay decisión importante
@@ -269,7 +269,7 @@ Cada decisión/módulo debe demostrar:
 │       ├── MODULOS/ ← Documentación por módulo
 │       │   ├── moddulo.md
 │       │   ├── sefix.md
-│       │   ├── monitor.md
+│       │   ├── centinela.md
 │       │   ├── cursos.md
 │       │   ├── recursos.md
 │       │   └── sitio.md
@@ -286,7 +286,7 @@ Cada decisión/módulo debe demostrar:
 ├── apps/ ← Módulos del proyecto
 │   ├── moddulo/
 │   ├── sefix/
-│   ├── monitor/
+│   ├── centinela/
 │   ├── cursos/
 │   ├── recursos/
 │   └── sitio/
@@ -310,7 +310,7 @@ Cada decisión/módulo debe demostrar:
 - UN único package.json (en la raíz)
 - npm audit se ejecuta UNA sola vez por sesión
 - Resultado: UN único 03_AUDIT_DEPENDENCIAS.md
-- Aplica a TODAS las secciones (Moddulo, SEFIX, Monitor, etc.)
+- Aplica a TODAS las secciones (Moddulo, SEFIX, Centinela, etc.)
 ```
 
 **Versiones a documentar:**
@@ -371,7 +371,7 @@ Cada decisión/módulo debe demostrar:
 ### SEFIX
 [Similar]
 
-### Monitor, Cursos, Recursos, Sitio
+### Centinela, Cursos, Recursos, Sitio
 [Similar]
 ```
 

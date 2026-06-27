@@ -163,14 +163,14 @@ lib/sefix/
 
 ---
 
-## 5. Roadmap: Apps Monitor y su integración con Moddulo
+## 5. Roadmap: Apps Centinela y su integración con Moddulo
 
-Cada app del ecosistema Monitor sigue el mismo patrón: **datos en Firebase Storage / Firestore → API Next.js → integración en `xpctoContext` de Moddulo**.
+Cada app del ecosistema Centinela sigue el mismo patrón: **datos en Firebase Storage / Firestore → API Next.js → integración en `xpctoContext` de Moddulo**.
 
 | App | Fase de Moddulo | Datos de entrada | Output para Claude |
 |-----|----------------|-------------------|--------------------|
 | **Sefix** (ya parcial) | F2 Político, Social | Resultados electorales + padrón | Contexto cuantitativo del territorio |
-| **Monitor de noticias** | F2 Político, Social | RSS/scraping de medios locales | Señales críticas en tiempo real |
+| **Centinela de noticias** | F2 Político, Social | RSS/scraping de medios locales | Señales críticas en tiempo real |
 | **Análisis SNA** | F2 Semáforo de Veto, F3 | Grafos de relaciones (personas/organizaciones) | Actores de veto con métricas de influencia |
 | **Perfiles de actores/stakeholders** | F2 Político, F4 | Base de datos de actores políticos | Fichas estructuradas: posición, capacidad, historial |
 | **Indicadores socioeconómicos** | F2 Social/Económico | INEGI, CONEVAL, OCDE | Brecha territorial: IDH, rezago social, empleo |
@@ -179,8 +179,8 @@ Cada app del ecosistema Monitor sigue el mismo patrón: **datos en Firebase Stor
 
 ### Patrón de integración con Moddulo
 
-1. La app Monitor procesa sus datos y los almacena en Firestore o Storage
-2. Moddulo lee los datos vía API interna (`/api/monitor/{fuente}`)
+1. La app Centinela procesa sus datos y los almacena en Firestore o Storage
+2. Moddulo lee los datos vía API interna (`/api/centinela/{fuente}`)
 3. Los datos se inyectan en `xpctoContext` en la fase correspondiente
 4. Claude los referencia directamente en el análisis: números, nombres, posiciones
 5. El widget de la app aparece en el panel de formulario de la fase correspondiente
@@ -192,7 +192,7 @@ Cada app del ecosistema Monitor sigue el mismo patrón: **datos en Firebase Stor
 | Sprint par | App | Justificación |
 |-----------|-----|--------------|
 | Sprint 2 | Sefix dashboard en Next.js | Base ya construida; alta visibilidad para el consultor |
-| Sprint 4 | Monitor de noticias (RSS + IA) | Señales críticas para F2 político y social |
+| Sprint 4 | Centinela de noticias (RSS + IA) | Señales críticas para F2 político y social |
 | Sprint 6 | Perfiles de actores/stakeholders | Semáforo de Veto en F2 + F4 Diagnóstico |
 | Sprint 8 | Indicadores socioeconómicos (INEGI) | F2 Social/Económico + F3 Investigación |
 | Sprint 10 | Análisis SNA | F2 Semáforo + F3 redes de poder |

@@ -16,10 +16,10 @@ import type {
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import type {
-  CentinelaProject,
+  PESTELProject,
   DimensionAnalysis,
   PestlAnalysisV2,
-} from "@/types/centinela.types";
+} from "@/types/pestel.types";
 
 // ==========================================
 // TIPOS SEFIX
@@ -104,17 +104,17 @@ export default function ExploracionPage() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
   const [sefixData, setSefixData] = useState<SefixData | null>(null);
-  const [centinelaImporting, setCentinelaImporting] = useState(false);
+  const [pestelImporting, setPESTELImporting] = useState(false);
   // V2: selection modal state
-  const [centinelaProjects, setCentinelaProjects] = useState<
-    (CentinelaProject & { id: string })[] | null
+  const [pestelProjects, setPESTELProjects] = useState<
+    (PESTELProject & { id: string })[] | null
   >(null);
-  const [centinelaAnalysisPending, setCentinelaAnalysisPending] = useState<
+  const [pestelAnalysisPending, setPESTELAnalysisPending] = useState<
     (PestlAnalysisV2 & { id: string; projectName: string }) | null
   >(null);
 
   // Mapear DimensionAnalysis[] → ExplorationForm.pestl (V2)
-  function mapCentinelaAnalysis(
+  function mapPESTELAnalysis(
     analysis: PestlAnalysisV2,
   ): Partial<ExplorationForm> {
     const dimByCode = Object.fromEntries(
@@ -145,21 +145,21 @@ export default function ExploracionPage() {
     };
   }
 
-  async function handleImportCentinela() {
-    setCentinelaImporting(true);
+  async function handleImportPESTEL() {
+    setPESTELImporting(true);
     try {
       // Fetch V2 projects
-      const projRes = await fetch("/api/monitor/centinela/project");
+      const projRes = await fetch("/api/centinela/pestel/project");
       if (!projRes.ok) return;
       const projData = (await projRes.json()) as {
-        projects: (CentinelaProject & { id: string })[];
+        projects: (PESTELProject & { id: string })[];
       };
       const withAnalysis = projData.projects.filter((p) =>
         (p.currentStage ?? 1) >= 5,
       );
       if (withAnalysis.length === 0) {
         alert(
-          "No tienes proyectos de Centinela con análisis completados. " +
+          "No tienes proyectos de PESTEL con análisis completados. " +
             "Ejecuta al menos un análisis primero.",
         );
         return;
@@ -169,18 +169,18 @@ export default function ExploracionPage() {
         await fetchAndConfirmAnalysis(withAnalysis[0]);
       } else {
         // Show project selection modal
-        setCentinelaProjects(withAnalysis);
+        setPESTELProjects(withAnalysis);
       }
     } finally {
-      setCentinelaImporting(false);
+      setPESTELImporting(false);
     }
   }
 
   async function fetchAndConfirmAnalysis(
-    project: CentinelaProject & { id: string },
+    project: PESTELProject & { id: string },
   ) {
     const latestRes = await fetch(
-      `/api/monitor/centinela/project/${project.id}/latest-analysis`,
+      `/api/centinela/pestel/project/${project.id}/latest-analysis`,
     );
     if (!latestRes.ok) {
       alert("No se pudo obtener el análisis del proyecto seleccionado.");
@@ -194,7 +194,7 @@ export default function ExploracionPage() {
       return;
     }
     const analysisRes = await fetch(
-      `/api/monitor/centinela/analysis/${latestData.analysisId}`,
+      `/api/centinela/pestel/analysis/${latestData.analysisId}`,
     );
     if (!analysisRes.ok) {
       alert("No se pudo cargar el análisis.");
@@ -203,15 +203,15 @@ export default function ExploracionPage() {
     const analysisData = (await analysisRes.json()) as {
       analysis: PestlAnalysisV2 & { id: string };
     };
-    setCentinelaAnalysisPending({
+    setPESTELAnalysisPending({
       ...analysisData.analysis,
       projectName: project.nombre,
     });
   }
 
-  function handleConfirmCentinelaImport() {
-    if (!centinelaAnalysisPending) return;
-    const mapped = mapCentinelaAnalysis(centinelaAnalysisPending);
+  function handleConfirmPESTELImport() {
+    if (!pestelAnalysisPending) return;
+    const mapped = mapPESTELAnalysis(pestelAnalysisPending);
     setForm((prev) => {
       const next = structuredClone(prev);
       if (mapped.pestl) {
@@ -228,7 +228,7 @@ export default function ExploracionPage() {
       }
       return next;
     });
-    setCentinelaAnalysisPending(null);
+    setPESTELAnalysisPending(null);
   }
 
   // Cargar proyecto al montar
@@ -534,17 +534,17 @@ export default function ExploracionPage() {
 
           {mode === "active" && (<>
             <button
-              onClick={handleImportCentinela}
-              disabled={centinelaImporting}
+              onClick={handleImportPESTEL}
+              disabled={pestelImporting}
               className="px-2.5 py-1.5 border border-bluegreen-eske/40
                 text-bluegreen-eske rounded-lg text-xs font-semibold
                 hover:bg-bluegreen-eske/5 transition-colors
                 disabled:opacity-40 flex items-center gap-1">
-              {centinelaImporting
+              {pestelImporting
                 ? <><div className="w-3 h-3 border-2 border-bluegreen-eske/30
                     border-t-bluegreen-eske rounded-full animate-spin" />
                     Cargando…</>
-                : "⚡ Importar Centinela"}
+                : "⚡ Importar PESTEL"}
             </button>
             <button onClick={handleStartEdit} disabled={!formComplete}
               className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
@@ -672,30 +672,30 @@ export default function ExploracionPage() {
         />
       )}
 
-      {/* Modal selección de proyecto Centinela (cuando hay más de uno) */}
-      {centinelaProjects && (
+      {/* Modal selección de proyecto PESTEL (cuando hay más de uno) */}
+      {pestelProjects && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center
           justify-center p-4">
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl p-6 max-w-md w-full
             flex flex-col gap-4">
             <h3 className="font-semibold text-bluegreen-eske-60">
-              Selecciona el proyecto de Centinela
+              Selecciona el proyecto de PESTEL
             </h3>
             <p className="text-sm text-gray-eske-60 dark:text-[#C7D6E0]">
               Elige el análisis PEST-L que deseas importar:
             </p>
             <ul className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-              {centinelaProjects.map((p) => (
+              {pestelProjects.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     onClick={async () => {
-                      setCentinelaProjects(null);
-                      setCentinelaImporting(true);
+                      setPESTELProjects(null);
+                      setPESTELImporting(true);
                       try {
                         await fetchAndConfirmAnalysis(p);
                       } finally {
-                        setCentinelaImporting(false);
+                        setPESTELImporting(false);
                       }
                     }}
                     className="w-full text-left px-4 py-3 rounded-lg border
@@ -715,7 +715,7 @@ export default function ExploracionPage() {
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setCentinelaProjects(null)}
+                onClick={() => setPESTELProjects(null)}
                 className="px-4 py-2 text-sm border border-gray-eske-20 dark:border-white/10 rounded-lg
                   hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors text-gray-eske-60 dark:text-[#C7D6E0]"
               >
@@ -726,20 +726,20 @@ export default function ExploracionPage() {
         </div>
       )}
 
-      {/* Modal confirmación importar análisis Centinela V2 */}
-      {centinelaAnalysisPending && (
+      {/* Modal confirmación importar análisis PESTEL V2 */}
+      {pestelAnalysisPending && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center
           justify-center p-4">
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl p-6 max-w-md w-full
             flex flex-col gap-4">
             <h3 className="font-semibold text-bluegreen-eske-60">
-              Importar análisis de Centinela
+              Importar análisis de PESTEL
             </h3>
             <p className="text-sm text-gray-eske-60 dark:text-[#C7D6E0]">
               Se importará el análisis PEST-L de{" "}
-              <strong>{centinelaAnalysisPending.projectName}</strong> (v
-              {centinelaAnalysisPending.version},{" "}
-              {centinelaAnalysisPending.globalConfidence}% confianza). Esto
+              <strong>{pestelAnalysisPending.projectName}</strong> (v
+              {pestelAnalysisPending.version},{" "}
+              {pestelAnalysisPending.globalConfidence}% confianza). Esto
               sobrescribirá el contexto y las señales críticas de las 5
               dimensiones. Los actores clave, actores de veto, semáforo e
               hipótesis no se modificarán.
@@ -747,7 +747,7 @@ export default function ExploracionPage() {
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                onClick={() => setCentinelaAnalysisPending(null)}
+                onClick={() => setPESTELAnalysisPending(null)}
                 className="px-4 py-2 text-sm border border-gray-eske-20 dark:border-white/10 rounded-lg
                   hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors text-gray-eske-60 dark:text-[#C7D6E0]"
               >
@@ -755,7 +755,7 @@ export default function ExploracionPage() {
               </button>
               <button
                 type="button"
-                onClick={handleConfirmCentinelaImport}
+                onClick={handleConfirmPESTELImport}
                 className="px-4 py-2 text-sm bg-bluegreen-eske text-white
                   rounded-lg hover:bg-bluegreen-eske-60 transition-colors
                   font-medium"

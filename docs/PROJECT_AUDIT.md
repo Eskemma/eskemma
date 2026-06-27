@@ -11,7 +11,7 @@
 eskemma/
 ├── _archive/                        # Código deprecated (no importar)
 ├── _docs/                           # Documentación interna de producto
-│   └── specs/centinela/             # Especificaciones funcionales Centinela (9 archivos)
+│   └── specs/pestel/             # Especificaciones funcionales PESTEL (9 archivos)
 ├── _moddulo-docs/                   # Documentos comerciales del módulo Moddulo
 ├── app/                             # App Router de Next.js
 │   ├── api/                         # 83 route handlers
@@ -21,7 +21,7 @@ eskemma/
 │   │   ├── cursos/                  # 1 ruta (progreso taller)
 │   │   ├── geo/                     # 2 rutas (formas TopoJSON, opciones)
 │   │   ├── moddulo/                 # 7 rutas (chat SSE, CRUD proyectos, exportar)
-│   │   ├── monitor/centinela/       # 39 rutas (proyectos, análisis, alertas, trigger)
+│   │   ├── centinela/pestel/       # 39 rutas (proyectos, análisis, alertas, trigger)
 │   │   ├── newsletter/              # 4 rutas
 │   │   ├── notifications/           # 1 ruta
 │   │   ├── posts/                   # 6 rutas (blog CRUD, likes, vistas)
@@ -36,14 +36,14 @@ eskemma/
 │   │   ├── geo/                     # 5 componentes de mapas Leaflet
 │   │   ├── legal/                   # 6 componentes legales
 │   │   ├── moddulo/                 # 2 componentes (modal, en construcción)
-│   │   ├── monitor/centinela/       # 24 componentes del dashboard Centinela
+│   │   ├── centinela/pestel/       # 24 componentes del dashboard PESTEL
 │   │   └── ui/                      # 1 componente (InfoTooltip)
 │   ├── hooks/                       # 4 hooks de cliente
 │   ├── moddulo/                     # Módulo Moddulo (9 fases + redactor)
 │   │   ├── proyecto/[projectId]/    # Fases F1–F9 (9 page.tsx)
 │   │   ├── redactor/                # App Redactor + 6 componentes
 │   │   └── components/              # 4 componentes compartidos Moddulo
-│   ├── monitor/centinela/           # Módulo Centinela E1–E8
+│   ├── centinela/pestel/           # Módulo PESTEL E1–E8
 │   │   ├── [projectId]/             # Vistas por etapa (datos, análisis, interpretación, informes)
 │   │   └── analisis/[id]/           # Vista individual de análisis
 │   ├── sefix/                       # Dashboard SEFIX + componentes
@@ -57,11 +57,11 @@ eskemma/
 │   └── specs/                       # Especificaciones SEO técnico
 ├── firebase/                        # Config cliente de Firebase
 ├── functions/                       # Cloud Functions Gen2 (Node 22)
-│   └── src/centinela/               # 11 archivos: scrapers, análisis, scheduler
+│   └── src/pestel/               # 11 archivos: scrapers, análisis, scheduler
 ├── info_geo_eske/                   # Geodatos masivos INE/INEGI (32 estados)
 ├── lib/                             # Lógica compartida (solo servidor o isomórfica)
 │   ├── ai/                          # Cliente Claude + prompts de 9 fases
-│   ├── centinela/                   # Utilidades de exportación y reportes
+│   ├── pestel/                   # Utilidades de exportación y reportes
 │   ├── constants/                   # Categorías, cursos, recursos
 │   ├── geo/                         # Utilidades de color y JSON geográfico
 │   ├── moddulo/                     # Lógica de proyectos, riesgos, changelog
@@ -147,13 +147,13 @@ eskemma/
 | **Moddulo — F1 Propósito** | `/moddulo/proyecto/[id]/proposito` | ✅ Implementado | Captura XPCTO: hito, sujeto, capacidades, tiempo, justificación |
 | **Moddulo — F2 Exploración** | `/moddulo/proyecto/[id]/exploracion` | ✅ Implementado | PEST-L, actores, hipótesis, viabilidad, matriz de brechas |
 | **Moddulo — F3–F9** | `/moddulo/proyecto/[id]/[fase]` | ⚠️ Esqueleto | Rutas y layouts existentes; contenido de fases en construcción |
-| **Centinela — E1–E3 Wizard** | `/monitor/centinela/nuevo` | ✅ Completado | Tipo de proyecto, territorio, variables PEST-L (3 pasos) |
-| **Centinela — E4 Datos** | `/monitor/centinela/[id]/datos` | ✅ Completado | Semáforo de cobertura, carga manual de fuentes |
-| **Centinela — E5 Análisis IA** | `/monitor/centinela/[id]/analisis` | ✅ Completado | 5 dims paralelas + sesgos + cadenas de impacto |
-| **Centinela — E6 Interpretación** | `/monitor/centinela/[id]/interpretacion` | ⚠️ En progreso | Ajuste manual, matriz, human-in-the-loop (parcial) |
-| **Centinela — E7 Informes** | `/monitor/centinela/[id]/informes` | ⚠️ En progreso | Viewer de reporte, scorecard (parcial) |
-| **Centinela — E8 Monitoreo** | `/monitor/centinela/[id]/monitoreo` | ⚠️ En progreso | Dashboard de alertas y tendencias (parcial) |
-| **Monitor Hub** | `/monitor` | ✅ Activo | Landing con catálogo de herramientas |
+| **PESTEL — E1–E3 Wizard** | `/centinela/pestel/nuevo` | ✅ Completado | Tipo de proyecto, territorio, variables PEST-L (3 pasos) |
+| **PESTEL — E4 Datos** | `/centinela/pestel/[id]/datos` | ✅ Completado | Semáforo de cobertura, carga manual de fuentes |
+| **PESTEL — E5 Análisis IA** | `/centinela/pestel/[id]/analisis` | ✅ Completado | 5 dims paralelas + sesgos + cadenas de impacto |
+| **PESTEL — E6 Interpretación** | `/centinela/pestel/[id]/interpretacion` | ⚠️ En progreso | Ajuste manual, matriz, human-in-the-loop (parcial) |
+| **PESTEL — E7 Informes** | `/centinela/pestel/[id]/informes` | ⚠️ En progreso | Viewer de reporte, scorecard (parcial) |
+| **PESTEL — E8 Monitoreo** | `/centinela/pestel/[id]/monitoreo` | ⚠️ En progreso | Dashboard de alertas y tendencias (parcial) |
+| **Centinela Hub** | `/centinela` | ✅ Activo | Landing con catálogo de herramientas |
 | **Autenticación** | Transversal | ✅ Activo | Firebase Auth + session cookies HTTP-only |
 | **Suscripciones** | `/suscripciones` | ⚠️ En progreso | Gestión de planes (integración de pago pendiente) |
 | **Perfil** | `/profile` | ✅ Activo | Datos de usuario, avatar, contraseña |
@@ -179,7 +179,7 @@ eskemma/
 | `/faq` | `app/faq/page.tsx` | ✅ vía `layout.tsx` |
 | `/servicios` | `app/servicios/page.tsx` | ✅ title + description + canonical |
 | `/sefix` | `app/sefix/page.tsx` | ✅ con canonical |
-| `/monitor` | `app/monitor/page.tsx` | ✅ con canonical |
+| `/centinela` | `app/centinela/page.tsx` | ✅ con canonical |
 | `/recursos` | `app/recursos/page.tsx` | ❌ sin metadata (placeholder) |
 | `/condiciones-de-uso` | `app/condiciones-de-uso/page.tsx` | ✅ |
 | `/politica-de-privacidad` | `app/politica-de-privacidad/page.tsx` | ✅ |
@@ -208,15 +208,15 @@ eskemma/
 | `/moddulo/proyecto/[id]/seguimiento` | → `[projectId]/seguimiento/page.tsx` | F8 ⚠️ |
 | `/moddulo/proyecto/[id]/evaluacion` | → `[projectId]/evaluacion/page.tsx` | F9 ⚠️ |
 | `/moddulo/redactor` | `app/moddulo/redactor/page.tsx` | ✅ Activo (freemium) |
-| `/monitor/centinela` | `app/monitor/centinela/page.tsx` | Hub proyectos |
-| `/monitor/centinela/nuevo` | `app/monitor/centinela/nuevo/page.tsx` | Wizard E1–E3 |
-| `/monitor/centinela/[id]` | → `[projectId]/page.tsx` | Hub proyecto |
-| `/monitor/centinela/[id]/datos` | → `[projectId]/datos/page.tsx` | E4 ✅ |
-| `/monitor/centinela/[id]/analisis` | → `[projectId]/analisis/page.tsx` | E5 ✅ |
-| `/monitor/centinela/[id]/interpretacion` | → `[projectId]/interpretacion/page.tsx` | E6 ⚠️ |
-| `/monitor/centinela/[id]/informes` | → `[projectId]/informes/page.tsx` | E7 ⚠️ |
-| `/monitor/centinela/[id]/monitoreo` | → `[projectId]/monitoreo/page.tsx` | E8 ⚠️ |
-| `/monitor/centinela/analisis/[id]` | `app/monitor/centinela/analisis/[id]/page.tsx` | Vista individual análisis |
+| `/centinela/pestel` | `app/centinela/pestel/page.tsx` | Hub proyectos |
+| `/centinela/pestel/nuevo` | `app/centinela/pestel/nuevo/page.tsx` | Wizard E1–E3 |
+| `/centinela/pestel/[id]` | → `[projectId]/page.tsx` | Hub proyecto |
+| `/centinela/pestel/[id]/datos` | → `[projectId]/datos/page.tsx` | E4 ✅ |
+| `/centinela/pestel/[id]/analisis` | → `[projectId]/analisis/page.tsx` | E5 ✅ |
+| `/centinela/pestel/[id]/interpretacion` | → `[projectId]/interpretacion/page.tsx` | E6 ⚠️ |
+| `/centinela/pestel/[id]/informes` | → `[projectId]/informes/page.tsx` | E7 ⚠️ |
+| `/centinela/pestel/[id]/monitoreo` | → `[projectId]/monitoreo/page.tsx` | E8 ⚠️ |
+| `/centinela/pestel/analisis/[id]` | `app/centinela/pestel/analisis/[id]/page.tsx` | Vista individual análisis |
 | `/profile` | `app/profile/page.tsx` | Perfil usuario |
 | `/suscripciones` | `app/suscripciones/page.tsx` | Planes |
 
@@ -262,7 +262,7 @@ eskemma/
 ### Mapas / Geografía (`geo/` — 5 componentes)
 `GeoVisualizador`, `GeoVisualizadorMap`, `GeoNavegador`, `GeoLegend`, `GeoMapSkeleton`
 
-### Monitor / Centinela (`monitor/centinela/` — 24 componentes)
+### Centinela / PESTEL (`centinela/pestel/` — 24 componentes)
 
 | Área | Componentes |
 |---|---|
@@ -272,7 +272,7 @@ eskemma/
 | Monitoreo E8 | `AlertsFeed`, `CrisisBanner`, `DimensionStatusGrid`, `HistoryChart` |
 | Informes E7 | `ReportViewer`, `ScorecardTable`, `PrintStyles` |
 | Exportar | `MatrizExporter` |
-| Navegación | `CentinelaStageNav`, `TerritorioSelector` |
+| Navegación | `PESTELStageNav`, `TerritorioSelector` |
 
 ### Legal (`legal/` — 6 componentes)
 `CookieBanner`, `CookieConfigButton`, `ClientOnlyBanner`, `LegalHero`, `LegalSection`, `TableOfContents`
@@ -291,15 +291,15 @@ eskemma/
 | `moddulo_projects` | Proyectos Moddulo (9 fases, historial de chat) | Activo |
 | `moddulo_redactor_projects` | Proyectos del Redactor | Activo |
 | `moddulo_redactor_generations` | Historial de generaciones del Redactor | Activo |
-| `centinela_projects` | Proyectos V2 (tipo, nombre, horizonte, etapa) | Activo |
-| `centinela_variable_configs` | Config variables PEST-L por proyecto (E3) | Activo |
-| `centinela_analyses` | Resultados PEST-L V2 (`PestlAnalysisV2`) | Activo |
-| `centinela_data_sources` | Fuentes de datos manuales cargadas en E4 | Activo |
-| `centinela_jobs` | Estado de jobs (`pending/running/completed/failed`) | Activo |
-| `centinela_raw_articles` | Artículos crudos del scraper | Activo |
-| `centinela_alerts` | Alertas por umbral de riesgo | Activo |
-| `centinela_configs` | Configuraciones legacy V1 (solo lectura) | Deprecated |
-| `centinela_feeds` | Resultados PEST-L V1 legacy | Deprecated |
+| `pestel_projects` | Proyectos V2 (tipo, nombre, horizonte, etapa) | Activo |
+| `pestel_variable_configs` | Config variables PEST-L por proyecto (E3) | Activo |
+| `pestel_analyses` | Resultados PEST-L V2 (`PestlAnalysisV2`) | Activo |
+| `pestel_data_sources` | Fuentes de datos manuales cargadas en E4 | Activo |
+| `pestel_jobs` | Estado de jobs (`pending/running/completed/failed`) | Activo |
+| `pestel_raw_articles` | Artículos crudos del scraper | Activo |
+| `pestel_alerts` | Alertas por umbral de riesgo | Activo |
+| `pestel_configs` | Configuraciones legacy V1 (solo lectura) | Deprecated |
+| `pestel_feeds` | Resultados PEST-L V1 legacy | Deprecated |
 | `notifications` | Notificaciones in-app | Activo |
 | `newsletter_subscribers` | Suscriptores del newsletter | Activo |
 | `resources` | Recursos descargables | Activo |
@@ -322,7 +322,7 @@ eskemma/
 }
 ```
 
-**`PestlAnalysisV2`** (`types/centinela.types.ts`)
+**`PestlAnalysisV2`** (`types/pestel.types.ts`)
 ```typescript
 {
   id: string
@@ -336,7 +336,7 @@ eskemma/
   status: AnalysisStatus         // PENDING_REVIEW | REVIEWED | APPROVED
   vigente: boolean
   adjustments: HumanAdjustment[] // Human-in-the-loop (E6)
-  jobId: string                  // trazabilidad → centinela_jobs
+  jobId: string                  // trazabilidad → pestel_jobs
 }
 ```
 
@@ -363,7 +363,7 @@ eskemma/
 |---|---|---|---|
 | freemium | `user` | $0 | Blog, Redactor (limitado) |
 | basic | `basic` | $2,899/mes | + Cursos, SEFIX |
-| premium | `premium` | $5,899/mes | + Monitor, Moddulo |
+| premium | `premium` | $5,899/mes | + Centinela, Moddulo |
 | professional | `professional` | $9,899/mes | + API, white label |
 
 ---
@@ -372,17 +372,17 @@ eskemma/
 
 | Servicio | Propósito | Capa | Configuración |
 |---|---|---|---|
-| **Anthropic Claude** (claude-sonnet-4-6) | Chat de fases Moddulo, análisis PEST-L Centinela | `lib/ai/claude.ts` + Cloud Functions | `ANTHROPIC_API_KEY` |
+| **Anthropic Claude** (claude-sonnet-4-6) | Chat de fases Moddulo, análisis PEST-L PESTEL | `lib/ai/claude.ts` + Cloud Functions | `ANTHROPIC_API_KEY` |
 | **Firebase Auth** | Autenticación (email/password, Google) + session cookies | `context/AuthContext.tsx`, `lib/session.ts` | `NEXT_PUBLIC_FIREBASE_*` |
 | **Firestore** | Base de datos principal | `lib/firebase-admin.ts` (servidor), `firebase/firebaseConfig.ts` (cliente) | `FIREBASE_PROJECT_ID` + credenciales admin |
 | **Firebase Storage** | JSONs pregenerados SEFIX, archivos de usuario | `firebase/storageUtils.ts` | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` |
 | **Cloud Functions Gen2** | Scraping + análisis PEST-L (fire-and-forget) | `FIREBASE_FUNCTIONS_URL` | Secrets en Firebase Secret Manager |
 | **Resend** | Emails transaccionales (newsletter, contacto, verificación) | `lib/email.ts` | `RESEND_API_KEY` |
 | **Nodemailer + Gmail** | SMTP de respaldo | `lib/emailService.ts` | `GMAIL_USER`, `GMAIL_APP_PASSWORD` |
-| **INEGI API** | Indicadores económicos para Centinela | Cloud Function `scrapers/inegi.ts` | `INEGI_TOKEN` (Secret Manager) |
-| **Banxico API** | Datos financieros para Centinela | Cloud Function `scrapers/banxico.ts` | `BANXICO_TOKEN` (Secret Manager) |
-| **Google News RSS** | Artículos de noticias para Centinela | Cloud Function `scrapers/googleNewsRSS.ts` | Sin key requerida |
-| **DOF (Diario Oficial)** | Marco legal para Centinela | Cloud Function `scrapers/dof.ts` | Sin key requerida |
+| **INEGI API** | Indicadores económicos para PESTEL | Cloud Function `scrapers/inegi.ts` | `INEGI_TOKEN` (Secret Manager) |
+| **Banxico API** | Datos financieros para PESTEL | Cloud Function `scrapers/banxico.ts` | `BANXICO_TOKEN` (Secret Manager) |
+| **Google News RSS** | Artículos de noticias para PESTEL | Cloud Function `scrapers/googleNewsRSS.ts` | Sin key requerida |
+| **DOF (Diario Oficial)** | Marco legal para PESTEL | Cloud Function `scrapers/dof.ts` | Sin key requerida |
 | **Vercel** | Deploy frontend + CDN Edge global | — | Configuración de dominio y env vars |
 
 ---
@@ -470,7 +470,7 @@ firebase functions:secrets:set BANXICO_TOKEN
 - No pueden importar desde `lib/` del proyecto raíz
 - Estilo ESLint Google: comillas dobles, 2 espacios, máx. 80 chars, JSDoc obligatorio
 
-### Centinela — pipeline de análisis
+### PESTEL — pipeline de análisis
 - Fire-and-forget: el frontend solicita el trigger y hace polling al estado del job
 - 5 llamadas paralelas a Claude (una por dimensión PEST-L)
 - Human-in-the-loop obligatorio en E6 — ningún output de IA es definitivo sin validación explícita
@@ -486,7 +486,7 @@ firebase functions:secrets:set BANXICO_TOKEN
 
 ---
 
-## 10. Estado de Moddulo, Monitor/Centinela
+## 10. Estado de Moddulo, Centinela/PESTEL
 
 ### Moddulo — Fases
 
@@ -511,11 +511,11 @@ firebase functions:secrets:set BANXICO_TOKEN
 
 **Pendiente de implementar:** F3–F9 requieren formularios propios de recolección de datos y prompts de Claude especializados por fase. La arquitectura de chat ya está lista; falta el contenido metodológico.
 
-### Monitor / Centinela — Etapas
+### Centinela / PESTEL — Etapas
 
 | Etapa | Descripción | Estado | Archivos clave |
 |---|---|---|---|
-| E1–E3 Wizard | Tipo, territorio, variables | ✅ Completado | `centinela/nuevo/page.tsx`, `WizardStep[1-3].tsx` |
+| E1–E3 Wizard | Tipo, territorio, variables | ✅ Completado | `pestel/nuevo/page.tsx`, `WizardStep[1-3].tsx` |
 | E4 Datos | Semáforo cobertura + carga manual | ✅ Completado | `[id]/datos/page.tsx`, `coverage` API |
 | E5 Análisis IA | 5 dims paralelas + sesgos + cadenas | ✅ Completado | `[id]/analisis/page.tsx`, `PESTLPanelV2.tsx` |
 | E6 Interpretación | Matriz, ajuste humano, human-in-the-loop | ⚠️ Parcial | `[id]/interpretacion/page.tsx`, `ImpactMatrix.tsx`, `AdjustmentModal.tsx` |
@@ -534,7 +534,7 @@ firebase functions:secrets:set BANXICO_TOKEN
 - E6: drag-and-drop de matriz de impacto/probabilidad
 - E7: exportación a 4 formatos (PDF, Word, PPT, JSON)
 - E8: alertas automáticas por umbral (reglas configurables)
-- Integración Centinela → Moddulo F2 (exploración consume análisis PEST-L existente)
+- Integración PESTEL → Moddulo F2 (exploración consume análisis PEST-L existente)
 
 ---
 
@@ -550,8 +550,8 @@ firebase functions:secrets:set BANXICO_TOKEN
 
 ### Tipos deprecated (migración pendiente)
 
-En `types/centinela.types.ts` existen interfaces V1 marcadas con `@deprecated`:
-- `CentinelaConfig`, `Factor`, `DimensionPESTL`, `PESTLAnalysis`, `CentinelaFeed`, `CentinelaAlert`
+En `types/pestel.types.ts` existen interfaces V1 marcadas con `@deprecated`:
+- `PESTELConfig`, `Factor`, `DimensionPESTL`, `PESTLAnalysis`, `PESTELFeed`, `PESTELAlert`
 - `ImpactoFactor` (alto/medio/bajo) → reemplazar por `Intensity` (ALTA/MEDIA/BAJA)
 - `ModoAnalisis` → reemplazar por `TipoProyecto`
 
