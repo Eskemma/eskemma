@@ -187,7 +187,7 @@ export default function ServiciosPage() {
             {/* Servicio 5: Monitoreo de Información */}
             <article className="flex flex-col items-center text-center" role="listitem">
               <Image
-                src="/icons/icon_Monitor.svg"
+                src="/icons/icon_Centinela.svg"
                 alt=""
                 width={80}
                 height={80}

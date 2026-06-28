@@ -4,6 +4,7 @@ import Image from "next/image";
 import PropAnimation from "./components/componentsHome/PropAnimation";
 import TeamModal from "./components/componentsHome/TeamModal";
 import BenefitsSection from "./components/componentsHome/BenefitsSection";
+import ComoFunciona from "./components/componentsHome/ComoFunciona";
 import FaqSection from "./components/componentsHome/FaqSection";
 import PropuestaInteractiva from "./components/componentsHome/PropuestaInteractiva";
 import VideoPresentation from "./components/componentsHome/VideoPresentation";
@@ -42,17 +43,21 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
           aria-hidden="true"
         ></div>
         <div className="relative z-10 text-center text-white-eske px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
-          <h1 className="text-[48px] max-sm:text-2xl leading-tight font-bold">
-            Consultoría política
+          <h1 className="text-[48px] max-sm:text-xl leading-tight font-bold max-sm:font-semibold">
+            La política se gana con estrategia,{" "}
+            <span className="max-sm:block">no con suerte.</span>
           </h1>
-          <p className="mt-8 max-sm:mt-4 text-[32px] max-sm:text-xl leading-tight font-light">
-            <span>El ecosistema digital</span>
-            <br />
-            <span>para tu proyecto político</span>
+          <p className="mt-8 max-sm:mt-4 text-[24px] max-sm:text-sm leading-relaxed font-light max-w-3xl mx-auto">
+            El ecosistema digital que te da certeza donde solo había incertidumbre.
+            Sin partido, sin agenda. Sólo tu proyecto político.
           </p>
-          <div className="mt-[10vh] max-sm:mt-6 space-y-4 max-sm:space-y-1 text-[18px] max-sm:text-base leading-[1.15] font-normal">
-            <p>Descubre tus ventajas competitivas.</p>
-            <p>Te acompañamos con tecnología y datos.</p>
+          <div className="mt-10 max-sm:mt-6">
+            <Link
+              href="/moddulo"
+              className="inline-block border-2 border-white-eske bg-transparent text-white-eske px-8 max-sm:px-6 py-3 max-sm:py-2.5 rounded-lg font-medium hover:bg-white-eske/20 transition-all duration-300 text-[15px] max-sm:text-sm focus-ring-light"
+            >
+              EXPLORAR EL ECOSISTEMA GRATIS
+            </Link>
           </div>
         </div>
       </section>
@@ -129,7 +134,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                       href={`/blog/${post.slug}`}
                       className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
                     >
-                      Leer completo →
+                      LEER COMPLETO →
                     </Link>
                   </div>
                 </article>
@@ -176,7 +181,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   href="/centinela"
                   className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
                 >
-                  Consultar información →
+                  CONSULTAR INFORMACIÓN →
                 </Link>
               </div>
             </div>
@@ -204,7 +209,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   href="/centinela"
                   className="block text-center w-full bg-bluegreen-eske text-white-eske py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-bluegreen-eske-70 transition-all duration-300 text-[14px] max-sm:text-xs focus-ring-light"
                 >
-                  Consultar información →
+                  CONSULTAR INFORMACIÓN →
                 </Link>
               </div>
             </div>
@@ -212,43 +217,9 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Propuesta Section */}
-      <section
-        className="bg-bluegreen-eske min-h-125 max-sm:min-h-100 py-18 max-sm:py-12 px-4 sm:px-6 md:px-8"
-        aria-labelledby="propuesta-heading"
-      >
-        <div className="w-[90%] mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between">
-          <div className="w-full md:w-1/3 flex justify-center">
-            <PropAnimation />
-          </div>
-
-          <div className="w-full md:w-1/2 text-center text-white-eske mt-8 md:mt-0">
-            <h2
-              id="propuesta-heading"
-              className="text-[24px] max-sm:text-lg block mb-8 max-sm:mb-6"
-            >
-              El tiempo es el recurso más valioso.
-            </h2>
-            <p className="text-[18px] max-sm:text-base font-light mb-4 max-sm:mb-3 leading-relaxed">
-              <span className="block">Nunca es demasiado pronto.</span>
-              <span className="block">Comencemos a planear tu estrategia.</span>
-            </p>
-            <p className="text-[18px] max-sm:text-base font-light mb-12 max-sm:mb-3 leading-relaxed">
-              <span className="mt-6 block">
-                Podemos colaborar desde ahora con una{" "}
-              </span>
-              <span className="block">asesoría gratuita de 30 minutos.</span>
-            </p>
-
-            {/* Client Island: botón + modales de agenda */}
-            <PropuestaInteractiva />
-          </div>
-        </div>
-      </section>
-
       {/* Sobre Nosotros Section */}
       <section
-        className="bg-white-eske py-12 max-sm:py-8 px-4 sm:px-6 md:px-8 dark:bg-[#0B1620]"
+        className="bg-gray-eske-10 py-12 max-sm:py-8 px-4 sm:px-6 md:px-8 dark:bg-[#112230]"
         aria-labelledby="about-heading"
       >
         <div className="w-[90%] mx-auto max-w-7xl text-center">
@@ -272,6 +243,9 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
 
       {/* Sección - Beneficios */}
       <BenefitsSection />
+
+      {/* Sección - Cómo funciona */}
+      <ComoFunciona />
 
       {/* Sección - Testimonios */}
       <section
@@ -382,6 +356,40 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         </div>
       </section>
 
+      {/* Sección - Propuesta */}
+      <section
+        className="bg-bluegreen-eske min-h-125 max-sm:min-h-100 py-18 max-sm:py-12 px-4 sm:px-6 md:px-8"
+        aria-labelledby="propuesta-heading"
+      >
+        <div className="w-[90%] mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between">
+          <div className="w-full md:w-1/3 flex justify-center">
+            <PropAnimation />
+          </div>
+
+          <div className="w-full md:w-1/2 text-center text-white-eske mt-8 md:mt-0">
+            <h2
+              id="propuesta-heading"
+              className="text-[24px] max-sm:text-lg block mb-8 max-sm:mb-6"
+            >
+              El tiempo es el recurso más valioso.
+            </h2>
+            <p className="text-[18px] max-sm:text-base font-light mb-4 max-sm:mb-3 leading-relaxed">
+              <span className="block">Nunca es demasiado pronto.</span>
+              <span className="block">Comencemos a planear tu estrategia.</span>
+            </p>
+            <p className="text-[18px] max-sm:text-base font-light mb-12 max-sm:mb-3 leading-relaxed">
+              <span className="mt-6 block">
+                Podemos colaborar desde ahora con una{" "}
+              </span>
+              <span className="block">sesión gratuita de 30 minutos.</span>
+            </p>
+
+            {/* Client Island: botón + modales de agenda */}
+            <PropuestaInteractiva />
+          </div>
+        </div>
+      </section>
+
       {/* Client Island: sección completa de suscripciones */}
       <PlanesInteractivos />
 
@@ -445,8 +453,8 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
               href="/centinela"
               className="flex flex-col items-center justify-center text-center text-bluegreen-eske hover:text-bluegreen-80 transition-all duration-300 ease-in-out h-full focus-ring-primary rounded"
             >
-              <Image src="/icons/icon_Monitor.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
-              <Image src="/icons/icons_dark_mode/icon_Monitor_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
+              <Image src="/icons/icon_Centinela.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 dark:hidden" />
+              <Image src="/icons/icons_dark_mode/icon_Centinela_wd.svg" alt="" aria-hidden="true" width={128} height={128} className="w-32 h-32 max-sm:w-20 max-sm:h-20 mb-4 max-sm:mb-2 transition-transform duration-300 ease-in-out hover:scale-110 hidden dark:block" />
               <span className="text-xl max-sm:text-sm text-bluegreen-eske font-medium hover:text-bluegreen-80 dark:text-[#4791B3]">Centinela</span>
             </Link>
 

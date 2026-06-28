@@ -94,7 +94,7 @@ const FaqSection = () => {
               id="faq-question-2"
             >
               <span className="text-xl max-sm:text-base font-medium text-bluegreen-eske dark:text-[#6BA4C6]">
-                ¿Cómo puedo agendar una asesoría gratuita?
+                ¿Cómo puedo agendar una sesión de diagnóstico gratuita?
               </span>
               <svg
                 className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
@@ -123,8 +123,8 @@ const FaqSection = () => {
                 className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0]"
               >
                 <p>
-                  Puedes agendar una asesoría gratuita haciendo clic en el botón
-                  "AGENDAR ASESORÍA GRATUITA" en esta página.
+                  Puedes agendarla haciendo clic en el botón
+                  "AGENDAR UNA SESIÓN DE DIAGNÓSTICO GRATUITA" en esta página.
                 </p>
               </div>
             )}

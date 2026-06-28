@@ -16,9 +16,9 @@ export default function PropuestaInteractiva() {
 
   return (
     <>
-      <div className="text-center mt-6 max-w-75 mx-auto">
+      <div className="text-center mt-6 max-w-[26rem] mx-auto">
         <Button
-          label="AGENDAR ASESORÍA GRATUITA"
+          label="AGENDAR UNA SESIÓN DE DIAGNÓSTICO GRATUITA"
           variant="secondary"
           onClick={() => setIsScheduleModalOpen(true)}
         />
