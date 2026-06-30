@@ -357,7 +357,6 @@ export default function InterpretacionPage() {
                 adjustments={analysis.adjustments ?? []}
                 saving={saving}
                 onAdjust={handleAdjust}
-                readOnly={analysis.status === "APPROVED"}
               />
               {(analysis.adjustments ?? []).length > 0 && (
                 <div className="mt-2">

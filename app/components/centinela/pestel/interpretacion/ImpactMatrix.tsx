@@ -164,23 +164,26 @@ export default function ImpactMatrix({
         <div className="text-xs text-black-eske dark:text-[#C5D8E8] space-y-1 mb-2
           bg-gray-eske-10 dark:bg-[#112233] rounded-lg px-3 py-2.5">
           <p>La matriz posiciona cada factor PESTEL según probabilidad de ocurrencia e impacto en el proyecto.</p>
-          <ul className="space-y-0.5 list-disc list-inside text-black-eske dark:text-[#9AAEBE]">
+          <ul className="space-y-0.5 list-disc pl-4 text-black-eske dark:text-[#9AAEBE]">
             <li>Eje horizontal: probabilidad de ocurrencia (baja → alta)</li>
             <li>Eje vertical: impacto en el proyecto (bajo → alto)</li>
           </ul>
           <p className="font-semibold mt-1">Cuadrantes:</p>
-          <ul className="space-y-0.5 list-disc list-inside text-black-eske dark:text-[#9AAEBE]">
+          <ul className="space-y-0.5 list-disc pl-4 text-black-eske dark:text-[#9AAEBE]">
             <li><span className="text-red-eske font-medium">Prioridad crítica:</span> alta probabilidad + alto impacto → acción inmediata</li>
             <li><span className="text-violet-700 dark:text-violet-400 font-medium">Vigilar:</span> baja probabilidad + alto impacto → monitoreo estrecho</li>
-            <li><span className="text-gray-eske-60 dark:text-[#9AAEBE] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
+            <li><span className="text-black-eske-70 dark:text-[#C5D8E8] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
             <li><span className="text-green-eske font-medium">Monitoreo básico:</span> baja probabilidad + bajo impacto → atención mínima</li>
           </ul>
-          {!readOnly && (
-            <p className="mt-1 italic text-black-eske-60 dark:text-[#9AAEBE]">
-              La IA posicionó cada dimensión según el análisis. Puedes arrastrar los puntos para ajustar. Cada movimiento requiere justificación.
-            </p>
-          )}
         </div>
+
+        {/* Drag instruction — always visible (matrix is always editable) */}
+        <p className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-40
+          bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 rounded-lg px-3 py-2 leading-relaxed">
+          La IA posicionó cada dimensión según el análisis. Puedes regresar a esta vista en cualquier
+          momento para arrastrar los puntos y ajustar la posición de cada factor. Cada movimiento
+          requiere una justificación que quedará registrada en el análisis.
+        </p>
 
         {/* Axis labels */}
         <div className="flex items-stretch gap-2">
@@ -247,7 +250,7 @@ export default function ImpactMatrix({
                   Monitoreo básico
                 </span>
                 <span className="absolute bottom-2 right-2 text-xs
-                  text-gray-eske-60 dark:text-[#9AAEBE] font-bold pointer-events-none text-right"
+                  text-black-eske-70 dark:text-[#C5D8E8] font-bold pointer-events-none text-right"
                   aria-hidden="true">
                   Atención moderada
                 </span>

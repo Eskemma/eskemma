@@ -140,6 +140,35 @@ export default function InformesPage() {
     loadAll();
   }, [loadAll]);
 
+  // Restore persisted reports for this analysis when analysis loads
+  useEffect(() => {
+    if (!analysis?.id) return;
+    try {
+      const saved = localStorage.getItem(`pestel_report_${projectId}_${analysis.id}`);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as Partial<Record<ReportFormat, string>>;
+      setReportCache(parsed);
+      // Pre-select the last cached format
+      const formats = Object.keys(parsed) as ReportFormat[];
+      if (formats.length > 0) setActiveFormat(formats[formats.length - 1]);
+    } catch {
+      // corrupt storage entry — ignore
+    }
+  }, [analysis?.id, projectId]);
+
+  // Persist cache whenever it changes
+  useEffect(() => {
+    if (!analysis?.id || Object.keys(reportCache).length === 0) return;
+    try {
+      localStorage.setItem(
+        `pestel_report_${projectId}_${analysis.id}`,
+        JSON.stringify(reportCache)
+      );
+    } catch {
+      // storage full — ignore
+    }
+  }, [reportCache, analysis?.id, projectId]);
+
   // ── Generate report (streaming) ────────────────────────────────
   // force=true → always regenerate (Regenerar button)
   // force=false → use cache if available (format tab click)

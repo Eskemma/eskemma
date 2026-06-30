@@ -113,7 +113,7 @@ Confianza global: ${analysis.globalConfidence}%
 Fecha: ${date}
 Versión: ${analysis.version}
 
-== DIMENSIONES PEST-L ==
+== DIMENSIONES PESTEL ==
 ${dimensionsText}
 
 == CADENAS DE IMPACTO ==
@@ -164,7 +164,7 @@ Extensión: sin límite (cubre todo el contenido).
 Formato: Markdown con encabezados ##.
 
 Estructura obligatoria:
-1. ## Ficha metodológica (tipo de proyecto, territorio, fecha, versión, metodología PEST-L)
+1. ## Ficha metodológica (tipo de proyecto, territorio, fecha, versión, metodología PESTEL)
 2. ## Análisis por dimensión (para cada dimensión: señal principal, narrativa completa, tendencia, intensidad, fuentes)
 3. ## Cadenas de impacto transversal
 4. ## Scorecard ponderado (tabla completa con pesos y scores)
@@ -174,18 +174,18 @@ Estructura obligatoria:
 Incluye notas metodológicas sobre el nivel de confianza y las fuentes cuando sea relevante.`;
 
 const FODA_INSTRUCTIONS = `== INSTRUCCIONES: SÍNTESIS FODA-LISTA ==
-Extrae del análisis PEST-L las oportunidades y amenazas para alimentar un análisis FODA posterior.
+Extrae del análisis PESTEL las oportunidades y amenazas para alimentar un análisis FODA posterior.
 
 Formato de respuesta (Markdown, sin texto adicional):
 
 ## Oportunidades
-- [Oportunidad 1 — dimensión PEST-L de origen]
-- [Oportunidad 2 — dimensión PEST-L de origen]
+- [Oportunidad 1 — dimensión PESTEL de origen]
+- [Oportunidad 2 — dimensión PESTEL de origen]
 ...
 
 ## Amenazas
-- [Amenaza 1 — dimensión PEST-L de origen]
-- [Amenaza 2 — dimensión PEST-L de origen]
+- [Amenaza 1 — dimensión PESTEL de origen]
+- [Amenaza 2 — dimensión PESTEL de origen]
 ...
 
 Reglas:

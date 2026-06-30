@@ -19,6 +19,7 @@ import {
   AlignmentType,
   Header,
   TabStopType,
+  LineRuleType,
 } from "docx";
 
 export type ReportFormat = "executive" | "technical" | "foda" | "scenarios";
@@ -81,12 +82,49 @@ const PRINT_CSS = `
   }
 
   body {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: Arimo, Arial, sans-serif;
     font-size: 11pt;
     color: #111;
     background: #fff;
     line-height: 1.6;
   }
+
+  /* Toolbar shown on screen, hidden when printing */
+  .print-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 20px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .print-toolbar span { font-size: 13px; color: #444; }
+  .print-toolbar button {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: Arimo, Arial, sans-serif;
+  }
+  .btn-print { background: #026988; color: #fff; }
+  .btn-print:hover { background: #024f66; }
+  .btn-close { background: #f0f0f0; color: #333; }
+  .btn-close:hover { background: #e0e0e0; }
+
+  @media print {
+    .print-toolbar { display: none; }
+    body { margin-top: 0 !important; }
+  }
+
+  .doc-wrapper { margin-top: 58px; }
 
   /* Document header */
   .doc-header {
@@ -186,20 +224,24 @@ export async function exportToPdf(
   <style>${PRINT_CSS}</style>
 </head>
 <body>
-  <div class="doc-header">
-    <img
-      class="logo"
-      src="${window.location.origin}/images/esk_log_csm.svg"
-      alt="eskemma"
-    />
-    <span class="brand">Centinela — PESTEL · ${formatLabel}</span>
+  <div class="print-toolbar">
+    <span>Centinela — PESTEL · ${formatLabel}</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+      <button class="btn-close" onclick="window.close()">Cerrar</button>
+    </div>
   </div>
-  <div class="doc-body">${html}</div>
-  <script>
-    window.addEventListener("load", function () {
-      setTimeout(function () { window.print(); }, 350);
-    });
-  </script>
+  <div class="doc-wrapper">
+    <div class="doc-header">
+      <img
+        class="logo"
+        src="${window.location.origin}/images/esk_log_csm.svg"
+        alt="eskemma"
+      />
+      <span class="brand">Centinela — PESTEL · ${formatLabel}</span>
+    </div>
+    <div class="doc-body">${html}</div>
+  </div>
 </body>`;
 }
 
@@ -253,13 +295,16 @@ function parseTableRow(line: string): string[] {
 function buildDocxTable(rows: string[][]): Table {
   const docxRows = rows.map((cells, rowIdx) =>
     new TableRow({
+      tableHeader: rowIdx === 0,
       children: cells.map(
         (cellText) =>
           new TableCell({
             children: [
               new Paragraph({
                 children: parseInline(cellText),
-                ...(rowIdx === 0 ? { heading: HeadingLevel.HEADING_4 } : {}),
+                ...(rowIdx === 0 ? { heading: HeadingLevel.HEADING_4 } : {
+                  spacing: { line: 360, lineRule: LineRuleType.AUTO },
+                }),
               }),
             ],
             width: { size: Math.floor(9000 / cells.length), type: WidthType.DXA },
@@ -269,6 +314,12 @@ function buildDocxTable(rows: string[][]): Table {
               left: { style: BorderStyle.SINGLE, size: 1, color: "BBBBBB" },
               right: { style: BorderStyle.SINGLE, size: 1, color: "BBBBBB" },
             },
+            shading:
+              rowIdx === 0
+                ? { fill: "F0F0F0" }
+                : rowIdx % 2 === 0
+                ? { fill: "FAFAFA" }
+                : undefined,
           })
       ),
     })
@@ -318,6 +369,7 @@ function markdownToDocxChildren(
         new Paragraph({
           children: parseInline(text),
           bullet: { level: 0 },
+          spacing: { line: 360, lineRule: LineRuleType.AUTO },
         })
       );
       i++;
@@ -331,6 +383,7 @@ function markdownToDocxChildren(
         new Paragraph({
           children: parseInline(numberedMatch[1]),
           numbering: { reference: "default-numbering", level: 0 },
+          spacing: { line: 360, lineRule: LineRuleType.AUTO },
         })
       );
       i++;
@@ -368,8 +421,11 @@ function markdownToDocxChildren(
       continue;
     }
 
-    // Default: paragraph with inline formatting
-    elements.push(new Paragraph({ children: parseInline(line) }));
+    // Default: paragraph with inline formatting and 1.5 line spacing
+    elements.push(new Paragraph({
+      children: parseInline(line),
+      spacing: { line: 360, lineRule: LineRuleType.AUTO },
+    }));
     i++;
   }
 
@@ -385,6 +441,33 @@ export async function exportToDocx(
   const children = markdownToDocxChildren(markdown);
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: { font: "Arial", size: 22 }, // 11pt, mirrors PDF body font
+          paragraph: { spacing: { line: 360, lineRule: LineRuleType.AUTO } },
+        },
+        heading1: {
+          run: { font: "Arial", size: 36, bold: true }, // 18pt — matches PDF h1
+          paragraph: { spacing: { before: 280, after: 160 } },
+        },
+        heading2: {
+          run: { font: "Arial", size: 28, bold: true, color: "1A1A1A" }, // 14pt — matches PDF h2
+          paragraph: {
+            spacing: { before: 240, after: 120 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "DDDDDD" } },
+          },
+        },
+        heading3: {
+          run: { font: "Arial", size: 24, bold: true }, // 12pt — matches PDF h3
+          paragraph: { spacing: { before: 200, after: 100 } },
+        },
+        heading4: {
+          run: { font: "Arial", size: 22, bold: true }, // 11pt — matches PDF h4
+          paragraph: { spacing: { before: 160, after: 80 } },
+        },
+      },
+    },
     numbering: {
       config: [
         {
@@ -412,13 +495,18 @@ export async function exportToDocx(
                     position: 9000,
                   },
                 ],
+                border: {
+                  bottom: { style: BorderStyle.SINGLE, size: 8, color: "DDDDDD" },
+                },
+                spacing: { after: 160 },
                 children: [
-                  new TextRun({ text: "eskemma", bold: true, size: 22 }),
+                  new TextRun({ text: "Eskemma", bold: true, size: 32, font: "Arial" }),
                   new TextRun({ text: "\t" }),
                   new TextRun({
                     text: "Centinela — PESTEL",
                     color: "0066CC",
                     size: 20,
+                    font: "Arial",
                   }),
                 ],
               }),
@@ -428,7 +516,9 @@ export async function exportToDocx(
         properties: {
           page: {
             margin: {
-              top: 1134,   // ~2cm in twentieths of a point
+              // Larger than the header's natural height so the body's first
+              // line never sits flush against the "Eskemma" header on any page.
+              top: 1700,   // ~3cm
               bottom: 1134,
               left: 1418,  // ~2.5cm
               right: 1134,
