@@ -7,7 +7,6 @@
 // Triggers AdjustmentModal when a meaningful drag ends.
 
 import { useState, useRef, useCallback } from "react";
-import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type {
   DimensionAnalysis,
   HumanAdjustment,
@@ -19,14 +18,7 @@ import {
   getAdjustedCoordinates,
 } from "@/lib/pestel/matrizUtils";
 import AdjustmentModal from "./AdjustmentModal";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META } from "@/types/pestel.types";
 
 // Minimum drag distance (in matrix units 0–100) to trigger the modal
 const DRAG_THRESHOLD = 5;
@@ -168,22 +160,36 @@ export default function ImpactMatrix({
   return (
     <>
       <div className="flex flex-col gap-2">
-        {/* Info tooltip row */}
-        <div className="flex items-center justify-end mb-1">
-          <InfoTooltip
-            content="La matriz posiciona cada factor PEST-L según probabilidad (eje horizontal, baja→alta) e impacto en el proyecto (eje vertical, bajo→alto). Cuadrantes: Prioridad crítica (alta prob. + alto impacto) → acción inmediata; Vigilar (baja prob. + alto impacto) → monitoreo estrecho; Atención moderada (alta prob. + bajo impacto) → gestión rutinaria; Monitoreo básico → atención mínima. Los puntos de la IA pueden ajustarse arrastrándolos."
-            placement="left"
-          />
+        {/* Visible methodology description */}
+        <div className="text-xs text-black-eske dark:text-[#C5D8E8] space-y-1 mb-2
+          bg-gray-eske-10 dark:bg-[#112233] rounded-lg px-3 py-2.5">
+          <p>La matriz posiciona cada factor PESTEL según probabilidad de ocurrencia e impacto en el proyecto.</p>
+          <ul className="space-y-0.5 list-disc list-inside text-black-eske dark:text-[#9AAEBE]">
+            <li>Eje horizontal: probabilidad de ocurrencia (baja → alta)</li>
+            <li>Eje vertical: impacto en el proyecto (bajo → alto)</li>
+          </ul>
+          <p className="font-semibold mt-1">Cuadrantes:</p>
+          <ul className="space-y-0.5 list-disc list-inside text-black-eske dark:text-[#9AAEBE]">
+            <li><span className="text-red-eske font-medium">Prioridad crítica:</span> alta probabilidad + alto impacto → acción inmediata</li>
+            <li><span className="text-violet-700 dark:text-violet-400 font-medium">Vigilar:</span> baja probabilidad + alto impacto → monitoreo estrecho</li>
+            <li><span className="text-gray-eske-60 dark:text-[#9AAEBE] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
+            <li><span className="text-green-eske font-medium">Monitoreo básico:</span> baja probabilidad + bajo impacto → atención mínima</li>
+          </ul>
+          {!readOnly && (
+            <p className="mt-1 italic text-black-eske-60 dark:text-[#9AAEBE]">
+              La IA posicionó cada dimensión según el análisis. Puedes arrastrar los puntos para ajustar. Cada movimiento requiere justificación.
+            </p>
+          )}
         </div>
 
         {/* Axis labels */}
-        <div className="flex items-end gap-2">
+        <div className="flex items-stretch gap-2">
           <div
-            className="flex flex-col items-center gap-1 text-xs text-black-eske dark:text-[#9AAEBE]"
+            className="flex flex-col items-center justify-center text-xs font-bold text-black-eske dark:text-[#C5D8E8] shrink-0"
             aria-hidden="true"
           >
             <span className="[writing-mode:vertical-rl] rotate-180 leading-none
-              py-2 text-center w-4">
+              py-2 text-center w-5 text-sm">
               Impacto ↑
             </span>
           </div>
@@ -194,7 +200,7 @@ export default function ImpactMatrix({
               ref={containerRef}
               className="relative w-full rounded-xl border border-gray-eske-20 dark:border-white/10
                 overflow-hidden cursor-crosshair"
-              style={{ paddingBottom: "100%" }}
+              style={{ paddingBottom: "75%" }}
               onPointerMove={handlePointerMove}
               role="group"
               aria-label="Matriz de impacto y probabilidad. Usa las teclas de flecha para mover los puntos."
@@ -202,16 +208,16 @@ export default function ImpactMatrix({
               {/* Absolute inner container */}
               <div className="absolute inset-0">
                 {/* Quadrant backgrounds */}
-                {/* Top-left: high impact, low probability */}
+                {/* Top-left: high impact, low probability → Vigilar */}
                 <div className="absolute top-0 left-0 w-1/2 h-1/2
-                  bg-yellow-eske/5" aria-hidden="true" />
-                {/* Top-right: high impact, high probability → critical */}
+                  bg-violet-100/40 dark:bg-violet-900/20" aria-hidden="true" />
+                {/* Top-right: high impact, high probability → Prioridad crítica */}
                 <div className="absolute top-0 right-0 w-1/2 h-1/2
                   bg-red-eske/8" aria-hidden="true" />
-                {/* Bottom-left: low impact, low probability */}
+                {/* Bottom-left: low impact, low probability → Monitoreo básico */}
                 <div className="absolute bottom-0 left-0 w-1/2 h-1/2
-                  bg-green-eske/5" aria-hidden="true" />
-                {/* Bottom-right: low impact, high probability */}
+                  bg-green-eske/10" aria-hidden="true" />
+                {/* Bottom-right: low impact, high probability → Atención moderada */}
                 <div className="absolute bottom-0 right-0 w-1/2 h-1/2
                   bg-gray-eske-10 dark:bg-white/5" aria-hidden="true" />
 
@@ -225,23 +231,23 @@ export default function ImpactMatrix({
                 </div>
 
                 {/* Quadrant labels */}
-                <span className="absolute top-2 left-2 text-[10px]
-                  text-yellow-eske/60 font-medium pointer-events-none"
+                <span className="absolute top-2 left-2 text-xs
+                  text-violet-700 dark:text-violet-400 font-bold pointer-events-none"
                   aria-hidden="true">
                   Vigilar
                 </span>
-                <span className="absolute top-2 right-2 text-[10px]
-                  text-red-eske/60 font-medium pointer-events-none text-right"
+                <span className="absolute top-2 right-2 text-xs
+                  text-red-eske font-bold pointer-events-none text-right"
                   aria-hidden="true">
                   Prioridad crítica
                 </span>
-                <span className="absolute bottom-2 left-2 text-[10px]
-                  text-green-eske/60 font-medium pointer-events-none"
+                <span className="absolute bottom-2 left-2 text-xs
+                  text-green-eske font-bold pointer-events-none"
                   aria-hidden="true">
                   Monitoreo básico
                 </span>
-                <span className="absolute bottom-2 right-2 text-[10px]
-                  text-gray-eske-50 dark:text-[#6D8294] font-medium pointer-events-none text-right"
+                <span className="absolute bottom-2 right-2 text-xs
+                  text-gray-eske-60 dark:text-[#9AAEBE] font-bold pointer-events-none text-right"
                   aria-hidden="true">
                   Atención moderada
                 </span>
@@ -292,7 +298,7 @@ export default function ImpactMatrix({
                       key={dim.code}
                       role="button"
                       tabIndex={readOnly ? -1 : 0}
-                      aria-label={`${DIMENSION_LABELS[dim.code]}. Impacto: ${Math.round(pos.y)}%, Probabilidad: ${Math.round(pos.x)}%. ${readOnly ? "" : "Usa flechas para mover, Enter para ajustar."}`}
+                      aria-label={`${DIMENSION_META[dim.code].label}. Impacto: ${Math.round(pos.y)}%, Probabilidad: ${Math.round(pos.x)}%. ${readOnly ? "" : "Usa flechas para mover, Enter para ajustar."}`}
                       className={[
                         "absolute w-9 h-9 rounded-full flex items-center justify-center",
                         "text-xs font-bold text-white shadow-sm",
@@ -325,7 +331,7 @@ export default function ImpactMatrix({
               </div>
             </div>
             {/* X axis label */}
-            <p className="text-xs text-black-eske dark:text-[#9AAEBE] text-center"
+            <p className="text-sm font-bold text-black-eske dark:text-[#C5D8E8] text-center"
               aria-hidden="true">
               Probabilidad →
             </p>

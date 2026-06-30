@@ -41,6 +41,74 @@ function formatDate(value: unknown): string {
   }
 }
 
+function calcularIntervaloSugerido(tipo: string, horizonte: number): number {
+  if (horizonte > 12) return tipo === "legislativo" ? 48 : 72;
+  if (horizonte > 6)  return tipo === "legislativo" ? 24 : 48;
+  if (horizonte > 3)  return tipo === "legislativo" ? 12 : 24;
+  if (horizonte > 1)  return tipo === "legislativo" ? 6  : 12;
+  return tipo === "legislativo" ? 4 : 6;
+}
+
+function TokenCostEstimate({ tipo, horizonte }: { tipo: string; horizonte: number }) {
+  const intervalo = calcularIntervaloSugerido(tipo, horizonte);
+  const tokensPerMonth = Math.round(2000 * (720 / intervalo));
+  return (
+    <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] bg-gray-eske-10 dark:bg-[#21425E]
+      px-3 py-2 rounded-lg">
+      Con el intervalo sugerido de {intervalo} h: ~{tokensPerMonth.toLocaleString("es-MX")} tokens/mes
+    </p>
+  );
+}
+
+function ModduloButton({
+  project,
+  projectId,
+  analysisId,
+}: {
+  project: PESTELProject | null;
+  projectId: string;
+  analysisId: string | undefined;
+}) {
+  const router = useRouter();
+  if (!project) return null;
+
+  if (project.modduloOrigenEscenario === "A" && project.modduloProjectId) {
+    const href = `/moddulo/proyecto/${project.modduloProjectId}/exploracion${
+      analysisId ? `?pest_analysis_id=${analysisId}` : ""
+    }`;
+    return (
+      <button
+        type="button"
+        onClick={() => router.push(href)}
+        className="px-5 py-2.5 border border-bluegreen-eske text-bluegreen-eske
+          rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/10
+          transition-colors"
+      >
+        Regresar a Moddulo F2 con resultados
+      </button>
+    );
+  }
+
+  const params = new URLSearchParams({
+    from: "pestel",
+    pestelProjectId: projectId,
+    pestelProjectName: project.nombre,
+    pestelProjectType: project.tipo,
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => router.push(`/moddulo/proyecto/nuevo?${params.toString()}`)}
+      className="px-5 py-2.5 bg-orange-eske text-white
+        rounded-lg text-sm font-semibold hover:bg-orange-eske-60
+        transition-colors shadow-sm"
+    >
+      Iniciar proyecto en Moddulo
+    </button>
+  );
+}
+
 export default function MonitoreoPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
@@ -188,7 +256,7 @@ export default function MonitoreoPage() {
                 {project?.territorio?.nombre ?? ""} ·{" "}
                 <span className="capitalize">{project?.tipo ?? ""}</span>
                 {" · "}
-                <span className="font-medium">Etapa 8 — Monitoreo</span>
+                <span className="font-medium">Etapa 6 — Monitoreo</span>
               </p>
             </div>
             <button
@@ -223,7 +291,7 @@ export default function MonitoreoPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1.5">
-                  Estado actual — PEST-L
+                  Estado actual — PESTEL
                   <InfoTooltip
                     content="Resumen de la clasificación más reciente para cada dimensión. La confianza global es el promedio ponderado de certeza de todos los análisis dimensionales. Para mejorar estos porcentajes: agrega fuentes de mayor confiabilidad en 'Datos' y asegura cobertura verde en el semáforo."
                     placement="right"
@@ -305,11 +373,14 @@ export default function MonitoreoPage() {
           <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">
             Monitoreo automático
           </h2>
-          <p className="text-xs text-black-eske dark:text-[#9AAEBE] mb-4">
+          <p className="text-xs text-black-eske dark:text-[#9AAEBE] mb-3">
             Cuando está activo, el sistema ejecuta un análisis automáticamente cada 6 horas.
             Por defecto está desactivado — solo se ejecuta si tú lo habilitas.
           </p>
-          <label className="flex items-center gap-3 cursor-pointer w-fit">
+          {project && (
+            <TokenCostEstimate tipo={project.tipo} horizonte={project.horizonte} />
+          )}
+          <label className="flex items-center gap-3 cursor-pointer w-fit mt-4">
             <div className="relative">
               <input
                 type="checkbox"
@@ -375,24 +446,11 @@ export default function MonitoreoPage() {
           >
             ← Ir a PESTEL
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              const params = new URLSearchParams({
-                from: "pestel",
-                pestelProjectId: projectId,
-                pestelProjectName: project?.nombre ?? "",
-                pestelProjectType: project?.tipo ?? "",
-              });
-              router.push(`/moddulo/proyecto/nuevo?${params.toString()}`);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-orange-eske text-white
-              rounded-lg text-sm font-semibold hover:bg-orange-eske-60
-              transition-colors shadow-sm"
-          >
-            <span aria-hidden="true">⚡</span>
-            Iniciar proyecto en Moddulo
-          </button>
+          <ModduloButton
+            project={project}
+            projectId={projectId}
+            analysisId={analysis?.id}
+          />
         </div>
       </div>
     </div>

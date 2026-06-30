@@ -13,9 +13,9 @@ import type {
 
 type JobPollStatus = "idle" | "running" | "completed" | "failed";
 
-// Max wait time: 12 min (CF timeout is 9 min; extra buffer for network latency)
+// Max wait time: 20 min (CF timeout is 18 min; buffer for network latency)
 const POLL_INTERVAL_MS = 4000;
-const POLL_TIMEOUT_MS = 12 * 60 * 1000;
+const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 
 function usePESTELJobV2(jobId: string | null) {
   const [status, setStatus] = useState<JobPollStatus>("idle");
@@ -34,7 +34,7 @@ function usePESTELJobV2(jobId: string | null) {
         clearInterval(interval);
         setStatus("failed");
         setError(
-          "El análisis tardó demasiado (más de 12 minutos). " +
+          "El análisis tardó demasiado (más de 20 minutos). " +
             "Es posible que la Cloud Function haya excedido su tiempo límite. " +
             "Intenta ejecutar el análisis nuevamente."
         );
@@ -277,8 +277,8 @@ export default function AnalisisPage() {
                 Analizando con IA…
               </p>
               <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
-                PESTEL está procesando las 5 dimensiones PEST-L en
-                paralelo. Este proceso tarda entre 2 y 8 minutos. Por favor, espera.
+                PESTEL está procesando las 6 dimensiones en
+                paralelo. Este proceso tarda entre 2 y 10 minutos. Por favor, espera.
               </p>
               {elapsedSeconds > 0 && (
                 <p className="text-xs text-black-eske dark:text-[#9AAEBE] mt-2">
@@ -320,7 +320,7 @@ export default function AnalisisPage() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8]">
-                  Etapa 5 — Resultados del análisis IA
+                  Etapa 3 — Resultados del análisis IA
                 </h2>
                 <p className="text-xs text-black-eske dark:text-[#9AAEBE]">
                   {formatDate(analysis.analyzedAt)}
@@ -348,6 +348,7 @@ export default function AnalisisPage() {
             <PESTLPanelV2
               analysis={analysis}
               onAcknowledgeBias={handleAcknowledgeBias}
+              onChainAdded={analysis.id ? () => loadAnalysis(analysis.id!) : undefined}
             />
           </div>
         )}

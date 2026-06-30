@@ -3,9 +3,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
-import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
+import DVSView from "./components/DVSView";
 import type {
   XPCTO,
   ProjectType,
@@ -13,13 +14,11 @@ import type {
   PhaseId,
   ExplorationForm,
   VetoActor,
+  DVSF2,
+  MapaPESTEL,
+  F2DimensionPESTEL,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
-import type {
-  PESTELProject,
-  DimensionAnalysis,
-  PestlAnalysisV2,
-} from "@/types/pestel.types";
 
 // ==========================================
 // TIPOS SEFIX
@@ -63,16 +62,18 @@ type PestlSection =
   | "economico"
   | "social"
   | "tecnologico"
+  | "ecologico"
   | "legal"
   | "semaforo"
   | "hipotesis";
 
-const PESTL_SECTIONS: { id: PestlSection; label: string; short: string }[] = [
-  { id: "politico",    label: "Político",      short: "P" },
-  { id: "economico",   label: "Económico",     short: "E" },
-  { id: "social",      label: "Social",        short: "S" },
-  { id: "tecnologico", label: "Tecnológico",   short: "T" },
-  { id: "legal",       label: "Legal",         short: "L" },
+const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?: string }[] = [
+  { id: "politico",    label: "Político",      short: "P",  dimCode: "P" },
+  { id: "economico",   label: "Económico",     short: "E",  dimCode: "E" },
+  { id: "social",      label: "Social",        short: "S",  dimCode: "S" },
+  { id: "tecnologico", label: "Tecnológico",   short: "T",  dimCode: "T" },
+  { id: "ecologico",   label: "Ecológico",     short: "Ec", dimCode: "Ec" },
+  { id: "legal",       label: "Legal",         short: "L",  dimCode: "L" },
   { id: "semaforo",    label: "Semáforo Veto", short: "⚑" },
   { id: "hipotesis",   label: "Hipótesis",     short: "H" },
 ];
@@ -93,7 +94,6 @@ export default function ExploracionPage() {
   const [activeSection, setActiveSection] = useState<PestlSection>("politico");
   const [mode, setMode] = useState<PageMode>("active");
   const [reportText, setReportText] = useState<string | null>(null);
-  const [showReport, setShowReport] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [isClosingPhase, setIsClosingPhase] = useState(false);
@@ -101,134 +101,33 @@ export default function ExploracionPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
   const [sefixData, setSefixData] = useState<SefixData | null>(null);
-  const [pestelImporting, setPESTELImporting] = useState(false);
-  // V2: selection modal state
-  const [pestelProjects, setPESTELProjects] = useState<
-    (PESTELProject & { id: string })[] | null
-  >(null);
-  const [pestelAnalysisPending, setPESTELAnalysisPending] = useState<
-    (PestlAnalysisV2 & { id: string; projectName: string }) | null
-  >(null);
 
-  // Mapear DimensionAnalysis[] → ExplorationForm.pestl (V2)
-  function mapPESTELAnalysis(
-    analysis: PestlAnalysisV2,
-  ): Partial<ExplorationForm> {
-    const dimByCode = Object.fromEntries(
-      analysis.dimensions.map((d) => [d.code, d]),
-    ) as Record<string, DimensionAnalysis>;
+  // DVS y MapaPESTEL (C2, C3, C4)
+  const [dvs, setDvs] = useState<DVSF2 | null>(null);
+  const [generandoDVS, setGenerandoDVS] = useState(false);
+  const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
 
-    const mapDim = (code: string) => {
-      const d = dimByCode[code];
-      if (!d) return { contexto: "", senalesCriticas: "" };
-      const chains = analysis.impactChains
-        .filter((c) => c.dimensions.includes(code as never))
-        .map((c) => `• ${c.description}`)
-        .join("\n");
-      return {
-        contexto: d.narrative,
-        senalesCriticas: [d.mainSignal, chains].filter(Boolean).join("\n\n"),
-      };
-    };
+  // RDA heredado de F1 (C8)
+  const [rdaActivo, setRdaActivo] = useState(false);
+  const [rdaItems, setRdaItems] = useState<string[]>([]);
 
-    return {
-      pestl: {
-        politico: { ...mapDim("P"), actoresClave: "", actoresVeto: "" },
-        economico: mapDim("E"),
-        social: mapDim("S"),
-        tecnologico: mapDim("T"),
-        legal: mapDim("L"),
-      },
-    };
-  }
+  // Máquina de estados del header (C2)
+  const headerState: "en_progreso" | "lista" | "editando" =
+    mode === "editing" ? "editando" :
+    dvs !== null ? "lista" :
+    "en_progreso";
 
-  async function handleImportPESTEL() {
-    setPESTELImporting(true);
-    try {
-      // Fetch V2 projects
-      const projRes = await fetch("/api/centinela/pestel/project");
-      if (!projRes.ok) return;
-      const projData = (await projRes.json()) as {
-        projects: (PESTELProject & { id: string })[];
-      };
-      const withAnalysis = projData.projects.filter((p) =>
-        (p.currentStage ?? 1) >= 5,
-      );
-      if (withAnalysis.length === 0) {
-        alert(
-          "No tienes proyectos de PESTEL con análisis completados. " +
-            "Ejecuta al menos un análisis primero.",
-        );
-        return;
-      }
-      if (withAnalysis.length === 1) {
-        // Auto-select the only project
-        await fetchAndConfirmAnalysis(withAnalysis[0]);
-      } else {
-        // Show project selection modal
-        setPESTELProjects(withAnalysis);
-      }
-    } finally {
-      setPESTELImporting(false);
-    }
-  }
-
-  async function fetchAndConfirmAnalysis(
-    project: PESTELProject & { id: string },
-  ) {
-    const latestRes = await fetch(
-      `/api/centinela/pestel/project/${project.id}/latest-analysis`,
-    );
-    if (!latestRes.ok) {
-      alert("No se pudo obtener el análisis del proyecto seleccionado.");
-      return;
-    }
-    const latestData = (await latestRes.json()) as {
-      analysisId: string | null;
-    };
-    if (!latestData.analysisId) {
-      alert("Este proyecto no tiene análisis disponibles todavía.");
-      return;
-    }
-    const analysisRes = await fetch(
-      `/api/centinela/pestel/analysis/${latestData.analysisId}`,
-    );
-    if (!analysisRes.ok) {
-      alert("No se pudo cargar el análisis.");
-      return;
-    }
-    const analysisData = (await analysisRes.json()) as {
-      analysis: PestlAnalysisV2 & { id: string };
-    };
-    setPESTELAnalysisPending({
-      ...analysisData.analysis,
-      projectName: project.nombre,
+  // C7 — Abrir PESTEL (reemplaza handleImportPESTEL)
+  function handleAbrirPESTEL() {
+    const meses = calcularMesesAlHito(xpcto?.tiempo?.fechaLimite);
+    const qs = new URLSearchParams({
+      moddulo_project_id: projectId,
+      tipo: projectType ?? "",
+      horizonte: String(meses),
     });
-  }
-
-  function handleConfirmPESTELImport() {
-    if (!pestelAnalysisPending) return;
-    const mapped = mapPESTELAnalysis(pestelAnalysisPending);
-    setForm((prev) => {
-      const next = structuredClone(prev);
-      if (mapped.pestl) {
-        next.pestl.politico.contexto = mapped.pestl.politico.contexto;
-        next.pestl.politico.senalesCriticas = mapped.pestl.politico.senalesCriticas;
-        next.pestl.economico.contexto = mapped.pestl.economico.contexto;
-        next.pestl.economico.senalesCriticas = mapped.pestl.economico.senalesCriticas;
-        next.pestl.social.contexto = mapped.pestl.social.contexto;
-        next.pestl.social.senalesCriticas = mapped.pestl.social.senalesCriticas;
-        next.pestl.tecnologico.contexto = mapped.pestl.tecnologico.contexto;
-        next.pestl.tecnologico.senalesCriticas = mapped.pestl.tecnologico.senalesCriticas;
-        next.pestl.legal.contexto = mapped.pestl.legal.contexto;
-        next.pestl.legal.senalesCriticas = mapped.pestl.legal.senalesCriticas;
-      }
-      return next;
-    });
-    setPESTELAnalysisPending(null);
+    router.push(`/centinela/pestel/nuevo?${qs.toString()}`);
   }
 
   // Cargar proyecto al montar
@@ -247,10 +146,8 @@ export default function ExploracionPage() {
         const p = data.project;
         setProjectType(p.type ?? "electoral");
 
-        // XPCTO de F1 como contexto fundacional
         if (p.xpcto) setXpcto(p.xpcto);
 
-        // Cargar datos de F2 desde phases.exploracion.data
         const phaseData = p.phases?.exploracion?.data;
         if (phaseData && Object.keys(phaseData).length > 0) {
           const loaded = mergePhaseData(emptyExplorationForm(), phaseData);
@@ -258,19 +155,53 @@ export default function ExploracionPage() {
           setEditForm(loaded);
         }
 
-        // Detectar si la fase está completada
         const phaseStatus = p.phases?.exploracion?.status;
         if (phaseStatus === "completed") setMode("completed");
 
-        // Cargar reporte guardado (borrador o final) independientemente del estado de la fase
         const savedReport = p.phases?.exploracion?.reportText;
         if (savedReport) setReportText(savedReport);
+
+        // Cargar DVS si existe
+        const savedDvs = p.phases?.exploracion?.dvs;
+        if (savedDvs) setDvs(savedDvs as DVSF2);
+
+        // Cargar MapaPESTEL si existe
+        const savedMapa = p.phases?.exploracion?.mapaPESTEL;
+        if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
+
+        // Cargar RDA de F1 (C8)
+        const rda = p.phases?.proposito?.rda;
+        if (rda?.activo) {
+          setRdaActivo(true);
+          setRdaItems(rda.items ?? []);
+        }
       })
       .catch((err) => console.error("[exploracion] fetch error:", err))
       .finally(() => setIsLoaded(true));
   }, [projectId]);
 
-  // Cargar datos de Sefix para proyectos electorales/gubernamentales con estado mexicano detectado
+  // C7 — Auto-import PESTEL al regresar con pest_analysis_id en URL
+  useEffect(() => {
+    if (!isLoaded || !projectId) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const pestId = urlParams.get("pest_analysis_id");
+    if (!pestId || mapaPESTEL) return; // skip if already imported
+
+    fetch("/api/moddulo/f2/import-pestel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ projectId, pestAnalysisId: pestId }),
+    })
+      .then(async (r) => {
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
+      })
+      .catch(() => {});
+  }, [isLoaded, projectId, mapaPESTEL]);
+
+  // Cargar datos Sefix
   useEffect(() => {
     if (!isLoaded || !xpcto || !["electoral", "gubernamental"].includes(projectType)) return;
     const estadoDetectado = detectEstadoFromXpcto(xpcto);
@@ -317,7 +248,7 @@ export default function ExploracionPage() {
     return () => clearTimeout(timer);
   }, [form, autoSave, isLoaded, mode]);
 
-  // Datos planos del formulario para el chat (incluye sección activa como contexto)
+  // Datos planos del formulario para el chat
   const currentFormData: Record<string, unknown> = {
     activeSection,
     "pestl.politico.contexto": form.pestl.politico.contexto,
@@ -330,6 +261,8 @@ export default function ExploracionPage() {
     "pestl.social.senalesCriticas": form.pestl.social.senalesCriticas,
     "pestl.tecnologico.contexto": form.pestl.tecnologico.contexto,
     "pestl.tecnologico.senalesCriticas": form.pestl.tecnologico.senalesCriticas,
+    "pestl.ecologico.contexto": form.pestl.ecologico.contexto,
+    "pestl.ecologico.senalesCriticas": form.pestl.ecologico.senalesCriticas,
     "pestl.legal.contexto": form.pestl.legal.contexto,
     "pestl.legal.senalesCriticas": form.pestl.legal.senalesCriticas,
     "semaforo.resumen": form.semaforo.resumen,
@@ -339,7 +272,7 @@ export default function ExploracionPage() {
     "hipotesis.implicaciones": form.hipotesis.implicaciones,
   };
 
-  // XPCTO como contexto para el prompt del chat (incluye datos Sefix si están disponibles)
+  // XPCTO como contexto para el chat
   const xpctoContext = xpcto
     ? {
         hito: xpcto.hito,
@@ -393,6 +326,8 @@ export default function ExploracionPage() {
       if (typeof data["pestl.social.senalesCriticas"] === "string")  next.pestl.social.senalesCriticas = data["pestl.social.senalesCriticas"];
       if (typeof data["pestl.tecnologico.contexto"] === "string")    next.pestl.tecnologico.contexto = data["pestl.tecnologico.contexto"];
       if (typeof data["pestl.tecnologico.senalesCriticas"] === "string") next.pestl.tecnologico.senalesCriticas = data["pestl.tecnologico.senalesCriticas"];
+      if (typeof data["pestl.ecologico.contexto"] === "string")      next.pestl.ecologico.contexto = data["pestl.ecologico.contexto"];
+      if (typeof data["pestl.ecologico.senalesCriticas"] === "string") next.pestl.ecologico.senalesCriticas = data["pestl.ecologico.senalesCriticas"];
       if (typeof data["pestl.legal.contexto"] === "string")          next.pestl.legal.contexto = data["pestl.legal.contexto"];
       if (typeof data["pestl.legal.senalesCriticas"] === "string")   next.pestl.legal.senalesCriticas = data["pestl.legal.senalesCriticas"];
       if (typeof data["semaforo.resumen"] === "string")              next.semaforo.resumen = data["semaforo.resumen"];
@@ -404,58 +339,64 @@ export default function ExploracionPage() {
     });
   }, []);
 
-  // Generar resultado exploratorio
-  const generateReport = async (formData: ExplorationForm): Promise<string | null> => {
-    setIsGeneratingReport(true);
+  // C5 — Generar DVS
+  const handleGenerarDVS = async () => {
+    setGenerandoDVS(true);
     try {
-      const r = await fetch(`/api/moddulo/projects/${projectId}/generate-report`, {
+      const r = await fetch("/api/moddulo/f2/generate-dvs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ phaseId: "exploracion", explorationData: formData, xpcto }),
+        body: JSON.stringify({ projectId }),
       });
-      if (!r.ok) return null;
+      if (!r.ok) return;
       const data = await r.json();
-      return data.reportText ?? null;
-    } catch { return null; }
-    finally { setIsGeneratingReport(false); }
-  };
-
-  const handleVerResultado = async () => {
-    if (reportText) { setShowReport(true); setMobileTab("chat"); return; }
-    const report = await generateReport(form);
-    if (report) {
-      setReportText(report);
-      setShowReport(true);
-      setMobileTab("chat");
-      // Persistir el borrador en Firestore para que sobreviva un refresh
-      fetch(`/api/moddulo/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ reportDraft: { phaseId: "exploracion", reportText: report } }),
-      }).catch(() => {});
+      if (data.dvs) setDvs(data.dvs as DVSF2);
+    } catch {/* silencioso */} finally {
+      setGenerandoDVS(false);
     }
   };
 
+  // C6 — Cerrar Fase 2 con propagación de PIP e incertidumbres
   const handleClosePhase = async () => {
     setIsClosingPhase(true);
     try {
-      const report = reportText ?? await generateReport(form);
       await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ phaseId: "exploracion", reportText: report ?? undefined }),
+        body: JSON.stringify({
+          phaseId: "exploracion",
+          reportText: reportText ?? undefined,
+        }),
       });
-      if (report) setReportText(report);
+
+      // Propagar PIP e incertidumbres a F3 (fire-and-forget)
+      if (dvs) {
+        fetch(`/api/moddulo/projects/${projectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            phaseData: {
+              phaseId: "exploracion",
+              data: { aprobadoEn: new Date().toISOString() },
+            },
+            f3Seed: {
+              pip: dvs.pip,
+              incertidumbres: dvs.incertidumbres,
+            },
+          }),
+        }).catch(() => {});
+      }
+
       setShowReview(false);
       router.push(`/moddulo/proyecto/${projectId}/investigacion`);
     } catch {/* silencioso */} finally { setIsClosingPhase(false); }
   };
 
   const handleStartEdit = () => { setEditForm(structuredClone(form)); setMode("editing"); };
-  const handleCancelEdit = () => setMode("completed");
+  const handleCancelEdit = () => setMode(dvs ? "completed" : "active");
 
   const handleSaveEdit = async () => {
     setIsSaving(true);
@@ -468,24 +409,29 @@ export default function ExploracionPage() {
       });
       setForm(structuredClone(editForm));
       setLastSaved(new Date());
-      const newReport = await generateReport(editForm);
-      if (newReport) {
-        setReportText(newReport);
-        setShowReport(true);
-        fetch(`/api/moddulo/projects/${projectId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ reportDraft: { phaseId: "exploracion", reportText: newReport } }),
-        }).catch(() => {});
+
+      // Re-generar DVS con los nuevos datos
+      setGenerandoDVS(true);
+      const r = await fetch("/api/moddulo/f2/generate-dvs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.dvs) setDvs(data.dvs as DVSF2);
       }
+
       const affected = await checkBackPropagation(projectId);
       if (affected.length > 0) setPropagationWarning(affected);
       else setMode("completed");
-    } catch {/* silencioso */} finally { setIsSaving(false); }
+    } catch {/* silencioso */} finally {
+      setIsSaving(false);
+      setGenerandoDVS(false);
+    }
   };
 
-  const formComplete = isF2FormComplete(form);
   const activeForm = mode === "editing" ? editForm : form;
   const setActiveForm = mode === "editing" ? setEditForm : (mode === "active" ? setForm : () => {});
 
@@ -502,93 +448,100 @@ export default function ExploracionPage() {
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske shrink-0">F2</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Exploración</h1>
-            {mode === "completed" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
+            {headerState === "lista" && (
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ DVS listo</span>
             )}
-            {mode === "editing" && (
+            {headerState === "editando" && (
               <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">Editando</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
             <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] hidden sm:block">
-              {isSaving ? "Guardando..." : lastSaved ? `✓ ${lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}
+              {isSaving || generandoDVS
+                ? (generandoDVS ? "Generando DVS..." : "Guardando...")
+                : lastSaved ? `✓ ${lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}
             </span>
             <DownloadButton form={form} reportText={reportText} chatMessages={chatMessages} />
           </div>
         </div>
 
-        {/* Botones de acción */}
+        {/* Botones de acción — máquina de estados C2 */}
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {(formComplete || mode === "completed" || mode === "editing") && (
+          {headerState === "en_progreso" && (<>
             <button
-              onClick={handleVerResultado}
-              disabled={isGeneratingReport}
-              className="flex items-center gap-1 px-2.5 py-1.5 border border-bluegreen-eske text-bluegreen-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-40"
-            >
-              {isGeneratingReport
-                ? <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" />Generando</>
-                : reportText ? "Ver resultado exploratorio" : "Generar resultado exploratorio"
-              }
+              onClick={handleAbrirPESTEL}
+              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
+              Abrir PESTEL
             </button>
-          )}
-
-          {mode === "active" && (<>
-            <button
-              onClick={handleImportPESTEL}
-              disabled={pestelImporting}
-              className="px-2.5 py-1.5 border border-bluegreen-eske/40
-                text-bluegreen-eske rounded-lg text-xs font-semibold
-                hover:bg-bluegreen-eske/5 transition-colors
-                disabled:opacity-40 flex items-center gap-1">
-              {pestelImporting
-                ? <><div className="w-3 h-3 border-2 border-bluegreen-eske/30
-                    border-t-bluegreen-eske rounded-full animate-spin" />
-                    Cargando…</>
-                : "⚡ Importar PESTEL"}
-            </button>
-            <button onClick={handleStartEdit} disabled={!formComplete}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <button disabled
+              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
               Editar análisis
             </button>
-            <button onClick={() => setShowReview(true)} disabled={!formComplete}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <button disabled
+              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
               Cerrar Fase 2
             </button>
           </>)}
 
-          {mode === "completed" && (<>
+          {headerState === "lista" && (<>
+            <button
+              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold cursor-default">
+              DVS F2
+            </button>
             <button onClick={handleStartEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
+              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
               Editar análisis
             </button>
             <button onClick={() => setShowReview(true)}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors">
+              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
               Cerrar Fase 2
             </button>
           </>)}
 
-          {mode === "editing" && (<>
+          {headerState === "editando" && (<>
             <button onClick={handleCancelEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
+              className="px-2.5 py-1.5 border border-gray-eske-70 dark:border-[#9AAEBE] text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
               Cancelar
             </button>
-            <button onClick={handleSaveEdit} disabled={isSaving}
-              className="px-2.5 py-1.5 border border-bluegreen-eske text-bluegreen-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-40">
-              {isSaving ? "Guardando..." : "Guardar cambios"}
+            <button onClick={handleSaveEdit} disabled={isSaving || generandoDVS}
+              className="px-2.5 py-1.5 border border-gray-eske-70 dark:border-[#9AAEBE] text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-40">
+              {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
             </button>
-            <button onClick={() => setShowReview(true)}
-              className="px-2.5 py-1.5 bg-bluegreen-eske text-white-eske rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors">
+            <button disabled
+              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
               Cerrar Fase 2
             </button>
           </>)}
         </div>
       </div>
 
+      {/* C8 — Alerta RDA heredada de F1 */}
+      {rdaActivo && (
+        <div
+          role="alert"
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-yellow-eske-10 border-l-4 border-yellow-eske text-sm dark:bg-yellow-eske/10"
+        >
+          <svg className="w-4 h-4 shrink-0 text-yellow-eske-70 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <span className="text-black-eske dark:text-white">
+            <strong>Deficiencias activas de F1</strong> —{" "}
+            {rdaItems.length > 0 ? `${rdaItems.length} pendientes` : "sin resolver"} en el Propósito.
+          </span>
+          <Link
+            href={`/moddulo/proyecto/${projectId}/proposito`}
+            className="ml-auto text-bluegreen-eske underline text-xs shrink-0 hover:text-bluegreen-eske-60"
+          >
+            Ver RDA de F1
+          </Link>
+        </div>
+      )}
+
       {/* ===== TABS MOBILE ===== */}
       <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
         {[
-          { id: "chat" as const, label: showReport || mode === "completed" ? "📋 Resultado" : "💬 Chat" },
-          { id: "form" as const, label: "📊 Análisis PEST-L" },
+          { id: "chat" as const, label: headerState === "lista" && mode !== "editing" ? "📋 DVS F2" : "💬 Chat" },
+          { id: "form" as const, label: "📊 Análisis PESTEL" },
         ].map(({ id, label }) => (
           <button key={id} onClick={() => setMobileTab(id)}
             className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
@@ -602,38 +555,40 @@ export default function ExploracionPage() {
       {/* ===== CONTENIDO PRINCIPAL ===== */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* Columna izquierda: chat / resultado */}
+        {/* Columna izquierda: DVSView (lista) o Chat (en_progreso/editando) */}
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
-          {showReport || mode === "completed" ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {showReport && mode !== "completed" && (
-                <button onClick={() => setShowReport(false)}
-                  className="shrink-0 mb-3 flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Volver al chat
-                </button>
-              )}
-              <PhaseReportView
-                phaseId="exploracion"
-                reportText={reportText}
-                projectId={projectId}
-                isCompleted={mode === "completed"}
-                onStartEdit={handleStartEdit}
-                className="flex-1 overflow-hidden"
-              />
+          {headerState === "lista" && mode !== "editing" ? (
+            <div className="flex-1 overflow-y-auto">
+              <DVSView dvs={dvs!} />
             </div>
           ) : (
-            <ModduloChat
-              phaseId="exploracion"
-              projectId={projectId}
-              currentFormData={currentFormData}
-              xpctoContext={xpctoContext}
-              onDataExtracted={handleDataExtracted}
-              onMessagesChange={setChatMessages}
-              className="flex-1 overflow-hidden"
-            />
+            <div className="flex-1 flex flex-col overflow-hidden gap-3">
+              <ModduloChat
+                phaseId="exploracion"
+                projectId={projectId}
+                currentFormData={currentFormData}
+                xpctoContext={xpctoContext}
+                onDataExtracted={handleDataExtracted}
+                onMessagesChange={setChatMessages}
+                className="flex-1 overflow-hidden"
+              />
+              {/* Botón Generar DVS (solo en en_progreso) */}
+              {headerState === "en_progreso" && (
+                <div className="shrink-0 flex justify-end">
+                  <button
+                    onClick={handleGenerarDVS}
+                    disabled={generandoDVS}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-bluegreen-eske text-white rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50"
+                  >
+                    {generandoDVS ? (
+                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />Generando DVS…</>
+                    ) : (
+                      "Generar DVS"
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -647,6 +602,7 @@ export default function ExploracionPage() {
             readOnly={mode === "completed"}
             projectType={projectType}
             sefixData={sefixData}
+            mapaPESTEL={mapaPESTEL}
           />
         </div>
       </div>
@@ -671,101 +627,6 @@ export default function ExploracionPage() {
           onDismiss={() => { setPropagationWarning([]); setMode("completed"); }}
         />
       )}
-
-      {/* Modal selección de proyecto PESTEL (cuando hay más de uno) */}
-      {pestelProjects && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center
-          justify-center p-4">
-          <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl p-6 max-w-md w-full
-            flex flex-col gap-4">
-            <h3 className="font-semibold text-bluegreen-eske-60">
-              Selecciona el proyecto de PESTEL
-            </h3>
-            <p className="text-sm text-gray-eske-60 dark:text-[#C7D6E0]">
-              Elige el análisis PEST-L que deseas importar:
-            </p>
-            <ul className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-              {pestelProjects.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setPESTELProjects(null);
-                      setPESTELImporting(true);
-                      try {
-                        await fetchAndConfirmAnalysis(p);
-                      } finally {
-                        setPESTELImporting(false);
-                      }
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg border
-                      border-gray-eske-20 dark:border-white/10 hover:border-bluegreen-eske
-                      hover:bg-bluegreen-eske/5 dark:hover:bg-white/5 transition-colors"
-                  >
-                    <p className="font-semibold text-black-eske dark:text-[#EAF2F8] text-sm">
-                      {p.nombre}
-                    </p>
-                    <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
-                      {p.territorio?.nombre ?? ""} · {p.tipo}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setPESTELProjects(null)}
-                className="px-4 py-2 text-sm border border-gray-eske-20 dark:border-white/10 rounded-lg
-                  hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors text-gray-eske-60 dark:text-[#C7D6E0]"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal confirmación importar análisis PESTEL V2 */}
-      {pestelAnalysisPending && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center
-          justify-center p-4">
-          <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl p-6 max-w-md w-full
-            flex flex-col gap-4">
-            <h3 className="font-semibold text-bluegreen-eske-60">
-              Importar análisis de PESTEL
-            </h3>
-            <p className="text-sm text-gray-eske-60 dark:text-[#C7D6E0]">
-              Se importará el análisis PEST-L de{" "}
-              <strong>{pestelAnalysisPending.projectName}</strong> (v
-              {pestelAnalysisPending.version},{" "}
-              {pestelAnalysisPending.globalConfidence}% confianza). Esto
-              sobrescribirá el contexto y las señales críticas de las 5
-              dimensiones. Los actores clave, actores de veto, semáforo e
-              hipótesis no se modificarán.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setPESTELAnalysisPending(null)}
-                className="px-4 py-2 text-sm border border-gray-eske-20 dark:border-white/10 rounded-lg
-                  hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors text-gray-eske-60 dark:text-[#C7D6E0]"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmPESTELImport}
-                className="px-4 py-2 text-sm bg-bluegreen-eske text-white
-                  rounded-lg hover:bg-bluegreen-eske-60 transition-colors
-                  font-medium"
-              >
-                Importar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -775,7 +636,7 @@ export default function ExploracionPage() {
 // ==========================================
 
 function ExplorationFormPanel({
-  form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData,
+  form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
 }: {
   form: ExplorationForm;
   onChange: (f: ExplorationForm) => void;
@@ -784,6 +645,7 @@ function ExplorationFormPanel({
   readOnly: boolean;
   projectType: ProjectType;
   sefixData: SefixData | null;
+  mapaPESTEL: MapaPESTEL | null;
 }) {
   const fieldClass =
     "w-full px-3 py-2 text-sm font-normal rounded-lg border border-gray-eske-20 dark:border-white/10 " +
@@ -796,7 +658,7 @@ function ExplorationFormPanel({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">Análisis PEST-L</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
         <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">{readOnly ? "Solo lectura" : "Auto-rellena via chat"}</span>
       </div>
 
@@ -804,6 +666,7 @@ function ExplorationFormPanel({
       <div className="shrink-0 flex overflow-x-auto border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
         {PESTL_SECTIONS.map((sec) => {
           const filled = isSectionFilled(form, sec.id);
+          const hasSignals = sec.dimCode && mapaPESTEL?.[sec.dimCode];
           return (
             <button key={sec.id} onClick={() => onSectionChange(sec.id)}
               className={`shrink-0 px-3 py-2 text-xs font-semibold transition-colors border-b-2 flex items-center gap-1 ${
@@ -813,7 +676,8 @@ function ExplorationFormPanel({
               }`}>
               <span className="hidden sm:inline">{sec.label}</span>
               <span className="sm:hidden">{sec.short}</span>
-              {filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />}
+              {hasSignals && <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Señales PESTEL importadas" />}
+              {!hasSignals && filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />}
             </button>
           );
         })}
@@ -822,59 +686,94 @@ function ExplorationFormPanel({
       {/* Contenido de la sección */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {activeSection === "politico" && (
-          <PoliticoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} projectType={projectType} sefixData={sefixData} />
+          mapaPESTEL?.["P"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
+          ) : (
+            <PoliticoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} projectType={projectType} sefixData={sefixData} />
+          )
         )}
         {activeSection === "economico" && (
-          <SimpleDimSection
-            title="Entorno Económico"
-            hint={projectType === "gubernamental"
-              ? "Recursos públicos, presupuesto, condiciones que afectan la gestión"
-              : "Condiciones económicas que impactan la viabilidad y el electorado"}
-            contexto={form.pestl.economico.contexto}
-            senales={form.pestl.economico.senalesCriticas}
-            onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, economico: { ...form.pestl.economico, contexto: v } } })}
-            onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, economico: { ...form.pestl.economico, senalesCriticas: v } } })}
-            readOnly={readOnly} fieldClass={fieldClass}
-          />
+          mapaPESTEL?.["E"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["E"]} />
+          ) : (
+            <SimpleDimSection
+              title="Entorno Económico"
+              hint={projectType === "gubernamental"
+                ? "Recursos públicos, presupuesto, condiciones que afectan la gestión"
+                : "Condiciones económicas que impactan la viabilidad y el electorado"}
+              contexto={form.pestl.economico.contexto}
+              senales={form.pestl.economico.senalesCriticas}
+              onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, economico: { ...form.pestl.economico, contexto: v } } })}
+              onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, economico: { ...form.pestl.economico, senalesCriticas: v } } })}
+              readOnly={readOnly} fieldClass={fieldClass}
+            />
+          )
         )}
         {activeSection === "social" && (
-          <SimpleDimSection
-            title="Entorno Social"
-            hint={projectType === "electoral"
-              ? "Demografía, preferencias e identidades del electorado"
-              : projectType === "ciudadano"
-              ? "Bases sociales, capacidad de movilización, tejido asociativo"
-              : "Percepción ciudadana, demandas sociales y cohesión"}
-            contexto={form.pestl.social.contexto}
-            senales={form.pestl.social.senalesCriticas}
-            onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, social: { ...form.pestl.social, contexto: v } } })}
-            onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, social: { ...form.pestl.social, senalesCriticas: v } } })}
-            readOnly={readOnly} fieldClass={fieldClass}
-          />
+          mapaPESTEL?.["S"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["S"]} />
+          ) : (
+            <SimpleDimSection
+              title="Entorno Social"
+              hint={projectType === "electoral"
+                ? "Demografía, preferencias e identidades del electorado"
+                : projectType === "ciudadano"
+                ? "Bases sociales, capacidad de movilización, tejido asociativo"
+                : "Percepción ciudadana, demandas sociales y cohesión"}
+              contexto={form.pestl.social.contexto}
+              senales={form.pestl.social.senalesCriticas}
+              onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, social: { ...form.pestl.social, contexto: v } } })}
+              onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, social: { ...form.pestl.social, senalesCriticas: v } } })}
+              readOnly={readOnly} fieldClass={fieldClass}
+            />
+          )
         )}
         {activeSection === "tecnologico" && (
-          <SimpleDimSection
-            title="Entorno Tecnológico"
-            hint="Infraestructura digital, redes sociales dominantes, herramientas disponibles"
-            contexto={form.pestl.tecnologico.contexto}
-            senales={form.pestl.tecnologico.senalesCriticas}
-            onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, tecnologico: { ...form.pestl.tecnologico, contexto: v } } })}
-            onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, tecnologico: { ...form.pestl.tecnologico, senalesCriticas: v } } })}
-            readOnly={readOnly} fieldClass={fieldClass}
-          />
+          mapaPESTEL?.["T"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["T"]} />
+          ) : (
+            <SimpleDimSection
+              title="Entorno Tecnológico"
+              hint="Infraestructura digital, redes sociales dominantes, herramientas disponibles"
+              contexto={form.pestl.tecnologico.contexto}
+              senales={form.pestl.tecnologico.senalesCriticas}
+              onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, tecnologico: { ...form.pestl.tecnologico, contexto: v } } })}
+              onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, tecnologico: { ...form.pestl.tecnologico, senalesCriticas: v } } })}
+              readOnly={readOnly} fieldClass={fieldClass}
+            />
+          )
+        )}
+        {activeSection === "ecologico" && (
+          mapaPESTEL?.["Ec"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["Ec"]} />
+          ) : (
+            <SimpleDimSection
+              title="Entorno Ecológico"
+              hint="Riesgos ambientales, normativa ecológica, impacto en territorio y comunidades"
+              contexto={form.pestl.ecologico.contexto}
+              senales={form.pestl.ecologico.senalesCriticas}
+              onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, ecologico: { ...form.pestl.ecologico, contexto: v } } })}
+              onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, ecologico: { ...form.pestl.ecologico, senalesCriticas: v } } })}
+              readOnly={readOnly} fieldClass={fieldClass}
+            />
+          )
         )}
         {activeSection === "legal" && (
-          <SimpleDimSection
-            title="Entorno Legal"
-            hint={projectType === "legislativo"
-              ? "Marco normativo, bloques parlamentarios, requisitos de coalición o mayoría"
-              : "Marco jurídico electoral, plazos legales, restricciones y oportunidades normativas"}
-            contexto={form.pestl.legal.contexto}
-            senales={form.pestl.legal.senalesCriticas}
-            onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, legal: { ...form.pestl.legal, contexto: v } } })}
-            onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, legal: { ...form.pestl.legal, senalesCriticas: v } } })}
-            readOnly={readOnly} fieldClass={fieldClass}
-          />
+          mapaPESTEL?.["L"] ? (
+            <TripartiteSignalsPanel dim={mapaPESTEL["L"]} />
+          ) : (
+            <SimpleDimSection
+              title="Entorno Legal"
+              hint={projectType === "legislativo"
+                ? "Marco normativo, bloques parlamentarios, requisitos de coalición o mayoría"
+                : "Marco jurídico electoral, plazos legales, restricciones y oportunidades normativas"}
+              contexto={form.pestl.legal.contexto}
+              senales={form.pestl.legal.senalesCriticas}
+              onCtx={(v) => onChange({ ...form, pestl: { ...form.pestl, legal: { ...form.pestl.legal, contexto: v } } })}
+              onSen={(v) => onChange({ ...form, pestl: { ...form.pestl, legal: { ...form.pestl.legal, senalesCriticas: v } } })}
+              readOnly={readOnly} fieldClass={fieldClass}
+            />
+          )
         )}
         {activeSection === "semaforo" && (
           <SemaforoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} />
@@ -884,6 +783,97 @@ function ExplorationFormPanel({
         )}
       </div>
     </div>
+  );
+}
+
+// ==========================================
+// SEÑALES TRIPARTITAS (C4)
+// ==========================================
+
+function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
+  const CLASIF_COLORS: Record<string, string> = {
+    OPORTUNIDAD: "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20",
+    NEUTRAL: "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10",
+    AMENAZA: "bg-red-eske-20 text-red-eske-80 dark:bg-red-eske/20",
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-black-eske dark:text-white">{dim.label}</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CLASIF_COLORS[dim.clasificacion] ?? CLASIF_COLORS.NEUTRAL}`}>
+          {dim.clasificacion}
+        </span>
+        {dim.confidence !== undefined && (
+          <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
+            {dim.confidence}% conf.
+          </span>
+        )}
+      </div>
+      {dim.narrativa && (
+        <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8]">{dim.narrativa}</p>
+      )}
+
+      <SignalGroup
+        title="Señales favorables"
+        signals={dim.senalesFavorables}
+        colorClass="text-green-eske-70 dark:text-[#7BC47C]"
+        summaryClass="border border-green-eske-30 dark:border-green-eske/20"
+      />
+      <SignalGroup
+        title="Señales adversas"
+        signals={dim.senalesAdversas}
+        colorClass="text-red-eske-70 dark:text-[#E07070]"
+        summaryClass="border border-red-eske-20 dark:border-red-eske/20"
+      />
+      <SignalGroup
+        title="Señales inciertas"
+        signals={dim.senalesInciertas}
+        colorClass="text-yellow-eske-70 dark:text-yellow-eske"
+        summaryClass="border border-yellow-eske-20 dark:border-yellow-eske/20"
+      />
+    </div>
+  );
+}
+
+function SignalGroup({
+  title, signals, colorClass, summaryClass,
+}: {
+  title: string;
+  signals: F2DimensionPESTEL["senalesFavorables"];
+  colorClass: string;
+  summaryClass: string;
+}) {
+  if (signals.length === 0) return null;
+  return (
+    <details className={`rounded-lg overflow-hidden ${summaryClass}`}>
+      <summary className={`px-3 py-2 text-xs font-semibold cursor-pointer list-none flex items-center justify-between ${colorClass}`}>
+        {title} <span className="text-gray-eske-50">({signals.length})</span>
+      </summary>
+      <ul className="divide-y divide-gray-eske-20 dark:divide-white/5">
+        {signals.map((s, i) => (
+          <li key={i} className="px-3 py-2 space-y-0.5">
+            <p className="text-xs text-black-eske dark:text-[#EAF2F8]">{s.descripcion}</p>
+            <div className="flex items-center gap-2 text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
+              <span>{s.fuente}</span>
+              {s.fechaCorte && <span>· {s.fechaCorte}</span>}
+              {s.origenInternacional && (
+                <span className="px-1.5 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-70 rounded text-xs dark:bg-bluegreen-eske/20">
+                  Intl.
+                </span>
+              )}
+              <span className={`ml-auto px-1.5 py-0.5 rounded text-xs ${
+                s.nivelConfianza === "alto" ? "bg-green-eske-10 text-green-eske-70" :
+                s.nivelConfianza === "bajo" ? "bg-red-eske-10 text-red-eske-70" :
+                "bg-gray-eske-10 text-gray-eske-60"
+              }`}>
+                {s.nivelConfianza}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -937,7 +927,7 @@ function PoliticoSection({ form, onChange, readOnly, fieldClass, projectType, se
 }
 
 // ==========================================
-// SECCIÓN GENÉRICA (E, S, T, L)
+// SECCIÓN GENÉRICA (E, S, T, Ec, L)
 // ==========================================
 
 function SimpleDimSection({ title, hint, contexto, senales, onCtx, onSen, readOnly, fieldClass }: {
@@ -1222,6 +1212,8 @@ function DownloadButton({ form, reportText, chatMessages }: {
     `Señales críticas: ${form.pestl.social.senalesCriticas || "(sin datos)"}`, "",
     "[ T ] TECNOLÓGICO", `Contexto: ${form.pestl.tecnologico.contexto || "(sin datos)"}`,
     `Señales críticas: ${form.pestl.tecnologico.senalesCriticas || "(sin datos)"}`, "",
+    "[ Ec ] ECOLÓGICO", `Contexto: ${form.pestl.ecologico.contexto || "(sin datos)"}`,
+    `Señales críticas: ${form.pestl.ecologico.senalesCriticas || "(sin datos)"}`, "",
     "[ L ] LEGAL", `Contexto: ${form.pestl.legal.contexto || "(sin datos)"}`,
     `Señales críticas: ${form.pestl.legal.senalesCriticas || "(sin datos)"}`, "",
     "SEMÁFORO DE VETO",
@@ -1236,7 +1228,7 @@ function DownloadButton({ form, reportText, chatMessages }: {
   ].join("\n");
 
   const options = [
-    { label: "Resultado exploratorio (.md)", available: !!reportText, action: () => reportText && dl(reportText, "F2-Exploracion-Resultado.md") },
+    { label: "Reporte exploratorio (.md)", available: !!reportText, action: () => reportText && dl(reportText, "F2-Exploracion-Resultado.md") },
     { label: "Historial del chat (.txt)", available: chatMessages.length > 0, action: () => {
       dl(chatMessages.map((m) => `[${m.role === "assistant" ? "Moddulo" : "Consultor"}]\n${m.content}`).join("\n\n---\n\n"), "F2-Exploracion-Chat.txt");
     }},
@@ -1344,23 +1336,18 @@ function SefixWidget({ data }: { data: SefixData }) {
 // HELPERS
 // ==========================================
 
-function isF2FormComplete(form: ExplorationForm): boolean {
-  return (["politico", "economico", "social", "tecnologico", "legal"] as const)
-    .every((dim) => form.pestl[dim].contexto.trim().length > 0) &&
-    form.hipotesis.enunciado.trim().length > 0;
-}
-
 function isSectionFilled(form: ExplorationForm, section: PestlSection): boolean {
   if (section === "hipotesis") return form.hipotesis.enunciado.trim().length > 0;
   if (section === "semaforo") return form.semaforo.actores.length > 0 || form.semaforo.resumen.trim().length > 0;
-  return form.pestl[section as keyof ExplorationForm["pestl"]].contexto.trim().length > 0;
+  const dim = form.pestl[section as keyof ExplorationForm["pestl"]];
+  return dim ? dim.contexto.trim().length > 0 : false;
 }
 
 function mergePhaseData(base: ExplorationForm, data: Record<string, unknown>): ExplorationForm {
   const merged = structuredClone(base);
   if (data.pestl && typeof data.pestl === "object") {
     const pestl = data.pestl as Record<string, unknown>;
-    for (const dim of ["politico", "economico", "social", "tecnologico", "legal"] as const) {
+    for (const dim of ["politico", "economico", "social", "tecnologico", "ecologico", "legal"] as const) {
       if (pestl[dim] && typeof pestl[dim] === "object") Object.assign(merged.pestl[dim], pestl[dim]);
     }
   }
@@ -1369,7 +1356,15 @@ function mergePhaseData(base: ExplorationForm, data: Record<string, unknown>): E
   return merged;
 }
 
-// Detecta un estado mexicano a partir del XPCTO (hito + sujeto)
+function calcularMesesAlHito(fechaLimite?: string): number {
+  if (!fechaLimite) return 12;
+  const target = new Date(fechaLimite);
+  const now = new Date();
+  const months = (target.getFullYear() - now.getFullYear()) * 12 +
+    (target.getMonth() - now.getMonth());
+  return Math.max(1, months);
+}
+
 const ESTADOS_MEXICO = [
   "aguascalientes", "baja california sur", "baja california",
   "campeche", "chiapas", "chihuahua", "coahuila", "colima",
@@ -1385,12 +1380,11 @@ function detectEstadoFromXpcto(xpcto: XPCTO): string | null {
   const text = `${xpcto.hito ?? ""} ${xpcto.sujeto ?? ""} ${xpcto.justificacion ?? ""}`
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[̀-ͯ]/g, "");
 
-  // Ordenar de más largo a más corto para evitar falsos positivos (e.g. "baja california" vs "baja california sur")
   const sorted = [...ESTADOS_MEXICO].sort((a, b) => b.length - a.length);
   for (const estado of sorted) {
-    const normalized = estado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalized = estado.normalize("NFD").replace(/[̀-ͯ]/g, "");
     if (text.includes(normalized)) return estado;
   }
   return null;

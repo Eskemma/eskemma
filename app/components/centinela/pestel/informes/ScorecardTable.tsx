@@ -5,19 +5,12 @@
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type { Scorecard } from "@/lib/pestel/matrizUtils";
 import type { DimensionAnalysis } from "@/types/pestel.types";
+import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface Props {
   scorecard: Scorecard;
   dimensions: DimensionAnalysis[];
 }
-
-const DIMENSION_LABELS: Record<string, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
 
 const CLASSIFICATION_STYLES: Record<string, string> = {
   OPORTUNIDAD: "bg-green-eske/10 text-green-eske border border-green-eske/30",
@@ -66,7 +59,7 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
                 Confianza
                 <InfoTooltip
                   content="Certeza del análisis IA para esta dimensión (0-100%), según cantidad y calidad de fuentes."
-                  placement="right"
+                  placement="left"
                 />
               </span>
             </th>
@@ -75,7 +68,7 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
                 Peso
                 <InfoTooltip
                   content="Importancia relativa configurada en E3 Variables. Dimensiones de mayor peso tienen más influencia en el score global."
-                  placement="right"
+                  placement="left"
                 />
               </span>
             </th>
@@ -91,7 +84,9 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
           </tr>
         </thead>
         <tbody>
-          {scorecard.dimensions.map((ds) => {
+          {[...scorecard.dimensions]
+            .sort((a, b) => DIMENSION_ORDER.indexOf(a.code) - DIMENSION_ORDER.indexOf(b.code))
+            .map((ds) => {
             const dim = dimensions.find((d) => d.code === ds.code);
             if (!dim) return null;
             return (
@@ -104,7 +99,7 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
                     <span className="w-6 h-6 rounded-full bg-bluegreen-eske text-white text-xs font-bold flex items-center justify-center shrink-0">
                       {ds.code}
                     </span>
-                    {DIMENSION_LABELS[ds.code]}
+                    {DIMENSION_META[ds.code]?.label ?? ds.code}
                   </span>
                 </td>
                 <td className="py-2.5 px-3 text-black-eske dark:text-[#C7D6E0] max-w-[200px]">
@@ -149,7 +144,7 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
               <span className="inline-flex items-center justify-end gap-1">
                 Score global ponderado
                 <InfoTooltip
-                  content="Promedio ponderado de los 5 scores. Indica la posición estratégica general del proyecto en el entorno analizado. Rango típico: -100 (todo amenazas) a +100 (todo oportunidades)."
+                  content="Promedio ponderado de los scores dimensionales. Escala bipolar: -100 (todas amenazas con 100% confianza) a +100 (todas oportunidades con 100% confianza). Neutro = 0."
                   placement="left"
                 />
               </span>
@@ -158,9 +153,9 @@ export default function ScorecardTable({ scorecard, dimensions }: Props) {
               <span
                 className={`text-lg font-bold ${globalScoreColor(scorecard.globalScore)}`}
               >
-                {scorecard.globalScore}
+                {scorecard.globalScore > 0 ? "+" : ""}{scorecard.globalScore}
                 <span className="text-sm font-normal text-black-eske dark:text-[#9AAEBE]">
-                  /100
+                  {" "}/ ±100
                 </span>
               </span>
             </td>
@@ -197,23 +192,26 @@ function ScoreBar({
       ? "bg-red-eske"
       : "bg-gray-eske-40";
 
+  const displayWidth = Math.abs(score);
+  const displayLabel = score > 0 ? `+${score}` : `${score}`;
+
   return (
     <div className="flex items-center gap-2 justify-center">
       <div className="w-16 h-1.5 bg-gray-eske-20 dark:bg-[#21425E] rounded-full overflow-hidden">
         <div
           className={`h-1.5 rounded-full ${color}`}
-          style={{ width: `${Math.min(score, 100)}%` }}
+          style={{ width: `${displayWidth}%` }}
         />
       </div>
-      <span className="text-xs font-semibold text-black-eske dark:text-[#C7D6E0] w-6 text-right">
-        {score}
+      <span className="text-xs font-semibold text-black-eske dark:text-[#C7D6E0] w-8 text-right">
+        {displayLabel}
       </span>
     </div>
   );
 }
 
 function globalScoreColor(score: number): string {
-  if (score >= 60) return "text-green-eske";
-  if (score >= 30) return "text-orange-eske";
+  if (score >= 20) return "text-green-eske";
+  if (score >= 0) return "text-orange-eske";
   return "text-red-eske";
 }

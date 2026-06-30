@@ -85,14 +85,14 @@ export interface DimensionScore {
   code: DimensionCode;
   dimWeight: number;       // sum of variable weights for this dimension
   confidence: number;      // 0-100 from DimensionAnalysis
-  classMultiplier: number; // 1.0 | 0.5 | 0.0
-  score: number;           // (confidence/100) * dimWeight * classMultiplier
+  classMultiplier: number; // +1.0 | 0.0 | -1.0
+  score: number;           // (confidence/100) * classMultiplier * 100, range -100..+100
 }
 
 export interface Scorecard {
   dimensions: DimensionScore[];
   totalWeight: number;
-  globalScore: number;     // weighted average, 0-100
+  globalScore: number;     // weighted average, range -100..+100
 }
 
 /**
@@ -110,14 +110,15 @@ export function buildScorecard(
       : 5; // fallback if config missing
 
     const classMultiplier = classificationMultiplier(dim.classification);
-    const score = (dim.confidence / 100) * dimWeight * classMultiplier * 100;
+    // score: -100..+100 (bipolar scale — negative = threat, positive = opportunity)
+    const score = Math.round((dim.confidence / 100) * classMultiplier * 100);
 
     return {
       code: dim.code,
       dimWeight,
       confidence: dim.confidence,
       classMultiplier,
-      score: Math.round(score),
+      score,
     };
   });
 
@@ -126,6 +127,7 @@ export function buildScorecard(
     (sum, d) => sum + d.score * d.dimWeight,
     0
   );
+  // globalScore: -100..+100 weighted average
   const globalScore =
     totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
 
@@ -134,8 +136,8 @@ export function buildScorecard(
 
 function classificationMultiplier(c: Classification): number {
   if (c === "OPORTUNIDAD") return 1.0;
-  if (c === "NEUTRAL") return 0.5;
-  return 0.0; // AMENAZA
+  if (c === "NEUTRAL") return 0.0;
+  return -1.0; // AMENAZA
 }
 
 // ─────────────────────────────────────────────────────────────

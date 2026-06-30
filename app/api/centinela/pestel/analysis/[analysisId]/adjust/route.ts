@@ -12,12 +12,13 @@ import type {
   DimensionCode,
   HumanAdjustment,
 } from "@/types/pestel.types";
+import { DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface RouteContext {
   params: Promise<{ analysisId: string }>;
 }
 
-const VALID_DIMENSION_CODES: DimensionCode[] = ["P", "E", "S", "T", "L"];
+const VALID_DIMENSION_CODES: DimensionCode[] = DIMENSION_ORDER;
 const VALID_CLASSIFICATIONS: Classification[] = [
   "OPORTUNIDAD",
   "AMENAZA",

@@ -9,14 +9,7 @@ import { useState, type RefObject } from "react";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import type { Classification, DimensionCode } from "@/types/pestel.types";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META } from "@/types/pestel.types";
 
 const CLASSIFICATION_LABELS: Record<Classification, string> = {
   OPORTUNIDAD: "Oportunidad",
@@ -78,7 +71,7 @@ export default function AdjustmentModal({
           >
             Justificar ajuste —{" "}
             <span className="text-bluegreen-eske">
-              {DIMENSION_LABELS[dimensionCode]}
+              {DIMENSION_META[dimensionCode].label}
             </span>
           </h2>
           <p className="text-xs text-black-eske dark:text-[#C7D6E0] mt-0.5">

@@ -27,26 +27,31 @@ const FORMAT_OPTIONS: {
   id: ReportFormat;
   label: string;
   description: string;
+  borderClass: string;
 }[] = [
   {
     id: "executive",
     label: "Ejecutivo",
     description: "Resumen para dirección política",
+    borderClass: "border-l-4 border-b-2 border-bluegreen-eske",
   },
   {
     id: "technical",
     label: "Técnico completo",
     description: "Metodología + fuentes + narrativas",
+    borderClass: "border-l-4 border-b-2 border-green-eske",
   },
   {
     id: "foda",
     label: "FODA-lista",
-    description: "Oportunidades y amenazas PEST-L",
+    description: "Oportunidades y amenazas PESTEL",
+    borderClass: "border-l-4 border-b-2 border-yellow-eske",
   },
   {
     id: "scenarios",
     label: "Escenarios",
     description: "Optimista / Base / Pesimista",
+    borderClass: "border-l-4 border-b-2 border-red-eske",
   },
 ];
 
@@ -289,7 +294,7 @@ export default function InformesPage() {
                 {project?.territorio?.nombre ?? ""} ·{" "}
                 <span className="capitalize">{project?.tipo ?? ""}</span>
                 {" · "}
-                <span className="font-medium">Etapa 7 — Informes</span>
+                <span className="font-medium">Etapa 5 — Informes</span>
               </p>
             </div>
             <button
@@ -355,11 +360,12 @@ export default function InformesPage() {
                   onClick={() => handleGenerate(opt.id)}
                   disabled={generating}
                   className={[
-                    "relative flex flex-col items-start gap-1 rounded-lg border p-3",
+                    "relative flex flex-col items-start gap-1 rounded-lg p-3",
                     "text-left transition-all",
+                    opt.borderClass,
                     isActive
-                      ? "border-bluegreen-eske bg-bluegreen-eske/5 ring-1 ring-bluegreen-eske"
-                      : "border-gray-eske-20 dark:border-white/10 hover:border-bluegreen-eske/40 hover:bg-gray-eske-10 dark:hover:bg-white/5",
+                      ? "bg-bluegreen-eske/5 ring-1 ring-bluegreen-eske"
+                      : "hover:bg-gray-eske-10 dark:hover:bg-white/5",
                     generating ? "opacity-50 cursor-not-allowed" : "",
                   ].join(" ")}
                 >
@@ -371,7 +377,7 @@ export default function InformesPage() {
                       ✓
                     </span>
                   )}
-                  <span className="font-medium text-sm text-black-eske dark:text-[#EAF2F8] pr-4">
+                    <span className="font-bold text-sm text-black-eske dark:text-[#EAF2F8] pr-4">
                     {opt.label}
                   </span>
                   <span className="text-xs text-black-eske dark:text-[#9AAEBE] leading-snug">

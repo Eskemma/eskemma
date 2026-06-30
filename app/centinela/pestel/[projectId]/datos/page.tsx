@@ -10,14 +10,7 @@ import type {
   DimensionCode,
   ReliabilityLevel,
 } from "@/types/pestel.types";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 const RELIABILITY_LABELS: Record<ReliabilityLevel, string> = {
   HIGH: "Alta",
@@ -250,7 +243,7 @@ export default function DatosPage() {
             {project?.nombre ?? "Proyecto"}
           </h1>
           <p className="text-white/80 text-sm mt-1">
-            Etapa 4 — Recolección de datos
+            Etapa 2 — Recolección de datos
           </p>
         </div>
       </div>
@@ -273,7 +266,7 @@ export default function DatosPage() {
           >
             Semáforo de cobertura
             <InfoTooltip
-              content="El semáforo indica si cada dimensión PEST-L tiene suficientes datos para un análisis confiable. 🟢 Verde (≥60% confianza): la dimensión puede analizarse. 🟡 Amarillo (30-59%): se recomienda agregar más fuentes. 🔴 Rojo (<30%): cobertura insuficiente, el análisis no puede ejecutarse hasta alcanzar el mínimo. La columna 'Confianza' refleja la calidad y cantidad de fuentes disponibles, ponderada por su nivel de confiabilidad."
+              content="El semáforo indica si cada dimensión PESTEL tiene suficientes datos para un análisis confiable. 🟢 Verde (≥60% confianza): la dimensión puede analizarse. 🟡 Amarillo (30-59%): se recomienda agregar más fuentes. 🔴 Rojo (<30%): cobertura insuficiente, el análisis no puede ejecutarse hasta alcanzar el mínimo. La columna 'Confianza' refleja la calidad y cantidad de fuentes disponibles, ponderada por su nivel de confiabilidad."
               placement="right"
             />
           </h2>
@@ -312,7 +305,7 @@ export default function DatosPage() {
                           <span className="text-xs text-bluegreen-eske font-bold mr-2">
                             {c.code}
                           </span>
-                          {DIMENSION_LABELS[c.code]}
+                          {DIMENSION_META[c.code].label}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -503,7 +496,7 @@ export default function DatosPage() {
                   >
                     Dimensión
                     <InfoTooltip
-                      content="Indica a qué dimensión PEST-L pertenece este dato para que el sistema lo incorpore en el análisis correcto."
+                      content="Indica a qué dimensión PESTEL pertenece este dato para que el sistema lo incorpore en el análisis correcto."
                       example="Una encuesta de seguridad → Dimensión S (Social)"
                     />
                   </label>
@@ -517,13 +510,11 @@ export default function DatosPage() {
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
                       bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
                   >
-                    {(["P", "E", "S", "T", "L"] as DimensionCode[]).map(
-                      (code) => (
-                        <option key={code} value={code}>
-                          {code} — {DIMENSION_LABELS[code]}
-                        </option>
-                      )
-                    )}
+                    {DIMENSION_ORDER.map((code) => (
+                      <option key={code} value={code}>
+                        {code} — {DIMENSION_META[code].label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

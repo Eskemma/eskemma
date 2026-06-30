@@ -38,8 +38,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = (await request.json()) as Partial<PESTELProject>;
-  const { nombre, tipo, territorio, horizonte, alertas } = body;
+  const body = (await request.json()) as Partial<PESTELProject> & {
+    modduloProjectId?: string;
+    modduloOrigenEscenario?: "A" | "B";
+  };
+  const {
+    nombre, tipo, territorio, horizonte, alertas,
+    color, modduloProjectId, modduloOrigenEscenario,
+  } = body;
 
   if (!nombre || !tipo || !territorio || !horizonte) {
     return NextResponse.json(
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
   const projectRef = adminDb.collection("pestel_projects").doc();
   const now = FieldValue.serverTimestamp();
 
-  await projectRef.set({
+  const projectData: Record<string, unknown> = {
     userId: session.uid,
     nombre,
     tipo,
@@ -72,7 +78,13 @@ export async function POST(request: NextRequest) {
     currentStage: 3, // ready to configure variables
     createdAt: now,
     updatedAt: now,
-  });
+  };
+
+  if (color) projectData.color = color;
+  if (modduloProjectId) projectData.modduloProjectId = modduloProjectId;
+  if (modduloOrigenEscenario) projectData.modduloOrigenEscenario = modduloOrigenEscenario;
+
+  await projectRef.set(projectData);
 
   return NextResponse.json({ projectId: projectRef.id }, { status: 201 });
 }

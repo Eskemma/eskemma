@@ -7,6 +7,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { DimensionCode, ReliabilityLevel } from "@/types/pestel.types";
+import { DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const validCodes: DimensionCode[] = ["P", "E", "S", "T", "L"];
+  const validCodes: DimensionCode[] = DIMENSION_ORDER;
   if (!validCodes.includes(dimensionCode)) {
     return NextResponse.json(
       { error: "dimensionCode inválido" },

@@ -1,19 +1,12 @@
 // app/components/centinela/pestel/monitoreo/DimensionStatusGrid.tsx
-// Grid of 5 PEST-L dimension cards showing current status from the latest analysis.
+// Grid of PEST-L dimension cards showing current status from the latest analysis.
 
 import type { DimensionAnalysis } from "@/types/pestel.types";
+import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface Props {
   dimensions: DimensionAnalysis[];
 }
-
-const DIMENSION_LABELS: Record<string, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
 
 const CLASSIFICATION_STYLES: Record<
   string,
@@ -57,9 +50,13 @@ export default function DimensionStatusGrid({ dimensions }: Props) {
     );
   }
 
+  const sorted = [...dimensions].sort(
+    (a, b) => DIMENSION_ORDER.indexOf(a.code) - DIMENSION_ORDER.indexOf(b.code)
+  );
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      {dimensions.map((dim) => {
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {sorted.map((dim) => {
         const styles =
           CLASSIFICATION_STYLES[dim.classification] ??
           CLASSIFICATION_STYLES.NEUTRAL;
@@ -86,7 +83,7 @@ export default function DimensionStatusGrid({ dimensions }: Props) {
 
             {/* Dimension name */}
             <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8] leading-tight">
-              {DIMENSION_LABELS[dim.code] ?? dim.code}
+              {DIMENSION_META[dim.code]?.label ?? dim.code}
             </p>
 
             {/* Signal */}

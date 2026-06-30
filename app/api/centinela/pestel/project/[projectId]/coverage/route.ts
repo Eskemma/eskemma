@@ -16,12 +16,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import type { CoverageStatus, DimensionCode } from "@/types/pestel.types";
+import { DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
 }
 
-const DIMENSION_CODES: DimensionCode[] = ["P", "E", "S", "T", "L"];
+const DIMENSION_CODES: DimensionCode[] = DIMENSION_ORDER;
 
 const RELIABILITY_CONFIDENCE: Record<string, number> = {
   HIGH: 90,
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   // Group manual sources by dimension
   const byDimension: Record<DimensionCode, { reliabilityLevel: string }[]> = {
-    P: [], E: [], S: [], T: [], L: [],
+    P: [], E: [], S: [], T: [], L: [], Ec: [],
   };
 
   for (const doc of sourcesSnap.docs) {

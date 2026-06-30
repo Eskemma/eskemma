@@ -105,7 +105,7 @@ export default function BiasCheckPanel({
                   className="text-xs text-bluegreen-eske hover:underline
                     shrink-0 disabled:opacity-50"
                 >
-                  {acknowledging === alert.type ? "…" : "Marcar revisado"}
+                  {acknowledging === alert.type ? "…" : "Marcar como revisado"}
                 </button>
               )}
             </div>

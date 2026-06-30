@@ -293,6 +293,56 @@ export const PESTL_PRESETS: PresetMap = {
       ],
     },
     {
+      code: "Ec",
+      variables: [
+        {
+          id: "ec-electoral-01",
+          name: "Eventos ambientales con impacto político",
+          weight: 2,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Desastres naturales, sequías, inundaciones en el territorio",
+              type: "QUALITATIVE",
+              dataSource: "CENAPRED / Protección Civil",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-electoral-02",
+          name: "Agenda ambiental de los candidatos",
+          weight: 2,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Propuestas ambientales en plataformas electorales",
+              type: "QUALITATIVE",
+              dataSource: "Plataformas partidistas / declaraciones",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-electoral-03",
+          name: "Riesgo de desastres naturales durante la campaña",
+          weight: 2,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Temporadas de riesgo (huracanes, lluvias, sequías) que coinciden con el calendario electoral",
+              type: "QUALITATIVE",
+              dataSource: "CENAPRED / SMN / Atlas de Riesgo",
+              isCustom: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
       code: "L",
       variables: [
         {
@@ -336,21 +386,6 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Restricciones de publicidad en período de veda",
               type: "QUALITATIVE",
               dataSource: "DOF / resoluciones INE",
-              isCustom: false,
-            },
-          ],
-        },
-        {
-          id: "l-electoral-04",
-          name: "Eventos ambientales recientes con impacto político",
-          weight: 2,
-          isPriority: false,
-          isDefault: true,
-          indicators: [
-            {
-              description: "Desastres naturales, sequías, inundaciones en el territorio",
-              type: "QUALITATIVE",
-              dataSource: "CENAPRED / Protección Civil",
               isCustom: false,
             },
           ],
@@ -609,6 +644,56 @@ export const PESTL_PRESETS: PresetMap = {
       ],
     },
     {
+      code: "Ec",
+      variables: [
+        {
+          id: "ec-gub-01",
+          name: "Cumplimiento de normativa ambiental",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Auditorías ambientales y resultados de cumplimiento",
+              type: "QUALITATIVE",
+              dataSource: "SEMARNAT / PROFEPA",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-gub-02",
+          name: "Conflictos ambientales en el territorio",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Conflictos por agua, tierra o contaminación activos",
+              type: "QUALITATIVE",
+              dataSource: "SEMARNAT / Monitoreo de medios",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-gub-03",
+          name: "Inversión en infraestructura verde y resiliencia",
+          weight: 2,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Proyectos de infraestructura climática y sostenibilidad en ejecución",
+              type: "QUALITATIVE",
+              dataSource: "SEMARNAT / Secretaría de Obras",
+              isCustom: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
       code: "L",
       variables: [
         {
@@ -628,21 +713,6 @@ export const PESTL_PRESETS: PresetMap = {
         },
         {
           id: "l-gub-02",
-          name: "Cumplimiento de normativa ambiental",
-          weight: 3,
-          isPriority: false,
-          isDefault: true,
-          indicators: [
-            {
-              description: "Auditorías ambientales y resultados de cumplimiento",
-              type: "QUALITATIVE",
-              dataSource: "SEMARNAT / PROFEPA",
-              isCustom: false,
-            },
-          ],
-        },
-        {
-          id: "l-gub-03",
           name: "Litigios activos contra el gobierno",
           weight: 4,
           isPriority: true,
@@ -652,6 +722,21 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Número de amparos y demandas activas",
               type: "QUANTITATIVE",
               dataSource: "Poder Judicial / Suprema Corte",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "l-gub-03",
+          name: "Marco normativo de las políticas prioritarias",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Leyes, decretos y reglamentos que habilitan o limitan las políticas de gobierno",
+              type: "QUALITATIVE",
+              dataSource: "DOF / Congreso local",
               isCustom: false,
             },
           ],
@@ -817,11 +902,11 @@ export const PESTL_PRESETS: PresetMap = {
       ],
     },
     {
-      code: "L",
+      code: "Ec",
       variables: [
         {
-          id: "l-leg-01",
-          name: "Iniciativas ambientales",
+          id: "ec-leg-01",
+          name: "Iniciativas ambientales en agenda",
           weight: 4,
           isPriority: false,
           isDefault: true,
@@ -835,7 +920,42 @@ export const PESTL_PRESETS: PresetMap = {
           ],
         },
         {
-          id: "l-leg-02",
+          id: "ec-leg-02",
+          name: "Presión de grupos ambientalistas en el congreso",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Organizaciones ambientales ejerciendo lobbying activo",
+              type: "QUALITATIVE",
+              dataSource: "Monitoreo de prensa y declaraciones",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-leg-03",
+          name: "Legislación ambiental aplicable al territorio",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Leyes federales y locales de medio ambiente vigentes que impactan la agenda",
+              type: "QUALITATIVE",
+              dataSource: "DOF / SEMARNAT / Congreso local",
+              isCustom: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "L",
+      variables: [
+        {
+          id: "l-leg-01",
           name: "Reformas constitucionales en proceso",
           weight: 5,
           isPriority: true,
@@ -845,6 +965,36 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Iniciativas de reforma constitucional y su estado",
               type: "QUALITATIVE",
               dataSource: "Congreso / Suprema Corte",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "l-leg-02",
+          name: "Marco regulatorio aplicable a la bancada",
+          weight: 4,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Normativa interna del congreso y reglamentos legislativos",
+              type: "QUALITATIVE",
+              dataSource: "Congreso local / DOF",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "l-leg-03",
+          name: "Litigios o amparos contra iniciativas clave",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Recursos judiciales interpuestos contra iniciativas de la bancada",
+              type: "QUALITATIVE",
+              dataSource: "Poder Judicial / Suprema Corte",
               isCustom: false,
             },
           ],
@@ -1016,6 +1166,56 @@ export const PESTL_PRESETS: PresetMap = {
       ],
     },
     {
+      code: "Ec",
+      variables: [
+        {
+          id: "ec-ciu-01",
+          name: "Reivindicaciones ambientales del movimiento",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Demandas ambientales en el pliego del movimiento",
+              type: "QUALITATIVE",
+              dataSource: "Documentos del movimiento / prensa",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-ciu-02",
+          name: "Impacto ambiental del conflicto central",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Factores ambientales que motivan o contextualizan el movimiento",
+              type: "QUALITATIVE",
+              dataSource: "CENAPRED / Monitoreo de medios",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "ec-ciu-03",
+          name: "Alianzas con organizaciones ambientalistas",
+          weight: 2,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Grupos ecologistas que apoyan o se oponen al movimiento",
+              type: "QUALITATIVE",
+              dataSource: "Monitoreo de medios / declaraciones",
+              isCustom: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
       code: "L",
       variables: [
         {
@@ -1044,6 +1244,21 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Procesos legales activos contra integrantes del movimiento",
               type: "QUALITATIVE",
               dataSource: "Poder Judicial / prensa",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "l-ciu-03",
+          name: "Jurisprudencia favorable o adversa reciente",
+          weight: 4,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Criterios judiciales recientes que afectan derechos de protesta y organización",
+              type: "QUALITATIVE",
+              dataSource: "Suprema Corte / Poder Judicial / prensa especializada",
               isCustom: false,
             },
           ],

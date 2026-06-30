@@ -5,14 +5,7 @@
 // highlighting classification changes, new factors, and stable signals.
 
 import type { DimensionAnalysis, DimensionCode, Classification } from "@/types/pestel.types";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META } from "@/types/pestel.types";
 
 const CLASSIFICATION_LABELS: Record<Classification, string> = {
   OPORTUNIDAD: "Oportunidad",
@@ -96,7 +89,7 @@ export default function ComparisonPanel({
                 {c.code}
               </span>
               <span className="text-sm text-black-eske dark:text-[#C7D6E0] flex-1 min-w-0">
-                {DIMENSION_LABELS[c.code]}
+                {DIMENSION_META[c.code].label}
               </span>
               <div className="flex items-center gap-2 shrink-0 text-xs">
                 <span
@@ -140,7 +133,7 @@ export default function ComparisonPanel({
                   {c.code}
                 </span>
                 <span className="text-xs text-gray-eske-70 dark:text-[#9AAEBE]">
-                  {DIMENSION_LABELS[c.code]}
+                  {DIMENSION_META[c.code].label}
                 </span>
                 <span
                   className={[

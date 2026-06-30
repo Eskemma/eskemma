@@ -1,4 +1,5 @@
 // app/centinela/page.tsx
+import type { ReactNode } from "react";
 import { Metadata } from "next";
 import CentinelaHeroSection from "./CentinelaHeroSection";
 import AppCard from "../components/centinela/AppCard";
@@ -17,7 +18,15 @@ export const metadata: Metadata = {
 // ──────────────────────────────────────────────
 // Catálogo de apps del Centinela
 // ──────────────────────────────────────────────
-const MONITOR_APPS = [
+const MONITOR_APPS: Array<{
+  name: string;
+  description: string;
+  href: string;
+  available: boolean;
+  tag?: string;
+  accentColor?: string;
+  icon: ReactNode;
+}> = [
   {
     name: "PESTEL",
     description:
@@ -25,6 +34,7 @@ const MONITOR_APPS = [
     href: "/centinela/pestel",
     available: true,
     tag: "Nuevo",
+    accentColor: "#ee701d",
     icon: (
       <svg
         className="w-6 h-6"
@@ -193,6 +203,7 @@ export default function MonitorPage() {
               icon={app.icon}
               available={app.available}
               tag={app.tag}
+              accentColor={app.accentColor}
             />
           ))}
         </div>

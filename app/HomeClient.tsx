@@ -43,11 +43,11 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
           aria-hidden="true"
         ></div>
         <div className="relative z-10 text-center text-white-eske px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
-          <h1 className="text-[48px] max-sm:text-xl leading-tight font-bold max-sm:font-semibold">
+          <h1 className="text-[38px] max-sm:text-xl leading-tight font-bold max-sm:font-semibold">
             La política se gana con estrategia,{" "}
             <span className="max-sm:block">no con suerte.</span>
           </h1>
-          <p className="mt-8 max-sm:mt-4 text-[24px] max-sm:text-sm leading-relaxed font-light max-w-3xl mx-auto">
+          <p className="mt-8 max-sm:mt-4 text-[20px] max-sm:text-sm leading-relaxed font-light max-w-3xl mx-auto">
             El ecosistema digital que te da certeza donde solo había incertidumbre.
             Sin partido, sin agenda. Sólo tu proyecto político.
           </p>

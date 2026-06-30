@@ -6,18 +6,11 @@
 
 import { useState } from "react";
 import type { DimensionCode, ReliabilityLevel } from "@/types/pestel.types";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 const RELIABILITY_LABELS: Record<ReliabilityLevel, { label: string; color: string }> = {
   HIGH: { label: "Alta", color: "text-green-eske bg-green-eske/10" },
-  MEDIUM: { label: "Media", color: "text-yellow-eske bg-yellow-eske/10" },
+  MEDIUM: { label: "Media", color: "text-purple-700 dark:text-yellow-eske-60 bg-purple-100 dark:bg-yellow-eske/10" },
   LOW: { label: "Baja", color: "text-red-eske bg-red-eske/10" },
 };
 
@@ -47,19 +40,19 @@ export default function VoicesPanelE6({ sources }: Props) {
   }
 
   // Group by dimension
-  const grouped = (["P", "E", "S", "T", "L"] as DimensionCode[]).reduce<
-    Record<DimensionCode, DataSourceItem[]>
+  const grouped = DIMENSION_ORDER.reduce<
+    Partial<Record<DimensionCode, DataSourceItem[]>>
   >(
     (acc, code) => {
       acc[code] = sources.filter((s) => s.dimensionCode === code);
       return acc;
     },
-    { P: [], E: [], S: [], T: [], L: [] }
-  );
+    {}
+  ) as Record<DimensionCode, DataSourceItem[]>;
 
   return (
     <div className="flex flex-col gap-2">
-      {(["P", "E", "S", "T", "L"] as DimensionCode[]).map((code) => {
+      {DIMENSION_ORDER.map((code) => {
         const items = grouped[code];
         if (items.length === 0) return null;
         const isOpen = openDimension === code;
@@ -84,7 +77,7 @@ export default function VoicesPanelE6({ sources }: Props) {
                 {code}
               </span>
               <span className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] flex-1">
-                {DIMENSION_LABELS[code]}
+                {DIMENSION_META[code].label}
               </span>
               <span className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
                 {items.length} fuente{items.length !== 1 ? "s" : ""}

@@ -19,8 +19,8 @@ import {generateAnalysisV2, generateFeedFromRawData} from "./generateFeed";
 
 export const scrapeAndAnalyze = onRequest(
   {
-    timeoutSeconds: 540,
-    memory: "512MiB",
+    timeoutSeconds: 1080,
+    memory: "1GiB",
     secrets: ["INEGI_TOKEN", "BANXICO_TOKEN", "ANTHROPIC_API_KEY"],
   },
   async (req, res) => {

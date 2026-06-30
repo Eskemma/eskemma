@@ -305,6 +305,78 @@ VARIABLES QUE DEBES CAPTURAR:
 };
 
 // ==========================================
+// PROMPT PARA GENERAR DVS F2 (one-shot, no streaming)
+// ==========================================
+
+export function getDVSGenerationPrompt(
+  projectType: string,
+  xpcto: Record<string, unknown>,
+  pestelContext: string
+): { system: string; user: string } {
+  const system = `Eres un analista estratégico experto en comunicación y consultoría política.
+Tu tarea es generar el DVS (Documento de Viabilidad Situacional) de la Fase 2 — Exploración.
+Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques de código.
+
+El DVS integra el análisis PEST-L del entorno con las variables XPCTO del proyecto para producir
+cinco secciones estructuradas que servirán como insumo para la Fase 3 — Investigación.
+
+Tipo de proyecto: ${projectType}`;
+
+  const user = `Genera el DVS F2 con base en el siguiente XPCTO y contexto PEST-L.
+
+== XPCTO DEL PROYECTO ==
+${JSON.stringify(xpcto, null, 2)}
+
+${pestelContext}
+
+== INSTRUCCIONES POR SECCIÓN ==
+
+1. HEI — Hipótesis Estratégica Inicial (objeto "hei"):
+   - tensionCentral: La tensión política central que define el escenario (1 frase concisa)
+   - contexto: Descripción del entorno inmediato del proyecto (2-3 oraciones)
+   - condicionesFavorables: Array de 2-4 factores del entorno que favorecen el XPCTO
+   - condicionesAdversas: Array de 2-4 factores que obstaculizan el XPCTO
+   - premisaEstrategica: Enunciado auditable sobre la viabilidad del hito (1 frase: "Si X… entonces Y es posible porque…")
+
+2. M2 — Contraste XPCTO (array "contrasteXPCTO", 5 elementos — uno por dimensión):
+   - dimension: "X" | "P" | "C" | "T" | "O"
+   - veredicto: "coherente" | "requiere_ajuste" | "requiere_investigacion"
+   - argumentacion: Por qué el entorno PEST-L apoya o cuestiona esta dimensión XPCTO (2-3 oraciones)
+   - senalesPESTEL: Array de 1-3 citas textuales breves de señales del análisis PEST-L que sustentan el veredicto
+
+3. M3 — Semáforo de Veto (array "semaforo"):
+   - nombre: Nombre del actor o institución
+   - tipo: Categoría del actor (ej. "Partido político", "Sindicato", "Poder judicial", "Media")
+   - nivelRiesgo: "rojo" (veto inmediato o alto) | "ambar" (riesgo condicional) | "verde" (riesgo potencial bajo)
+   - capacidadVeto: Descripción concreta de cómo puede bloquear o afectar el proyecto
+   - motivacion: Por qué actuaría en contra (o no) del proyecto
+   - requiereInvestigacion: true si se necesitan datos de campo para confirmar
+
+4. M4 — Mapa de Incertidumbres (array "incertidumbres"):
+   - descripcion: La incertidumbre o brecha de información identificada
+   - urgencia: "alta" | "media" | "baja" — qué tan pronto hay que resolverla
+   - resolucion: "alta" | "media" | "baja" — qué tan resoluble es con investigación de campo
+   - destino: "F3" (resoluble en F3-Investigación) | "SIP" (no resoluble a corto plazo)
+
+5. PIP — Programa de Investigación Profunda (array "pip", mínimo 4 máximo 8 elementos):
+   - numero: Número de orden por prioridad (1 = más urgente)
+   - pregunta: La pregunta de investigación específica y auditable
+   - metodo: Método para responderla (ej. "Encuesta de opinión", "Entrevistas a profundidad", "Análisis documental", "Trabajo de campo")
+   - vinculoHito: Qué variable XPCTO o factor PEST-L afecta directamente esta pregunta
+
+Responde con este JSON exacto (sin campos adicionales):
+{
+  "hei": { "tensionCentral": "", "contexto": "", "condicionesFavorables": [], "condicionesAdversas": [], "premisaEstrategica": "" },
+  "contrasteXPCTO": [{ "dimension": "X", "veredicto": "coherente", "argumentacion": "", "senalesPESTEL": [] }, ...],
+  "semaforo": [{ "nombre": "", "tipo": "", "nivelRiesgo": "rojo", "capacidadVeto": "", "motivacion": "", "requiereInvestigacion": true }, ...],
+  "incertidumbres": [{ "descripcion": "", "urgencia": "alta", "resolucion": "media", "destino": "F3" }, ...],
+  "pip": [{ "numero": 1, "pregunta": "", "metodo": "", "vinculoHito": "" }, ...]
+}`;
+
+  return { system, user };
+}
+
+// ==========================================
 // FUNCIÓN PRINCIPAL
 // ==========================================
 

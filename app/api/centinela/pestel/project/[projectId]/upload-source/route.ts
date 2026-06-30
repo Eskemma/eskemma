@@ -12,6 +12,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import Anthropic from "@anthropic-ai/sdk";
 import type { DimensionCode, ReliabilityLevel } from "@/types/pestel.types";
+import { DIMENSION_ORDER } from "@/types/pestel.types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -22,7 +23,7 @@ const PDF_TEXT_MIN_CHARS = 120;
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_TEXT_CHARS = 50_000;
 
-const VALID_DIMENSION_CODES: DimensionCode[] = ["P", "E", "S", "T", "L"];
+const VALID_DIMENSION_CODES: DimensionCode[] = DIMENSION_ORDER;
 const VALID_RELIABILITY: ReliabilityLevel[] = ["HIGH", "MEDIUM", "LOW"];
 
 const SUPPORTED_TYPES: Record<string, string> = {

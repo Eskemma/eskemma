@@ -40,7 +40,7 @@ const TYPE_ICONS: Record<string, string> = {
 const STAGE_LABELS: Record<number, string> = {
   1: "Tipo de proyecto",
   2: "Territorio",
-  3: "Variables PEST-L",
+  3: "Variables PESTEL",
   4: "Datos",
   5: "Análisis IA",
   6: "Interpretación",
@@ -53,7 +53,6 @@ const STAGE_LABELS: Record<number, string> = {
 function ProjectCard({ project }: { project: PESTELProject & { id: string } }) {
   const router = useRouter();
   const stage = project.currentStage ?? 1;
-  const hasAnalysis = stage >= 5;
 
   function handleClick() {
     if (stage <= 3) {
@@ -71,16 +70,7 @@ function ProjectCard({ project }: { project: PESTELProject & { id: string } }) {
     }
   }
 
-  function handleCreateModduloProject(e: React.MouseEvent) {
-    e.stopPropagation();
-    const params = new URLSearchParams({
-      from: "pestel",
-      pestelProjectId: project.id,
-      pestelProjectName: project.nombre,
-      pestelProjectType: project.tipo,
-    });
-    router.push(`/moddulo/proyecto/nuevo?${params.toString()}`);
-  }
+  const accentColor = project.color ?? "#026988";
 
   return (
     <div
@@ -88,6 +78,7 @@ function ProjectCard({ project }: { project: PESTELProject & { id: string } }) {
         border-gray-eske-20 dark:border-white/10 p-5 flex flex-col gap-4
         hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
         w-full"
+      style={{ borderLeft: `4px solid ${accentColor}` }}
     >
       {/* Clickable body */}
       <button
@@ -151,27 +142,6 @@ function ProjectCard({ project }: { project: PESTELProject & { id: string } }) {
         </p>
       </button>
 
-      {/* Iniciar en Moddulo */}
-      <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
-        <button
-          type="button"
-          onClick={handleCreateModduloProject}
-          disabled={!hasAnalysis}
-          title={
-            hasAnalysis
-              ? "Crear un proyecto en Moddulo usando este análisis PEST-L"
-              : "Completa al menos un análisis para habilitar esta acción"
-          }
-          className="w-full flex items-center justify-center gap-2 px-3 py-2
-            text-xs font-semibold rounded-lg transition-colors
-            disabled:opacity-40 disabled:cursor-not-allowed
-            border border-orange-eske/40 text-orange-eske
-            hover:bg-orange-eske/5 disabled:hover:bg-transparent"
-        >
-          <span aria-hidden="true">⚡</span>
-          Iniciar proyecto en Moddulo
-        </button>
-      </div>
     </div>
   );
 }
@@ -227,7 +197,7 @@ export default function PESTELHubPage() {
             <div>
               <h1 className="text-2xl font-bold text-white">PESTEL</h1>
               <p className="text-sm text-white/75 mt-1 max-w-xl leading-relaxed">
-                Análisis PEST-L con IA para proyectos de comunicación política.
+                Análisis PESTEL con IA para proyectos de comunicación política.
                 Define el territorio, configura las variables y obtén un análisis
                 estratégico trazable y potenciado por IA.
               </p>
@@ -273,7 +243,7 @@ export default function PESTELHubPage() {
                 No tienes proyectos todavía
               </p>
               <p className="text-sm text-gray-eske-60 dark:text-[#9AAEBE] mt-1 max-w-sm">
-                Crea tu primer proyecto para comenzar un análisis PEST-L con IA.
+                Crea tu primer proyecto para comenzar un análisis PESTEL con IA.
               </p>
             </div>
             <button

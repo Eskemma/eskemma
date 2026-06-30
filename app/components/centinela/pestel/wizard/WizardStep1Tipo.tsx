@@ -1,16 +1,21 @@
 "use client";
 
+import { useRef } from "react";
 import type { TipoProyecto } from "@/types/pestel.types";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+
+const PALETTE = ["#026988","#248cc1","#ffa366","#649941","#ffd14a","#d10f3f","#474747"];
 
 interface Props {
   tipo: TipoProyecto | null;
   nombre: string;
   horizonte: number;
+  color: string;
   onChange: (fields: {
     tipo?: TipoProyecto;
     nombre?: string;
     horizonte?: number;
+    color?: string;
   }) => void;
   onNext: () => void;
 }
@@ -56,9 +61,11 @@ export default function WizardStep1Tipo({
   tipo,
   nombre,
   horizonte,
+  color,
   onChange,
   onNext,
 }: Props) {
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const selectedType = PROJECT_TYPES.find((t) => t.value === tipo);
   const canContinue = tipo !== null && nombre.trim().length > 0;
 
@@ -69,12 +76,12 @@ export default function WizardStep1Tipo({
         <h2 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] mb-1 flex items-center gap-1.5">
           ¿Qué tipo de proyecto es?
           <InfoTooltip
-            content="Define el marco metodológico del análisis. Cada tipo activa un conjunto distinto de variables PEST-L por defecto, ajustado a su contexto político."
+            content="Define el marco metodológico del análisis. Cada tipo activa un conjunto distinto de variables PESTEL por defecto, ajustado a su contexto político."
             example="Si coordinas una campaña a diputado local → Electoral"
           />
         </h2>
         <p className="text-sm text-gray-eske-70 dark:text-[#9AAEBE] mb-4">
-          El tipo define las variables PEST-L que se activan por defecto.
+          El tipo define las variables PESTEL que se activan por defecto.
         </p>
         <div className="grid grid-cols-2 gap-3">
           {PROJECT_TYPES.map((pt) => (
@@ -153,6 +160,70 @@ export default function WizardStep1Tipo({
         <div className="flex justify-between text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
           <span>1 mes</span>
           <span>24 meses</span>
+        </div>
+      </div>
+
+      {/* Color picker */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
+          Color de identificación
+          <InfoTooltip
+            content="Color que identifica este proyecto en el Hub de PESTEL. Útil cuando tienes varios proyectos activos."
+          />
+        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          {PALETTE.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onChange({ color: c })}
+              className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+              style={{
+                background: c,
+                borderColor: color === c ? "#fff" : "transparent",
+                outline: color === c ? `2px solid ${c}` : "none",
+              }}
+              aria-label={`Color ${c}`}
+              aria-pressed={color === c}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => colorInputRef.current?.click()}
+            className="w-7 h-7 rounded-full border-2 border-dashed border-gray-eske-40
+              flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+              transition-colors text-xs font-bold"
+            aria-label="Elegir color personalizado"
+          >
+            +
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={color}
+            onChange={(e) => onChange({ color: e.target.value })}
+            className="sr-only"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <input
+            type="text"
+            value={color}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (/^#[0-9A-Fa-f]{6}$/.test(val)) onChange({ color: val });
+            }}
+            maxLength={7}
+            className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+              text-xs font-mono bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+            aria-label="Código hexadecimal del color"
+          />
+          <span
+            className="w-7 h-7 rounded-full border border-gray-eske-20 shrink-0"
+            style={{ background: color }}
+            aria-hidden="true"
+          />
         </div>
       </div>
 

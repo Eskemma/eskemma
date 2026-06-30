@@ -269,7 +269,7 @@ export default function InterpretacionPage() {
             <div>
               <h1 className="text-xl font-semibold">Interpretación</h1>
               <p className="text-white/80 text-sm mt-0.5">
-                Etapa 6 — Revisión y validación estratégica
+                Etapa 4 — Interpretación y validación estratégica
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -308,7 +308,7 @@ export default function InterpretacionPage() {
 
         {/* Section tabs */}
         <div
-          className="flex border-b border-gray-eske-20 dark:border-white/10"
+          className="flex gap-1 bg-gray-eske-10 dark:bg-[#112233] rounded-xl p-1"
           role="tablist"
         >
           {SECTIONS.map((s) => (
@@ -319,11 +319,11 @@ export default function InterpretacionPage() {
               aria-selected={activeSection === s.id}
               onClick={() => setActiveSection(s.id)}
               className={[
-                "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium",
-                "border-b-2 -mb-px transition-colors",
+                "flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg",
+                "flex-1 justify-center transition-colors",
                 activeSection === s.id
-                  ? "border-bluegreen-eske text-bluegreen-eske"
-                  : "border-transparent text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8]",
+                  ? "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske shadow-sm"
+                  : "text-black-eske-70 dark:text-[#C5D8E8] hover:text-bluegreen-eske dark:hover:text-bluegreen-eske-40",
               ].join(" ")}
             >
               {s.label}
@@ -348,15 +348,9 @@ export default function InterpretacionPage() {
           {activeSection === "matrix" && (
             <div className="flex flex-col gap-4">
               <div>
-                <h2 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">
+                <h2 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
                   Matriz de impacto / probabilidad
                 </h2>
-                <p className="text-xs text-black-eske dark:text-[#9AAEBE]">
-                  La IA posicionó cada dimensión según el análisis.
-                  {!analysis.status || analysis.status !== "APPROVED"
-                    ? " Arrastra los puntos para ajustar. Se requiere justificación."
-                    : " El análisis está aprobado — la matriz es de solo lectura."}
-                </p>
               </div>
               <ImpactMatrix
                 dimensions={analysis.dimensions}

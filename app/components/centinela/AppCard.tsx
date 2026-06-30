@@ -9,7 +9,8 @@ interface AppCardProps {
   href: string;
   icon: React.ReactNode;
   available: boolean;
-  tag?: string; // ej. "Nuevo", "Beta"
+  tag?: string;
+  accentColor?: string; // hex — defaults to bluegreen-eske (#026988)
 }
 
 export default function AppCard({
@@ -19,6 +20,7 @@ export default function AppCard({
   icon,
   available,
   tag,
+  accentColor = "#026988",
 }: AppCardProps) {
   const cardContent = (
     <div
@@ -31,7 +33,10 @@ export default function AppCard({
       {/* Badges superiores */}
       <div className="flex items-start justify-between">
         {/* Ícono de la app */}
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-bluegreen-eske/10 text-bluegreen-eske">
+        <div
+          className="flex items-center justify-center w-12 h-12 rounded-xl"
+          style={{ backgroundColor: `${accentColor}1a`, color: accentColor }}
+        >
           {icon}
         </div>
         <div className="flex items-center gap-2">

@@ -9,14 +9,7 @@ import type {
   PestlVariable,
   DimensionCode,
 } from "@/types/pestel.types";
-
-const DIMENSION_LABELS: Record<DimensionCode, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface Props {
   tipo: TipoProyecto;
@@ -38,7 +31,7 @@ export default function WizardStep3Variables({
   );
   const [openDimension, setOpenDimension] = useState<DimensionCode>("P");
   const [newVarInputs, setNewVarInputs] = useState<Record<DimensionCode, string>>({
-    P: "", E: "", S: "", T: "", L: "",
+    P: "", E: "", S: "", T: "", L: "", Ec: "",
   });
 
   // Reset preset when tipo changes
@@ -105,7 +98,7 @@ export default function WizardStep3Variables({
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">
-          Variables PEST-L
+          Variables PESTEL
         </h2>
         <p className="text-sm text-gray-eske-70 dark:text-[#9AAEBE]">
           Cargamos las variables por defecto para un proyecto{" "}
@@ -134,7 +127,9 @@ export default function WizardStep3Variables({
 
       {/* Dimensions accordion */}
       <div className="flex flex-col gap-2">
-        {dimensions.map((dim) => {
+        {[...dimensions]
+          .sort((a, b) => DIMENSION_ORDER.indexOf(a.code) - DIMENSION_ORDER.indexOf(b.code))
+          .map((dim) => {
           const isOpen = openDimension === dim.code;
           const hasWarning = dim.variables.length < 3;
 
@@ -160,7 +155,7 @@ export default function WizardStep3Variables({
                     {dim.code}
                   </span>
                   <span className="font-medium text-black-eske dark:text-[#EAF2F8] text-sm">
-                    {DIMENSION_LABELS[dim.code]}
+                    {DIMENSION_META[dim.code].label}
                   </span>
                   <span className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
                     {dim.variables.length} variable{dim.variables.length !== 1 ? "s" : ""}
@@ -175,7 +170,7 @@ export default function WizardStep3Variables({
                 {/* InfoTooltip and chevron sit outside the button to avoid nesting */}
                 <div className="flex items-center gap-2 shrink-0 pl-2">
                   <InfoTooltip
-                    content="Agrupa los factores que el análisis PEST-L monitoreará para esta dimensión. Se recomienda mínimo 3 variables para un análisis robusto."
+                    content="Agrupa los factores que el análisis PESTEL monitoreará para esta dimensión. Se recomienda mínimo 3 variables para un análisis robusto."
                   />
                   <span
                     className="text-gray-eske-60 transition-transform"
@@ -309,7 +304,7 @@ export default function WizardStep3Variables({
                           text-xs focus:outline-none focus-visible:ring-2
                           focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-50 dark:placeholder-[#6D8294]
                           bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
-                        aria-label={`Agregar variable a ${DIMENSION_LABELS[dim.code]}`}
+                        aria-label={`Agregar variable a ${DIMENSION_META[dim.code].label}`}
                       />
                       <InfoTooltip
                         content="Variables personalizadas no incluidas en el preset base. Úsalas para factores locales o específicos de tu proyecto."

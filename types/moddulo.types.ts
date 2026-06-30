@@ -208,6 +208,25 @@ export interface PhaseState {
   reportText?: string;
   // Dictamen de Coherencia XPCTO (solo F1)
   dictamen?: Dictamen;
+  // Registro de Deficiencias Activas (F1) — heredado en F2 como alerta
+  rda?: {
+    activo: boolean;
+    items?: string[];
+  };
+  // DVS de Exploración (F2) — generado por generate-dvs
+  dvs?: DVSF2;
+  // ID del análisis PESTEL vinculado (F2)
+  pestAnalysisId?: string;
+  // MapaPESTEL transformado para F2 (señales tripartitas por dimensión)
+  mapaPESTEL?: MapaPESTEL;
+  // Estado semántico de la fase (F2: "lista" cuando DVS generado)
+  estado?: string;
+  // Fecha de aprobación/cierre de la fase
+  aprobadoEn?: string;
+  // Programa de Investigación Profunda heredado de F2 (F3)
+  pip?: PIPItem[];
+  // Incertidumbres heredadas de F2 (F3)
+  incertidumbres?: IncertidumbreF2[];
 }
 
 // ==========================================
@@ -271,7 +290,82 @@ export type UpdateProjectInput = Partial<
 >;
 
 // ==========================================
-// FASE 2 — EXPLORACIÓN
+// FASE 2 — EXPLORACIÓN: DVS (Documento de Viabilidad Situacional)
+// ==========================================
+
+export interface HEIF2 {
+  tensionCentral: string;
+  contexto: string;
+  condicionesFavorables: string[];
+  condicionesAdversas: string[];
+  premisaEstrategica: string;
+}
+
+export interface ContrasteXPCTO {
+  dimension: "X" | "P" | "C" | "T" | "O";
+  veredicto: "coherente" | "requiere_ajuste" | "requiere_investigacion";
+  argumentacion: string;
+  senalesPESTEL: string[];
+}
+
+export interface ActorVetoF2 {
+  nombre: string;
+  tipo: string;
+  nivelRiesgo: "rojo" | "ambar" | "verde";
+  capacidadVeto: string;
+  motivacion: string;
+  requiereInvestigacion: boolean;
+}
+
+export interface IncertidumbreF2 {
+  descripcion: string;
+  urgencia: "alta" | "media" | "baja";
+  resolucion: "alta" | "media" | "baja";
+  destino: "F3" | "SIP";
+}
+
+export interface PIPItem {
+  numero: number;
+  pregunta: string;
+  metodo: string;
+  vinculoHito: string;
+}
+
+export interface DVSF2 {
+  hei: HEIF2;
+  contrasteXPCTO: ContrasteXPCTO[];  // M2
+  semaforo: ActorVetoF2[];           // M3
+  incertidumbres: IncertidumbreF2[]; // M4
+  pip: PIPItem[];
+}
+
+// ==========================================
+// FASE 2 — MapaPESTEL (señales tripartitas desde Centinela)
+// ==========================================
+
+export interface F2Senal {
+  descripcion: string;
+  fuente: string;
+  fechaCorte: string;
+  nivelConfianza: "alto" | "medio" | "bajo";
+  origenInternacional: boolean;
+}
+
+export interface F2DimensionPESTEL {
+  code: string;
+  label: string;
+  clasificacion: "OPORTUNIDAD" | "NEUTRAL" | "AMENAZA";
+  senalesFavorables: F2Senal[];
+  senalesAdversas: F2Senal[];
+  senalesInciertas: F2Senal[];
+  narrativa?: string;
+  confidence?: number;
+}
+
+export type MapaPESTEL = Partial<Record<string, F2DimensionPESTEL>>;
+
+// ==========================================
+// FASE 2 — EXPLORACIÓN: formulario
 // ==========================================
 
 export interface PestlDimension {
@@ -296,6 +390,7 @@ export interface ExplorationForm {
     economico: PestlDimension;
     social: PestlDimension;
     tecnologico: PestlDimension;
+    ecologico: PestlDimension;
     legal: PestlDimension;
   };
   semaforo: {
@@ -319,6 +414,7 @@ export const emptyExplorationForm = (): ExplorationForm => ({
     economico:   { contexto: "", senalesCriticas: "" },
     social:      { contexto: "", senalesCriticas: "" },
     tecnologico: { contexto: "", senalesCriticas: "" },
+    ecologico:   { contexto: "", senalesCriticas: "" },
     legal:       { contexto: "", senalesCriticas: "" },
   },
   semaforo: { actores: [], resumen: "" },

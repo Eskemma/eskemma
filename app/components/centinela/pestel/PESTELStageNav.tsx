@@ -1,33 +1,37 @@
 // app/components/centinela/pestel/PESTELStageNav.tsx
-// Horizontal stepper showing E1-E8 PESTEL stage progress.
+// Horizontal stepper showing 6 PESTEL stages (1-Config … 6-Monitoreo).
 // Placed just below the page header in each of the E4-E8 pages.
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ConfigEditModal from "./ConfigEditModal";
 
 interface PESTELStageNavProps {
   projectId: string;
   /** Highest stage the user has reached (project.currentStage). */
   currentStage: number;
-  /** Stage number of the current page (4–8). */
+  /** Internal stage number of the current page (3–8). */
   activeStage: number;
 }
 
 interface StageNode {
-  /** Stage number used for comparison logic. Config group = 3 (always completed in E4+). */
+  /** Internal stage number (3–8) used for comparison logic. */
   stageNum: number;
+  /** Display number shown in the bubble (1–6). */
+  displayNum: number;
   label: string;
   shortLabel: string;
-  route: string | null; // null = not navigable
+  route: string;
 }
 
 const STAGES: StageNode[] = [
-  { stageNum: 3,  label: "Configuración", shortLabel: "Config.", route: null },
-  { stageNum: 4,  label: "Datos",          shortLabel: "Datos",   route: "datos" },
-  { stageNum: 5,  label: "Análisis",        shortLabel: "Análisis", route: "analisis" },
-  { stageNum: 6,  label: "Interpretación",  shortLabel: "Interpr.", route: "interpretacion" },
-  { stageNum: 7,  label: "Informes",        shortLabel: "Informes", route: "informes" },
-  { stageNum: 8,  label: "Monitoreo",       shortLabel: "Centinela",  route: "monitoreo" },
+  { stageNum: 3, displayNum: 1, label: "Configuración", shortLabel: "Config.",  route: "configurar" },
+  { stageNum: 4, displayNum: 2, label: "Datos",         shortLabel: "Datos",    route: "datos" },
+  { stageNum: 5, displayNum: 3, label: "Análisis",      shortLabel: "Análisis", route: "analisis" },
+  { stageNum: 6, displayNum: 4, label: "Interpretación",shortLabel: "Interpr.", route: "interpretacion" },
+  { stageNum: 7, displayNum: 5, label: "Informes",      shortLabel: "Informes", route: "informes" },
+  { stageNum: 8, displayNum: 6, label: "Monitoreo",     shortLabel: "Monitoreo",route: "monitoreo" },
 ];
 
 type NodeStatus = "completed" | "active" | "pending";
@@ -48,16 +52,23 @@ export default function PESTELStageNav({
   activeStage,
 }: PESTELStageNavProps) {
   const router = useRouter();
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   return (
+    <>
+    {showConfigModal && (
+      <ConfigEditModal
+        projectId={projectId}
+        onClose={() => setShowConfigModal(false)}
+      />
+    )}
     <div className="bg-white-eske dark:bg-[#18324A] border-b border-gray-eske-20 dark:border-white/10">
       <div className="max-w-4xl mx-auto px-6 py-3">
         <nav aria-label="Progreso de etapas PESTEL">
           <ol className="flex items-center">
             {STAGES.map((stage, idx) => {
               const status = getStatus(stage.stageNum, currentStage, activeStage);
-              const isClickable =
-                status === "completed" && stage.route !== null;
+              const isClickable = status !== "pending";
               const isActive = status === "active";
               const isPending = status === "pending";
 
@@ -66,7 +77,7 @@ export default function PESTELStageNav({
               const bubbleClass = [
                 bubbleBase,
                 isActive
-                  ? "bg-bluegreen-eske text-white ring-4 ring-bluegreen-eske/20"
+                  ? "bg-bluegreen-eske-80 text-white ring-4 ring-bluegreen-eske/30 shadow-sm"
                   : status === "completed"
                   ? "bg-bluegreen-eske text-white"
                   : "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-60 dark:text-[#9AAEBE]",
@@ -82,7 +93,7 @@ export default function PESTELStageNav({
               const labelClass = [
                 "text-xs font-medium hidden sm:block ml-2 truncate max-w-[80px]",
                 isActive
-                  ? "text-bluegreen-eske"
+                  ? "text-bluegreen-eske-80 font-semibold"
                   : status === "completed"
                   ? "text-bluegreen-eske-60"
                   : "text-gray-eske-60 dark:text-[#9AAEBE]",
@@ -91,7 +102,7 @@ export default function PESTELStageNav({
               const nodeContent = (
                 <>
                   <span className={bubbleClass} aria-hidden="true">
-                    {status === "completed" ? "✓" : stage.stageNum === 3 ? "1-3" : stage.stageNum}
+                    {status === "completed" ? "✓" : stage.displayNum}
                   </span>
                   <span className={labelClass}>{stage.shortLabel}</span>
                 </>
@@ -107,15 +118,19 @@ export default function PESTELStageNav({
                     {isClickable ? (
                       <button
                         type="button"
-                        onClick={() =>
-                          router.push(
-                            `/centinela/pestel/${projectId}/${stage.route}`,
-                          )
-                        }
+                        onClick={() => {
+                          if (stage.route === "configurar" && currentStage >= 4) {
+                            setShowConfigModal(true);
+                          } else {
+                            router.push(
+                              `/centinela/pestel/${projectId}/${stage.route}`,
+                            );
+                          }
+                        }}
                         className="flex items-center hover:opacity-80 transition-opacity
                           focus-visible:outline-none focus-visible:ring-2
                           focus-visible:ring-bluegreen-eske rounded-full"
-                        aria-label={`Ir a etapa ${stage.label}`}
+                        aria-label={`Ir a ${stage.label}`}
                       >
                         {nodeContent}
                       </button>
@@ -123,13 +138,9 @@ export default function PESTELStageNav({
                       <div
                         className={[
                           "flex items-center",
-                          isPending ? "opacity-50" : "",
+                          isPending ? "opacity-40" : "",
                         ].join(" ")}
-                        aria-label={
-                          isPending
-                            ? `Etapa ${stage.label} — pendiente`
-                            : `Etapa ${stage.label} — ${isActive ? "actual" : "completada"}`
-                        }
+                        aria-label={`${stage.label} — pendiente`}
                       >
                         {nodeContent}
                       </div>
@@ -147,5 +158,6 @@ export default function PESTELStageNav({
         </nav>
       </div>
     </div>
+    </>
   );
 }

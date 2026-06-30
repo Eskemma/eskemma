@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import WizardStep1Tipo from "@/app/components/centinela/pestel/wizard/WizardStep1Tipo";
 import WizardStep2Territorio from "@/app/components/centinela/pestel/wizard/WizardStep2Territorio";
 import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/WizardStep3Variables";
@@ -15,21 +15,33 @@ type WizardData = {
   tipo: TipoProyecto | null;
   nombre: string;
   horizonte: number;
+  color: string;
   territorio: Territorio | null;
   dimensions: PestlDimensionConfig[];
+  modduloProjectId?: string;
+  modduloOrigenEscenario?: "A" | "B";
 };
 
-const STEPS = ["Tipo y nombre", "Territorio", "Variables PEST-L"];
+const VALID_TIPOS: TipoProyecto[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];
+
+const STEPS = ["Tipo y nombre", "Territorio", "Variables PESTEL"];
 
 export default function NuevoProyectoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<WizardData>({
-    tipo: null,
-    nombre: "",
-    horizonte: 6,
-    territorio: null,
-    dimensions: [],
+  const [data, setData] = useState<WizardData>(() => {
+    const tipoParam = searchParams.get("tipo") as TipoProyecto | null;
+    const modduloProjectId = searchParams.get("moddulo_project_id") ?? undefined;
+    return {
+      tipo: VALID_TIPOS.includes(tipoParam as TipoProyecto) ? tipoParam : null,
+      nombre: searchParams.get("nombre") ?? "",
+      horizonte: Number(searchParams.get("horizonte") ?? 6) || 6,
+      color: searchParams.get("color") ?? "#026988",
+      territorio: null,
+      dimensions: [],
+      ...(modduloProjectId ? { modduloProjectId, modduloOrigenEscenario: "A" as const } : {}),
+    };
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +69,11 @@ export default function NuevoProyectoPage() {
           tipo: data.tipo,
           territorio: data.territorio,
           horizonte: data.horizonte,
+          color: data.color,
+          ...(data.modduloProjectId ? {
+            modduloProjectId: data.modduloProjectId,
+            modduloOrigenEscenario: data.modduloOrigenEscenario,
+          } : {}),
         }),
       });
 
@@ -103,7 +120,7 @@ export default function NuevoProyectoPage() {
           </button>
           <h1 className="text-2xl font-semibold">Nuevo proyecto de análisis</h1>
           <p className="text-white/80 text-sm mt-1">
-            Configura las etapas 1-3 para comenzar tu análisis PEST-L
+            Configura las etapas 1-3 para comenzar tu análisis PESTEL
           </p>
         </div>
       </div>
@@ -153,6 +170,7 @@ export default function NuevoProyectoPage() {
             tipo={data.tipo}
             nombre={data.nombre}
             horizonte={data.horizonte}
+            color={data.color}
             onChange={(fields) => setData((d) => ({ ...d, ...fields }))}
             onNext={goNext}
           />

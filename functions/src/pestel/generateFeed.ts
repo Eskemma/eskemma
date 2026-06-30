@@ -1,6 +1,6 @@
 // functions/src/pestel/generateFeed.ts
 // Two orquestrators:
-// V2 (new): generateAnalysisV2 — 5 parallel dimension calls + chains + bias
+// V2 (new): generateAnalysisV2 — 6 parallel dimension calls + chains + bias
 // V1 (legacy): generateFeedFromRawData — kept for existing feeds
 
 import * as admin from "firebase-admin";
@@ -247,7 +247,7 @@ export async function generateAnalysisV2(params: {
     .get();
 
   const manualByDim: Record<DimensionCode, string[]> = {
-    P: [], E: [], S: [], T: [], L: [],
+    P: [], E: [], S: [], T: [], L: [], Ec: [],
   };
   for (const doc of sourcesSnap.docs) {
     const d = doc.data();
@@ -259,7 +259,7 @@ export async function generateAnalysisV2(params: {
 
   // 3. Build raw data text per dimension
   const articlesByDim: Record<DimensionCode, string[]> = {
-    P: [], E: [], S: [], T: [], L: [],
+    P: [], E: [], S: [], T: [], L: [], Ec: [],
   };
 
   const dimKeywords: Record<DimensionCode, string[]> = {
@@ -281,7 +281,12 @@ export async function generateAnalysisV2(params: {
     ],
     L: [
       "ley", "legal", "reforma", "constitución", "decreto",
-      "ambiental", "medio ambiente", "reglamento", "norma",
+      "reglamento", "norma", "resolución", "jurídico",
+    ],
+    Ec: [
+      "ambiental", "medio ambiente", "clima", "sequía", "inundación",
+      "contaminación", "agua", "ecológico", "desastre natural",
+      "cambio climático", "biodiversidad", "emisiones",
     ],
   };
 
@@ -305,9 +310,9 @@ export async function generateAnalysisV2(params: {
   }
 
   const rawDataPerDim: Record<DimensionCode, string> = {
-    P: "", E: "", S: "", T: "", L: "",
+    P: "", E: "", S: "", T: "", L: "", Ec: "",
   };
-  const CODES: DimensionCode[] = ["P", "E", "S", "T", "L"];
+  const CODES: DimensionCode[] = ["P", "E", "S", "T", "L", "Ec"];
   const sefixText = formatSefixForPrompt(sefixData ?? null);
 
   for (const code of CODES) {
@@ -327,8 +332,8 @@ export async function generateAnalysisV2(params: {
     rawDataPerDim[code] = parts.join("\n\n");
   }
 
-  // 4. 5 parallel dimension calls
-  console.log("[generateFeed] Starting 5 parallel dimension analyses...");
+  // 4. 6 parallel dimension calls (P, E, S, T, L, Ec)
+  console.log("[generateFeed] Starting 6 parallel dimension analyses...");
   const dimensionPromises = CODES.map((code) => {
     const dimConfig = variableConfigs.find((d) => d.code === code);
     const variables = dimConfig ?

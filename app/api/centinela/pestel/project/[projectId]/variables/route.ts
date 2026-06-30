@@ -7,6 +7,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PestlDimensionConfig } from "@/types/pestel.types";
+import { DIMENSION_ORDER } from "@/types/pestel.types";
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -41,7 +42,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
 
   // Validate each dimension has at least 1 variable
-  const validCodes = ["P", "E", "S", "T", "L"];
+  const validCodes = DIMENSION_ORDER;
   for (const dim of dimensions) {
     if (!validCodes.includes(dim.code)) {
       return NextResponse.json(
@@ -77,11 +78,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     savedAt: FieldValue.serverTimestamp(),
   });
 
-  // Advance project to E4
-  await adminDb
-    .collection("pestel_projects")
-    .doc(projectId)
-    .update({ currentStage: 4, updatedAt: FieldValue.serverTimestamp() });
+  // Only advance to E4 if project hasn't started analysis yet
+  const currentStage = (projectSnap.data()?.currentStage as number) ?? 0;
+  if (currentStage <= 3) {
+    await adminDb
+      .collection("pestel_projects")
+      .doc(projectId)
+      .update({ currentStage: 4, updatedAt: FieldValue.serverTimestamp() });
+  }
 
   return NextResponse.json({ ok: true });
 }

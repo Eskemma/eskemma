@@ -9,6 +9,7 @@ import type {
   HumanAdjustment,
   TipoProyecto,
 } from "@/types/pestel.types";
+import { DIMENSION_META } from "@/types/pestel.types";
 import {
   buildScorecard,
   getHighStakeDimensions,
@@ -131,7 +132,7 @@ function formatDimension(
   const adjNote = adj
     ? `\n  Ajuste analista: "${adj.justification}" (clasificación → ${adj.newClassification})`
     : "";
-  return `[${d.code}] ${DIMENSION_LABELS[d.code]}
+  return `[${d.code}] ${DIMENSION_LABELS(d.code)}
   Clasificación: ${d.classification} | Tendencia: ${d.trend} | Intensidad: ${d.intensity}
   Señal principal: ${d.mainSignal}
   Narrativa: ${d.narrative}
@@ -206,7 +207,7 @@ function buildScenariosPrompt(base: string, ctx: ReportContext): string {
       ? highStake
           .map(
             (d) =>
-              `  [${d.code}] ${DIMENSION_LABELS[d.code]}: ${d.mainSignal} (${d.classification}, ${d.intensity})`
+              `  [${d.code}] ${DIMENSION_LABELS(d.code)}: ${d.mainSignal} (${d.classification}, ${d.intensity})`
           )
           .join("\n")
       : "  (Todos los factores están por debajo del umbral crítico — usa los de mayor intensidad)";
@@ -217,7 +218,7 @@ function buildScenariosPrompt(base: string, ctx: ReportContext): string {
           .filter((d) => d.intensity === "ALTA")
           .map(
             (d) =>
-              `  [${d.code}] ${DIMENSION_LABELS[d.code]}: ${d.mainSignal}`
+              `  [${d.code}] ${DIMENSION_LABELS(d.code)}: ${d.mainSignal}`
           )
           .join("\n")
       : "";
@@ -250,13 +251,8 @@ Formato Markdown con encabezados ##.
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-const DIMENSION_LABELS: Record<string, string> = {
-  P: "Político",
-  E: "Económico",
-  S: "Social",
-  T: "Tecnológico",
-  L: "Legal / Ambiental",
-};
+const DIMENSION_LABELS = (code: string): string =>
+  DIMENSION_META[code as keyof typeof DIMENSION_META]?.label ?? code;
 
 const TYPE_LABELS: Record<TipoProyecto, string> = {
   electoral: "electoral",

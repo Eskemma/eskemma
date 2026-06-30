@@ -45,11 +45,21 @@ interface ClaudeClassificationResult {
 // V2 TYPES
 // ============================================================
 
-export type DimensionCode = "P" | "E" | "S" | "T" | "L";
+// C2: "Ec" is the new 6th dimension (Ecológico). "L" is now Legal only.
+export type DimensionCode = "P" | "E" | "S" | "T" | "L" | "Ec";
 
 export interface DimensionVariable {
   name: string;
   weight: number;
+}
+
+// C3: individual tripartite signal
+export interface Senal {
+  descripcion: string;
+  fuente: string;
+  fechaCorte: string;
+  nivelConfianza: "alto" | "medio" | "bajo";
+  origenInternacional: boolean;
 }
 
 export interface DimensionAnalysisResult {
@@ -60,6 +70,10 @@ export interface DimensionAnalysisResult {
   narrative: string;
   classification: "OPORTUNIDAD" | "AMENAZA" | "NEUTRAL";
   confidence: number;
+  // C3: tripartite signals (may be absent in legacy responses)
+  senalesFavorables?: Senal[];
+  senalesAdversas?: Senal[];
+  senalesInciertas?: Senal[];
 }
 
 export interface ImpactChainResult {
@@ -76,6 +90,10 @@ interface DimensionRawOutput {
   narrativa: string;
   clasificación: "OPORTUNIDAD" | "AMENAZA" | "NEUTRAL";
   confianza: number;
+  // C3: tripartite signals from Claude
+  señalesFavorables?: Senal[];
+  señalesAdversas?: Senal[];
+  señalesInciertas?: Senal[];
 }
 
 // ============================================================
@@ -96,7 +114,8 @@ const DIMENSION_NAMES: Record<DimensionCode, string> = {
   E: "Económico",
   S: "Social",
   T: "Tecnológico",
-  L: "Legal / Ambiental",
+  L: "Legal",
+  Ec: "Ecológico",
 };
 
 const TIPO_DESCRIPTIONS: Record<string, string> = {
@@ -214,6 +233,20 @@ function buildDimensionPrompt(params: {
     (banxicoText ? `Banxico:\n${banxicoText}\n` : "") :
     "";
 
+  const ecologicoCtx = code === "Ec" ? `
+DIMENSIÓN ECOLÓGICA — enfocar el análisis en:
+- Cambio climático y eventos climáticos extremos con impacto político
+- Recursos hídricos y disputas por agua
+- Política ambiental: normas, sanciones, litigios, movilización
+- Desastres naturales y respuesta gubernamental
+- Presión de grupos ambientalistas o movimientos "por la naturaleza"
+No abordar factores legales ni económicos generales aquí (están en \
+L y E respectivamente).
+`.trim() : "";
+
+  const legalBlock = useLegalCtx ? `\n${MEXICAN_LEGAL_CONTEXT}\n` : "";
+  const ecoBlock = ecologicoCtx ? `\n${ecologicoCtx}\n` : "";
+
   return `Eres un consultor experto en comunicación política en \
 Latinoamérica. Analiza la dimensión ${dimName} del análisis PEST-L.
 
@@ -221,7 +254,7 @@ CONTEXTO DEL PROYECTO:
 - Tipo de proyecto: ${tipoDesc}
 - Territorio: ${territorio}
 - Horizonte temporal: ${horizonte} meses
-${useLegalCtx ? `\n${MEXICAN_LEGAL_CONTEXT}\n` : ""}
+${legalBlock}${ecoBlock}
 VARIABLES MONITOREADAS:
 ${varsText}
 
@@ -233,6 +266,10 @@ INSTRUCCIONES:
 fuente entre paréntesis: (Fuente: nombre, fecha). Máx. 3-4 citas.
 - Si no hay fuente clara para un hecho, no cites.
 - Usa solo terminología vigente para el contexto mexicano.
+- En señalesFavorables/Adversas/Inciertas: fuente = nombre del medio \
+o institución; fechaCorte = fecha de la noticia en formato YYYY-MM-DD \
+o "sin fecha"; origenInternacional = true solo si la fuente es \
+extranjera.
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
 {
@@ -241,9 +278,22 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "señal_principal": "máx. 150 chars describiendo el hallazgo clave",
   "narrativa": "2-3 párrafos con el análisis detallado",
   "clasificación": "OPORTUNIDAD" | "AMENAZA" | "NEUTRAL",
-  "confianza": número entre 0 y 100
+  "confianza": número entre 0 y 100,
+  "señalesFavorables": [
+    {
+      "descripcion": "...",
+      "fuente": "...",
+      "fechaCorte": "YYYY-MM-DD",
+      "nivelConfianza": "alto" | "medio" | "bajo",
+      "origenInternacional": false
+    }
+  ],
+  "señalesAdversas": [...],
+  "señalesInciertas": [...]
 }
 
+Incluye entre 1 y 5 señales por categoría según los datos \
+disponibles. Si no hay señales de una categoría, usa array vacío [].
 La confianza debe reflejar la calidad y cantidad de datos disponibles.
 Sin datos suficientes asigna confianza menor a 50.`;
 }
@@ -286,12 +336,17 @@ export async function analyzeDimension(params: {
     confianza: 0,
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
   try {
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 2048,
-      messages: [{role: "user", content: prompt}],
-    });
+    const response = await client.messages.create(
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: 2048,
+        messages: [{role: "user", content: prompt}],
+      },
+      {signal: controller.signal}
+    );
 
     const text = response.content
       .filter((b) => b.type === "text")
@@ -304,6 +359,8 @@ export async function analyzeDimension(params: {
     }
   } catch (error) {
     console.error(`[claudePESTL] analyzeDimension ${code} failed:`, error);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return {
@@ -314,6 +371,9 @@ export async function analyzeDimension(params: {
     narrative: raw.narrativa ?? "",
     classification: raw.clasificación ?? "NEUTRAL",
     confidence: Math.max(0, Math.min(100, raw.confianza ?? 0)),
+    senalesFavorables: raw.señalesFavorables ?? [],
+    senalesAdversas: raw.señalesAdversas ?? [],
+    senalesInciertas: raw.señalesInciertas ?? [],
   };
 }
 
@@ -367,12 +427,17 @@ Responde ÚNICAMENTE con un JSON array:
   "recommendation": "máx. 100 caracteres con acción recomendada"
 }]`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
   try {
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1024,
-      messages: [{role: "user", content: prompt}],
-    });
+    const response = await client.messages.create(
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: 1024,
+        messages: [{role: "user", content: prompt}],
+      },
+      {signal: controller.signal}
+    );
 
     const text = response.content
       .filter((b) => b.type === "text")
@@ -392,6 +457,8 @@ Responde ÚNICAMENTE con un JSON array:
     }
   } catch (error) {
     console.error("[claudePESTL] buildImpactChains failed:", error);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return [];
