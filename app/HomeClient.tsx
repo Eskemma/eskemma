@@ -44,12 +44,12 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         ></div>
         <div className="relative z-10 text-center text-white-eske px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
           <h1 className="text-[38px] max-sm:text-xl leading-tight font-bold max-sm:font-semibold">
-            La política se gana con estrategia,{" "}
-            <span className="max-sm:block">no con suerte.</span>
+            Tu proyecto político, con el método que merece.
           </h1>
           <p className="mt-8 max-sm:mt-4 text-[20px] max-sm:text-sm leading-relaxed font-light max-w-3xl mx-auto">
-            El ecosistema digital que te da certeza donde solo había incertidumbre.
-            Sin partido, sin agenda. Sólo tu proyecto político.
+            El ecosistema digital que te da certeza.
+            <br />
+            Sin partido, sin agenda. Solo tu proyecto.
           </p>
           <div className="mt-10 max-sm:mt-6">
             <Link
@@ -255,9 +255,9 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         <div className="w-[90%] mx-auto max-w-7xl">
           <h2
             id="testimonials-heading"
-            className="text-3xl max-sm:text-xl font-semibold text-center text-bluegreen-eske mb-12 max-sm:mb-8 dark:text-[#6BA4C6]"
+            className="text-3xl max-sm:text-lg font-semibold text-center text-bluegreen-eske mb-12 max-sm:mb-8 dark:text-[#6BA4C6]"
           >
-            ¿Qué opinan nuestros clientes?
+            Proyectos reales. Resultados reales.
           </h2>
 
           <div className="space-y-12 max-sm:space-y-8">
@@ -279,8 +279,8 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@carriaganl</p>
                 </div>
               </div>
-              <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>"Cuando pensé que no había nada más que hacer en mi candidatura decidí utilizar el <em>Moddulo</em> de Eskemma. Descubrí que había muchas opciones para competir con fuerza."</p>
+              <blockquote className="text-[16px] max-sm:text-[11px] text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
+                <p>"Cuando pensé que no había nada más que hacer en mi candidatura, Moddulo me mostró que me faltaba diagnosticar tres aspectos que mis adversarios ya conocían de mi territorio. Eso cambió completamente la planeación de las últimas semanas de campaña."</p>
               </blockquote>
             </figure>
 
@@ -302,7 +302,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@sergehernan33</p>
                 </div>
               </div>
-              <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
+              <blockquote className="text-[16px] max-sm:text-[11px] text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
                 <p>"En los cursos de comunicación política siempre hablan de estrategia, pero hasta ahora sé cómo hacerlo en territorio, no sólo en teoría."</p>
               </blockquote>
             </figure>
@@ -325,8 +325,8 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@JCMontañez</p>
                 </div>
               </div>
-              <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>"Con su ayuda logré analizar mejor la información y saber cómo aventajar a los otros partidos. Lo mejor es que lo hice yo mismo y me ahorré una lana."</p>
+              <blockquote className="text-[16px] max-sm:text-[11px] text-black-eske font-light max-sm:text-left sm:text-left w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
+                <p>"Con su ayuda entendí qué distritos eran más fuertes y cuáles debía trabajar con mayor atención. Lo mejor es que lo hice yo mismo con Sefix y me ahorré lo que hubiera pagado a un analista externo."</p>
               </blockquote>
             </figure>
 
@@ -348,8 +348,8 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                   <p className="text-[11px] max-sm:text-[10px] text-gray-eske-80 leading-tight mt-0.5 dark:text-[#6D8294]">@mtsepulvedaCDMX</p>
                 </div>
               </div>
-              <blockquote className="text-[16px] max-sm:text-sm text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
-                <p>"Pensé que estos servicios sólo eran para grandes campañas. Participé en una elección local en 2024 y pude utilizar mucha de la ayuda que me brindaron."</p>
+              <blockquote className="text-[16px] max-sm:text-[11px] text-black-eske font-light max-sm:text-right sm:text-right w-full sm:max-w-[70%] dark:text-[#C7D6E0]">
+                <p>"Pensé que este tipo de herramientas solo estaban al alcance de las grandes campañas con presupuesto millonario. En mi última elección local usé Moddulo para diseñar mi estrategia de mensaje y Centinela para saber qué temas importaban más en mi municipio. Nunca había tenido acceso a ese nivel de análisis."</p>
               </blockquote>
             </figure>
           </div>

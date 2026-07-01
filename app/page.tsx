@@ -10,13 +10,14 @@ export const revalidate = 3600;
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://eskemma.com";
 
 export const metadata: Metadata = {
-  title: "Eskemma — Plataforma de Consultoría Política con IA",
+  title: "Eskemma — Estrategia política digital para México y Latinoamérica",
   description:
-    "Herramientas avanzadas para consultores, equipos de campaña y funcionarios públicos en México: análisis PEST-L, datos electorales, metodología por fases y formación especializada.",
+    "Eskemma es el ecosistema digital que combina inteligencia artificial, datos electorales históricos y monitoreo de entorno político en tiempo real. Para candidatos, funcionarios, consultores y organizaciones ciudadanas en México y Latinoamérica.",
+  robots: { index: true, follow: true },
   openGraph: {
-    title: "Eskemma — Plataforma de Consultoría Política con IA",
+    title: "Eskemma — Tu proyecto político, con el método que merece",
     description:
-      "Herramientas avanzadas para consultores, equipos de campaña y funcionarios públicos en México.",
+      "El ecosistema digital de estrategia política para México y Latinoamérica. Datos electorales, monitoreo en tiempo real e inteligencia artificial para tomar mejores decisiones desde el primer día.",
     url: SITE_URL,
     siteName: "Eskemma",
     locale: "es_MX",
@@ -26,15 +27,15 @@ export const metadata: Metadata = {
         url: `${SITE_URL}/images/blog-hero.jpg`,
         width: 1200,
         height: 630,
-        alt: "Eskemma — Plataforma de Consultoría Política con IA",
+        alt: "Eskemma — Estrategia política digital para México y Latinoamérica",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Eskemma — Plataforma de Consultoría Política con IA",
+    title: "Eskemma — Tu proyecto político, con el método que merece",
     description:
-      "Herramientas avanzadas para consultores y equipos de campaña en México.",
+      "El ecosistema digital de estrategia política para México y Latinoamérica. Datos electorales, monitoreo en tiempo real e inteligencia artificial para tomar mejores decisiones desde el primer día.",
     images: [`${SITE_URL}/images/blog-hero.jpg`],
   },
   alternates: {

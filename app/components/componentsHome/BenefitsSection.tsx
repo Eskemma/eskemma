@@ -12,56 +12,56 @@ const BenefitsSection = () => {
 
   const cards = [
     {
-      front: "Respaldo profesional",
-      back: "Recibe acompañamiento especializado en cada paso de tu proyecto. Asegura estrategias efectivas y resultados óptimos.",
+      front: "Contexto",
+      back: "Antes de proponer cualquier solución, Eskemma entiende el escenario específico del proyecto. No hay receta universal que funcione en política. Lo que hay es un diagnóstico honesto para una estrategia real.",
       bg: "bg-blue-eske-60",
       text: "text-white-eske",
     },
     {
-      front: "Impacto rápido",
-      back: "Obtén resultados tangibles en poco tiempo gracias a herramientas y estrategias probadas para el éxito político.",
+      front: "Certeza",
+      back: "No prometemos victorias. Prometemos que cada decisión tiene mejor información. En política, es la diferencia entre reaccionar y anticipar.",
       bg: "bg-white-eske",
       text: "text-bluegreen-eske",
     },
     {
-      front: "Valor garantizado",
-      back: "Invierte en soluciones que maximizan tu presupuesto. Obtén un retorno favorable en términos de éxito y eficiencia.",
+      front: "Rendimiento",
+      back: "Lo que antes costaba contratar un equipo de análisis ahora está disponible en la suscripción. La información existe. La diferencia es cuánto tiempo y dinero inviertes en tenerla.",
       bg: "bg-bluegreen-eske-60",
       text: "text-white-eske",
     },
     {
-      front: "Adaptabilidad",
-      back: "Eskemma ayuda en proyectos de cualquier tamaño, proporcionando herramientas y estrategias para cada necesidad.",
+      front: "Escala",
+      back: "Eskemma no es una plantilla. Es un ecosistema que se adapta al tamaño, al momento y al tipo de proyecto político. Desde el inicio hasta donde quieras llegar.",
       bg: "bg-bluegreen-eske-60",
       text: "text-white-eske",
     },
     {
-      front: "Ventajas competitivas",
-      back: "Descubre y explota tus ventajas competitivas con metodologías que te diferencian en el campo político.",
+      front: "Anticipación",
+      back: "Centinela monitorea el entorno político en tiempo real. Lo que se mueve en la arena política, Eskemma lo registra antes de que se convierta en un problema sin solución.",
       bg: "bg-white-eske",
       text: "text-bluegreen-eske",
     },
     {
-      front: "Ahorra dinero",
-      back: "Reduce costos en la contratación de personal o servicios. Nuestras herramientas te facilitan la obtención de información útil.",
+      front: "Datos",
+      back: "Con Sefix, los datos electorales históricos de México están disponibles en segundos. Información que antes requería horas de trabajo técnico, ahora es parte del proceso estratégico desde el primer día.",
       bg: "bg-blue-eske-60",
       text: "text-white-eske",
     },
     {
-      front: "Integridad y excelencia",
-      back: "Trabaja con un equipo comprometido con la transparencia, la calidad y la lealtad, que te asegura un servicio honesto y profesional.",
+      front: "Honestidad",
+      back: "Eskemma dice lo que el proyecto necesita escuchar, no lo que es más cómodo oír. El diagnóstico honesto a veces incomoda, pero es el que te permite tomar decisiones reales.",
       bg: "bg-blue-eske-60",
       text: "text-white-eske",
     },
     {
-      front: "Aplicación inmediata",
-      back: "Implementa acciones estratégicas de inmediato, aprovechando oportunidades y resolviendo desafíos con agilidad.",
+      front: "Inmediatez",
+      back: "En cuanto se activa la cuenta, Moddulo guía la primera fase de la estrategia. Sin configuraciones complejas ni manuales interminables. El método empieza a funcionar de inmediato.",
       bg: "bg-white-eske",
       text: "text-bluegreen-eske",
     },
     {
-      front: "Disponibilidad",
-      back: "Consulta con especialistas en cualquier momento. Recibe asesoría personalizada y soluciones adaptadas a tus necesidades.",
+      front: "Continuidad",
+      back: "El newsletter semanal mantiene el panorama claro. Centinela monitorea en tiempo real. Y cuando se necesita hablar con alguien, el equipo está disponible para agendar. Eskemma trabaja aunque no estés mirando.",
       bg: "bg-bluegreen-eske-60",
       text: "text-white-eske",
     },
@@ -106,9 +106,13 @@ const BenefitsSection = () => {
       className="bg-bluegreen-eske min-h-[800px] max-sm:min-h-[500px] py-20 max-sm:py-12 px-4 sm:px-6 md:px-8"
       onClick={() => setFlippedCards(Array(9).fill(false))}
     >
-      <h2 className="text-3xl max-sm:text-xl font-bold text-white-eske mb-20 max-sm:mb-8 text-center">
-        ¿Qué obtienes con Eskemma?
+      <h2 className="text-3xl max-sm:text-xl font-bold text-white-eske mb-6 max-sm:mb-4 text-center">
+        Lo que cambia cuando trabajas con método
       </h2>
+
+      <p className="text-center text-white-eske/80 text-lg max-sm:text-sm font-light max-w-2xl mx-auto mb-16 max-sm:mb-8">
+        La política sin método es adivinar. Con Eskemma, cada decisión tiene datos, contexto y una estrategia detrás.
+      </p>
 
       <div className="w-[90%] mx-auto max-w-screen-xl" ref={cardsContainerRef}>
         {/* Grid optimizado: 3 columnas en mobile, 2 en tablet, 3 en desktop */}
@@ -123,9 +127,8 @@ const BenefitsSection = () => {
               aria-pressed={flippedCards[index]}
             >
               <div
-                className={`flip-card-inner relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${
-                  flippedCards[index] ? "rotate-y-180" : ""
-                }`}
+                className={`flip-card-inner relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${flippedCards[index] ? "rotate-y-180" : ""
+                  }`}
               >
                 {/* Frente de la tarjeta */}
                 <div
@@ -139,10 +142,10 @@ const BenefitsSection = () => {
 
                 {/* Reverso de la tarjeta */}
                 <div
-                  className="flip-card-back absolute w-full h-full rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 flex items-center justify-center bg-orange-eske text-white-eske backface-hidden rotate-y-180"
+                  className="flip-card-back absolute w-full h-full rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 flex items-center justify-center bg-orange-eske text-white-eske backface-hidden rotate-y-180 overflow-hidden"
                   aria-hidden={!flippedCards[index]}
                 >
-                  <p className="text-[18px] sm:text-[18px] max-sm:text-[9px] max-sm:leading-tight font-light text-center p-4 max-sm:p-2">
+                  <p className="text-[18px] sm:text-[18px] max-sm:text-[7px] max-sm:leading-tight font-light text-center p-4 max-sm:p-1.5">
                     {card.back}
                   </p>
                 </div>
