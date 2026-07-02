@@ -69,6 +69,9 @@ export default function DatosPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Import from Moddulo
+  const [importingModdulo, setImportingModdulo] = useState(false);
+  const [modduloImportMsg, setModduloImportMsg] = useState<string | null>(null);
 
   const loadProject = useCallback(async () => {
     try {
@@ -106,6 +109,34 @@ export default function DatosPage() {
       setLoading(false)
     );
   }, [loadProject, loadCoverage]);
+
+  // Auto-importar adjuntos de Moddulo F2 si el proyecto tiene modduloProjectId
+  // y aún no se han importado.
+  useEffect(() => {
+    if (loading) return;
+    const p = project as (PESTELProject & { modduloProjectId?: string; modduloAttachmentsImported?: boolean }) | null;
+    if (!p?.modduloProjectId || p.modduloAttachmentsImported) return;
+
+    setImportingModdulo(true);
+    fetch(`/api/centinela/pestel/project/${projectId}/import-moddulo-attachments`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(async (r) => {
+        if (!r.ok) return;
+        const data = (await r.json()) as { imported: number };
+        if (data.imported > 0) {
+          setModduloImportMsg(
+            `${data.imported} ${data.imported === 1 ? "documento" : "documentos"} de Moddulo F2 importado${data.imported === 1 ? "" : "s"} automáticamente.`
+          );
+          // Recargar cobertura para reflejar las nuevas fuentes
+          await loadCoverage();
+          setTimeout(() => setModduloImportMsg(null), 6000);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setImportingModdulo(false));
+  }, [loading, project, projectId, loadCoverage]);
 
   async function handleSaveManual(e: React.FormEvent) {
     e.preventDefault();
@@ -258,6 +289,19 @@ export default function DatosPage() {
       )}
 
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-8">
+        {/* Banner de importación automática de Moddulo */}
+        {importingModdulo && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bluegreen-eske/5 border border-bluegreen-eske/20 text-sm text-bluegreen-eske">
+            <div className="w-4 h-4 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin shrink-0" aria-hidden="true" />
+            Importando documentos de Moddulo F2 y clasificando por dimensión…
+          </div>
+        )}
+        {modduloImportMsg && !importingModdulo && (
+          <div className="px-4 py-3 rounded-lg bg-green-eske/5 border border-green-eske/20 text-sm text-green-eske font-medium">
+            ✓ {modduloImportMsg}
+          </div>
+        )}
+
         {/* Coverage semaphore */}
         <section aria-labelledby="coverage-heading">
           <h2

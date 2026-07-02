@@ -2,9 +2,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { PaperClipIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage, PhaseId } from "@/types/moddulo.types";
+import { uploadMedia } from "@/firebase/storageUtils";
+import { useAuth } from "@/context/AuthContext";
+import type { ChatMessage, PhaseId, ChatAttachment } from "@/types/moddulo.types";
 
 interface ModduloChatProps {
   phaseId: PhaseId;
@@ -15,6 +18,7 @@ interface ModduloChatProps {
   onDataExtracted?: (data: Record<string, unknown>) => void;
   onMessagesChange?: (messages: ChatMessage[]) => void;
   className?: string;
+  renderAfterWelcome?: React.ReactNode;
 }
 
 // Elimina bloques JSON completos e incompletos del texto visible
@@ -35,7 +39,9 @@ export default function ModduloChat({
   onDataExtracted,
   onMessagesChange,
   className = "",
+  renderAfterWelcome,
 }: ModduloChatProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
 
   // Notificar al padre cuando cambian los mensajes
@@ -45,9 +51,12 @@ export default function ModduloChat({
   }, [messages]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scroll interno al contenedor — nunca afecta el documento
   useEffect(() => {
@@ -67,13 +76,48 @@ export default function ModduloChat({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseId]);
 
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setPendingFiles((prev) => [...prev, ...files]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    const hasText = !!input.trim();
+    const hasFiles = pendingFiles.length > 0;
+    if ((!hasText && !hasFiles) || isLoading || isUploading) return;
+
+    let attachments: ChatAttachment[] = [];
+
+    if (hasFiles && user) {
+      setIsUploading(true);
+      try {
+        attachments = await Promise.all(
+          pendingFiles.map(async (file) => {
+            const path = `moddulo/${user.uid}/${projectId}/fases/${phaseId}/attachments/${crypto.randomUUID()}-${file.name}`;
+            const url = await uploadMedia(file, path);
+            return { nombre: file.name, url, tipo: file.type };
+          })
+        );
+      } finally {
+        setIsUploading(false);
+      }
+      setPendingFiles([]);
+    }
+
+    const displayContent =
+      hasText
+        ? input.trim() + (attachments.length > 0 ? "\n" + attachments.map((a) => `📎 ${a.nombre}`).join("\n") : "")
+        : attachments.map((a) => `📎 ${a.nombre}`).join("\n");
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: input.trim(),
+      content: displayContent,
       timestamp: new Date().toISOString(),
     };
 
@@ -87,12 +131,13 @@ export default function ModduloChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage.content,
+          message: input.trim(),
           projectId,
           phaseId,
           currentFormData,
           xpctoContext,
           chatHistory: messages.filter((m) => m.id !== "welcome"),
+          attachments: attachments.length > 0 ? attachments : undefined,
         }),
       });
 
@@ -177,8 +222,11 @@ export default function ModduloChat({
 
       {/* Messages — scroll interno, sin empujar el layout */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0">
-        {messages.map((msg) => (
-          <ChatBubble key={msg.id} message={msg} />
+        {messages.map((msg, index) => (
+          <div key={msg.id}>
+            <ChatBubble message={msg} />
+            {index === 0 && msg.id === "welcome" && renderAfterWelcome}
+          </div>
         ))}
 
         {/* Streaming — solo el texto filtrado */}
@@ -217,6 +265,28 @@ export default function ModduloChat({
 
       {/* Input */}
       <div className="shrink-0 px-4 py-3 border-t border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
+        {/* File chips */}
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {pendingFiles.map((file, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-bluegreen-eske/10 text-bluegreen-eske rounded-full border border-bluegreen-eske/20"
+              >
+                <PaperClipIcon className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                <span className="max-w-[140px] truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  aria-label={`Quitar ${file.name}`}
+                  className="ml-0.5 hover:text-red-eske transition-colors"
+                >
+                  <XMarkIcon className="w-2.5 h-2.5" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
@@ -225,21 +295,48 @@ export default function ModduloChat({
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu respuesta aquí..."
             rows={2}
-            disabled={isLoading}
+            disabled={isLoading || isUploading}
             className="flex-1 resize-none px-4 py-3 text-sm font-medium border-2 border-gray-300 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-bluegreen-eske/30 focus:border-bluegreen-eske disabled:opacity-50 text-gray-800 dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder-[#6D8294] bg-gray-50 dark:bg-[#112230] transition-colors"
             style={{ maxHeight: "120px" }}
           />
-          <button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            className="p-3 bg-bluegreen-eske text-white-eske rounded-xl hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-            aria-label="Enviar mensaje"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploading}
+              aria-label="Adjuntar archivo"
+              className="p-3 border-2 border-gray-300 dark:border-white/10 text-gray-500 dark:text-[#9AAEBE] rounded-xl hover:border-bluegreen-eske hover:text-bluegreen-eske transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <PaperClipIcon className="w-4 h-4" aria-hidden="true" />
+            </button>
+            <button
+              onClick={sendMessage}
+              disabled={(!input.trim() && pendingFiles.length === 0) || isLoading || isUploading}
+              className="p-3 bg-bluegreen-eske text-white-eske rounded-xl hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Enviar mensaje"
+            >
+              {isUploading ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.csv,.png,.jpg,.jpeg"
+          multiple
+          onChange={handleFileAttach}
+          style={{ display: "none" }}
+          aria-hidden="true"
+        />
         <p className="text-xs font-medium text-gray-500 dark:text-[#9AAEBE] mt-2">
           <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-[#112230] border border-gray-300 dark:border-white/10 rounded text-gray-600 dark:text-[#C7D6E0] text-xs">Enter</kbd> para enviar
           {" · "}
@@ -380,7 +477,7 @@ function MarkdownContent({ content }: { content: string }) {
 function getWelcomeMessage(phaseId: PhaseId): string {
   const welcomes: Record<PhaseId, string> = {
     proposito: "Bienvenido a la **Fase 1 — Propósito**. Aquí vamos a definir el ADN de tu proyecto mediante las variables XPCTO.\n\nEmpecemos por lo más importante: ¿cuál es el **Hito (X)** de este proyecto? Es decir, ¿qué resultado concreto, específico y medible buscas lograr?",
-    exploracion: "Estamos en la **Fase 2 — Exploración**. Realizaremos el escaneo situacional PEST-L para contrastar las capacidades del proyecto con el entorno real.\n\n**Para comenzar:** ¿ya cuentas con información, estudios o reportes sobre el entorno del proyecto —factores políticos, económicos, sociales, tecnológicos o legales— o prefieres que yo proponga un análisis inicial a partir del Propósito que ya definimos?",
+    exploracion: "Estamos en la Fase 2 — Exploración. Aquí realizaremos el escaneo situacional del entorno de tu proyecto para contrastar el contexto real con las variables XPCTO que ya definimos.\n\nTienes dos vías para este análisis:\n\n**Análisis de contexto express** — Yo propongo el escaneo PESTEL directamente aquí en F2, a partir del Propósito que ya definimos. Si tienes documentos, estudios o reportes sobre el entorno —encuestas, notas de campo, análisis previos— puedes adjuntarlos aquí o pegar el texto en el chat para enriquecer el análisis.\n\n**Análisis PESTEL** — Usa la app PESTEL de Centinela: configurarás las variables con pesos, agregarás fuentes de datos y obtendrás interpretación, informes y monitoreo continuo. Si compartes documentos aquí primero, PESTEL los recuperará automáticamente.\n\n¿Con qué información cuentas y cuál vía prefieres?",
     investigacion: "**Fase 3 — Investigación**. Es el momento de trabajar con los datos de campo.\n\n¿Cuáles son los principales hallazgos de la investigación que ya tienes disponible?",
     diagnostico: "Estamos en la **Fase 4 — Diagnóstico**. Transformamos la inteligencia en un dictamen de viabilidad.\n\n¿Cómo caracterizarías el entorno actual del proyecto: de **Continuidad**, **Ruptura**, **Terciopelo** o **Caos**?",
     estrategia: "**Fase 5 — Diseño Estratégico**. La inteligencia se convierte en narrativa.\n\n¿Cuál es la propuesta de valor única que diferencia a este proyecto de sus competidores?",

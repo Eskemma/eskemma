@@ -30,5 +30,10 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.token.role == "admin";
     }
 
+    // ========== ADJUNTOS DE MODDULO ==========
+    match /moddulo/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
   }
 }

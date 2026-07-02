@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const body = await request.json();
-    const { type, name, description, color, pestelProjectId } = body;
+    const { type, name, description, color, territorio, pestelProjectId } = body;
 
     if (!type || !name) {
       return NextResponse.json(
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       description,
       color: typeof color === "string" && color.trim() ? color.trim() : "#026988",
+      territorio: territorio && typeof territorio === "object" && territorio.nivel ? territorio : undefined,
       pestelProjectId: typeof pestelProjectId === "string" ? pestelProjectId : undefined,
     };
     const project = await createProject(session.uid, input);

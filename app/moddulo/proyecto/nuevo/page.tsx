@@ -4,12 +4,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import TerritorySelector from "@/app/components/shared/TerritorySelector";
 import { PROJECT_TYPE_LABELS, PROJECT_TYPE_DESCRIPTIONS } from "@/types/moddulo.types";
-import type { ProjectType } from "@/types/moddulo.types";
+import type { ProjectType, Territorio } from "@/types/moddulo.types";
 
 type Step = 1 | 2 | 3;
 
-// Separated so useSearchParams is inside a Suspense boundary
 function NuevoProyectoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,6 +24,7 @@ function NuevoProyectoContent() {
   const [color, setColor] = useState("#026988");
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [customHex, setCustomHex] = useState("");
+  const [territory, setTerritory] = useState<Territorio | null>(null);
 
   // PESTEL integration — query params
   const pestelProjectId = searchParams.get("pestelProjectId");
@@ -44,6 +45,7 @@ function NuevoProyectoContent() {
 
   const projectTypes: ProjectType[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];
   const canAdvanceStep1 = name.trim().length >= 3 && type !== null;
+  const canAdvanceStep2 = territory !== null;
 
   const handleCreate = async () => {
     if (!type || !name.trim()) return;
@@ -60,6 +62,7 @@ function NuevoProyectoContent() {
           name: name.trim(),
           description: description.trim(),
           color,
+          territorio: territory,
           pestelProjectId: fromPESTEL ? pestelProjectId : undefined,
         }),
         credentials: "include",
@@ -79,6 +82,8 @@ function NuevoProyectoContent() {
       setIsCreating(false);
     }
   };
+
+  const STEP_LABELS = ["Nombre y tipo", "Territorio", "Confirmación"];
 
   return (
     <div className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620]">
@@ -120,7 +125,7 @@ function NuevoProyectoContent() {
 
         {/* Indicador de pasos */}
         <div className="flex items-center gap-2 mb-8">
-          {[1, 2].map((s) => (
+          {([1, 2, 3] as Step[]).map((s) => (
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
@@ -131,7 +136,7 @@ function NuevoProyectoContent() {
               >
                 {s}
               </div>
-              {s < 2 && (
+              {s < 3 && (
                 <div
                   className={`h-0.5 w-12 transition-colors ${
                     step > s ? "bg-bluegreen-eske" : "bg-gray-eske-20 dark:bg-[#21425E]"
@@ -141,11 +146,11 @@ function NuevoProyectoContent() {
             </div>
           ))}
           <span className="ml-2 text-sm text-gray-eske-50 dark:text-[#9AAEBE]">
-            {step === 1 ? "Nombre y tipo" : "Confirmación"}
+            {STEP_LABELS[step - 1]}
           </span>
         </div>
 
-        {/* Step 1: Nombre y tipo */}
+        {/* Step 1: Nombre, tipo y color */}
         {step === 1 && (
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-6">
             <h1 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-1">
@@ -213,7 +218,6 @@ function NuevoProyectoContent() {
                     style={{ backgroundColor: hex }}
                   />
                 ))}
-                {/* Botón "+" para color libre */}
                 <button
                   type="button"
                   onClick={() => setShowCustomColor((v) => !v)}
@@ -226,7 +230,6 @@ function NuevoProyectoContent() {
                 >
                   +
                 </button>
-                {/* Vista previa del color seleccionado */}
                 <div
                   className="w-6 h-6 rounded-full border border-gray-eske-20 dark:border-white/10 ml-1"
                   style={{ backgroundColor: color }}
@@ -302,8 +305,21 @@ function NuevoProyectoContent() {
           </div>
         )}
 
-        {/* Step 2: Confirmación */}
+        {/* Step 2: Territorio */}
         {step === 2 && (
+          <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-6">
+            <TerritorySelector
+              territorio={territory}
+              onChange={setTerritory}
+              onNext={() => { if (canAdvanceStep2) setStep(3); }}
+              onBack={() => setStep(1)}
+              label="¿Cuál es el territorio de tu proyecto?"
+            />
+          </div>
+        )}
+
+        {/* Step 3: Confirmación */}
+        {step === 3 && (
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-6">
             <h1 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-1">
               Confirma tu proyecto
@@ -328,6 +344,13 @@ function NuevoProyectoContent() {
                   {type && PROJECT_TYPE_DESCRIPTIONS[type]}
                 </p>
               </div>
+              {territory && (
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Territorio</span>
+                  <p className="text-black-eske dark:text-[#EAF2F8] font-medium mt-0.5">{territory.nombre}</p>
+                  <p className="text-gray-eske-50 dark:text-[#9AAEBE] text-xs mt-0.5 capitalize">{territory.nivel}</p>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Color</span>
                 <div
@@ -347,7 +370,7 @@ function NuevoProyectoContent() {
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Vinculado a PESTEL</span>
                   <p className="text-bluegreen-eske text-sm font-medium mt-0.5">
-                    🛡️ {pestelProjectName ?? pestelProjectId}
+                    {pestelProjectName ?? pestelProjectId}
                   </p>
                 </div>
               )}
@@ -362,7 +385,7 @@ function NuevoProyectoContent() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
                 disabled={isCreating}
                 className="flex-1 py-3 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-lg
                   font-medium text-sm hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-40"

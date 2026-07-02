@@ -1,5 +1,7 @@
 // types/moddulo.types.ts
 import type { Timestamp } from "firebase/firestore";
+import type { Territorio, NivelTerritorial } from "./pestel.types";
+export type { Territorio, NivelTerritorial };
 
 // ==========================================
 // ENUMERACIONES FUNDAMENTALES
@@ -256,6 +258,7 @@ export interface ModduloProject {
   name: string;
   description?: string;
   color?: string;            // Hex del color del proyecto, ej. "#026988"
+  territorio?: Territorio;   // Alcance geográfico definido al crear el proyecto
   fasesCompletadas?: number[]; // Array de números de fase completadas, ej. [1, 2]
   faseActual?: number;       // Número de fase actual (1-9), alternativo a currentPhase
   xpcto: XPCTO;
@@ -281,6 +284,7 @@ export interface CreateProjectInput {
   name: string;
   description?: string;
   color?: string;
+  territorio?: Territorio;
   xpcto?: Partial<XPCTO>;
   pestelProjectId?: string;
 }
@@ -425,13 +429,20 @@ export const emptyExplorationForm = (): ExplorationForm => ({
 // TIPOS PARA EL CHAT API
 // ==========================================
 
+export interface ChatAttachment {
+  nombre: string;
+  url: string;
+  tipo: string;
+}
+
 export interface ChatRequest {
   message: string;
   projectId: string;
   phaseId: PhaseId;
   currentFormData?: Record<string, unknown>;
   chatHistory?: ChatMessage[];
-  xpctoContext?: Record<string, unknown>; // XPCTO de F1, disponible para F2+
+  xpctoContext?: Record<string, unknown>;
+  attachments?: ChatAttachment[];
 }
 
 export interface ChatResponseChunk {

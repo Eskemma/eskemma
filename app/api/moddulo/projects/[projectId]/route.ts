@@ -1,6 +1,8 @@
 // app/api/moddulo/projects/[projectId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
+import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { getProject, updateProject, updatePhaseData, savePhaseReportDraft } from "@/lib/moddulo/project";
 import type { UpdateProjectInput, ModduloProject, PhaseId } from "@/types/moddulo.types";
 
@@ -94,8 +96,23 @@ export async function PATCH(
 
     // Si se envía phaseData, guardar datos de la fase específica
     if (body.phaseData) {
-      const { phaseId, data } = body.phaseData as { phaseId: PhaseId; data: Record<string, unknown> };
-      await updatePhaseData(projectId, session.uid, phaseId, data);
+      const { phaseId, data, started } = body.phaseData as {
+        phaseId: PhaseId;
+        data?: Record<string, unknown>;
+        started?: boolean;
+      };
+      // started: true → marcar la fase como iniciada sin sobreescribir datos
+      if (started === true && !data) {
+        const proj = await getProject(projectId, session.uid);
+        if (!proj) return NextResponse.json({ error: "Proyecto no encontrado o sin acceso." }, { status: 404 });
+        await adminDb.collection("moddulo_projects").doc(projectId).update({
+          [`phases.${phaseId}.started`]: true,
+          [`phases.${phaseId}.status`]: "in-progress",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        await updatePhaseData(projectId, session.uid, phaseId, data ?? {});
+      }
     } else if (body.reportDraft) {
       // Guardar borrador del reporte sin completar la fase
       const { phaseId, reportText } = body.reportDraft as { phaseId: PhaseId; reportText: string };

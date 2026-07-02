@@ -7,7 +7,7 @@ import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
 import { detectRisks } from "@/lib/moddulo/risks";
-import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen } from "@/types/moddulo.types";
+import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen, Territorio } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
 // ==========================================
@@ -44,6 +44,11 @@ export default function PropositoPage() {
   const [form, setForm] = useState<XPCTOForm>(emptyForm());
   const [editForm, setEditForm] = useState<XPCTOForm>(emptyForm());
   const [projectType, setProjectType] = useState<ProjectType>("electoral");
+  // A1 — Landing page: metadatos del proyecto
+  const [showLanding, setShowLanding] = useState(true);
+  const [projectName, setProjectName] = useState<string>("");
+  const [projectColor, setProjectColor] = useState<string>("#026988");
+  const [projectTerritory, setProjectTerritory] = useState<Territorio | null>(null);
   const [mode, setMode] = useState<PageMode>("active");
   const [reportText, setReportText] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);  // muestra reporte en columna izquierda
@@ -76,6 +81,9 @@ export default function PropositoPage() {
         if (!data?.project) return;
         const p = data.project;
         setProjectType(p.type ?? "electoral");
+        setProjectName(p.name ?? "");
+        setProjectColor(p.color ?? "#026988");
+        if (p.territorio) setProjectTerritory(p.territorio);
 
         // Poblar formulario desde xpcto
         const xpcto = p.xpcto;
@@ -101,6 +109,11 @@ export default function PropositoPage() {
         // Detectar si la fase está completada
         const phaseStatus = p.phases?.proposito?.status;
         if (phaseStatus === "completed") setMode("completed");
+
+        // A1 — Ocultar landing si ya inició o completó la fase
+        if (p.phases?.proposito?.started || phaseStatus === "completed") {
+          setShowLanding(false);
+        }
 
         // Cargar reportText (siempre, no solo cuando está completada)
         // Detectar el caso legacy donde se almacenó el JSON completo como reportText
@@ -169,6 +182,17 @@ export default function PropositoPage() {
     const timer = setTimeout(() => autoSave(form), 1500);
     return () => clearTimeout(timer);
   }, [form, autoSave, isLoaded, mode]);
+
+  // A1 — Comenzar F1: marca la fase como iniciada y oculta la landing
+  const handleComenzarF1 = () => {
+    setShowLanding(false);
+    fetch(`/api/moddulo/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ phaseData: { phaseId: "proposito", started: true } }),
+    }).catch(() => {});
+  };
 
   // Datos del formulario como objeto plano para el chat
   const currentFormData = {
@@ -366,8 +390,18 @@ export default function PropositoPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      {/* ===== A1 — LANDING DE F1 (primera visita) ===== */}
+      {showLanding && isLoaded && (
+        <F1LandingView
+          projectName={projectName}
+          projectType={projectType}
+          projectTerritory={projectTerritory}
+          onComenzar={handleComenzarF1}
+        />
+      )}
+
       {/* ===== HEADER RESPONSIVE ===== */}
-      <div className="shrink-0 px-3 sm:px-6 py-2 sm:py-3 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
+      {!showLanding && <div className="shrink-0 px-3 sm:px-6 py-2 sm:py-3 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
         {/* Fila 1: título + estado + descarga */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
@@ -456,10 +490,10 @@ export default function PropositoPage() {
             </div>
           );
         })()}
-      </div>
+      </div>}
 
       {/* ===== TABS MOBILE (solo < lg) ===== */}
-      <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
+      {!showLanding && <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
         <button
           onClick={() => setMobileTab("chat")}
           className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
@@ -484,10 +518,10 @@ export default function PropositoPage() {
           📝 Variables XPCTO
           {mode !== "editing" && <span className="ml-1 opacity-60">(solo lectura)</span>}
         </button>
-      </div>
+      </div>}
 
       {/* ===== CONTENIDO PRINCIPAL ===== */}
-      <div className="flex-1 flex overflow-hidden">
+      {!showLanding && <div className="flex-1 flex overflow-hidden">
 
         {/* Columna izquierda: chat / reporte — visible en mobile solo si tab=chat */}
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
@@ -548,7 +582,7 @@ export default function PropositoPage() {
             readOnly={mode === "completed"}
           />
         </div>
-      </div>
+      </div>}
 
       {/* Modal revisión de cierre */}
       {showReview && (
@@ -924,6 +958,134 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
           className="w-full py-2.5 bg-bluegreen-eske text-white-eske rounded-lg text-sm font-medium hover:bg-bluegreen-eske/90 transition-colors"
         >
           Entendido — revisar las fases afectadas
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// LANDING — F1 PROPÓSITO (primera visita)
+// ==========================================
+
+const TYPE_LABELS_F1: Record<string, string> = {
+  electoral: "Electoral",
+  gubernamental: "Gubernamental",
+  legislativo: "Legislativo",
+  ciudadano: "Ciudadano",
+};
+
+const XPCTO_VARIABLES = [
+  {
+    code: "X",
+    title: "Hito",
+    desc: "El resultado concreto, medible e inamovible que persigue el proyecto. No es un objetivo ni una aspiración: es el evento que define el éxito o fracaso de la campaña.",
+  },
+  {
+    code: "P",
+    title: "Sujeto político",
+    desc: "El actor central del proyecto: candidato, funcionario, líder o institución. Define quién lleva el proyecto y cómo se percibe en el entorno.",
+  },
+  {
+    code: "C",
+    title: "Capacidades",
+    desc: "Los recursos reales disponibles en tres dimensiones: financiero, humano y logístico. Determinan hasta dónde puede llegar la estrategia.",
+  },
+  {
+    code: "T",
+    title: "Tiempo",
+    desc: "La fecha límite inamovible. Todo el plan se construye en función de ese horizonte temporal. Moddulo calcula automáticamente la duración en meses.",
+  },
+  {
+    code: "O",
+    title: "Justificación ética",
+    desc: "El propósito que legitima la existencia del proyecto más allá del resultado. La razón ética que sostiene la campaña y la distingue de la mera ambición política.",
+  },
+];
+
+function F1LandingView({
+  projectName,
+  projectType,
+  projectTerritory,
+  onComenzar,
+}: {
+  projectName: string;
+  projectType: ProjectType;
+  projectTerritory: Territorio | null;
+  onComenzar: () => void;
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-4 py-8 sm:py-12">
+      <div className="w-full max-w-xl space-y-6">
+
+        {/* Encabezado del proyecto */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">F1 — Propósito</span>
+          </div>
+          {projectName && (
+            <h1 className="text-xl sm:text-2xl font-bold text-black-eske dark:text-[#EAF2F8] leading-tight">
+              {projectName}
+            </h1>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {projectType && (
+              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-[#6BA4C6] rounded-full text-xs font-medium">
+                {TYPE_LABELS_F1[projectType] ?? projectType}
+              </span>
+            )}
+            {projectTerritory?.nombre && (
+              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+                {projectTerritory.nombre}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Descripción de F1 */}
+        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">
+          F1 establece el propósito estratégico del proyecto mediante el modelo XPCTO.
+          Aquí definirás las cinco variables fundamentales que dan coherencia y dirección
+          a todo el trabajo de consultoría: desde quién es el sujeto político hasta cuál
+          es la justificación ética que sostiene el proyecto.
+        </p>
+
+        {/* Variables XPCTO */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+            Las cinco variables XPCTO
+          </p>
+          <div className="space-y-2">
+            {XPCTO_VARIABLES.map((v) => (
+              <div key={v.code}
+                className="flex gap-3 p-3 rounded-lg bg-gray-eske-10/60 dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10">
+                <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full
+                  bg-bluegreen-eske/10 text-bluegreen-eske text-xs font-bold">
+                  {v.code}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8]">{v.title}</p>
+                  <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] leading-relaxed mt-0.5">{v.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Nota informativa */}
+        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
+          Las variables XPCTO se construyen en conversación con el asistente de IA.
+          El formulario de la derecha se llena automáticamente conforme avanza el chat,
+          y puedes editarlo directamente en cualquier momento.
+        </p>
+
+        {/* CTA */}
+        <button
+          onClick={onComenzar}
+          className="w-full py-3 rounded-xl bg-bluegreen-eske text-white font-semibold text-sm
+            hover:bg-bluegreen-eske/90 active:scale-[0.98] transition-all"
+        >
+          Comenzar Fase 1
         </button>
       </div>
     </div>

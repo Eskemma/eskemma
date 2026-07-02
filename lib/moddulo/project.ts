@@ -83,6 +83,10 @@ export async function createProject(
 
   data.color = input.color ?? "#026988";
 
+  if (input.territorio) {
+    data.territorio = input.territorio;
+  }
+
   if (input.pestelProjectId) {
     data.pestelProjectId = input.pestelProjectId;
   }

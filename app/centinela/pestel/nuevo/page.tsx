@@ -8,6 +8,7 @@ import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/Wizar
 import type {
   TipoProyecto,
   Territorio,
+  NivelTerritorial,
   PestlDimensionConfig,
 } from "@/types/pestel.types";
 
@@ -33,12 +34,31 @@ export default function NuevoProyectoPage() {
   const [data, setData] = useState<WizardData>(() => {
     const tipoParam = searchParams.get("tipo") as TipoProyecto | null;
     const modduloProjectId = searchParams.get("moddulo_project_id") ?? undefined;
+
+    const VALID_NIVELES: NivelTerritorial[] = ["nacional", "estatal", "municipal", "distrito"];
+    const nivelParam = searchParams.get("nivel") as NivelTerritorial | null;
+    const nivelTerritorio = VALID_NIVELES.includes(nivelParam as NivelTerritorial) ? nivelParam! : null;
+    const estadoParam = searchParams.get("estado") ?? "";
+    const municipioParam = searchParams.get("municipio") ?? "";
+    const paisParam = searchParams.get("pais") ?? "";
+
+    const territorioNombre = [estadoParam, municipioParam].filter(Boolean).join(" › ");
+    const territorioInicial: Territorio | null = nivelTerritorio
+      ? {
+          nivel: nivelTerritorio,
+          nombre: territorioNombre || nivelTerritorio,
+          ...(paisParam ? { pais: paisParam } : {}),
+          ...(estadoParam ? { estado: estadoParam } : {}),
+          ...(municipioParam ? { municipio: municipioParam } : {}),
+        }
+      : null;
+
     return {
       tipo: VALID_TIPOS.includes(tipoParam as TipoProyecto) ? tipoParam : null,
       nombre: searchParams.get("nombre") ?? "",
       horizonte: Number(searchParams.get("horizonte") ?? 6) || 6,
       color: searchParams.get("color") ?? "#026988",
-      territorio: null,
+      territorio: territorioInicial,
       dimensions: [],
       ...(modduloProjectId ? { modduloProjectId, modduloOrigenEscenario: "A" as const } : {}),
     };

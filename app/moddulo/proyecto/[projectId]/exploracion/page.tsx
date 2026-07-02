@@ -17,6 +17,7 @@ import type {
   DVSF2,
   MapaPESTEL,
   F2DimensionPESTEL,
+  Territorio,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 
@@ -49,6 +50,8 @@ interface SefixData {
   estado: string;
   resultados: SefixResultados | null;
   padron: SefixPadron | null;
+  gubernatura?: SefixResultados | null;
+  nivel?: string;
 }
 
 // ==========================================
@@ -113,21 +116,42 @@ export default function ExploracionPage() {
   const [rdaActivo, setRdaActivo] = useState(false);
   const [rdaItems, setRdaItems] = useState<string[]>([]);
 
+  // A1 — Landing page: metadatos del proyecto
+  const [showLanding, setShowLanding] = useState(true);
+  const [projectName, setProjectName] = useState<string>("");
+  const [projectColor, setProjectColor] = useState<string>("#026988");
+  const [projectTerritory, setProjectTerritory] = useState<Territorio | null>(null);
+
+  // A7 — rastrear si el usuario eligió la vía PESTEL desde el chat
+  const [pestlVia, setPestlVia] = useState<"pestel" | null>(null);
+
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
     mode === "editing" ? "editando" :
     dvs !== null ? "lista" :
     "en_progreso";
 
-  // C7 — Abrir PESTEL (reemplaza handleImportPESTEL)
+  // C7 — Abrir PESTEL con pre-llenado completo
   function handleAbrirPESTEL() {
+    setPestlVia("pestel");
     const meses = calcularMesesAlHito(xpcto?.tiempo?.fechaLimite);
-    const qs = new URLSearchParams({
+
+    const params: Record<string, string> = {
       moddulo_project_id: projectId,
       tipo: projectType ?? "",
       horizonte: String(meses),
-    });
-    router.push(`/centinela/pestel/nuevo?${qs.toString()}`);
+      nombre: projectName,
+      color: projectColor,
+    };
+
+    if (projectTerritory) {
+      params.nivel = projectTerritory.nivel;
+      if (projectTerritory.estado) params.estado = projectTerritory.estado;
+      if (projectTerritory.municipio) params.municipio = projectTerritory.municipio;
+      if (projectTerritory.pais) params.pais = projectTerritory.pais;
+    }
+
+    router.push(`/centinela/pestel/nuevo?${new URLSearchParams(params).toString()}`);
   }
 
   // Cargar proyecto al montar
@@ -145,6 +169,9 @@ export default function ExploracionPage() {
         if (!data?.project) return;
         const p = data.project;
         setProjectType(p.type ?? "electoral");
+        setProjectName(p.name ?? "");
+        setProjectColor(p.color ?? "#026988");
+        if (p.territorio) setProjectTerritory(p.territorio);
 
         if (p.xpcto) setXpcto(p.xpcto);
 
@@ -163,11 +190,19 @@ export default function ExploracionPage() {
 
         // Cargar DVS si existe
         const savedDvs = p.phases?.exploracion?.dvs;
-        if (savedDvs) setDvs(savedDvs as DVSF2);
+        if (savedDvs) {
+          setDvs(savedDvs as DVSF2);
+          setShowLanding(false);
+        }
 
         // Cargar MapaPESTEL si existe
         const savedMapa = p.phases?.exploracion?.mapaPESTEL;
         if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
+
+        // A1 — Ocultar landing si ya inició la fase
+        if (p.phases?.exploracion?.started || phaseStatus === "completed") {
+          setShowLanding(false);
+        }
 
         // Cargar RDA de F1 (C8)
         const rda = p.phases?.proposito?.rda;
@@ -203,27 +238,32 @@ export default function ExploracionPage() {
 
   // Cargar datos Sefix
   useEffect(() => {
-    if (!isLoaded || !xpcto || !["electoral", "gubernamental"].includes(projectType)) return;
-    const estadoDetectado = detectEstadoFromXpcto(xpcto);
-    if (!estadoDetectado) return;
+    if (!isLoaded || !["electoral", "gubernamental"].includes(projectType)) return;
+    // Preferir estado del territorio del proyecto; fallback a detección por XPCTO
+    const estadoSefix = projectTerritory?.estado ?? (xpcto ? detectEstadoFromXpcto(xpcto) : null);
+    if (!estadoSefix) return;
 
     const fetchSefix = async () => {
       try {
-        const [resR, padR] = await Promise.all([
-          fetch(`/api/sefix/resultados?estado=${encodeURIComponent(estadoDetectado)}&cargo=diputados`, { credentials: "include" }),
-          fetch(`/api/sefix/padron?estado=${encodeURIComponent(estadoDetectado)}`, { credentials: "include" }),
+        const [resR, padR, gobR] = await Promise.all([
+          fetch(`/api/sefix/resultados?estado=${encodeURIComponent(estadoSefix)}&cargo=diputados`, { credentials: "include" }),
+          fetch(`/api/sefix/padron?estado=${encodeURIComponent(estadoSefix)}`, { credentials: "include" }),
+          fetch(`/api/sefix/resultados?estado=${encodeURIComponent(estadoSefix)}&cargo=gobernador`, { credentials: "include" }),
         ]);
         const resJson = resR.ok ? await resR.json() : null;
         const padJson = padR.ok ? await padR.json() : null;
+        const gobJson = gobR.ok ? await gobR.json() : null;
         setSefixData({
-          estado: estadoDetectado,
+          estado: estadoSefix,
           resultados: resJson?.resultados ?? null,
           padron: padJson?.padron ?? null,
+          gubernatura: gobJson?.resultados ?? null,
+          nivel: projectTerritory?.nivel ?? undefined,
         });
       } catch { /* no-op */ }
     };
     fetchSefix();
-  }, [isLoaded, xpcto, projectType]);
+  }, [isLoaded, xpcto, projectType, projectTerritory]);
 
   // Auto-guardar (solo en modo activo, después de cargar)
   const autoSave = useCallback(async (formData: ExplorationForm) => {
@@ -395,6 +435,17 @@ export default function ExploracionPage() {
     } catch {/* silencioso */} finally { setIsClosingPhase(false); }
   };
 
+  // A1 — Iniciar F2: oculta landing y persiste flag
+  const handleComenzarF2 = () => {
+    setShowLanding(false);
+    fetch(`/api/moddulo/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ phaseData: { phaseId: "exploracion", started: true } }),
+    }).catch(() => {});
+  };
+
   const handleStartEdit = () => { setEditForm(structuredClone(form)); setMode("editing"); };
   const handleCancelEdit = () => setMode(dvs ? "completed" : "active");
 
@@ -468,11 +519,13 @@ export default function ExploracionPage() {
         {/* Botones de acción — máquina de estados C2 */}
         <div className="flex flex-wrap gap-1.5 mt-2">
           {headerState === "en_progreso" && (<>
-            <button
-              onClick={handleAbrirPESTEL}
-              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
-              Abrir PESTEL
-            </button>
+            {pestlVia === "pestel" && (
+              <button
+                onClick={handleAbrirPESTEL}
+                className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
+                Abrir PESTEL
+              </button>
+            )}
             <button disabled
               className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
               Editar análisis
@@ -537,25 +590,38 @@ export default function ExploracionPage() {
         </div>
       )}
 
-      {/* ===== TABS MOBILE ===== */}
-      <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
-        {[
-          { id: "chat" as const, label: headerState === "lista" && mode !== "editing" ? "📋 DVS F2" : "💬 Chat" },
-          { id: "form" as const, label: "📊 Análisis PESTEL" },
-        ].map(({ id, label }) => (
-          <button key={id} onClick={() => setMobileTab(id)}
-            className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
-              mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske" : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* ===== TABS MOBILE (solo cuando no está en landing) ===== */}
+      {!showLanding && (
+        <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
+          {[
+            { id: "chat" as const, label: headerState === "lista" && mode !== "editing" ? "DVS F2" : "Chat" },
+            { id: "form" as const, label: "Análisis PESTEL" },
+          ].map(({ id, label }) => (
+            <button key={id} onClick={() => setMobileTab(id)}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
+                mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske" : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ===== CONTENIDO PRINCIPAL ===== */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* Columna izquierda: DVSView (lista) o Chat (en_progreso/editando) */}
+        {/* A1 — Landing page de F2 */}
+        {showLanding && isLoaded && (
+          <F2LandingView
+            projectName={projectName}
+            projectType={projectType}
+            projectTerritory={projectTerritory}
+            onComenzar={handleComenzarF2}
+          />
+        )}
+
+        {/* Columnas de trabajo (ocultas cuando se muestra la landing) */}
+        {!showLanding && (<>
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
           {headerState === "lista" && mode !== "editing" ? (
             <div className="flex-1 overflow-y-auto">
@@ -571,6 +637,18 @@ export default function ExploracionPage() {
                 onDataExtracted={handleDataExtracted}
                 onMessagesChange={setChatMessages}
                 className="flex-1 overflow-hidden"
+                renderAfterWelcome={
+                  dvs === null && pestlVia === null ? (
+                    <div className="flex justify-start mt-2 ml-10">
+                      <button
+                        onClick={handleAbrirPESTEL}
+                        className="text-sm font-semibold rounded-full px-4 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] hover:bg-bluegreen-eske/5 transition-colors"
+                      >
+                        Abrir PESTEL
+                      </button>
+                    </div>
+                  ) : null
+                }
               />
               {/* Botón Generar DVS (solo en en_progreso) */}
               {headerState === "en_progreso" && (
@@ -605,6 +683,7 @@ export default function ExploracionPage() {
             mapaPESTEL={mapaPESTEL}
           />
         </div>
+        </>)}
       </div>
 
       {/* Modal de revisión al cerrar */}
@@ -897,7 +976,7 @@ function PoliticoSection({ form, onChange, readOnly, fieldClass, projectType, se
 
   return (
     <div className="space-y-3">
-      {sefixData && <SefixWidget data={sefixData} />}
+      {sefixData && <SefixWidget data={sefixData} projectType={projectType} />}
       <SectionField label="Contexto político general" hint={hint}>
         <AutoResizeTextarea value={form.pestl.politico.contexto}
           onChange={(v) => upd({ contexto: v })} disabled={readOnly}
@@ -1270,9 +1349,28 @@ function DownloadButton({ form, reportText, chatMessages }: {
 // SEFIX WIDGET
 // ==========================================
 
-function SefixWidget({ data }: { data: SefixData }) {
-  const { resultados, padron } = data;
-  if (!resultados && !padron) return null;
+function SefixWidget({ data, projectType }: { data: SefixData; projectType?: ProjectType }) {
+  const { resultados, padron, gubernatura, nivel } = data;
+  if (!resultados && !padron && !gubernatura) return null;
+
+  const isElectoral = !projectType || projectType === "electoral";
+  const esNivelEstatal = nivel === "Estatal";
+  const esNivelMunicipal = ["Municipal", "Local", "Distrital"].includes(nivel ?? "");
+
+  // Para proyectos estatales: gubernatura es el primario, diputados es el contraste
+  // Para proyectos municipales: padrón es primario; gubernatura + diputados son contraste
+  // Para proyectos federales / default: diputados es primario; gubernatura es contraste
+  const labelPrimario = esNivelEstatal
+    ? "DATOS ELECTORALES — ESTATAL"
+    : esNivelMunicipal
+    ? `DATOS ELECTORALES — MUNICIPAL`
+    : `DATOS SEFIX — ${data.estado.toUpperCase()}`;
+
+  const labelContraste = esNivelEstatal
+    ? "CONTRASTE — FEDERAL"
+    : "CONTRASTE — GUBERNATURA";
+
+  const contextLabel = isElectoral ? null : "Contexto electoral de referencia";
 
   const fmtN = (n: number) =>
     n >= 1_000_000
@@ -1281,41 +1379,71 @@ function SefixWidget({ data }: { data: SefixData }) {
       ? `${(n / 1_000).toFixed(0)}K`
       : String(n);
 
-  const top3 = resultados?.partidos.slice(0, 3) ?? [];
+  const top3primary = (esNivelEstatal ? gubernatura : resultados)?.partidos.slice(0, 3) ?? [];
+  const primaryEleccion = esNivelEstatal ? gubernatura : resultados;
+  const contrasteEleccion = esNivelEstatal ? resultados : gubernatura;
 
   return (
-    <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">
-          Datos Sefix — {data.estado}
-        </p>
-        <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">INE / DERFE</span>
-      </div>
+    <div className="space-y-2">
+      {/* Sección primaria */}
+      <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">
+            {contextLabel ?? labelPrimario}
+          </p>
+          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">INE · DERFE</span>
+        </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {padron && (
-          <>
-            <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-              <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
-              <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">al {padron.corte}</p>
-            </div>
-            <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-              <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
-              <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
-                H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
+        <div className="grid grid-cols-2 gap-2">
+          {padron && (
+            <>
+              <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
+                <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
+                <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">al {padron.corte}</p>
+              </div>
+              <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
+                <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
+                <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+                  H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
+                </p>
+              </div>
+            </>
+          )}
+          {primaryEleccion && (
+            <div className="col-span-2 bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+              <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-1">
+                Última elección — {primaryEleccion.cargo} {primaryEleccion.anio}
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                {top3primary.map((p) => (
+                  <div key={p.partido} className="text-xs">
+                    <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
+                    <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-1">
+                Participación: {primaryEleccion.participacion}% · {fmtN(primaryEleccion.totalVotos)} votos
               </p>
             </div>
-          </>
-        )}
-        {resultados && (
-          <div className="col-span-2 bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+          )}
+        </div>
+      </div>
+
+      {/* Sección contraste — solo si hay datos */}
+      {contrasteEleccion && (
+        <div className="rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230] p-3 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+            {labelContraste}
+          </p>
+          <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
             <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-1">
-              Última elección — {resultados.cargo} {resultados.anio}
+              {contrasteEleccion.cargo} {contrasteEleccion.anio}
             </p>
             <div className="flex gap-3 flex-wrap">
-              {top3.map((p) => (
+              {contrasteEleccion.partidos.slice(0, 3).map((p) => (
                 <div key={p.partido} className="text-xs">
                   <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
                   <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
@@ -1323,11 +1451,11 @@ function SefixWidget({ data }: { data: SefixData }) {
               ))}
             </div>
             <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-1">
-              Participación: {resultados.participacion}% · {fmtN(resultados.totalVotos)} votos
+              Participación: {contrasteEleccion.participacion}%
             </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1388,6 +1516,132 @@ function detectEstadoFromXpcto(xpcto: XPCTO): string | null {
     if (text.includes(normalized)) return estado;
   }
   return null;
+}
+
+// ==========================================
+// A1 — LANDING PAGE F2
+// ==========================================
+
+const TYPE_LABELS: Record<string, string> = {
+  electoral: "Electoral",
+  gubernamental: "Gubernamental",
+  legislativo: "Legislativo",
+  ciudadano: "Ciudadano",
+};
+
+const F2_MOTORS = [
+  {
+    code: "M1",
+    title: "Escaneo PESTEL situado",
+    desc: "Análisis de las seis dimensiones del entorno: Político, Económico, Social, Tecnológico, Ecológico y Legal.",
+  },
+  {
+    code: "M2",
+    title: "Contraste XPCTO-Entorno",
+    desc: "Veredicto por cada variable del proyecto frente a las señales del entorno.",
+  },
+  {
+    code: "M3",
+    title: "Semáforo de Riesgo de Veto",
+    desc: "Identificación de actores con poder de bloqueo y su nivel de riesgo.",
+  },
+  {
+    code: "M4",
+    title: "Mapa de Incertidumbres Estratégicas",
+    desc: "Clasificación de lo que no sabemos por urgencia y posibilidad de resolución.",
+  },
+  {
+    code: "M5",
+    title: "Hipótesis Estratégica Inicial",
+    desc: "Síntesis interpretativa del entorno que F3 validará, ajustará o refutará.",
+  },
+];
+
+function F2LandingView({
+  projectName,
+  projectType,
+  projectTerritory,
+  onComenzar,
+}: {
+  projectName: string;
+  projectType: ProjectType;
+  projectTerritory: Territorio | null;
+  onComenzar: () => void;
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-4 py-8 sm:py-12">
+      <div className="w-full max-w-xl space-y-6">
+
+        {/* Encabezado del proyecto */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">F2 — Exploración</span>
+          </div>
+          {projectName && (
+            <h1 className="text-xl sm:text-2xl font-bold text-black-eske dark:text-[#EAF2F8] leading-tight">
+              {projectName}
+            </h1>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {projectType && (
+              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-[#6BA4C6] rounded-full text-xs font-medium">
+                {TYPE_LABELS[projectType] ?? projectType}
+              </span>
+            )}
+            {projectTerritory?.nombre && (
+              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+                {projectTerritory.nombre}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Descripción de F2 */}
+        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">
+          F2 establece el mapa situacional del entorno del proyecto mediante el modelo PESTEL,
+          contrasta las señales del entorno con las variables XPCTO definidas en F1,
+          y produce el Programa de Investigación Profunda que guiará la Fase 3.
+        </p>
+
+        {/* Los cinco motores */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+            Los cinco motores de F2
+          </p>
+          <div className="space-y-2">
+            {F2_MOTORS.map((m) => (
+              <div key={m.code}
+                className="flex gap-3 p-3 rounded-lg bg-gray-eske-10/60 dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10">
+                <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full
+                  bg-bluegreen-eske/10 text-bluegreen-eske text-xs font-bold">
+                  {m.code}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8]">{m.title}</p>
+                  <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] leading-relaxed mt-0.5">{m.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Nota informativa */}
+        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
+          Los resultados de F2 son editables en cualquier momento. Cualquier cambio actualiza
+          automáticamente el DVS y puede impactar las fases anteriores y posteriores.
+        </p>
+
+        {/* CTA */}
+        <button
+          onClick={onComenzar}
+          className="w-full py-3 rounded-xl bg-bluegreen-eske text-white font-semibold text-sm
+            hover:bg-bluegreen-eske/90 active:scale-[0.98] transition-all"
+        >
+          Comenzar Fase 2
+        </button>
+      </div>
+    </div>
+  );
 }
 
 async function checkBackPropagation(projectId: string): Promise<PhaseId[]> {
