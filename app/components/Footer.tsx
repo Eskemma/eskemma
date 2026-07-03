@@ -254,10 +254,10 @@ const Footer = () => {
                 </li>
                 <li>
                   <Link
-                    href="/condiciones-asesorias-gratuitas"
+                    href="/condiciones-sesiones-diagnostico-gratuitas"
                     className="hover:text-blue-eske-10 transition-colors duration-300 text-sm max-sm:text-xs focus-ring-light rounded"
                   >
-                    Condiciones de uso para asesorías gratuitas
+                    Condiciones de uso para sesiones de diagnóstico gratuitas
                   </Link>
                 </li>
               </ul>
@@ -398,10 +398,10 @@ const Footer = () => {
             </Link>{" "}
             |{" "}
             <Link
-              href="/condiciones-asesorias-gratuitas"
+              href="/condiciones-sesiones-diagnostico-gratuitas"
               className="hover:text-blue-eske-10 transition-colors duration-300 focus-ring-light rounded"
             >
-              Condiciones de uso para Asesorías Gratuitas
+              Condiciones de uso para Sesiones de Diagnóstico Gratuitas
             </Link>
           </p>
         </div>

@@ -11,11 +11,11 @@ import { generateFAQStructuredData } from "@/lib/seo";
 
 const FAQ_SCHEMA_ITEMS = [
   { question: "¿Qué es Eskemma y cómo puede ayudarme en mi proyecto político?", answer: "Eskemma es un ecosistema digital diseñado para impulsar tu proyecto político con tecnología y datos estratégicos. Te acompañamos en el diseño, ejecución y evaluación de tu estrategia, ofreciéndote soluciones personalizadas para que logres tus objetivos con mayor eficacia y confianza." },
-  { question: "¿Por qué debería elegir Eskemma en lugar de otras opciones gratuitas o tradicionales?", answer: "Aunque existen recursos gratuitos, Eskemma te ofrece información procesada, actualizada y herramientas digitales fáciles de usar, diseñadas para el éxito de tu proyecto político. Esto te permite ahorrar tiempo, dinero y esfuerzo, evitando la improvisación y actuando con estrategia." },
+  { question: "¿Por qué debería elegir Eskemma en lugar de otras opciones gratuitas o tradicionales?", answer: "No se trata de gratuidad vs. pago. Se trata de disperso vs. integrado. Los recursos gratuitos existen: el INE tiene datos, YouTube tiene tutoriales, Google Trends tiene tendencias. Ninguno de ellos está conectado con los demás ni pensado para que puedas usarlos juntos en tiempo real en tu proyecto político. Eso es lo que hace Eskemma." },
   { question: "¿Cómo garantizan que las herramientas y datos sean útiles para mi contexto político?", answer: "Nuestras herramientas están basadas en metodologías probadas y adaptadas a las necesidades de políticos y militantes en Iberoamérica. Además, ofrecemos acompañamiento personalizado para que puedas aplicar los recursos a tu entorno específico." },
   { question: "¿Qué tipo de proyectos políticos pueden beneficiarse de Eskemma?", answer: "Desde campañas locales hasta proyectos estatales o nacionales, Eskemma es útil para candidatos, equipos de campaña, militantes y organizaciones sociales o políticas que buscan profesionalizar su estrategia de comunicación política y maximizar su impacto." },
   { question: "¿Qué herramientas incluye Eskemma y cómo puedo acceder a ellas?", answer: "Eskemma ofrece herramientas como Sefix (bases de datos y dashboards para análisis político-electoral) y Moddulo (para diseñar tu estrategia política y evaluar su impacto). Puedes acceder a versiones freemium para probar su utilidad antes de suscribirte." },
-  { question: "¿Necesito conocimientos técnicos para usar las herramientas de Eskemma?", answer: "No. Nuestras herramientas están diseñadas para ser intuitivas y fáciles de usar. Además, ofrecemos tutoriales y soporte técnico para que puedas sacarle el máximo provecho sin complicaciones." },
+  { question: "¿Necesito conocimientos técnicos para usar las herramientas de Eskemma?", answer: "No. Sefix te muestra datos electorales en visualizaciones interactivas sin que tengas que descargar ni procesar ningún archivo. Moddulo te hace preguntas y te acompaña para construir tu estrategia a partir de tus respuestas. Si en algún momento tienes dudas, el equipo de soporte y los tutoriales guiados están disponibles. El único conocimiento que necesitas es el de tu propio proyecto político." },
   { question: "¿Puedo probar las herramientas antes de comprar?", answer: "Sí. Ofrecemos versiones de prueba gratuitas de Sefix y Moddulo, para que puedas explorar su funcionalidad y decidir con confianza." },
   { question: "¿Cuáles son los planes de suscripción disponibles y qué incluyen?", answer: "Ofrecemos planes mensuales y anuales (individual o grupal), con acceso a herramientas, datos, asesorías y recursos exclusivos. Puedes comparar los planes en nuestra sección de Suscripciones y elegir el que mejor se adapte a tu presupuesto y necesidades." },
   { question: "¿Puedo pagar en cuotas o mensualidades?", answer: "Sí. En México, puedes pagar a 12 meses sin intereses con tarjetas de crédito. Para otros países, contáctanos o escríbenos a teamsupport@eskemma.com para evaluar opciones de pago flexibles." },
@@ -26,7 +26,11 @@ const FAQ_SCHEMA_ITEMS = [
   { question: "¿Cómo maneja Eskemma la confidencialidad de la información de mis proyectos políticos?", answer: "Tu información es confidencial y solo será utilizada para mejorar tu experiencia en la plataforma. No compartimos datos con terceros sin tu consentimiento." },
   { question: "¿Qué tipo de soporte ofrecen si tengo dudas o problemas técnicos?", answer: "Ofrecemos soporte técnico 24/7 a través de nuestro formulario de contacto, WhatsApp y redes sociales. También contamos con tutoriales y guías para resolver dudas comunes. Puedes escribirnos directamente a teamsupport@eskemma.com" },
   { question: "¿Puedo recibir asesoría personalizada para mi proyecto político?", answer: "Sí. Ofrecemos asesorías por hora o paquetes de acompañamiento. Puedes agendar una sesión gratuita para explorar cómo podemos ayudarte." },
-  { question: "¿Por qué debería pagar por información si hay recursos gratuitos disponibles?", answer: "Eskemma no solo te ofrece información, sino datos procesados, herramientas prácticas y acompañamiento experto para que puedas aplicarlos de manera efectiva. La diferencia está en el ahorro de tiempo, la precisión y el impacto en tu proyecto." },
+  { question: "¿Por qué debería pagar por información si hay recursos gratuitos disponibles?", answer: "Porque el tiempo que tardas en buscar, procesar y cruzar información política de fuentes distintas es tiempo que no estás dedicando a tu proyecto. Sefix te da los datos electorales de México de 2006 a 2024 en visualizaciones listas para usar. Centinela automatiza información del entorno por su relevancia política y te comparte alertas relevantes para tu proyecto. Lo que antes tomaba días, ahora toma minutos. Eso es lo que pagas: tiempo recuperado y decisiones más rápidas y oportunas." },
+  { question: "¿Eskemma trabaja con candidatos de todos los partidos?", answer: "Sí, y esa es una decisión deliberada. Eskemma no tiene afiliación partidista ni candidato o gobierno preferido. Trabajamos con igual compromiso con cualquier proyecto político legítimo, independientemente del partido, la ideología o el nivel de gobierno. Nuestra única solicitud es que el proyecto respete el marco democrático y los derechos de las personas. Para Eskemma, la independencia no es un slogan, es el único modelo que nos permite ser útiles sin conflicto de interés." },
+  { question: "¿Qué pasa con mi información estratégica? ¿Podría llegar a mis adversarios?", answer: "No. La información que trabajas dentro de Eskemma es tuya y solo tuya. Cada proyecto opera en un entorno privado. Ni el equipo de Eskemma ni ningún otro usuario tiene acceso a tu estrategia, tus diagnósticos ni tus datos de proyecto. Eskemma nunca comparte, vende ni cruza información entre proyectos. La confidencialidad no es una cláusula en letra pequeña, es la base sobre la cual funciona la confianza que necesitamos para que esto sirva de algo." },
+  { question: "¿Cómo sé si Eskemma es adecuado para mi nivel de conocimiento político?", answer: "La mejor forma de saberlo es usar Eskemma antes de decidir. La primera fase de Moddulo está disponible de forma gratuita y sin tarjeta de crédito: en menos de una hora puedes tener un diagnóstico inicial de tu proyecto y evaluar por ti mismo si el nivel de profundidad y el tipo de acompañamiento es lo que necesitas. Si después de eso tienes dudas, el equipo está disponible para una sesión de diagnóstico gratuita de treinta minutos. La mejor respuesta a esa pregunta es la experiencia directa." },
+  { question: "¿Puedo usar Eskemma si no tengo equipo de campaña?", answer: "Sí, y de hecho es uno de los escenarios para los que Eskemma fue diseñado. Moddulo funciona como un colaborador estratégico que te hace las preguntas correctas y te acompaña en cada fase aunque seas la única persona trabajando en tu proyecto. Sefix y Centinela te dan acceso a información que antes solo estaba disponible para quienes podían pagar un equipo de analistas. No necesitas estructura para empezar. Necesitas un proyecto y disposición para trabajar con método." },
   { question: "¿Cómo sé que Eskemma es la mejor opción para mi proyecto político?", answer: "Eskemma está respaldado por años de experiencia en proyectos políticos en Iberoamérica. Nuestros clientes han logrado ventajas competitivas gracias a nuestras herramientas y metodologías." },
   { question: "¿Qué pasa si no veo resultados inmediatos?", answer: "La estrategia política es un proceso, pero con nuestras herramientas podrás identificar oportunidades y tomar decisiones basadas en evidencia desde el primer día. Te acompañamos para que veas resultados tangibles en el corto y mediano plazo." },
   { question: "¿Cómo funciona el proceso de compra y activación de mi cuenta?", answer: "El proceso es sencillo: elige tu plan, completa el pago con tarjeta o Stripe, y tu cuenta se activará de inmediato. Si pagas con depósito o transferencia, la activación puede tardar hasta 24 horas." },
@@ -59,7 +63,7 @@ interface FaqCategory {
 export default function FaqPage() {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  
+
   const { setIsSignInModalOpen } = useAuth();
 
   const toggleDropdown = (index: number) => {
@@ -86,6 +90,20 @@ export default function FaqPage() {
     setIsScheduleModalOpen(false);
   };
 
+  const BRAND_WORDS = ['Sefix', 'Moddulo', 'Centinela', 'Suscripciones'];
+  const BRAND_REGEX = new RegExp(`(${BRAND_WORDS.join('|')})`, 'g');
+
+  const highlightBrands = (text: string): React.ReactNode => {
+    const parts = text.split(BRAND_REGEX);
+    return parts.map((part, i) =>
+      BRAND_WORDS.includes(part) ? (
+        <span key={i} className="text-bluegreen-eske font-medium">{part}</span>
+      ) : (
+        part
+      )
+    );
+  };
+
   const faqData: FaqCategory = {
     general: [
       {
@@ -98,7 +116,12 @@ export default function FaqPage() {
         question:
           "¿Por qué debería elegir Eskemma en lugar de otras opciones gratuitas o tradicionales?",
         answer:
-          "Aunque existen recursos gratuitos, Eskemma te ofrece información procesada, actualizada y herramientas digitales fáciles de usar, diseñadas para el éxito de tu proyecto político. Esto te permite ahorrar tiempo, dinero y esfuerzo, evitando la improvisación y actuando con estrategia.",
+          "No se trata de gratuidad vs. pago. Se trata de disperso vs. integrado. Los recursos gratuitos existen: el INE tiene datos, YouTube tiene tutoriales, Google Trends tiene tendencias. Ninguno de ellos está conectado con los demás ni pensado para que puedas usarlos juntos en tiempo real en tu proyecto político. Eso es lo que hace Eskemma.",
+      },
+      {
+        question: "¿Eskemma trabaja con candidatos de todos los partidos?",
+        answer:
+          "Sí, y esa es una decisión deliberada. Eskemma no tiene afiliación partidista ni candidato o gobierno preferido. Trabajamos con igual compromiso con cualquier proyecto político legítimo, independientemente del partido, la ideología o el nivel de gobierno. Nuestra única solicitud es que el proyecto respete el marco democrático y los derechos de las personas. Para Eskemma, la independencia no es un slogan, es el único modelo que nos permite ser útiles sin conflicto de interés.",
       },
       {
         question:
@@ -110,25 +133,39 @@ export default function FaqPage() {
         question:
           "¿Qué tipo de proyectos políticos pueden beneficiarse de Eskemma?",
         answer:
-          "Desde campañas locales hasta proyectos estatales o nacionales, Eskemma es útil para candidatos, equipos de campaña, militantes y organizaciones sociales o políticas que buscan profesionalizar su estrategia de comunicación política y maximizar su impacto.",
+          "Desde campañas locales hasta proyectos estatales o nacionales, Eskemma es útil para candidatos, equipos de campaña, militantes, legisladores, gobiernos y organizaciones sociales o políticas que buscan profesionalizar su estrategia de comunicación política y maximizar su impacto.",
       },
     ],
     herramientas: [
       {
         question:
           "¿Qué herramientas incluye Eskemma y cómo puedo acceder a ellas?",
-        answer:
-          "Eskemma ofrece herramientas como Sefix (bases de datos y dashboards para análisis político-electoral) y Moddulo (para diseñar tu estrategia política y evaluar su impacto). Puedes acceder a versiones freemium para probar su utilidad antes de suscribirte.",
+        answer: (
+          <>
+            Eskemma ofrece herramientas como{" "}
+            <span className="text-bluegreen-eske font-medium">Sefix</span>:
+            dashboard de datos electorales de México para análisis
+            político-electoral;{" "}
+            <span className="text-bluegreen-eske font-medium">Moddulo</span>:
+            para diseñar, dirigir y evaluar tu estrategia política con IA; y{" "}
+            <span className="text-bluegreen-eske font-medium">Centinela</span>:
+            conjunto de aplicaciones web con IA para obtener y monitorear datos
+            relevantes e información oportuna para tu proyecto político. Puedes
+            acceder a versiones freemium para probar su utilidad antes de
+            suscribirte.
+          </>
+        ),
         cta: [
           { text: "Explorar Sefix", link: "/sefix" },
-          { text: "Explorar Moddulo", link: "/moddulo" } 
+          { text: "Explorar Moddulo", link: "/moddulo" },
+          { text: "Explorar Centinela", link: "/centinela" },
         ],
       },
       {
         question:
           "¿Necesito conocimientos técnicos para usar las herramientas de Eskemma?",
         answer:
-          "No. Nuestras herramientas están diseñadas para ser intuitivas y fáciles de usar. Además, ofrecemos tutoriales y soporte técnico para que puedas sacarle el máximo provecho sin complicaciones.",
+          "No. Sefix te muestra datos electorales en visualizaciones interactivas sin que tengas que descargar ni procesar ningún archivo. Moddulo te hace preguntas y te acompaña para construir tu estrategia a partir de tus respuestas. Si en algún momento tienes dudas, el equipo de soporte y los tutoriales guiados están disponibles. El único conocimiento que necesitas es el de tu propio proyecto político.",
       },
       {
         question:
@@ -139,9 +176,9 @@ export default function FaqPage() {
       {
         question: "¿Puedo probar las herramientas antes de comprar?",
         answer:
-          "¡Claro! Ofrecemos versiones de prueba gratuitas de Sefix y Moddulo, para que puedas explorar su funcionalidad y decidir con confianza.",
-        cta: { 
-          text: "Registrarme gratis", 
+          "¡Claro! Ofrecemos versiones de prueba gratuitas de Sefix, Moddulo y Centinela, para que puedas explorar su funcionalidad y decidir con confianza.",
+        cta: {
+          text: "Registrarme gratis",
           action: handleOpenSignUp
         },
       },
@@ -233,6 +270,16 @@ export default function FaqPage() {
         answer:
           "Tu información es confidencial y solo será utilizada para mejorar tu experiencia en la plataforma. No compartimos datos con terceros sin tu consentimiento.",
       },
+      {
+        question:
+          "¿Qué pasa con mi información estratégica? ¿Podría llegar a mis adversarios?",
+        answer:
+          "No. La información que trabajas dentro de Eskemma es tuya y solo tuya. Cada proyecto opera en un entorno privado. Ni el equipo de Eskemma ni ningún otro usuario tiene acceso a tu estrategia, tus diagnósticos ni tus datos de proyecto. Eskemma nunca comparte, vende ni cruza información entre proyectos. La confidencialidad no es una cláusula en letra pequeña, es la base sobre la cual funciona la confianza que necesitamos para que esto sirva de algo.",
+        cta: {
+          text: "Ver política de privacidad",
+          link: "/politica-de-privacidad",
+        },
+      },
     ],
     soporte: [
       {
@@ -264,9 +311,9 @@ export default function FaqPage() {
         question:
           "¿Puedo recibir asesoría personalizada para mi proyecto político?",
         answer:
-          "Sí. Ofrecemos asesorías por hora o paquetes de acompañamiento. Puedes agendar una sesión gratuita para explorar cómo podemos ayudarte.",
-        cta: { 
-          text: "Agendar asesoría gratis", 
+          "Sí. Ofrecemos asesorías por hora o paquetes de acompañamiento. Puedes agendar una sesión de diagnóstico gratuita para explorar cómo podemos ayudarte.",
+        cta: {
+          text: "Agendar sesión de diagnóstico",
           action: handleOpenSchedule
         },
       },
@@ -299,7 +346,23 @@ export default function FaqPage() {
         question:
           "¿Por qué debería pagar por información si hay recursos gratuitos disponibles?",
         answer:
-          "Eskemma no solo te ofrece información, sino datos procesados, herramientas prácticas y acompañamiento experto para que puedas aplicarlos de manera efectiva. La diferencia está en el ahorro de tiempo, la precisión y el impacto en tu proyecto.",
+          "Porque el tiempo que tardas en buscar, procesar y cruzar información política de fuentes distintas es tiempo que no estás dedicando a tu proyecto. Sefix te da los datos electorales de México de 2006 a 2024 en visualizaciones listas para usar. Centinela automatiza información del entorno por su relevancia política y te comparte alertas relevantes para tu proyecto. Lo que antes tomaba días, ahora toma minutos. Eso es lo que pagas: tiempo recuperado y decisiones más rápidas y oportunas.",
+      },
+      {
+        question:
+          "¿Cómo sé si Eskemma es adecuado para mi nivel de conocimiento político?",
+        answer:
+          "La mejor forma de saberlo es usar Eskemma antes de decidir. La primera fase de Moddulo está disponible de forma gratuita y sin tarjeta de crédito: en menos de una hora puedes tener un diagnóstico inicial de tu proyecto y evaluar por ti mismo si el nivel de profundidad y el tipo de acompañamiento es lo que necesitas. Si después de eso tienes dudas, el equipo está disponible para una sesión de diagnóstico gratuita de treinta minutos. La mejor respuesta a esa pregunta es la experiencia directa.",
+        cta: {
+          text: "Agendar sesión de diagnóstico",
+          action: handleOpenSchedule,
+        },
+      },
+      {
+        question:
+          "¿Puedo usar Eskemma si no tengo equipo de campaña?",
+        answer:
+          "Sí, y de hecho es uno de los escenarios para los que Eskemma fue diseñado. Moddulo funciona como un colaborador estratégico que te hace las preguntas correctas y te acompaña en cada fase aunque seas la única persona trabajando en tu proyecto. Sefix y Centinela te dan acceso a información que antes solo estaba disponible para quienes podían pagar un equipo de analistas. No necesitas estructura para empezar. Necesitas un proyecto y disposición para trabajar con método.",
       },
       {
         question:
@@ -394,7 +457,7 @@ export default function FaqPage() {
   // ✅ Helper para renderizar CTAs (soporta uno o múltiples)
   const renderCTAs = (cta: FaqCTA | FaqCTA[]) => {
     const ctas = Array.isArray(cta) ? cta : [cta];
-    
+
     return (
       <div className="mt-4 max-sm:mt-2 flex flex-wrap gap-3 max-sm:gap-2">
         {ctas.map((ctaItem, index) => (
@@ -492,9 +555,8 @@ export default function FaqPage() {
                           {faq.question}
                         </span>
                         <svg
-                          className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske transform transition-transform duration-300 ease-in-out flex-shrink-0 ${
-                            openDropdown === currentIndex ? "rotate-180" : ""
-                          }`}
+                          className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske transform transition-transform duration-300 ease-in-out flex-shrink-0 ${openDropdown === currentIndex ? "rotate-180" : ""
+                            }`}
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
                           viewBox="0 0 24 24"
@@ -511,14 +573,16 @@ export default function FaqPage() {
                       </button>
 
                       {openDropdown === currentIndex && (
-                        <div 
+                        <div
                           id={`faq-answer-${currentIndex}`}
                           role="region"
                           aria-labelledby={`faq-question-${currentIndex}`}
                           className="mt-4 max-sm:mt-2"
                         >
                           <div className="text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0] leading-relaxed">
-                            {faq.answer}
+                            {typeof faq.answer === 'string'
+                              ? highlightBrands(faq.answer)
+                              : faq.answer}
                           </div>
 
                           {/* ✅ Renderizado de CTAs (soporta uno o múltiples) */}
@@ -547,8 +611,8 @@ export default function FaqPage() {
                 </Link>
               </div>
               <div className="max-w-[250px] w-full">
-                <Button 
-                  label="AGENDAR ASESORÍA" 
+                <Button
+                  label="AGENDAR SESIÓN DE DIAGNÓSTICO"
                   variant="primary"
                   onClick={handleOpenSchedule}
                 />
@@ -560,10 +624,10 @@ export default function FaqPage() {
 
       {/* ✅ Modal de Agendar Asesoría */}
       {isScheduleModalOpen && (
-        <ScheduleDate 
+        <ScheduleDate
           isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)} 
-          onSubmitSuccess={handleSubmitSuccess} 
+          onClose={() => setIsScheduleModalOpen(false)}
+          onSubmitSuccess={handleSubmitSuccess}
         />
       )}
     </main>

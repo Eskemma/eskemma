@@ -12,7 +12,7 @@ const FaqSection = () => {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  
+
   // Función para alternar el estado del dropdown
   const toggleDropdown = (index: number) => {
     setOpenDropdown(openDropdown === index ? null : index);
@@ -49,9 +49,8 @@ const FaqSection = () => {
                 ¿Qué es Eskemma?
               </span>
               <svg
-                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
-                  openDropdown === 1 ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${openDropdown === 1 ? "rotate-180" : ""
+                  }`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -68,17 +67,19 @@ const FaqSection = () => {
             </button>
             {/* Respuesta del Dropdown */}
             {openDropdown === 1 && (
-              <div 
+              <div
                 id="faq-answer-1"
                 role="region"
                 aria-labelledby="faq-question-1"
                 className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0]"
               >
                 <p>
-                  Eskemma es un ecosistema digital para el triunfo político. Te
-                  invitamos a explorar los recursos gratuitos y de pago para tu
-                  proyecto y que nos permiten acompañarte permanentemente hacia
-                  el logro de tus objetivos políticos.
+                  Eskemma es el ecosistema digital que combina metodología
+                  estratégica, inteligencia política e inteligencia artificial
+                  para que puedas diseñar, ejecutar y evaluar tu proyecto
+                  político con rigor y con los datos correctos. No prometemos
+                  victorias. Prometemos que tomarás mejores decisiones que antes
+                  de usar Eskemma.
                 </p>
               </div>
             )}
@@ -97,9 +98,8 @@ const FaqSection = () => {
                 ¿Cómo puedo agendar una sesión de diagnóstico gratuita?
               </span>
               <svg
-                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
-                  openDropdown === 2 ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${openDropdown === 2 ? "rotate-180" : ""
+                  }`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -116,7 +116,7 @@ const FaqSection = () => {
             </button>
             {/* Respuesta del Dropdown */}
             {openDropdown === 2 && (
-              <div 
+              <div
                 id="faq-answer-2"
                 role="region"
                 aria-labelledby="faq-question-2"
@@ -140,12 +140,11 @@ const FaqSection = () => {
               id="faq-question-3"
             >
               <span className="text-xl max-sm:text-base font-medium text-bluegreen-eske dark:text-[#6BA4C6]">
-                ¿Qué diferencia a Eskemma de otros consultores políticos?
+                ¿Por qué debería elegir Eskemma en lugar de otras opciones gratuitas o tradicionales?
               </span>
               <svg
-                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
-                  openDropdown === 3 ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${openDropdown === 3 ? "rotate-180" : ""
+                  }`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -162,15 +161,22 @@ const FaqSection = () => {
             </button>
             {/* Respuesta del Dropdown */}
             {openDropdown === 3 && (
-              <div 
+              <div
                 id="faq-answer-3"
                 role="region"
                 aria-labelledby="faq-question-3"
                 className="mt-4 max-sm:mt-2 text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0]"
               >
                 <p>
-                  Eskemma combina tecnología, análisis de datos y experiencia
-                  política para ofrecer soluciones personalizadas y efectivas.
+                  Tres diferencias concretas: 1) Eskemma integra en un solo
+                  ecosistema lo que antes requería contratar múltiples
+                  proveedores: datos electorales y del entorno,
+                  metodología estratégica, monitoreo automático y formación. 2) Eskemma no tiene
+                  afiliación partidista ni candidato preferido; trabaja con igual
+                  compromiso para cualquier proyecto político legítimo. 3)
+                  Eskemma está diseñado desde el conocimiento del ecosistema
+                  político mexicano y latinoamericano, no adaptado de
+                  herramientas pensadas para otro contexto.
                 </p>
               </div>
             )}
@@ -189,9 +195,8 @@ const FaqSection = () => {
                 ¿Ofrecen servicios internacionales?
               </span>
               <svg
-                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
-                  openDropdown === 4 ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${openDropdown === 4 ? "rotate-180" : ""
+                  }`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -208,7 +213,7 @@ const FaqSection = () => {
             </button>
             {/* Respuesta del Dropdown */}
             {openDropdown === 4 && (
-              <div 
+              <div
                 id="faq-answer-4"
                 role="region"
                 aria-labelledby="faq-question-4"
@@ -236,9 +241,8 @@ const FaqSection = () => {
                 ¿Cuál es el costo de los servicios?
               </span>
               <svg
-                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${
-                  openDropdown === 5 ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 max-sm:w-5 max-sm:h-5 text-bluegreen-eske dark:text-[#6BA4C6] transform transition-transform duration-300 ease-in-out flex-shrink-0 ml-4 max-sm:ml-2 ${openDropdown === 5 ? "rotate-180" : ""
+                  }`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -255,7 +259,7 @@ const FaqSection = () => {
             </button>
             {/* Respuesta del Dropdown */}
             {openDropdown === 5 && (
-              <div 
+              <div
                 id="faq-answer-5"
                 role="region"
                 aria-labelledby="faq-question-5"

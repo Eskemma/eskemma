@@ -136,11 +136,11 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
         </button>
         {/* Título */}
         <h2 id="schedule-date-title" className="text-[24px] max-sm:text-xl font-bold text-bluegreen-eske dark:text-[#6BA4C6] text-center mb-6 max-sm:mb-4">
-          Agendar asesoría
+          Agendar sesión de diagnóstico
         </h2>
         {/* Descripción */}
         <p className="text-[16px] max-sm:text-sm text-gray-700 dark:text-[#C7D6E0] font-semibold text-center mb-4 max-sm:mb-3">
-          Sesión de 30 minutos de asesoría gratuita en línea.
+          Sesión de diagnóstico gratuita de 30 minutos en línea.
         </p>
         <p className="text-[16px] max-sm:text-sm text-gray-700 dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
           Para agendar, favor de llenar el siguiente formulario:
@@ -333,12 +333,12 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
             <p className="text-[14px] max-sm:text-xs text-gray-700 text-center mt-4 max-sm:mt-3">
               Consultar{" "}
               <a
-                href="/condiciones-asesorias-gratuitas"
+                href="/condiciones-sesiones-diagnostico-gratuitas"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-eske underline focus-ring-primary rounded"
               >
-                Condiciones de Uso para las Asesorías Gratuitas
+                Condiciones de Uso para las Sesiones de Diagnóstico Gratuitas
                 <span className="sr-only"> (se abre en nueva ventana)</span>
               </a>
               .

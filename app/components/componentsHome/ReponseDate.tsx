@@ -46,7 +46,7 @@ export default function ResponseDate({
         <button
           className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
-          aria-label="Cerrar confirmación de asesoría"
+          aria-label="Cerrar confirmación de sesión de diagnóstico"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -72,7 +72,7 @@ export default function ResponseDate({
           </h2>
           {/* Mensaje de agradecimiento */}
           <p className="text-[16px] max-sm:text-sm font-normal text-black-eske dark:text-[#C7D6E0]">
-            Gracias por agendar la asesoría gratuita.
+            Gracias por agendar tu sesión de diagnóstico gratuita.
           </p>
           {/* Detalles de la cita */}
           <div>
@@ -88,8 +88,8 @@ export default function ResponseDate({
             </span>{' '}
             Hemos enviado un email de confirmación a tu cuenta de correo:{' '}
             <span className="font-bold">{email}</span>. En ese email hay
-            indicaciones importantes para concluir la agenda de la asesoría
-            gratuita.
+            indicaciones importantes para concluir la agenda de la sesión
+            de diagnóstico.
           </p>
           {/* Información del asesor */}
           <p className="text-[16px] max-sm:text-sm font-normal text-black-eske dark:text-[#C7D6E0]">
@@ -132,7 +132,7 @@ export default function ResponseDate({
             <div className="flex items-center space-x-2">
               <p className="text-[16px] max-sm:text-sm font-normal text-black-eske dark:text-[#C7D6E0]">
                 Si deseas enviar con anterioridad algún documento que consideres
-                útil para la sesión de asesoría, favor de hacer clic{' '}
+                útil para la sesión de diagnóstico, favor de hacer clic{' '}
                 <a href="#" className="text-blue-eske underline focus-ring-primary rounded">
                   aquí (enviar documento)
                 </a>
@@ -142,9 +142,9 @@ export default function ResponseDate({
             {/* Cancelar asesoría */}
             <div className="mt-6 max-sm:mt-4 flex items-center space-x-2">
               <p className="text-[16px] max-sm:text-sm font-normal text-black-eske dark:text-[#C7D6E0]">
-                Si deseas cancelar la asesoría, haz clic{' '}
+                Si deseas cancelar la sesión de diagnóstico, haz clic{' '}
                 <a href="#" className="text-blue-eske underline focus-ring-primary rounded">
-                  aquí (cancelar asesoría)
+                  aquí (cancelar sesión)
                 </a>
                 .
               </p>
@@ -171,7 +171,7 @@ export default function ResponseDate({
               rel="noopener noreferrer" 
               className="text-blue-eske underline focus-ring-primary rounded"
             >
-              términos y condiciones de las asesorías en línea
+              términos y condiciones de las sesiones de diagnóstico
               <span className="sr-only"> (se abre en nueva ventana)</span>
             </a>
             .

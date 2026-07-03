@@ -31,6 +31,17 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Redirect 301 — renombrado de URL
+  async redirects() {
+    return [
+      {
+        source: '/condiciones-asesorias-gratuitas',
+        destination: '/condiciones-sesiones-diagnostico-gratuitas',
+        permanent: true,
+      },
+    ];
+  },
+
   // Headers de seguridad, SEO y caché
   async headers() {
     const isProduction = process.env.NEXT_PUBLIC_ENVIRONMENT === 'production';

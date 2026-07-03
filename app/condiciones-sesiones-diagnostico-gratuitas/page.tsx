@@ -1,4 +1,4 @@
-// app/condiciones-asesorias-gratuitas/page.tsx
+// app/condiciones-sesiones-diagnostico-gratuitas/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -13,12 +13,12 @@ import ResponseDate from "../components/componentsHome/ReponseDate";
 
 // Nota: metadata no funciona en Client Components, se movería a layout.tsx si es necesario
 // export const metadata: Metadata = {
-//   title: "Condiciones de Asesorías Gratuitas | Eskemma",
-//   description: "Términos y condiciones para las asesorías gratuitas de Eskemma. Conoce tus derechos y obligaciones.",
+//   title: "Condiciones de Sesiones de Diagnóstico Gratuitas | Eskemma",
+//   description: "Términos y condiciones para las sesiones de diagnóstico gratuitas de Eskemma. Conoce tus derechos y obligaciones.",
 //   robots: "index, follow",
 // };
 
-export default function CondicionesAsesoriasGratuitas() {
+export default function CondicionesSessionesDiagnosticoGratuitas() {
   // Estados para los modales
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
@@ -59,8 +59,8 @@ export default function CondicionesAsesoriasGratuitas() {
     <div className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
       {/* Hero Section */}
       <LegalHero
-        title="Condiciones de Uso para Asesorías Gratuitas"
-        subtitle="Términos específicos que rigen nuestro servicio de asesorías gratuitas de 30 minutos"
+        title="Condiciones de Uso para Sesiones de Diagnóstico Gratuitas"
+        subtitle="Términos específicos que rigen nuestro servicio de sesiones de diagnóstico gratuitas de 30 minutos"
         lastUpdated="Diciembre de 2025"
       />
 
@@ -76,7 +76,7 @@ export default function CondicionesAsesoriasGratuitas() {
             {/* Introducción */}
             <div className="mb-8 text-[16px] max-sm:text-[14px] text-black-eske-10 dark:text-[#C7D6E0] leading-relaxed">
               <p className="mb-4">
-                Bienvenido al servicio de asesorías gratuitas de{" "}
+                Bienvenido al servicio de sesiones de diagnóstico gratuitas de{" "}
                 <strong>Eskemma</strong>. Estas Condiciones complementan
                 nuestras{" "}
                 <Link
@@ -86,12 +86,12 @@ export default function CondicionesAsesoriasGratuitas() {
                   Condiciones de Uso Generales
                 </Link>{" "}
                 y regulan específicamente el acceso y uso de nuestras sesiones
-                de asesoría gratuita.
+                de sesión de diagnóstico gratuita.
               </p>
               <div className="bg-bluegreen-eske-10 dark:bg-[#112230] p-4 rounded-lg">
                 <p className="font-semibold mb-2">Importante:</p>
                 <p>
-                  Al solicitar o participar en una asesoría gratuita, aceptas
+                  Al solicitar o participar en una sesión de diagnóstico gratuita, aceptas
                   cumplir con estas Condiciones, así como con nuestra{" "}
                   <Link
                     href="/politica-de-privacidad"
@@ -108,7 +108,7 @@ export default function CondicionesAsesoriasGratuitas() {
             <LegalSection id="objeto" title="1. Objeto y Alcance del Servicio">
               <p className="mb-4">
                 Eskemma ofrece un servicio de{" "}
-                <strong>asesorías gratuitas de 30 minutos</strong> para:
+                <strong>sesiones de diagnóstico gratuitas de 30 minutos</strong> para:
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
                 <li>
@@ -150,7 +150,7 @@ export default function CondicionesAsesoriasGratuitas() {
                 <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                   2.1. Quién Puede Solicitar una Asesoría
                 </h4>
-                <p className="mb-2">Pueden solicitar asesorías gratuitas:</p>
+                <p className="mb-2">Pueden solicitar sesiones de diagnóstico gratuitas:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4 mb-4">
                   <li>Personas mayores de 18 años</li>
                   <li>
@@ -211,7 +211,7 @@ export default function CondicionesAsesoriasGratuitas() {
                 </p>
                 <p className="mb-2">
                   Si contratas un plan de suscripción de Eskemma, podrás
-                  solicitar asesorías adicionales según tu plan (consulta
+                  solicitar sesiones de diagnóstico adicionales según tu plan (consulta
                   términos de cada plan).
                 </p>
               </div>
@@ -243,7 +243,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   </li>
                   <li>
                     <strong>Documento adjunto</strong> (opcional): Puedes enviar
-                    archivos relevantes para la asesoría
+                    archivos relevantes para la sesión de diagnóstico
                   </li>
                 </ul>
               </div>
@@ -262,7 +262,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   <p className="mb-2">
                     Completa el formulario de solicitud haciendo clic en el
                     botón
-                    <strong> "Solicitar Asesoría"</strong> disponible en:
+                    <strong> "Solicitar sesión de diagnóstico"</strong> disponible en:
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4 mb-4">
                     <li>
@@ -329,7 +329,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                     Paso 3: Preparación para la Sesión
                   </h4>
-                  <p className="mb-2">Antes de tu asesoría:</p>
+                  <p className="mb-2">Antes de tu sesión de diagnóstico:</p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
                     <li>
                       <strong>Revisa tu correo de confirmación:</strong>{" "}
@@ -453,7 +453,7 @@ export default function CondicionesAsesoriasGratuitas() {
               <p className="mb-4">
                 Para garantizar la calidad del servicio, fines de capacitación
                 interna y cumplimiento legal,
-                <strong> Eskemma puede grabar las sesiones de asesoría</strong>.
+                <strong> Eskemma puede grabar las sesiones de diagnóstico</strong>.
               </p>
 
               <div className="space-y-6">
@@ -531,7 +531,7 @@ export default function CondicionesAsesoriasGratuitas() {
                     </li>
                     <li>
                       <strong>Oponerte a la grabación:</strong> Si no deseas ser
-                      grabado, puedes rechazar la asesoría antes de que inicie
+                      grabado, puedes rechazar la sesión de diagnóstico antes de que inicie
                       (ver sección siguiente)
                     </li>
                   </ul>
@@ -716,7 +716,7 @@ export default function CondicionesAsesoriasGratuitas() {
                     7.3. Derechos de los Padres o Tutores
                   </h4>
                   <p className="mb-2">
-                    Si tu hijo menor de edad participa en una asesoría, tienes
+                    Si tu hijo menor de edad participa en una sesión de diagnóstico, tienes
                     derecho a:
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
@@ -753,7 +753,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   Servicio Informativo, NO Vinculante
                 </h4>
                 <p className="mb-4">
-                  Las asesorías gratuitas tienen un carácter{" "}
+                  Las sesiones de diagnóstico gratuitas tienen un carácter{" "}
                   <strong>orientativo y educativo</strong>. La información
                   proporcionada:
                 </p>
@@ -780,7 +780,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   </h4>
                   <p className="mb-4">
                     Aunque nuestro equipo tiene experiencia en estrategia
-                    política y herramientas digitales, las asesorías gratuitas
+                    política y herramientas digitales, las sesiones de diagnóstico gratuitas
                     NO equivalen a:
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
@@ -798,7 +798,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   </h4>
                   <p className="mb-2">
                     Cualquier decisión que tomes basándote en la información de
-                    la asesoría es
+                    la sesión de diagnóstico es
                     <strong> bajo tu exclusiva responsabilidad</strong>. Eskemma
                     NO se hace responsable de:
                   </p>
@@ -877,7 +877,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   </h4>
                   <p className="mb-2 text-black-eske dark:text-[#C7D6E0]">
                     Eskemma se reserva el derecho de rechazar, cancelar o
-                    terminar una asesoría si:
+                    terminar una sesión de diagnóstico si:
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4 text-black-eske dark:text-[#C7D6E0]">
                     <li>
@@ -911,7 +911,7 @@ export default function CondicionesAsesoriasGratuitas() {
                     <li>
                       <strong>Con más de 24 horas de anticipación:</strong>{" "}
                       Puedes reprogramar sin penalización. Utiliza el link
-                      "Cancelar asesoría" proporcionado en tu correo de
+                      "Cancelar sesión de diagnóstico" proporcionado en tu correo de
                       confirmación, o envía un correo a{" "}
                       <a
                         href="mailto:asesorias@eskemma.com"
@@ -1134,7 +1134,7 @@ export default function CondicionesAsesoriasGratuitas() {
                   Servicio "TAL CUAL" (As-Is):
                 </p>
                 <p className="mb-4">
-                  Las asesorías gratuitas se proporcionan{" "}
+                  Las sesiones de diagnóstico gratuitas se proporcionan{" "}
                   <strong>"tal cual"</strong> y
                   <strong> "según disponibilidad"</strong>, sin garantías de
                   ningún tipo, expresas o implícitas.
@@ -1259,7 +1259,7 @@ export default function CondicionesAsesoriasGratuitas() {
               <div className="space-y-3">
                 <div className="bg-white-eske border-2 border-bluegreen-eske-20 rounded-lg p-4">
                   <p className="font-semibold text-bluegreen-eske mb-2">
-                    Asesorías y Reservas:
+                    Sesiones de Diagnóstico y Reservas:
                   </p>
                   <p className="mb-1 dark:text-black-eske">
                     <strong>Correo:</strong>{" "}
@@ -1337,16 +1337,16 @@ export default function CondicionesAsesoriasGratuitas() {
             {/* CTA Final */}
             <div className="mt-12 p-6 bg-gray-eske-30 dark:bg-[#21425E] rounded-lg text-white-eske text-center">
               <h3 className="text-2xl text-black-eske dark:text-[#EAF2F8] font-bold mb-4">
-                ¿Listo para solicitar tu asesoría gratuita?
+                ¿Listo para solicitar tu sesión de diagnóstico gratuita?
               </h3>
               <p className="text-[16px] text-black-eske dark:text-[#C7D6E0] mb-6 opacity-90">
                 Al solicitar una sesión, confirmas que has leído y aceptado
-                estas Condiciones Específicas para Asesorías Gratuitas.
+                estas Condiciones Específicas para Sesiones de Diagnóstico Gratuitas.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
                 <div className="flex-1">
                   <Button
-                    label="Solicitar Asesoría"
+                    label="Solicitar sesión de diagnóstico"
                     variant="primary"
                     onClick={() => setIsScheduleModalOpen(true)}
                   />

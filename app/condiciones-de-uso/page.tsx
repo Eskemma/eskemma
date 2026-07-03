@@ -77,12 +77,12 @@ export default function CondicionesDeUso() {
               <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
                 <p className="font-semibold mb-2">Nota importante:</p>
                 <p>
-                  Las asesorías gratuitas se rigen por sus propias{" "}
+                  Las sesiones de diagnóstico gratuitas se rigen por sus propias{" "}
                   <Link
-                    href="/condiciones-asesorias-gratuitas"
+                    href="/condiciones-sesiones-diagnostico-gratuitas"
                     className="text-bluegreen-eske hover:text-bluegreen-eske-70 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 underline focus-ring-primary rounded"
                   >
-                    Condiciones de Uso para Asesorías Gratuitas
+                    Condiciones de Uso para Sesiones de Diagnóstico Gratuitas
                   </Link>
                 </p>
               </div>
