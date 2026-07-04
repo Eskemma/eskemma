@@ -119,10 +119,58 @@ export const scrapeAndAnalyze = onRequest(
     }
 
     try {
+      // ----- Build territory-specific topics -----
+      let newsTopics: string[] | undefined;
+      if (isV2 && projectData) {
+        const tipo = projectData.tipo as string ?? "";
+        const nivel = (
+          projectData.territorio as {nivel?: string} | undefined
+        )?.nivel ?? "";
+
+        if (tipo === "electoral") {
+          newsTopics = nivel === "municipal" ?
+            [
+              "elecciones municipales",
+              "presidente municipal",
+              "alcalde",
+              "campaña electoral",
+              "partidos políticos",
+              "candidatos",
+            ] :
+            [
+              "elecciones",
+              "campaña electoral",
+              "candidatos",
+              "partidos políticos",
+              "proceso electoral",
+              "política",
+            ];
+        } else if (tipo === "gubernamental") {
+          newsTopics = [
+            "gobierno",
+            "política gubernamental",
+            "administración pública",
+            "presupuesto",
+            "servicios públicos",
+            "seguridad",
+          ];
+        } else if (tipo === "legislativo") {
+          newsTopics = [
+            "legislatura",
+            "congreso",
+            "diputados",
+            "leyes",
+            "reforma legislativa",
+            "política",
+          ];
+        }
+        // ciudadano → use default topics from the scraper
+      }
+
       // ----- Scrapers in parallel -----
       const [newsResult, dofResult, inegiResult, banxicoResult] =
         await Promise.allSettled([
-          fetchGoogleNewsRSS(territorioNombre),
+          fetchGoogleNewsRSS(territorioNombre, newsTopics),
           fetchDOFRSS(),
           fetchInegiIndicators(INEGI_DEFAULT_SERIES),
           Promise.all(

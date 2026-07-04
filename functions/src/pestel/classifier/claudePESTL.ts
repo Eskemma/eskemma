@@ -292,7 +292,7 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "señalesInciertas": [...]
 }
 
-Incluye entre 1 y 5 señales por categoría según los datos \
+Incluye entre 1 y 3 señales por categoría según los datos \
 disponibles. Si no hay señales de una categoría, usa array vacío [].
 La confianza debe reflejar la calidad y cantidad de datos disponibles.
 Sin datos suficientes asigna confianza menor a 50.`;
@@ -336,31 +336,68 @@ export async function analyzeDimension(params: {
     confianza: 0,
   };
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90_000);
-  try {
-    const response = await client.messages.create(
-      {
-        model: CLAUDE_MODEL,
-        max_tokens: 2048,
-        messages: [{role: "user", content: prompt}],
-      },
-      {signal: controller.signal}
-    );
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    // 90 s gives Claude room to complete ~2048 output tokens under API load.
+    const timeoutId = setTimeout(() => controller.abort(), 90_000);
+    try {
+      const response = await client.messages.create(
+        {
+          model: CLAUDE_MODEL,
+          max_tokens: 2048,
+          messages: [{role: "user", content: prompt}],
+        },
+        {signal: controller.signal}
+      );
 
-    const text = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+      const text = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("");
 
-    const parsed = extractJson(text) as DimensionRawOutput | null;
-    if (parsed && typeof parsed === "object") {
-      raw = {...raw, ...parsed};
+      const parsed = extractJson(text) as DimensionRawOutput | null;
+      clearTimeout(timeoutId);
+
+      if (parsed && typeof parsed === "object") {
+        raw = {...raw, ...parsed};
+        break; // valid JSON received — done
+      }
+
+      // JSON parse failed: log and retry (malformed or truncated response)
+      console.warn(
+        `[claudePESTL] analyzeDimension ${code} attempt ${attempt}: ` +
+        `JSON parse failed. stop_reason=${response.stop_reason}, ` +
+        `output_tokens=${response.usage?.output_tokens ?? "?"}, ` +
+        `response_snippet=${text.slice(0, 120)}`
+      );
+      if (attempt >= MAX_ATTEMPTS) break;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const isRetryable =
+        error instanceof Error &&
+        (error.message.includes("429") ||
+          error.message.includes("rate") ||
+          error.message.includes("overloaded") ||
+          error.name === "AbortError");
+
+      if (attempt < MAX_ATTEMPTS && isRetryable) {
+        const backoff = 2000 * attempt; // 2 s, 4 s
+        console.warn(
+          `[claudePESTL] analyzeDimension ${code} attempt ${attempt} failed ` +
+          `(${error instanceof Error ? error.message : "unknown"}), ` +
+          `retrying in ${backoff / 1000}s...`
+        );
+        await new Promise((r) => setTimeout(r, backoff));
+      } else {
+        console.error(
+          `[claudePESTL] analyzeDimension ${code} failed ` +
+          `after ${attempt} attempt(s):`,
+          error
+        );
+        break;
+      }
     }
-  } catch (error) {
-    console.error(`[claudePESTL] analyzeDimension ${code} failed:`, error);
-  } finally {
-    clearTimeout(timeoutId);
   }
 
   return {

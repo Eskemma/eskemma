@@ -127,16 +127,21 @@ function detectBiases(params: {
 // V2: MAIN ORCHESTRATOR
 // ============================================================
 
+interface SefixResultadoNorm {
+  estado: string;
+  cargo: string;
+  anio: number;
+  totalVotos: number;
+  participacion: number;
+  partidos: { partido: string; votos: number; porcentaje: number }[];
+  fuente: string;
+}
+
 interface SefixData {
-  resultados: {
-    estado: string;
-    cargo: string;
-    anio: number;
-    totalVotos: number;
-    participacion: number;
-    partidos: { partido: string; votos: number; porcentaje: number }[];
-    fuente: string;
-  } | null;
+  // Up to 4 electoral datasets ordered by priority (new format)
+  resultadosList?: SefixResultadoNorm[];
+  // Legacy single-result field (kept for backward compat)
+  resultados?: SefixResultadoNorm | null;
   padron: {
     estado: string;
     padronElectoral: number;
@@ -148,23 +153,29 @@ interface SefixData {
 
 /**
  * Formats Sefix electoral data as text for the Political dimension prompt.
+ * Handles both the new resultadosList format and the legacy resultados field.
  * @param {SefixData|null} data Sefix data
  * @return {string} Formatted text block or empty string
  */
 function formatSefixForPrompt(data: SefixData | null): string {
-  if (!data || (!data.resultados && !data.padron)) return "";
+  if (!data) return "";
 
-  const parts: string[] = [
-    "DATOS ELECTORALES (INE / DERFE):",
-  ];
+  // Normalize: prefer resultadosList, fall back to wrapping legacy resultados
+  const list: SefixResultadoNorm[] =
+    data.resultadosList ??
+    (data.resultados ? [data.resultados] : []);
 
-  if (data.resultados) {
-    const r = data.resultados;
-    const top3 = r.partidos.slice(0, 3)
+  if (list.length === 0 && !data.padron) return "";
+
+  const parts: string[] = ["DATOS ELECTORALES (INE / DERFE):"];
+
+  for (const r of list) {
+    const top3 = r.partidos
+      .slice(0, 3)
       .map((p) => `${p.partido}: ${p.porcentaje}%`)
       .join(", ");
     parts.push(
-      `- Última elección: ${r.cargo} ${r.anio} | ` +
+      `- ${r.cargo} ${r.anio} | ` +
       `Participación: ${r.participacion}% | ` +
       `Top partidos: ${top3} | Fuente: ${r.fuente}`
     );
@@ -302,12 +313,21 @@ export async function generateAnalysisV2(params: {
     if (assigned.size === 0) assigned.add("P");
     for (const code of assigned) {
       const url = article.link ? ` | url: ${article.link}` : "";
+      // Truncate content to keep prompts lean and within latency budget.
+      const snippet = article.content.slice(0, 400);
       articlesByDim[code].push(
-        `[${article.source}] ${article.title}${url}: ` +
-        article.content
+        `[${article.source}] ${article.title}${url}: ${snippet}`
       );
     }
   }
+
+  // Per-dimension prompt budgets (chars):
+  // - Max 8 articles × ~440 chars each ≈ 3,500 chars of news
+  // - Each manual entry capped at 3,000 chars (PDFs can store up to 50,000)
+  // Together these keep input tokens under ~2,000 per dimension,
+  // ensuring Claude responds within the 90 s timeout.
+  const MAX_ARTICLES_PER_DIM = 8;
+  const MAX_MANUAL_CHARS = 3000;
 
   const rawDataPerDim: Record<DimensionCode, string> = {
     P: "", E: "", S: "", T: "", L: "", Ec: "",
@@ -319,11 +339,14 @@ export async function generateAnalysisV2(params: {
     const parts: string[] = [];
     if (articlesByDim[code].length > 0) {
       parts.push(
-        "NOTICIAS:\n" + articlesByDim[code].slice(0, 15).join("\n")
+        "NOTICIAS:\n" +
+        articlesByDim[code].slice(0, MAX_ARTICLES_PER_DIM).join("\n")
       );
     }
     if (manualByDim[code].length > 0) {
-      parts.push("DATOS MANUALES:\n" + manualByDim[code].join("\n"));
+      const truncatedManual = manualByDim[code]
+        .map((m) => m.slice(0, MAX_MANUAL_CHARS));
+      parts.push("DATOS MANUALES:\n" + truncatedManual.join("\n\n"));
     }
     // Append Sefix electoral data to Political dimension
     if (code === "P" && sefixText) {
@@ -332,28 +355,50 @@ export async function generateAnalysisV2(params: {
     rawDataPerDim[code] = parts.join("\n\n");
   }
 
-  // 4. 6 parallel dimension calls (P, E, S, T, L, Ec)
-  console.log("[generateFeed] Starting 6 parallel dimension analyses...");
-  const dimensionPromises = CODES.map((code) => {
-    const dimConfig = variableConfigs.find((d) => d.code === code);
-    const variables = dimConfig ?
-      dimConfig.variables.map((v) => ({name: v.name, weight: v.weight})) :
-      [];
-    return analyzeDimension({
-      code,
-      tipo,
-      territorio,
-      horizonte,
-      variables,
-      rawData: rawDataPerDim[code],
-      // Only pass economic data to the Economic dimension
-      inegiData: code === "E" ? inegiData : undefined,
-      banxicoData: code === "E" ? banxicoData : undefined,
-      anthropicKey,
-    });
-  });
-
-  const dimResults = await Promise.all(dimensionPromises);
+  // 4. Batch-parallel dimension calls (2 at a time).
+  // 6-parallel caused rate-limit failures; pure sequential caused timeouts.
+  // 2 concurrent per round balances speed vs. API rate limits (~5 min total).
+  const BATCH_SIZE_DIM = 2;
+  console.log(
+    "[generateFeed] Starting dimension analyses " +
+    `(${BATCH_SIZE_DIM} concurrent per batch)...`
+  );
+  const dimResults: DimensionAnalysisResult[] = [];
+  for (let i = 0; i < CODES.length; i += BATCH_SIZE_DIM) {
+    const batch = CODES.slice(i, i + BATCH_SIZE_DIM);
+    console.log(`[generateFeed] Batch: ${batch.join(", ")}`);
+    const batchResults = await Promise.all(
+      batch.map((code) => {
+        const dimConfig = variableConfigs.find((d) => d.code === code);
+        const variables = dimConfig ?
+          dimConfig.variables.map((v) => ({name: v.name, weight: v.weight})) :
+          [];
+        return analyzeDimension({
+          code,
+          tipo,
+          territorio,
+          horizonte,
+          variables,
+          rawData: rawDataPerDim[code],
+          inegiData: code === "E" ? inegiData : undefined,
+          banxicoData: code === "E" ? banxicoData : undefined,
+          anthropicKey,
+        }).then((result) => {
+          console.log(
+            `[generateFeed] ${code} done — ` +
+            `confidence: ${result.confidence}, ` +
+            `signal: ${result.mainSignal.slice(0, 60)}`
+          );
+          return result;
+        });
+      })
+    );
+    dimResults.push(...batchResults);
+    // 1 s gap between batches to stay within Claude rate limits
+    if (i + BATCH_SIZE_DIM < CODES.length) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
   console.log("[generateFeed] Dimension analyses completed");
 
   // 5. Impact chains (1 additional call)

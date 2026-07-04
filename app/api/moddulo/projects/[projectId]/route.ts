@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { getProject, updateProject, updatePhaseData, savePhaseReportDraft } from "@/lib/moddulo/project";
+import { getProject, updateProject, updatePhaseData, savePhaseReportDraft, deleteProject } from "@/lib/moddulo/project";
 import type { UpdateProjectInput, ModduloProject, PhaseId } from "@/types/moddulo.types";
 
 // GET: Obtener proyecto individual
@@ -105,11 +105,14 @@ export async function PATCH(
       if (started === true && !data) {
         const proj = await getProject(projectId, session.uid);
         if (!proj) return NextResponse.json({ error: "Proyecto no encontrado o sin acceso." }, { status: 404 });
-        await adminDb.collection("moddulo_projects").doc(projectId).update({
+        const phaseUpdates: Record<string, unknown> = {
           [`phases.${phaseId}.started`]: true,
           [`phases.${phaseId}.status`]: "in-progress",
           updatedAt: FieldValue.serverTimestamp(),
-        });
+        };
+        // draft → active when user starts the first phase
+        if (proj.status === "draft") phaseUpdates.status = "active";
+        await adminDb.collection("moddulo_projects").doc(projectId).update(phaseUpdates);
       } else {
         await updatePhaseData(projectId, session.uid, phaseId, data ?? {});
       }
@@ -127,6 +130,26 @@ export async function PATCH(
   } catch (error) {
     console.error("Error al actualizar proyecto:", error);
     const message = error instanceof Error ? error.message : "Error al actualizar proyecto";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// DELETE: Eliminar proyecto permanentemente
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
+  try {
+    const session = await getSessionFromRequest(request);
+    if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    const { projectId } = await params;
+    await deleteProject(projectId, session.uid);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error al eliminar proyecto:", error);
+    const message = error instanceof Error ? error.message : "Error al eliminar proyecto";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

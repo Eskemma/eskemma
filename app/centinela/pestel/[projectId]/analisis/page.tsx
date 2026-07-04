@@ -278,7 +278,7 @@ export default function AnalisisPage() {
               </p>
               <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
                 PESTEL está procesando las 6 dimensiones en
-                paralelo. Este proceso tarda entre 2 y 10 minutos. Por favor, espera.
+                paralelo. Este proceso tarda varios minutos. Por favor, espera.
               </p>
               {elapsedSeconds > 0 && (
                 <p className="text-xs text-black-eske dark:text-[#9AAEBE] mt-2">

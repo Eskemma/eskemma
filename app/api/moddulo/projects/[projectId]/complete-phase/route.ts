@@ -57,6 +57,19 @@ export async function POST(
 
     await adminDb.collection("moddulo_projects").doc(projectId).update(updates);
 
+    // Auto-transition to "completed" when all 9 phases are done
+    const updatedPhases = {
+      ...(project.phases ?? {}),
+      [phaseId]: { ...(project.phases?.[phaseId] ?? {}), status: "completed" },
+    };
+    const allDone = PHASE_ORDER.every((p) => updatedPhases[p]?.status === "completed");
+    if (allDone && project.status !== "completed") {
+      await adminDb.collection("moddulo_projects").doc(projectId).update({
+        status: "completed",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
     return NextResponse.json({ success: true, nextPhase });
   } catch (error) {
     console.error("[complete-phase] Error:", error);

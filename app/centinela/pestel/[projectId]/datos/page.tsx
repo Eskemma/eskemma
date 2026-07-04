@@ -69,6 +69,9 @@ export default function DatosPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { name: string; dimension: DimensionCode; method: "text" | "vision" }[]
+  >([]);
   // Import from Moddulo
   const [importingModdulo, setImportingModdulo] = useState(false);
   const [modduloImportMsg, setModduloImportMsg] = useState<string | null>(null);
@@ -205,18 +208,24 @@ export default function DatosPage() {
         extractedLength: number;
         method: "text" | "vision";
       };
+      const uploadedName = selectedFile.name;
+      const uploadedDim = manualDimension;
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setManualSource("");
+      setUploadedFiles((prev) => [
+        ...prev,
+        { name: uploadedName, dimension: uploadedDim, method: data.method },
+      ]);
       const visionNote =
         data.method === "vision"
           ? " Las páginas con gráficas e imágenes fueron interpretadas con IA."
           : "";
       setManualSuccessMsg(
-        `✓ Archivo guardado correctamente. Será incluido como fuente en el análisis.${visionNote}`
+        `✓ Archivo procesado y guardado. Será incluido en el análisis.${visionNote}`
       );
       setManualSuccess(true);
-      setTimeout(() => setManualSuccess(false), 6000);
+      setTimeout(() => setManualSuccess(false), 5000);
       await loadCoverage();
     } catch (err) {
       setFileError(
@@ -624,6 +633,32 @@ export default function DatosPage() {
                 </p>
               )}
 
+              {/* List of files uploaded this session */}
+              {uploadedFiles.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-black-eske dark:text-[#C7D6E0]">
+                    Archivos subidos en esta sesión:
+                  </p>
+                  <ul className="flex flex-col gap-1">
+                    {uploadedFiles.map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center gap-2 text-xs text-black-eske dark:text-[#C7D6E0]
+                          bg-green-eske/5 border border-green-eske/20 rounded-lg px-3 py-1.5"
+                      >
+                        <span className="text-green-eske font-medium" aria-hidden="true">✓</span>
+                        <span className="font-medium truncate max-w-[200px]">{f.name}</span>
+                        <span className="text-gray-eske-50">→</span>
+                        <span className="shrink-0">{f.dimension}</span>
+                        {f.method === "vision" && (
+                          <span className="text-bluegreen-eske shrink-0">(IA)</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -709,11 +744,17 @@ export default function DatosPage() {
               Revisa o elimina esos datos antes de continuar.
             </p>
           )}
+          {savingManual && (
+            <p className="text-sm text-bluegreen-eske bg-bluegreen-eske/5 border border-bluegreen-eske/20
+              rounded-lg px-4 py-2 text-center">
+              Procesando archivo… El análisis estará disponible al terminar.
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleTrigger}
-              disabled={!canTrigger || triggering}
+              disabled={!canTrigger || triggering || savingManual}
               className="px-8 py-3 bg-orange-eske text-white rounded-xl text-base
                 font-semibold hover:bg-orange-eske-60 transition-colors
                 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
@@ -721,11 +762,11 @@ export default function DatosPage() {
               {triggering ? "Iniciando análisis…" : "Ejecutar análisis IA"}
             </button>
             <InfoTooltip
-              content="Inicia el análisis con IA usando todas las fuentes disponibles. El proceso tarda 2-8 minutos y no se puede cancelar una vez iniciado."
+              content="Inicia el análisis con IA usando todas las fuentes disponibles. No se puede cancelar una vez iniciado."
             />
           </div>
           <p className="text-xs text-black-eske dark:text-[#9AAEBE] text-center max-w-sm">
-            El análisis puede tardar 2-8 minutos. Serás redirigido
+            El análisis puede tardar varios minutos. PESTEL te redirigirá
             automáticamente al completarse.
           </p>
         </div>
