@@ -347,7 +347,7 @@ export default function MonitoreoPage() {
               <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1.5">
                 Alertas
                 <InfoTooltip
-                  content="Las alertas se generan cuando una dimensión supera umbrales de riesgo configurados: picos de menciones, caídas de sentimiento positivo, o cambios económicos bruscos. Las alertas de crisis activan el banner rojo en la parte superior. Las alertas no leídas se cuentan en el indicador rojo junto al título."
+                  content="Las alertas se generan cuando el score de riesgo del análisis supera el umbral del proyecto (vector ≥ 70 por defecto). Se activan en cada análisis —manual o automático—. Las alertas de crisis activan el banner rojo en la parte superior."
                   placement="right"
                 />
               </h2>
@@ -359,7 +359,7 @@ export default function MonitoreoPage() {
               )}
             </div>
             <p className="text-xs text-black-eske dark:text-[#9AAEBE] mb-3">
-              Actualizadas cada 30 segundos
+              Verificadas cada 30 segundos
             </p>
             <AlertsFeed
               projectId={projectId}
@@ -374,7 +374,7 @@ export default function MonitoreoPage() {
             Monitoreo automático
           </h2>
           <p className="text-xs text-black-eske dark:text-[#9AAEBE] mb-3">
-            Cuando está activo, el sistema ejecuta un análisis automáticamente cada 6 horas.
+            Si activas esta opción, el sistema ejecuta un análisis automático cada 6 horas.
             Por defecto está desactivado — solo se ejecuta si tú lo habilitas.
           </p>
           {project && (

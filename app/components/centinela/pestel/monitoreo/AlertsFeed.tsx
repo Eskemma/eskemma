@@ -110,7 +110,7 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
           Sin alertas recientes
         </p>
         <p className="text-xs text-black-eske dark:text-[#9AAEBE] mt-1">
-          El sistema monitoreará automáticamente cada 6 horas.
+          Las alertas se generarán en cada análisis cuando el riesgo supere el umbral configurado para el proyecto.
         </p>
       </div>
     );

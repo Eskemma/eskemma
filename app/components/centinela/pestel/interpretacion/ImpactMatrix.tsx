@@ -180,9 +180,9 @@ export default function ImpactMatrix({
         {/* Drag instruction — always visible (matrix is always editable) */}
         <p className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-40
           bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 rounded-lg px-3 py-2 leading-relaxed">
-          La IA posicionó cada dimensión según el análisis. Puedes regresar a esta vista en cualquier
-          momento para arrastrar los puntos y ajustar la posición de cada factor. Cada movimiento
-          requiere una justificación que quedará registrada en el análisis.
+          La IA posicionó cada dimensión según el análisis. Puedes arrastrar los puntos y ajustar
+          la posición de cada factor. Cada movimiento requiere una justificación que quedará
+          registrada en el análisis.
         </p>
 
         {/* Axis labels */}
@@ -267,7 +267,7 @@ export default function ImpactMatrix({
                   return (
                     <div
                       key={`ghost-${dim.code}`}
-                      className="absolute w-9 h-9 rounded-full border-2
+                      className="absolute w-7 h-7 sm:w-9 sm:h-9 rounded-full border-2
                         border-dashed border-bluegreen-eske/40
                         bg-bluegreen-eske/10 flex items-center justify-center
                         pointer-events-none -translate-x-1/2 translate-y-1/2"
@@ -303,8 +303,8 @@ export default function ImpactMatrix({
                       tabIndex={readOnly ? -1 : 0}
                       aria-label={`${DIMENSION_META[dim.code].label}. Impacto: ${Math.round(pos.y)}%, Probabilidad: ${Math.round(pos.x)}%. ${readOnly ? "" : "Usa flechas para mover, Enter para ajustar."}`}
                       className={[
-                        "absolute w-9 h-9 rounded-full flex items-center justify-center",
-                        "text-xs font-bold text-white shadow-sm",
+                        "absolute w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center",
+                        "text-[10px] sm:text-xs font-bold text-white shadow-sm",
                         "-translate-x-1/2 translate-y-1/2",
                         readOnly
                           ? "cursor-default"

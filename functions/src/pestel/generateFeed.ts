@@ -313,10 +313,11 @@ export async function generateAnalysisV2(params: {
     if (assigned.size === 0) assigned.add("P");
     for (const code of assigned) {
       const url = article.link ? ` | url: ${article.link}` : "";
+      const dateStr = article.pubDate ? ` (${article.pubDate})` : "";
       // Truncate content to keep prompts lean and within latency budget.
       const snippet = article.content.slice(0, 400);
       articlesByDim[code].push(
-        `[${article.source}] ${article.title}${url}: ${snippet}`
+        `[${article.source}${dateStr}] ${article.title}${url}: ${snippet}`
       );
     }
   }

@@ -18,7 +18,7 @@ type SubTab = "M2" | "M3" | "M4";
 function VeredictoM2Badge({ v }: { v: ContrasteXPCTO["veredicto"] }) {
   const map = {
     coherente: { label: "Coherente", classes: "bg-green-eske-20 text-green-eske-80" },
-    requiere_ajuste: { label: "Requiere ajuste", classes: "bg-yellow-eske-20 text-black-eske" },
+    requiere_ajuste: { label: "Requiere ajuste", classes: "bg-purple-100 text-purple-700 dark:bg-yellow-eske-20 dark:text-black-eske" },
     requiere_investigacion: { label: "Requiere investigación", classes: "bg-red-eske-20 text-red-eske-80" },
   } as const;
   const { label, classes } = map[v];
@@ -34,7 +34,7 @@ function VeredictoM2Badge({ v }: { v: ContrasteXPCTO["veredicto"] }) {
 function NivelRiesgoBadge({ nivel }: { nivel: ActorVetoF2["nivelRiesgo"] }) {
   const map = {
     rojo: { dot: "bg-red-eske", label: "Veto inmediato" },
-    ambar: { dot: "bg-yellow-eske-70", label: "Riesgo condicional" },
+    ambar: { dot: "bg-purple-400 dark:bg-yellow-eske-70", label: "Riesgo condicional" },
     verde: { dot: "bg-green-eske-60", label: "Riesgo bajo" },
   } as const;
   const { dot, label } = map[nivel];
@@ -51,7 +51,7 @@ function NivelRiesgoBadge({ nivel }: { nivel: ActorVetoF2["nivelRiesgo"] }) {
 function NivelBadge({ level, label }: { level: "alta" | "media" | "baja"; label: string }) {
   const colors = {
     alta: "bg-red-eske-20 text-red-eske-80",
-    media: "bg-yellow-eske-20 text-black-eske",
+    media: "bg-purple-100 text-purple-700 dark:bg-yellow-eske-20 dark:text-black-eske",
     baja: "bg-green-eske-20 text-green-eske-80",
   } as const;
   return (

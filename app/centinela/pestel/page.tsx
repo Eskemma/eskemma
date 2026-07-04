@@ -184,7 +184,7 @@ function ProjectCard({
             onClick={() => setKebabOpen((o) => !o)}
             className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40
               hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10
-              transition-colors sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+              transition-colors focus-visible:opacity-100"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <circle cx="8" cy="3" r="1.5" />

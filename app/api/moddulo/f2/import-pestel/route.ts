@@ -113,12 +113,15 @@ export async function POST(request: NextRequest) {
     mapaPESTEL[code] = entry;
   }
 
+  const pestProjectId = analysis.projectId as string;
+
   // Save to Moddulo project
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.pestAnalysisId": pestAnalysisId,
+    "phases.exploracion.pestProjectId": pestProjectId,
     "phases.exploracion.mapaPESTEL": mapaPESTEL,
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  return NextResponse.json({ mapaPESTEL }, { status: 200 });
+  return NextResponse.json({ mapaPESTEL, pestProjectId }, { status: 200 });
 }

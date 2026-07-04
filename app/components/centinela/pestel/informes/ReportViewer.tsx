@@ -172,7 +172,7 @@ export default function ReportViewer({
 
       {content && !editMode && (
         <p className="text-xs text-gray-eske-50 dark:text-[#6D8294]">
-          Haz clic en "Editar texto" para modificar antes de exportar.
+          Puedes hacer clic en "Editar texto" para modificar antes de exportar.
         </p>
       )}
     </div>

@@ -5,6 +5,8 @@
 // Helps analysts ground the interpretation in qualitative data.
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { DimensionCode, ReliabilityLevel } from "@/types/pestel.types";
 import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
@@ -26,10 +28,23 @@ interface Props {
   sources: DataSourceItem[];
 }
 
+function extractFirstParagraph(content: string): string {
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) =>
+      l.length > 0 &&
+      !l.startsWith("#") &&
+      !l.startsWith("---") &&
+      !l.startsWith("|") &&
+      !/^[-=\s]+$/.test(l)
+    );
+  return lines.slice(0, 3).join(" ").trim();
+}
+
 export default function VoicesPanelE6({ sources }: Props) {
-  const [openDimension, setOpenDimension] = useState<DimensionCode | null>(
-    null
-  );
+  const [openDimension, setOpenDimension] = useState<DimensionCode | null>(null);
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
 
   if (sources.length === 0) {
     return (
@@ -39,7 +54,6 @@ export default function VoicesPanelE6({ sources }: Props) {
     );
   }
 
-  // Group by dimension
   const grouped = DIMENSION_ORDER.reduce<
     Partial<Record<DimensionCode, DataSourceItem[]>>
   >(
@@ -49,6 +63,15 @@ export default function VoicesPanelE6({ sources }: Props) {
     },
     {}
   ) as Record<DimensionCode, DataSourceItem[]>;
+
+  function toggleSource(id: string) {
+    setExpandedSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -93,23 +116,19 @@ export default function VoicesPanelE6({ sources }: Props) {
 
             {isOpen && (
               <div className="px-4 pb-4 pt-2 border-t border-gray-eske-10 dark:border-white/10
-                bg-white-eske dark:bg-[#18324A] flex flex-col gap-3">
+                bg-white-eske dark:bg-[#18324A] flex flex-col gap-4">
                 {items.map((item) => {
                   const rel = RELIABILITY_LABELS[item.reliabilityLevel];
-                  // Show a preview — first 300 chars
-                  const preview =
-                    item.content.length > 300
-                      ? item.content.slice(0, 300) + "…"
-                      : item.content;
+                  const quote = extractFirstParagraph(item.content);
+                  const isExpanded = expandedSources.has(item.id);
 
                   return (
                     <blockquote
                       key={item.id}
-                      className="border-l-2 border-bluegreen-eske/30 pl-3
-                        flex flex-col gap-1"
+                      className="border-l-2 border-bluegreen-eske/30 pl-3 flex flex-col gap-2"
                     >
                       <p className="text-xs text-black-eske dark:text-[#C7D6E0] leading-relaxed italic">
-                        "{preview}"
+                        "{quote}"
                       </p>
                       <footer className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] not-italic">
@@ -124,6 +143,30 @@ export default function VoicesPanelE6({ sources }: Props) {
                           Confiabilidad {rel.label}
                         </span>
                       </footer>
+                      {item.content.length > 0 && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => toggleSource(item.id)}
+                            className="text-xs text-bluegreen-eske hover:underline"
+                          >
+                            {isExpanded ? "Ocultar fuente completa ▴" : "Ver fuente completa ▾"}
+                          </button>
+                          {isExpanded && (
+                            <div className="mt-2 text-xs text-black-eske dark:text-[#C7D6E0]
+                              leading-relaxed prose prose-sm max-w-none
+                              dark:prose-invert prose-headings:text-sm
+                              prose-headings:font-semibold prose-headings:mt-3
+                              prose-p:my-1 prose-li:my-0.5
+                              overflow-x-auto
+                              [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs
+                              [&_th]:border [&_th]:border-gray-eske-20 [&_th]:dark:border-white/20 [&_th]:px-4 [&_th]:py-2 [&_th]:text-left [&_th]:bg-gray-eske-10 [&_th]:dark:bg-white/5 [&_th]:font-semibold [&_th]:whitespace-nowrap
+                              [&_td]:border [&_td]:border-gray-eske-20 [&_td]:dark:border-white/10 [&_td]:px-4 [&_td]:py-2 [&_td]:align-top">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </blockquote>
                   );
                 })}

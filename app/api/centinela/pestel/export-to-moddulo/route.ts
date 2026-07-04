@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     await adminDb.collection("moddulo_projects").doc(modduloProjectId).update({
       "phases.exploracion.pestAnalysisId": analysisId,
+      "phases.exploracion.pestProjectId": analysis.projectId,
     });
 
     const redirectUrl = `/moddulo/proyecto/${modduloProjectId}/exploracion?pest_analysis_id=${analysisId}`;

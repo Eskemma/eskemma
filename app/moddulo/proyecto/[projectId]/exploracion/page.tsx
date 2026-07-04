@@ -124,6 +124,10 @@ export default function ExploracionPage() {
 
   // A7 — rastrear si el usuario eligió la vía PESTEL desde el chat
   const [pestlVia, setPestlVia] = useState<"pestel" | null>(null);
+  // ID del proyecto PESTEL vinculado (si ya exportó desde Centinela)
+  const [pestProjectId, setPestProjectId] = useState<string | null>(null);
+  // ID del análisis PESTEL vinculado (para resolver pestProjectId cuando falta)
+  const [pestAnalysisId, setPestAnalysisId] = useState<string | null>(null);
 
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
@@ -199,6 +203,18 @@ export default function ExploracionPage() {
         const savedMapa = p.phases?.exploracion?.mapaPESTEL;
         if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
 
+        // Cargar referencia al proyecto PESTEL vinculado
+        const savedPestProjectId = p.phases?.exploracion?.pestProjectId;
+        const savedPestAnalysisId = p.phases?.exploracion?.pestAnalysisId;
+        if (savedPestAnalysisId) setPestAnalysisId(savedPestAnalysisId as string);
+        if (savedPestProjectId) {
+          setPestProjectId(savedPestProjectId as string);
+          setPestlVia("pestel");
+        } else if (savedPestAnalysisId || savedMapa) {
+          // Proyecto vinculado antes de que se guardara pestProjectId
+          setPestlVia("pestel");
+        }
+
         // A1 — Ocultar landing si ya inició la fase
         if (p.phases?.exploracion?.started || phaseStatus === "completed") {
           setShowLanding(false);
@@ -232,9 +248,30 @@ export default function ExploracionPage() {
         if (!r.ok) return;
         const data = await r.json();
         if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
+        if (data.pestProjectId) {
+          setPestProjectId(data.pestProjectId as string);
+          setPestlVia("pestel");
+        }
       })
       .catch(() => {});
   }, [isLoaded, projectId, mapaPESTEL]);
+
+  // C7b — Resolver pestProjectId cuando existe pestAnalysisId pero no pestProjectId
+  useEffect(() => {
+    if (!isLoaded || !projectId || pestProjectId || !pestAnalysisId) return;
+    fetch("/api/moddulo/f2/import-pestel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ projectId, pestAnalysisId }),
+    })
+      .then(async (r) => {
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data.pestProjectId) setPestProjectId(data.pestProjectId as string);
+      })
+      .catch(() => {});
+  }, [isLoaded, projectId, pestAnalysisId, pestProjectId]);
 
   // Cargar datos Sefix
   useEffect(() => {
@@ -519,13 +556,6 @@ export default function ExploracionPage() {
         {/* Botones de acción — máquina de estados C2 */}
         <div className="flex flex-wrap gap-1.5 mt-2">
           {headerState === "en_progreso" && (<>
-            {pestlVia === "pestel" && (
-              <button
-                onClick={handleAbrirPESTEL}
-                className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
-                Abrir PESTEL
-              </button>
-            )}
             <button disabled
               className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
               Editar análisis
@@ -572,9 +602,9 @@ export default function ExploracionPage() {
       {rdaActivo && (
         <div
           role="alert"
-          className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-yellow-eske-10 border-l-4 border-yellow-eske text-sm dark:bg-yellow-eske/10"
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-purple-50 border-l-4 border-purple-400 text-sm dark:bg-yellow-eske/10 dark:border-yellow-eske"
         >
-          <svg className="w-4 h-4 shrink-0 text-yellow-eske-70 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <svg className="w-4 h-4 shrink-0 text-purple-600 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
           <span className="text-black-eske dark:text-white">
@@ -638,31 +668,31 @@ export default function ExploracionPage() {
                 onMessagesChange={setChatMessages}
                 className="flex-1 overflow-hidden"
                 renderAfterWelcome={
-                  dvs === null && pestlVia === null ? (
+                  headerState === "en_progreso" ? (
                     <div className="flex justify-start mt-2 ml-10">
                       <button
-                        onClick={handleAbrirPESTEL}
-                        className="text-sm font-semibold rounded-full px-4 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] hover:bg-bluegreen-eske/5 transition-colors"
+                        onClick={handleGenerarDVS}
+                        disabled={generandoDVS}
+                        className="flex items-center gap-1.5 text-sm font-semibold rounded-full px-4 py-1.5 bg-bluegreen-eske text-white hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50"
                       >
-                        Abrir PESTEL
+                        {generandoDVS ? (
+                          <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />Generando DVS…</>
+                        ) : "Generar DVS"}
                       </button>
                     </div>
                   ) : null
                 }
               />
-              {/* Botón Generar DVS (solo en en_progreso) */}
-              {headerState === "en_progreso" && (
+              {/* Botón PESTEL — posición inferior */}
+              {(dvs === null || pestlVia === "pestel") && mode !== "editing" && (
                 <div className="shrink-0 flex justify-end">
                   <button
-                    onClick={handleGenerarDVS}
-                    disabled={generandoDVS}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-bluegreen-eske text-white rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50"
+                    onClick={pestlVia === "pestel" && pestProjectId
+                      ? () => router.push(`/centinela/pestel/${pestProjectId}/analisis`)
+                      : handleAbrirPESTEL}
+                    className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
                   >
-                    {generandoDVS ? (
-                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />Generando DVS…</>
-                    ) : (
-                      "Generar DVS"
-                    )}
+                    {pestlVia === "pestel" && pestProjectId ? "Regresar a PESTEL →" : "Abrir PESTEL"}
                   </button>
                 </div>
               )}
@@ -872,7 +902,7 @@ function ExplorationFormPanel({
 function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
   const CLASIF_COLORS: Record<string, string> = {
     OPORTUNIDAD: "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20",
-    NEUTRAL: "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10",
+    NEUTRAL: "bg-[#FFF2CC] text-[#816000] dark:bg-yellow-eske/20 dark:text-yellow-eske",
     AMENAZA: "bg-red-eske-20 text-red-eske-80 dark:bg-red-eske/20",
   };
 
@@ -890,7 +920,11 @@ function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
         )}
       </div>
       {dim.narrativa && (
-        <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8]">{dim.narrativa}</p>
+        <div className="text-xs text-black-eske-80 dark:text-[#C5D8E8] space-y-2">
+          {dim.narrativa.split("\n\n").filter(Boolean).map((para, i) => (
+            <p key={i}>{para.trim()}</p>
+          ))}
+        </div>
       )}
 
       <SignalGroup
@@ -908,8 +942,8 @@ function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
       <SignalGroup
         title="Señales inciertas"
         signals={dim.senalesInciertas}
-        colorClass="text-yellow-eske-70 dark:text-yellow-eske"
-        summaryClass="border border-yellow-eske-20 dark:border-yellow-eske/20"
+        colorClass="text-purple-700 dark:text-yellow-eske"
+        summaryClass="border border-purple-200 dark:border-yellow-eske/20"
       />
     </div>
   );
@@ -1278,7 +1312,7 @@ function DownloadButton({ form, reportText, chatMessages }: {
   };
 
   const pestlText = [
-    "ANÁLISIS PEST-L — FASE 2: EXPLORACIÓN",
+    "ANÁLISIS PESTEL — FASE 2: EXPLORACIÓN",
     "======================================", "",
     "[ P ] POLÍTICO",
     `Contexto: ${form.pestl.politico.contexto || "(sin datos)"}`,
@@ -1311,7 +1345,7 @@ function DownloadButton({ form, reportText, chatMessages }: {
     { label: "Historial del chat (.txt)", available: chatMessages.length > 0, action: () => {
       dl(chatMessages.map((m) => `[${m.role === "assistant" ? "Moddulo" : "Consultor"}]\n${m.content}`).join("\n\n---\n\n"), "F2-Exploracion-Chat.txt");
     }},
-    { label: "Análisis PEST-L (.txt)", available: !!(form.pestl.politico.contexto || form.hipotesis.enunciado), action: () => dl(pestlText, "F2-Exploracion-PESTL.txt") },
+    { label: "Análisis PESTEL (.txt)", available: !!(form.pestl.politico.contexto || form.hipotesis.enunciado), action: () => dl(pestlText, "F2-Exploracion-PESTL.txt") },
   ];
 
   return (

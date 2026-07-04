@@ -23,9 +23,9 @@ const CLASSIFICATION_STYLES: Record<
     badge: "bg-red-eske/10 text-red-eske border border-red-eske/30",
   },
   NEUTRAL: {
-    bg: "bg-gray-eske-10 dark:bg-[#21425E] border-gray-eske-20 dark:border-white/10",
-    text: "text-gray-eske-60 dark:text-[#9AAEBE]",
-    badge: "bg-gray-eske-20 dark:bg-[#112230] text-gray-eske-60 dark:text-[#9AAEBE] border border-gray-eske-30 dark:border-white/10",
+    bg: "bg-[#FFF2CC]/50 dark:bg-yellow-eske/10 border-[#C8A800]/20 dark:border-yellow-eske/20",
+    text: "text-[#816000] dark:text-yellow-eske",
+    badge: "bg-[#FFF2CC] dark:bg-yellow-eske/20 text-[#816000] dark:text-yellow-eske border border-[#C8A800]/20 dark:border-yellow-eske/30",
   },
 };
 
@@ -109,7 +109,7 @@ export default function DimensionStatusGrid({ dimensions }: Props) {
                       ? "bg-green-eske"
                       : dim.classification === "AMENAZA"
                       ? "bg-red-eske"
-                      : "bg-gray-eske-40"
+                      : "bg-[#816000] dark:bg-gray-eske-40"
                   }`}
                   style={{ width: `${dim.confidence}%` }}
                 />

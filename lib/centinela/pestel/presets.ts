@@ -290,6 +290,27 @@ export const PESTL_PRESETS: PresetMap = {
             },
           ],
         },
+        {
+          id: "t-electoral-03",
+          name: "Identificación de contenidos sintéticos",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Casos reportados de deepfakes, bots o desinformación generada por IA",
+              type: "QUANTITATIVE",
+              dataSource: "Monitoreo especializado / medios",
+              isCustom: false,
+            },
+            {
+              description: "Cobertura mediática sobre uso de IA en el contexto electoral",
+              type: "QUALITATIVE",
+              dataSource: "Monitoreo de prensa",
+              isCustom: false,
+            },
+          ],
+        },
       ],
     },
     {
@@ -641,6 +662,27 @@ export const PESTL_PRESETS: PresetMap = {
             },
           ],
         },
+        {
+          id: "t-gub-04",
+          name: "Identificación de contenidos sintéticos",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Casos reportados de deepfakes o desinformación por IA sobre la gestión",
+              type: "QUANTITATIVE",
+              dataSource: "Monitoreo especializado / medios",
+              isCustom: false,
+            },
+            {
+              description: "Cobertura mediática sobre uso de IA en el contexto gubernamental",
+              type: "QUALITATIVE",
+              dataSource: "Monitoreo de prensa",
+              isCustom: false,
+            },
+          ],
+        },
       ],
     },
     {
@@ -895,6 +937,27 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Volumen y sentimiento del debate legislativo en redes",
               type: "QUANTITATIVE",
               dataSource: "Social listening",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "t-leg-03",
+          name: "Identificación de contenidos sintéticos",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Casos reportados de deepfakes o desinformación por IA en el debate legislativo",
+              type: "QUANTITATIVE",
+              dataSource: "Monitoreo especializado / medios",
+              isCustom: false,
+            },
+            {
+              description: "Proyectos legislativos o debates sobre regulación de IA y contenido sintético",
+              type: "QUALITATIVE",
+              dataSource: "Gaceta legislativa / medios",
               isCustom: false,
             },
           ],
@@ -1159,6 +1222,27 @@ export const PESTL_PRESETS: PresetMap = {
               description: "Canales utilizados (WhatsApp, Telegram, medios propios)",
               type: "QUALITATIVE",
               dataSource: "Inventario de comunicación del movimiento",
+              isCustom: false,
+            },
+          ],
+        },
+        {
+          id: "t-ciu-03",
+          name: "Identificación de contenidos sintéticos",
+          weight: 3,
+          isPriority: false,
+          isDefault: true,
+          indicators: [
+            {
+              description: "Casos de deepfakes o desinformación por IA que afecten al movimiento",
+              type: "QUANTITATIVE",
+              dataSource: "Monitoreo especializado / medios",
+              isCustom: false,
+            },
+            {
+              description: "Percepción ciudadana sobre uso de IA en procesos de participación",
+              type: "QUALITATIVE",
+              dataSource: "Encuestas / grupos focales",
               isCustom: false,
             },
           ],

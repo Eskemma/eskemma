@@ -329,7 +329,8 @@ export default function DatosPage() {
                 Sin datos aún. Agrega fuentes para ver el estado de cobertura.
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="min-w-[420px] w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-eske-10 dark:border-white/10 bg-gray-eske-10 dark:bg-[#112230]">
                     <th className="text-left px-4 py-3 font-medium text-black-eske dark:text-[#C7D6E0]">
@@ -405,6 +406,7 @@ export default function DatosPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </section>

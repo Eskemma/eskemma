@@ -50,7 +50,7 @@ function getNextStep(phaseId: PhaseId): { action: string; next: string } {
 function getFooterText(phaseId: PhaseId): string {
   const texts: Partial<Record<PhaseId, string>> = {
     proposito: "Documento rector de la Fase 1. Úsalo como referencia para las siguientes fases.",
-    exploracion: "Resultado exploratorio de la Fase 2. Documenta el escaneo situacional PEST-L del proyecto.",
+    exploracion: "Resultado exploratorio de la Fase 2. Documenta el escaneo situacional PESTEL del proyecto.",
     investigacion: "Reporte de investigación de campo. Valida o refuta la hipótesis planteada en F2.",
     diagnostico: "Dictamen diagnóstico de la Fase 4. Base para el diseño estratégico.",
     estrategia: "Diseño estratégico de la Fase 5. Define la narrativa y posicionamiento del proyecto.",
@@ -87,7 +87,7 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   ) : (
-                    <svg className="w-5 h-5 text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Requiere ajuste">
+                    <svg className="w-5 h-5 text-purple-600 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Requiere ajuste">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   )}
@@ -98,7 +98,7 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       cruce.veredicto === "coherente"
                         ? "bg-green-eske/15 text-green-eske"
-                        : "bg-yellow-eske/20 text-yellow-eske"
+                        : "bg-purple-100 text-purple-700 dark:bg-yellow-eske/20 dark:text-yellow-eske"
                     }`}>
                       {cruce.veredicto === "coherente" ? "Coherente" : "Requiere ajuste"}
                     </span>
@@ -156,7 +156,7 @@ function CriteriosSection({
                 ? "bg-green-eske/15 text-green-eske"
                 : c.nivel === "Prioritario"
                   ? "bg-red-eske/15 text-red-eske"
-                  : "bg-yellow-eske/20 text-yellow-eske"
+                  : "bg-purple-100 text-purple-700 dark:bg-yellow-eske/20 dark:text-yellow-eske"
             }`}>
               {c.estado === "resuelto" ? (
                 <>
@@ -210,10 +210,10 @@ function RDASection({
               className={`rounded-lg border p-4 ${
                 c.nivel === "Prioritario"
                   ? "border-red-eske/30 bg-red-eske/5"
-                  : "border-yellow-eske/30 bg-yellow-eske/5"
+                  : "border-purple-200 bg-purple-50 dark:border-yellow-eske/30 dark:bg-yellow-eske/5"
               }`}
             >
-              <p className={`text-xs font-bold mb-1 ${c.nivel === "Prioritario" ? "text-red-eske" : "text-yellow-eske"}`}>
+              <p className={`text-xs font-bold mb-1 ${c.nivel === "Prioritario" ? "text-red-eske" : "text-purple-700 dark:text-yellow-eske"}`}>
                 Criterio {c.id} — {c.nombre}
               </p>
               <p className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] mb-2">{def.descripcion}</p>

@@ -219,6 +219,8 @@ export interface PhaseState {
   dvs?: DVSF2;
   // ID del análisis PESTEL vinculado (F2)
   pestAnalysisId?: string;
+  // ID del proyecto PESTEL vinculado (F2) — para navegar de vuelta a Centinela
+  pestProjectId?: string;
   // MapaPESTEL transformado para F2 (señales tripartitas por dimensión)
   mapaPESTEL?: MapaPESTEL;
   // Estado semántico de la fase (F2: "lista" cuando DVS generado)

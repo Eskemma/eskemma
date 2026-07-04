@@ -16,7 +16,7 @@ import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 const CLASSIFICATION_CONFIG = {
   OPORTUNIDAD: { label: "Oportunidad", color: "text-green-eske", bg: "bg-green-eske/10" },
   AMENAZA: { label: "Amenaza", color: "text-red-eske", bg: "bg-red-eske/10" },
-  NEUTRAL: { label: "Neutral", color: "text-gray-eske-70", bg: "bg-gray-eske-20" },
+  NEUTRAL: { label: "Neutral", color: "text-[#816000] dark:text-yellow-eske", bg: "bg-[#FFF2CC] dark:bg-yellow-eske/20" },
 };
 
 const TREND_ICONS = {
@@ -116,7 +116,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               analysis.globalConfidence >= 70
                 ? "text-green-eske"
                 : analysis.globalConfidence >= 50
-                ? "text-yellow-eske"
+                ? "text-purple-700 dark:text-yellow-eske"
                 : "text-red-eske",
             ].join(" ")}
           >
@@ -130,7 +130,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               analysis.globalConfidence >= 70
                 ? "bg-green-eske"
                 : analysis.globalConfidence >= 50
-                ? "bg-yellow-eske"
+                ? "bg-purple-400 dark:bg-yellow-eske"
                 : "bg-red-eske",
             ].join(" ")}
             style={{ width: `${analysis.globalConfidence}%` }}
@@ -359,7 +359,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               <input
                 id="chain-recommendation"
                 type="text"
-                maxLength={100}
+                maxLength={300}
                 value={chainForm.recommendation}
                 onChange={(e) => setChainForm((p) => ({ ...p, recommendation: e.target.value }))}
                 className="w-full text-sm rounded-lg border border-gray-eske-20 dark:border-white/10
@@ -460,7 +460,7 @@ function DimensionPanel({ dim }: { dim: DimensionAnalysis }) {
               dim.confidence >= 70
                 ? "bg-green-eske"
                 : dim.confidence >= 40
-                ? "bg-yellow-eske"
+                ? "bg-purple-400 dark:bg-yellow-eske"
                 : "bg-red-eske",
             ].join(" ")}
             style={{ width: `${dim.confidence}%` }}
@@ -616,7 +616,7 @@ function BiasAlertCard({
         "flex items-start gap-3 p-4 rounded-xl border",
         isAcknowledged
           ? "border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] opacity-60"
-          : "border-yellow-eske/30 bg-yellow-eske/5 dark:bg-yellow-900/10",
+          : "border-purple-200 bg-purple-50 dark:border-yellow-eske/30 dark:bg-yellow-900/10",
       ].join(" ")}
     >
       <span className="text-lg mt-0.5" aria-hidden="true">

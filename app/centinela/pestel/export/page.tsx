@@ -2,5 +2,5 @@
 import UnderConstructionPage from "../../../components/UnderConstructionPage";
 
 export default function PESTELExportPage() {
-  return <UnderConstructionPage title="Exportar Matriz PEST-L" />;
+  return <UnderConstructionPage title="Exportar Matriz PESTEL" />;
 }

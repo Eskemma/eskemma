@@ -8,6 +8,7 @@ import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { useParams, useRouter } from "next/navigation";
 import ScorecardTable from "@/app/components/centinela/pestel/informes/ScorecardTable";
 import ReportViewer from "@/app/components/centinela/pestel/informes/ReportViewer";
+import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import {
   buildScorecard,
   type Scorecard,
@@ -353,11 +354,15 @@ export default function InformesPage() {
         {scorecard && analysis && (
           <section className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-gray-eske-20 dark:border-white/10 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-eske-20 dark:border-white/10">
-              <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8]">
+              <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1">
                 Scorecard ponderado
+                <InfoTooltip
+                  content="Tabla que sintetiza el peso relativo, score y señal dominante de cada dimensión PESTEL. Permite comparar el equilibrio entre amenazas y oportunidades en el análisis."
+                  placement="right"
+                />
               </h2>
               <p className="text-xs text-black-eske dark:text-[#9AAEBE] mt-0.5">
-                Calculado con los pesos configurados en la Etapa 3
+                Calculado con los pesos configurados para el análisis.
               </p>
             </div>
             <div className="px-1 py-2">

@@ -115,7 +115,7 @@ function NuevoProyectoContent() {
                 Proyecto vinculado a PESTEL
               </p>
               <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
-                El análisis PEST-L de{" "}
+                El análisis PESTEL de{" "}
                 <strong>{pestelProjectName ?? "tu proyecto PESTEL"}</strong>{" "}
                 estará disponible para importar en la Fase 2 — Exploración.
               </p>
