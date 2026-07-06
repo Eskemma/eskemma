@@ -404,6 +404,314 @@ Responde con este JSON exacto (sin campos adicionales):
 }
 
 // ==========================================
+// EXPRESS PATH — MapaPESTEL desde formulario
+// ==========================================
+
+export function getMapaPESTELExpressPrompt(
+  projectType: string,
+  xpcto: Record<string, unknown>
+): { system: string; user: string } {
+  const x = xpcto as {
+    hito?: string; sujeto?: string; justificacion?: string;
+    capacidades?: { financiero?: string; humano?: string; logistico?: string };
+    tiempo?: { fechaLimite?: string; duracionMeses?: number };
+  };
+  const cap = x.capacidades ?? {};
+  const t = x.tiempo ?? {};
+
+  const system = `Eres un analista político experto en metodología PEST-L aplicada a consultoría política.
+Tu tarea es generar un MapaPESTEL tripartito completo para un proyecto de tipo "${projectType}".
+Este MapaPESTEL es la lectura inicial del entorno que realiza Moddulo cuando el consultor no utiliza la app PESTEL.
+Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques de código.`;
+
+  const user = `Genera el MapaPESTEL para este proyecto. El análisis debe ser específico al hito, el sujeto y el contexto político-territorial implícito en el XPCTO.
+
+== XPCTO DEL PROYECTO ==
+X — Hito: ${x.hito ?? ""}
+P — Sujeto político: ${x.sujeto ?? ""}
+C — Capacidad financiera: ${cap.financiero ?? ""}
+C — Capacidad humana: ${cap.humano ?? ""}
+C — Capacidad logística: ${cap.logistico ?? ""}
+T — Fecha límite: ${t.fechaLimite ?? ""} (${t.duracionMeses ?? "?"} meses)
+O — Justificación: ${x.justificacion ?? ""}
+
+== INSTRUCCIONES ==
+Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
+- Infiere el contexto político-territorial a partir del hito, sujeto y tipo de proyecto.
+- clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
+- 2–4 señales por categoría (favorables/adversas/inciertas); solo las relevantes para este proyecto específico.
+- narrativa: 2–3 oraciones de síntesis directamente vinculadas al hito y sujeto XPCTO.
+- confidence: 50 (análisis de escritorio sin datos de campo).
+- Cada señal: descripcion específica al proyecto, fuente: "Análisis Moddulo (sin campo)", fechaCorte: "${new Date().toISOString().slice(0, 7)}", nivelConfianza: "bajo".
+
+Responde con este JSON exacto (las 6 claves en el nivel raíz):
+{
+  "P": { "code": "P", "label": "Político", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
+  "E": { "code": "E", "label": "Económico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
+  "S": { "code": "S", "label": "Social", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
+  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
+  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
+  "L": { "code": "L", "label": "Legal", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 }
+}`;
+
+  return { system, user };
+}
+
+// ==========================================
+// DVS MULTI-MOTOR — helper serialización
+// ==========================================
+
+type RawSenal = { descripcion?: string; fuente?: string; fechaCorte?: string; nivelConfianza?: string };
+type RawDim = {
+  label?: string; clasificacion?: string; confidence?: number; narrativa?: string;
+  senalesFavorables?: RawSenal[]; senalesAdversas?: RawSenal[]; senalesInciertas?: RawSenal[];
+};
+
+// MAX_SIGNALS: máximo de señales por tipo por dimensión (para mantener el prompt manejable)
+const MAX_SIGNALS = 3;
+// MAX_DESC_CHARS: longitud máxima de la descripción de cada señal individual
+const MAX_DESC_CHARS = 140;
+
+const CONFIDENCE_ORDER: Record<string, number> = { alto: 3, medio: 2, bajo: 1 };
+
+function sortByConfidence(signals: RawSenal[]): RawSenal[] {
+  return [...signals].sort((a, b) => {
+    const ca = CONFIDENCE_ORDER[a.nivelConfianza?.toLowerCase() ?? ""] ?? 0;
+    const cb = CONFIDENCE_ORDER[b.nivelConfianza?.toLowerCase() ?? ""] ?? 0;
+    return cb - ca;
+  });
+}
+
+export function serializeMapaPESTEL(mapa: Record<string, unknown>): string {
+  const ORDER = ["P", "E", "S", "T", "Ec", "L"];
+  const LABELS: Record<string, string> = {
+    P: "Político", E: "Económico", S: "Social",
+    T: "Tecnológico", Ec: "Ecológico", L: "Legal",
+  };
+
+  const truncate = (s: string) =>
+    s.length > MAX_DESC_CHARS ? s.slice(0, MAX_DESC_CHARS - 1) + "…" : s;
+
+  const serSignals = (raw: RawSenal[] | undefined, symbol: string, label: string) => {
+    if (!raw || raw.length === 0) return "";
+    const valid = raw.filter((s) => s.descripcion);
+    const sorted = sortByConfidence(valid);
+    const top = sorted.slice(0, MAX_SIGNALS);
+    const omitted = valid.length - top.length;
+    const lines = top.map((s) => `    ${symbol} ${truncate(s.descripcion!)}`).join("\n");
+    const extra = omitted > 0 ? `\n    (+ ${omitted} señales adicionales omitidas)` : "";
+    return lines ? `\n  ${label}:\n${lines}${extra}` : "";
+  };
+
+  return ORDER
+    .filter((code) => mapa[code])
+    .map((code) => {
+      const dim = mapa[code] as RawDim;
+      const conf = dim.confidence != null ? ` (confianza: ${dim.confidence}%)` : "";
+      // Narrativa completa — es el contexto más importante para M2 y M3
+      const narrativa = dim.narrativa ? `\n  Narrativa: ${dim.narrativa}` : "";
+      return (
+        `[${code}] ${dim.label ?? LABELS[code] ?? code} — ${dim.clasificacion ?? "NEUTRAL"}${conf}` +
+        narrativa +
+        serSignals(dim.senalesFavorables, "+", "Señales favorables") +
+        serSignals(dim.senalesAdversas, "-", "Señales adversas") +
+        serSignals(dim.senalesInciertas, "?", "Señales inciertas")
+      );
+    })
+    .join("\n\n");
+}
+
+// ==========================================
+// DVS MULTI-MOTOR — prompts por motor
+// ==========================================
+
+type XPCTOFlat = {
+  hito?: string; sujeto?: string; justificacion?: string;
+  capacidades?: { financiero?: string; humano?: string; logistico?: string };
+  tiempo?: { fechaLimite?: string; duracionMeses?: number };
+};
+
+function xpctoToText(xpcto: Record<string, unknown>): string {
+  const x = xpcto as XPCTOFlat;
+  const cap = x.capacidades ?? {};
+  const t = x.tiempo ?? {};
+  return [
+    `X — Hito: ${x.hito ?? ""}`,
+    `P — Sujeto político: ${x.sujeto ?? ""}`,
+    `C — Capacidad financiera: ${cap.financiero ?? ""}`,
+    `C — Capacidad humana: ${cap.humano ?? ""}`,
+    `C — Capacidad logística: ${cap.logistico ?? ""}`,
+    `T — Fecha límite: ${t.fechaLimite ?? ""} (${t.duracionMeses ?? "?"} meses)`,
+    `O — Justificación: ${x.justificacion ?? ""}`,
+  ].join("\n");
+}
+
+export function getDVSM2Prompt(
+  projectType: string,
+  xpcto: Record<string, unknown>,
+  mapaSerialized: string
+): { system: string; user: string } {
+  return {
+    system: `Eres un analista político especializado en metodología XPCTO de consultoría Eskemma.
+Tu tarea es el Dictamen de Contraste XPCTO–Entorno (M2) del DVS F2.
+Respondes SOLO con JSON válido — array de 5 objetos, sin markdown, sin texto adicional.
+Tipo de proyecto: ${projectType}`,
+    user: `Evalúa cómo el entorno PEST-L impacta cada variable del XPCTO del proyecto.
+
+== XPCTO DEL PROYECTO ==
+${xpctoToText(xpcto)}
+
+== MAPA PEST-L ==
+${mapaSerialized}
+
+== INSTRUCCIONES ==
+Para cada una de las 5 variables XPCTO (X, P, C, T, O):
+1. Escanea TODAS las dimensiones PEST-L buscando señales relevantes para esa variable.
+2. Veredicto:
+   - "coherente": el entorno apoya o no obstaculiza esta variable
+   - "requiere_ajuste": fricción moderada que el proyecto puede gestionar
+   - "requiere_investigacion": riesgo importante o falta información crítica
+3. argumentacion: 2–3 oraciones específicas.
+4. senalesPESTEL: 1–3 FRAGMENTOS TEXTUALES EXACTOS copiados de las señales listadas arriba.
+   REGLA ABSOLUTA: no parafrasees ni inventes. Si no hay señal directamente relevante, usa [].
+
+Responde SOLO con este JSON (array de exactamente 5 elementos):
+[
+  { "dimension": "X", "veredicto": "coherente", "argumentacion": "...", "senalesPESTEL": ["fragmento textual exacto"] },
+  { "dimension": "P", "veredicto": "requiere_ajuste", "argumentacion": "...", "senalesPESTEL": [] },
+  { "dimension": "C", "veredicto": "...", "argumentacion": "...", "senalesPESTEL": [] },
+  { "dimension": "T", "veredicto": "...", "argumentacion": "...", "senalesPESTEL": [] },
+  { "dimension": "O", "veredicto": "...", "argumentacion": "...", "senalesPESTEL": [] }
+]`,
+  };
+}
+
+export function getDVSM3Prompt(
+  projectType: string,
+  xpcto: Record<string, unknown>,
+  mapaSerialized: string
+): { system: string; user: string } {
+  return {
+    system: `Eres un analista político especializado en mapeo de actores políticos.
+Tu tarea es el Semáforo de Riesgo de Veto (M3) del DVS F2.
+Respondes SOLO con JSON válido — array de objetos, sin markdown, sin texto adicional.
+Tipo de proyecto: ${projectType}`,
+    user: `Identifica actores con poder de bloqueo real sobre este proyecto.
+
+== XPCTO DEL PROYECTO ==
+${xpctoToText(xpcto)}
+
+== MAPA PEST-L ==
+${mapaSerialized}
+
+== INSTRUCCIONES ==
+1. Identifica actores mencionados en el PEST-L o evidentes para este tipo de proyecto.
+2. nivelRiesgo: "rojo" (veto inmediato/alta probabilidad) | "ambar" (riesgo condicional) | "verde" (riesgo bajo)
+3. capacidadVeto: mecanismo concreto de bloqueo (2 oraciones).
+4. motivacion: por qué actuaría en contra o a favor (1–2 oraciones).
+5. requiereInvestigacion: true si no hay datos suficientes para confirmar su posición.
+6. Incluye 3–6 actores; prioriza los de mayor riesgo.
+
+Responde SOLO con este JSON:
+[{ "nombre": "...", "tipo": "...", "nivelRiesgo": "rojo", "capacidadVeto": "...", "motivacion": "...", "requiereInvestigacion": true }]`,
+  };
+}
+
+export function getDVSM4Prompt(
+  mapaSerialized: string,
+  m2Veredictos: Array<{ dimension: string; veredicto: string; argumentacion: string }>
+): { system: string; user: string } {
+  const m2Summary = m2Veredictos
+    .map((v) => `${v.dimension}: ${v.veredicto} — ${v.argumentacion}`)
+    .join("\n");
+
+  return {
+    system: `Eres un analista político especializado en gestión de incertidumbre estratégica.
+Tu tarea es el Mapa de Incertidumbres (M4) del DVS F2.
+Respondes SOLO con JSON válido — array de objetos, sin markdown, sin texto adicional.`,
+    user: `Identifica qué no sabemos y necesitamos saber para continuar con el proyecto.
+
+== VEREDICTOS CONTRASTE XPCTO (M2) ==
+${m2Summary}
+
+== MAPA PEST-L ==
+${mapaSerialized}
+
+== INSTRUCCIONES ==
+Una incertidumbre es una BRECHA DE INFORMACIÓN, no un riesgo.
+1. Deriva incertidumbres de:
+   - Variables M2 con "requiere_investigacion" → urgencia alta
+   - Señales inciertas del PEST-L → urgencia según relevancia al hito
+   - Brechas entre lo conocido y lo necesario
+2. descripcion: brecha concreta y específica al proyecto (no genérica).
+3. urgencia: "alta" si bloquea avanzar | "media" si importante | "baja" si deseable
+4. resolucion: "alta" si campo puede resolverla | "media" | "baja" si requiere acceso difícil
+5. destino: "F3" (resoluble en investigación próxima) | "SIP" (largo plazo)
+6. Incluye 4–7 incertidumbres.
+
+Responde SOLO con este JSON:
+[{ "descripcion": "...", "urgencia": "alta", "resolucion": "media", "destino": "F3" }]`,
+  };
+}
+
+export function getDVSM5Prompt(
+  projectType: string,
+  xpcto: Record<string, unknown>,
+  mapaSerialized: string,
+  m3Actores: Array<{ nombre: string; nivelRiesgo: string; motivacion: string }>,
+  m4Incertidumbres: Array<{ descripcion: string; urgencia: string; destino: string }>
+): { system: string; user: string } {
+  const actoresCriticos = m3Actores
+    .filter((a) => a.nivelRiesgo === "rojo" || a.nivelRiesgo === "ambar")
+    .map((a) => `${a.nombre} (${a.nivelRiesgo}): ${a.motivacion}`)
+    .join("\n") || "Ninguno identificado";
+
+  const incAltas = m4Incertidumbres
+    .filter((i) => i.urgencia === "alta")
+    .map((i) => `• ${i.descripcion}`)
+    .join("\n") || "Ninguna";
+
+  return {
+    system: `Eres un estratega político especializado en metodología Eskemma.
+Tu tarea es la Hipótesis Estratégica Inicial (HEI) y el Programa de Investigación Profunda (PIP) del DVS F2.
+Respondes SOLO con JSON válido — objeto con "hei" y "pip", sin markdown, sin texto adicional.
+Tipo de proyecto: ${projectType}`,
+    user: `Formula la hipótesis estratégica y el programa de investigación para este proyecto.
+
+== XPCTO DEL PROYECTO ==
+${xpctoToText(xpcto)}
+
+== MAPA PEST-L ==
+${mapaSerialized}
+
+== ACTORES DE VETO CRÍTICOS (M3) ==
+${actoresCriticos}
+
+== INCERTIDUMBRES DE ALTA URGENCIA (M4) ==
+${incAltas}
+
+== INSTRUCCIONES HEI ==
+- tensionCentral: tensión política central ESPECÍFICA al proyecto y tipo "${projectType}"; incluye el eje de disputa concreto.
+- contexto: 2–3 oraciones del entorno inmediato relevante al hito XPCTO.
+- condicionesFavorables: 2–4 factores del PEST-L que favorecen el hito (específicos, no genéricos).
+- condicionesAdversas: 2–4 factores que obstaculizan el hito.
+- premisaEstrategica: enunciado auditable y falseable: "Si [condición del entorno]… entonces [hito] es viable porque [razón estratégica concreta]"
+
+== INSTRUCCIONES PIP ==
+- 4–6 preguntas ordenadas de más a menos urgente.
+- Prioriza preguntas vinculadas a las incertidumbres de alta urgencia de M4.
+- metodo: específico (ej. "Encuesta cuantitativa a 400 votantes", "12 entrevistas a líderes comunitarios").
+- vinculoHito: variable XPCTO o señal PEST-L que afecta directamente esta pregunta.
+
+Responde SOLO con este JSON:
+{
+  "hei": { "tensionCentral": "...", "contexto": "...", "condicionesFavorables": [], "condicionesAdversas": [], "premisaEstrategica": "..." },
+  "pip": [{ "numero": 1, "pregunta": "...", "metodo": "...", "vinculoHito": "..." }]
+}`,
+  };
+}
+
+// ==========================================
 // FUNCIÓN PRINCIPAL
 // ==========================================
 

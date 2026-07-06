@@ -1,0 +1,70 @@
+Estado actual de F2 — Exploración
+Lo que ya existe y funciona
+Estructura y navegación
+
+Landing page (A1) con los 5 motores de F2, tipo de proyecto, territorio y flag started persistido en Firestore.
+Layout de dos columnas: izquierda (chat / DVS), derecha (formulario PESTEL por tabs). En mobile: toggle Chat / Análisis PESTEL.
+Header con máquina de estados: en_progreso → lista (DVS generado) → editando. Indicadores de guardado y botones contextuales por estado.
+Alerta RDA heredada de F1 si hay deficiencias activas.
+Formulario PESTEL (columna derecha)
+
+8 tabs: P / E / S / T / Ec / L + Semáforo de Veto + Hipótesis.
+Cada tab tiene hints contextuales adaptados al tipo de proyecto (electoral, gubernamental, legislativo, ciudadano).
+Indicador de punto azul (relleno) u orange (señales importadas de PESTEL) por tab.
+Auto-save con debounce de 1500ms en modo activo.
+Widget Sefix (en tab Político)
+
+Auto-fetch de datos electorales por estado, adaptado al nivel del territorio (estatal/municipal/federal).
+Muestra lista nominal, padrón, última elección (cargo, año, top 3 partidos, participación) y sección de contraste.
+Solo se activa para proyectos electoral o gubernamental con estado detectable.
+Chat ↔ Formulario
+
+ModduloChat en streaming SSE con contexto XPCTO + fecha + datos ya capturados + datos Sefix.
+onDataExtracted extrae automáticamente valores del chat y rellena los campos del formulario.
+Señales tripartitas (TripartiteSignalsPanel)
+
+Cuando mapaPESTEL tiene datos para una dimensión, reemplaza el formulario libre con una vista estructurada de señales favorables / adversas / inciertas (acordeón <details>), cada señal con fuente, fecha, nivel de confianza e indicador Intl..
+DVS (Documento de Viabilidad Situacional)
+
+Botón "Generar DVS" aparece en renderAfterWelcome cuando headerState === "en_progreso".
+/api/moddulo/f2/generate-dvs: call one-shot a Claude (no streaming) con XPCTO + contexto PESTEL del análisis vinculado (o formulario como fallback). Genera JSON estructurado con 5 secciones.
+DVSView muestra HEI (Hipótesis Estratégica Inicial) + sub-tabs M2 / M3 / M4 + bloque PIP → F3.
+HEI: tensión central, contexto, condiciones favorables/adversas, premisa estratégica.
+M2 Contraste XPCTO: 5 ítems (X/P/C/T/O) con veredicto + argumentación + señales PESTEL citadas.
+M3 Semáforo de Veto: actores con nivel de riesgo (rojo/ámbar/verde) + capacidad + motivación + flag requiereInvestigacion.
+M4 Incertidumbres: urgencia/resolución/destino (F3 o SIP).
+PIP: Programa de Investigación Profunda — ≥4 preguntas con método y vínculo al hito.
+Integración PESTEL ↔ F2
+
+handleAbrirPESTEL pre-llena el wizard de Centinela con tipo, horizonte, nombre, color y territorio del proyecto Moddulo.
+Al regresar de PESTEL con ?pest_analysis_id=, auto-importa el análisis (import-pestel) que transforma DimensionAnalysis[] → MapaPESTEL y guarda pestAnalysisId + pestProjectId.
+useEffect C7b: resuelve pestProjectId en proyectos más antiguos que solo tienen pestAnalysisId.
+Botón en zona inferior del chat: "Abrir PESTEL" o "Regresar a PESTEL →" según estado.
+Cierre de fase
+
+Botón "Cerrar Fase 2" abre PhaseTransitionReview → complete-phase endpoint → navega a /investigacion.
+Propaga pip + incertidumbres a F3 como f3Seed (fire-and-forget).
+Modal de back-propagation si hay fases posteriores en progreso.
+Modo edición: re-edita formulario, regenera DVS y verifica propagación.
+Descarga
+
+Menú dropdown: reporte exploratorio .md, historial chat .txt, análisis PESTEL .txt.
+Deuda y gaps identificados
+#	Gap	Severidad	Notas
+1	DVS no editable directamente	Media	Solo se puede editar vía formulario + regenerar. No hay human-in-the-loop sobre el contenido del DVS (similar a PESTEL E6 sin implementar).
+2	Sin validación antes de generar DVS	Baja	No hay guarda que exija un mínimo de campos llenos. El DVS se puede generar con formulario vacío (usa solo XPCTO).
+3	senalesPESTEL en M2 son generadas, no verificadas	Media	Claude inventa las citas del contraste XPCTO-PESTEL; no están vinculadas a señales reales del MapaPESTEL.
+4	F3 seed no confirmado	Baja	f3Seed se persiste en Firestore pero no está claro cómo F3 lo consume en su chat/formulario.
+5	style de HEI usa CSS variable mal interpolada	Baja	rgba(var(--color-bluegreen-eske-10, 2 105 136) / 0.15) — la sintaxis no es válida en CSS estándar; funciona solo por coincidencia. Debería ser clase Tailwind.
+6	Sin indicador de confianza global del DVS	Baja	PESTEL muestra globalConfidence; el DVS no tiene ningún indicador de calidad del análisis.
+7	El formulario PESTEL manual no sincroniza con señales importadas	Media	Si el usuario rellena tabs manualmente y luego importa PESTEL, las tabs pasan a modo "señales PESTEL" y se pierden los textos manuales visualmente (aunque siguen guardados en form.pestl.*). No hay aviso.
+Pendiente metodológico (specs)
+La spec _docs/specs/pestel/ cubre E1-E8 de Centinela. Para F2 de Moddulo, la spec relevante es la integración con Centinela (sección "Integración con Moddulo F2" en CLAUDE.md), que actualmente está marcada como ⏳ Pendiente. Los motores M1-M5 están implementados funcionalmente pero no hay spec formal que describa los criterios de calidad del DVS ni los flujos alternativos (¿qué pasa si el usuario no quiere usar PESTEL de Centinela?).
+
+¿Por dónde continuar?
+Dependiendo de la prioridad, los candidatos naturales son:
+
+Edición directa del DVS (human-in-the-loop sobre HEI, M2, M3, M4, PIP) — alinea con el principio de "colaborador estratégico, no oráculo".
+Validación y calidad del formulario antes de generar DVS — guía al usuario a completar secciones clave.
+Corrección del estilo de HEI y mejoras visuales menores de DVSView.
+Consumo del f3Seed en F3 — para cerrar el ciclo de propagación.

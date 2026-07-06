@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { RiskSignal } from "@/lib/moddulo/risks";
 import type { PhaseId, XPCTO } from "@/types/moddulo.types";
 import { PHASE_NAMES } from "@/types/moddulo.types";
+import type { CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 
 interface PhaseTransitionReviewProps {
   phaseId: PhaseId;
@@ -14,6 +15,7 @@ interface PhaseTransitionReviewProps {
   onConfirm: () => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  dvsChecklist?: CriterioDVS[];
 }
 
 export default function PhaseTransitionReview({
@@ -24,6 +26,7 @@ export default function PhaseTransitionReview({
   onConfirm,
   onCancel,
   isSubmitting = false,
+  dvsChecklist,
 }: PhaseTransitionReviewProps) {
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -134,6 +137,49 @@ export default function PhaseTransitionReview({
                   El consultor tiene soberanía sobre esta decisión.
                 </span>
               </label>
+            </div>
+          )}
+
+          {/* Checklist DVS F2 */}
+          {dvsChecklist && dvsChecklist.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-eske-70 dark:text-[#9AAEBE]">
+                Criterios de suficiencia del DVS
+              </h3>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {dvsChecklist.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`flex items-start gap-2 text-xs p-2 rounded-lg ${
+                      c.satisfecho
+                        ? "bg-green-eske-10 dark:bg-green-eske/10"
+                        : c.severidad === "bloqueante"
+                          ? "bg-red-eske-10 dark:bg-red-eske/10"
+                          : "bg-yellow-eske-10 dark:bg-yellow-eske/10"
+                    }`}
+                  >
+                    {c.satisfecho ? (
+                      <svg className="w-3.5 h-3.5 text-green-eske-60 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-eske-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
+                      </svg>
+                    )}
+                    <span className={`leading-snug ${
+                      c.satisfecho
+                        ? "text-green-eske-80 dark:text-green-eske-40"
+                        : c.severidad === "bloqueante"
+                          ? "text-red-eske-80 dark:text-red-eske-40"
+                          : "text-black-eske dark:text-[#C5D8E8]"
+                    }`}>
+                      {c.descripcion}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

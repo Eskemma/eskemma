@@ -7,6 +7,7 @@ import Link from "next/link";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
+import MotoresSequentialView from "./components/MotoresSequentialView";
 import type {
   XPCTO,
   ProjectType,
@@ -20,6 +21,7 @@ import type {
   Territorio,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
+import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 
 // ==========================================
 // TIPOS SEFIX
@@ -66,9 +68,7 @@ type PestlSection =
   | "social"
   | "tecnologico"
   | "ecologico"
-  | "legal"
-  | "semaforo"
-  | "hipotesis";
+  | "legal";
 
 const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?: string }[] = [
   { id: "politico",    label: "Político",      short: "P",  dimCode: "P" },
@@ -77,8 +77,6 @@ const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?
   { id: "tecnologico", label: "Tecnológico",   short: "T",  dimCode: "T" },
   { id: "ecologico",   label: "Ecológico",     short: "Ec", dimCode: "Ec" },
   { id: "legal",       label: "Legal",         short: "L",  dimCode: "L" },
-  { id: "semaforo",    label: "Semáforo Veto", short: "⚑" },
-  { id: "hipotesis",   label: "Hipótesis",     short: "H" },
 ];
 
 // ==========================================
@@ -111,6 +109,15 @@ export default function ExploracionPage() {
   const [dvs, setDvs] = useState<DVSF2 | null>(null);
   const [generandoDVS, setGenerandoDVS] = useState(false);
   const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
+  const [showReporte, setShowReporte] = useState(false);
+  // Nuevo flujo de motores secuenciales (Iter 2+)
+  const [draftDVS, setDraftDVS] = useState<DVSF2 | null>(null);
+  const [motorAprobaciones, setMotorAprobaciones] = useState<{
+    M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean;
+  }>({});
+  const [isGeneratingMotors, setIsGeneratingMotors] = useState(false);
+  const [motorGenerationError, setMotorGenerationError] = useState<string | null>(null);
+  const [dvsChecklist, setDvsChecklist] = useState<CriterioDVS[]>([]);
 
   // RDA heredado de F1 (C8)
   const [rdaActivo, setRdaActivo] = useState(false);
@@ -197,7 +204,16 @@ export default function ExploracionPage() {
         if (savedDvs) {
           setDvs(savedDvs as DVSF2);
           setShowLanding(false);
+          setShowReporte(true);
         }
+
+        // Cargar draftDVS y motorAprobaciones (nuevo flujo de motores)
+        const savedDraftDVS = p.phases?.exploracion?.draftDVS;
+        if (savedDraftDVS) setDraftDVS(savedDraftDVS as DVSF2);
+        const savedMotorAprobaciones = p.phases?.exploracion?.motorAprobaciones;
+        if (savedMotorAprobaciones) setMotorAprobaciones(
+          savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
+        );
 
         // Cargar MapaPESTEL si existe
         const savedMapa = p.phases?.exploracion?.mapaPESTEL;
@@ -325,6 +341,15 @@ export default function ExploracionPage() {
     return () => clearTimeout(timer);
   }, [form, autoSave, isLoaded, mode]);
 
+  // Auto-generar draftDVS cuando mapaPESTEL llega y no hay draft ni DVS final
+  useEffect(() => {
+    if (mapaPESTEL !== null && draftDVS === null && dvs === null && isLoaded) {
+      generarDraftDVS();
+    }
+  // generarDraftDVS es estable (useCallback sin deps que cambien en runtime)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapaPESTEL, isLoaded]);
+
   // Datos planos del formulario para el chat
   const currentFormData: Record<string, unknown> = {
     activeSection,
@@ -416,22 +441,67 @@ export default function ExploracionPage() {
     });
   }, []);
 
-  // C5 — Generar DVS
-  const handleGenerarDVS = async () => {
-    setGenerandoDVS(true);
+  // Genera draftDVS a partir del mapaPESTEL actual (PESTEL app path o express path)
+  const generarDraftDVS = useCallback(async () => {
+    setIsGeneratingMotors(true);
+    setMotorGenerationError(null);
     try {
       const r = await fetch("/api/moddulo/f2/generate-dvs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ projectId, saveas: "draft" }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        const motor = (err as { motor?: string }).motor;
+        setMotorGenerationError(
+          motor
+            ? `Error al generar ${motor}. Intenta de nuevo.`
+            : "No se pudo generar el análisis. Intenta de nuevo."
+        );
+        return;
+      }
+      const data = await r.json();
+      if (data.dvs) setDraftDVS(data.dvs as DVSF2);
+    } catch {
+      setMotorGenerationError("Error de red. Verifica tu conexión e intenta de nuevo.");
+    } finally {
+      setIsGeneratingMotors(false);
+    }
+  }, [projectId]);
+
+  // C5 — Express path: genera mapaPESTEL con Claude, luego draft DVS
+  const handleGenerarDVS = async () => {
+    setGenerandoDVS(true);
+    try {
+      // Si ya hay mapaPESTEL (PESTEL app path), solo generar draft
+      if (mapaPESTEL !== null) {
+        await generarDraftDVS();
+        return;
+      }
+      // Express path: generar mapaPESTEL primero
+      const mR = await fetch("/api/moddulo/f2/generate-m1-express", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ projectId }),
       });
-      if (!r.ok) return;
-      const data = await r.json();
-      if (data.dvs) setDvs(data.dvs as DVSF2);
+      if (!mR.ok) return;
+      const mData = await mR.json();
+      if (mData.mapaPESTEL) {
+        setMapaPESTEL(mData.mapaPESTEL as MapaPESTEL);
+        // generarDraftDVS se ejecuta via useEffect cuando mapaPESTEL cambia
+      }
     } catch {/* silencioso */} finally {
       setGenerandoDVS(false);
     }
+  };
+
+  // Abre el modal de cierre evaluando los 10 criterios DVS
+  const handleOpenReview = () => {
+    if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs));
+    setShowReview(true);
   };
 
   // C6 — Cerrar Fase 2 con propagación de PIP e incertidumbres
@@ -483,8 +553,44 @@ export default function ExploracionPage() {
     }).catch(() => {});
   };
 
+  // Aprobación secuencial de motores M2→M5
+  const handleApproveMotor = async (motor: "M2" | "M3" | "M4" | "M5") => {
+    // Actualización optimista
+    setMotorAprobaciones((prev) => ({ ...prev, [motor]: true }));
+
+    if (motor !== "M5") {
+      // Persistir aprobación parcial
+      fetch("/api/moddulo/f2/approve-motor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId, motor }),
+      }).catch(() => {});
+      return;
+    }
+
+    // M5: finalizar — promueve draftDVS → dvs
+    try {
+      const r = await fetch("/api/moddulo/f2/finalize-dvs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId, draftDVS }),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data.dvs) {
+        setDvs(data.dvs as DVSF2);
+        setDraftDVS(null);
+        setMotorAprobaciones({});
+        setShowReporte(true);
+        if (mode !== "completed") setMode("completed");
+      }
+    } catch {/* silencioso */}
+  };
+
   const handleStartEdit = () => { setEditForm(structuredClone(form)); setMode("editing"); };
-  const handleCancelEdit = () => setMode(dvs ? "completed" : "active");
+  const handleCancelEdit = () => { setMode(dvs ? "completed" : "active"); if (dvs) setShowReporte(true); };
 
   const handleSaveEdit = async () => {
     setIsSaving(true);
@@ -508,12 +614,15 @@ export default function ExploracionPage() {
       });
       if (r.ok) {
         const data = await r.json();
-        if (data.dvs) setDvs(data.dvs as DVSF2);
+        if (data.dvs) {
+          setDvs(data.dvs as DVSF2);
+          setShowReporte(true);
+        }
       }
 
       const affected = await checkBackPropagation(projectId);
       if (affected.length > 0) setPropagationWarning(affected);
-      else setMode("completed");
+      else { setMode("completed"); setShowReporte(true); }
     } catch {/* silencioso */} finally {
       setIsSaving(false);
       setGenerandoDVS(false);
@@ -532,70 +641,72 @@ export default function ExploracionPage() {
 
       {/* ===== HEADER ===== */}
       <div className="shrink-0 px-3 sm:px-6 py-2 sm:py-3 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
+        {/* Fila 1: título + badge + descarga */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske shrink-0">F2</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Exploración</h1>
-            {headerState === "lista" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ DVS listo</span>
+            {dvs !== null && mode !== "editing" && (
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
             )}
-            {headerState === "editando" && (
+            {mode === "editing" && (
               <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">Editando</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] hidden sm:block">
-              {isSaving || generandoDVS
-                ? (generandoDVS ? "Generando DVS..." : "Guardando...")
-                : lastSaved ? `✓ ${lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}
+            <span className="text-xs hidden sm:block">
+              {isSaving || generandoDVS ? (
+                <span className="text-gray-eske-40 dark:text-[#6D8294]">{generandoDVS ? "Generando..." : "Guardando..."}</span>
+              ) : lastSaved ? (
+                <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
+              ) : null}
             </span>
             <DownloadButton form={form} reportText={reportText} chatMessages={chatMessages} />
           </div>
         </div>
 
-        {/* Botones de acción — máquina de estados C2 */}
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {headerState === "en_progreso" && (<>
-            <button disabled
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
-              Editar análisis
-            </button>
-            <button disabled
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
-              Cerrar Fase 2
-            </button>
-          </>)}
+        {/* Fila 2: 3 chips — idéntico a F1 */}
+        {(() => {
+          const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
+          const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
 
-          {headerState === "lista" && (<>
-            <button
-              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold cursor-default">
-              DVS F2
-            </button>
-            <button onClick={handleStartEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-60 dark:text-[#C7D6E0] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
-              Editar análisis
-            </button>
-            <button onClick={() => setShowReview(true)}
-              className="px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:text-[#6BA4C6] dark:border-[#6BA4C6] rounded-full text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors">
-              Cerrar Fase 2
-            </button>
-          </>)}
+          return (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {/* Chip 1: Reporte F2 / Cancelar */}
+              {headerState === "editando" ? (
+                <button onClick={handleCancelEdit} className={btnBase}>Cancelar</button>
+              ) : (
+                <button
+                  onClick={() => setShowReporte(true)}
+                  disabled={headerState === "en_progreso"}
+                  className={btnBase}
+                >
+                  Reporte F2
+                </button>
+              )}
 
-          {headerState === "editando" && (<>
-            <button onClick={handleCancelEdit}
-              className="px-2.5 py-1.5 border border-gray-eske-70 dark:border-[#9AAEBE] text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
-              Cancelar
-            </button>
-            <button onClick={handleSaveEdit} disabled={isSaving || generandoDVS}
-              className="px-2.5 py-1.5 border border-gray-eske-70 dark:border-[#9AAEBE] text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-semibold hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-40">
-              {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
-            </button>
-            <button disabled
-              className="px-2.5 py-1.5 border border-gray-eske-20 dark:border-white/10 text-gray-eske-40 dark:text-[#6D8294] rounded-full text-xs font-semibold opacity-30 cursor-not-allowed">
-              Cerrar Fase 2
-            </button>
-          </>)}
-        </div>
+              {/* Chip 2: Editar análisis / Guardar cambios */}
+              {headerState === "editando" ? (
+                <button onClick={handleSaveEdit} disabled={isSaving || generandoDVS} className={btnBase}>
+                  {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
+                </button>
+              ) : (
+                <button onClick={handleStartEdit} disabled={headerState === "en_progreso"} className={btnBase}>
+                  Editar análisis
+                </button>
+              )}
+
+              {/* Chip 3: Cerrar Fase 2 */}
+              <button
+                onClick={handleOpenReview}
+                disabled={headerState !== "lista"}
+                className={headerState === "lista" ? btnClose : btnBase}
+              >
+                Cerrar Fase 2
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* C8 — Alerta RDA heredada de F1 */}
@@ -624,7 +735,7 @@ export default function ExploracionPage() {
       {!showLanding && (
         <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
           {[
-            { id: "chat" as const, label: headerState === "lista" && mode !== "editing" ? "DVS F2" : "Chat" },
+            { id: "chat" as const, label: showReporte && dvs !== null && mode !== "editing" ? "Reporte F2" : mapaPESTEL !== null && dvs === null && mode !== "editing" ? "Motores" : "Chat" },
             { id: "form" as const, label: "Análisis PESTEL" },
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
@@ -653,10 +764,60 @@ export default function ExploracionPage() {
         {/* Columnas de trabajo (ocultas cuando se muestra la landing) */}
         {!showLanding && (<>
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
-          {headerState === "lista" && mode !== "editing" ? (
-            <div className="flex-1 overflow-y-auto">
-              <DVSView dvs={dvs!} />
+
+          {/* Reporte F2 — DVS finalizado */}
+          {showReporte && dvs !== null && mode !== "editing" ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <button
+                onClick={() => setShowReporte(false)}
+                className="shrink-0 mb-3 flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Volver al chat
+              </button>
+              <div className="flex-1 overflow-y-auto">
+                <DVSView dvs={dvs} />
+              </div>
             </div>
+
+          /* Estado B — mapaPESTEL disponible, DVS aún no finalizado */
+          ) : mapaPESTEL !== null && dvs === null && mode !== "editing" ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="shrink-0 mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-black-eske dark:text-white">
+                    Análisis por motores
+                  </p>
+                  <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
+                    Revisa y aprueba cada sección antes de generar el DVS final.
+                  </p>
+                </div>
+                {pestlVia === "pestel" && pestProjectId && (
+                  <button
+                    onClick={() => router.push(`/centinela/pestel/${pestProjectId}/analisis`)}
+                    className="shrink-0 px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                  >
+                    Regresar a PESTEL →
+                  </button>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <MotoresSequentialView
+                  projectId={projectId}
+                  draftDVS={draftDVS}
+                  motorAprobaciones={motorAprobaciones}
+                  isGenerating={isGeneratingMotors}
+                  generationError={motorGenerationError}
+                  onRetry={generarDraftDVS}
+                  onApprove={handleApproveMotor}
+                  onDraftChange={setDraftDVS}
+                />
+              </div>
+            </div>
+
+          /* Estado A — chat (sin mapaPESTEL o en modo edición) */
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden gap-3">
               <ModduloChat
@@ -726,6 +887,7 @@ export default function ExploracionPage() {
           onConfirm={handleClosePhase}
           onCancel={() => setShowReview(false)}
           isSubmitting={isClosingPhase}
+          dvsChecklist={dvsChecklist.length > 0 ? dvsChecklist : undefined}
         />
       )}
 
@@ -883,12 +1045,6 @@ function ExplorationFormPanel({
               readOnly={readOnly} fieldClass={fieldClass}
             />
           )
-        )}
-        {activeSection === "semaforo" && (
-          <SemaforoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} />
-        )}
-        {activeSection === "hipotesis" && (
-          <HipotesisSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} />
         )}
       </div>
     </div>
@@ -1059,140 +1215,6 @@ function SimpleDimSection({ title, hint, contexto, senales, onCtx, onSen, readOn
         <AutoResizeTextarea value={senales} onChange={onSen} disabled={readOnly}
           placeholder="Alertas u oportunidades identificadas en esta dimensión..."
           minRows={2} maxRows={5} className={fieldClass} />
-      </SectionField>
-    </div>
-  );
-}
-
-// ==========================================
-// SECCIÓN SEMÁFORO DE VETO
-// ==========================================
-
-function SemaforoSection({ form, onChange, readOnly, fieldClass }: {
-  form: ExplorationForm; onChange: (f: ExplorationForm) => void;
-  readOnly: boolean; fieldClass: string;
-}) {
-  const NIVEL_COLORS: Record<VetoActor["nivel"], string> = {
-    alto:  "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
-    medio: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-    bajo:  "bg-gray-eske-10 dark:bg-[#21425E] text-gray-eske-60 dark:text-[#9AAEBE] border-gray-eske-20 dark:border-white/10",
-  };
-
-  const addActor = () => {
-    if (readOnly) return;
-    onChange({ ...form, semaforo: { ...form.semaforo,
-      actores: [...form.semaforo.actores, { nombre: "", nivel: "medio", descripcion: "" }],
-    }});
-  };
-
-  const updateActor = (i: number, patch: Partial<VetoActor>) => {
-    const actores = [...form.semaforo.actores];
-    actores[i] = { ...actores[i], ...patch };
-    onChange({ ...form, semaforo: { ...form.semaforo, actores } });
-  };
-
-  const removeActor = (i: number) => {
-    if (readOnly) return;
-    onChange({ ...form, semaforo: { ...form.semaforo,
-      actores: form.semaforo.actores.filter((_, idx) => idx !== i),
-    }});
-  };
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs font-semibold text-gray-eske-60 dark:text-[#9AAEBE]">Actores con poder de veto</p>
-      <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Lista los actores que pueden bloquear el proyecto con su nivel de riesgo.</p>
-
-      {form.semaforo.actores.length === 0 && (
-        <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] italic">Sin actores registrados. Usa el chat o añade manualmente.</p>
-      )}
-
-      <div className="space-y-2">
-        {form.semaforo.actores.map((actor, i) => (
-          <div key={i} className={`rounded-lg border p-2.5 ${NIVEL_COLORS[actor.nivel]}`}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <input type="text" value={actor.nombre}
-                onChange={(e) => updateActor(i, { nombre: e.target.value })} disabled={readOnly}
-                placeholder="Nombre del actor"
-                className="flex-1 text-xs font-semibold bg-transparent border-b border-current/20 focus:outline-none py-0.5 placeholder:font-normal placeholder:text-current/40" />
-              <select value={actor.nivel}
-                onChange={(e) => updateActor(i, { nivel: e.target.value as VetoActor["nivel"] })}
-                disabled={readOnly}
-                className="text-xs font-semibold bg-transparent border border-current/20 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer">
-                <option value="alto">Alto</option>
-                <option value="medio">Medio</option>
-                <option value="bajo">Bajo</option>
-              </select>
-              {!readOnly && (
-                <button onClick={() => removeActor(i)} className="text-current/50 hover:text-current transition-colors">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <input type="text" value={actor.descripcion}
-              onChange={(e) => updateActor(i, { descripcion: e.target.value })} disabled={readOnly}
-              placeholder="¿Por qué puede bloquear y cómo?"
-              className="w-full text-xs bg-transparent border-b border-current/20 focus:outline-none py-0.5 placeholder:text-current/40" />
-          </div>
-        ))}
-      </div>
-
-      {!readOnly && (
-        <button onClick={addActor}
-          className="text-xs font-semibold text-bluegreen-eske hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
-          </svg>
-          Añadir actor
-        </button>
-      )}
-
-      <SectionField label="Síntesis del riesgo de veto">
-        <AutoResizeTextarea value={form.semaforo.resumen}
-          onChange={(v) => onChange({ ...form, semaforo: { ...form.semaforo, resumen: v } })}
-          disabled={readOnly}
-          placeholder="Resumen del riesgo general de veto y estrategias de manejo..."
-          minRows={2} maxRows={6} className={fieldClass} />
-      </SectionField>
-    </div>
-  );
-}
-
-// ==========================================
-// SECCIÓN HIPÓTESIS
-// ==========================================
-
-function HipotesisSection({ form, onChange, readOnly, fieldClass }: {
-  form: ExplorationForm; onChange: (f: ExplorationForm) => void;
-  readOnly: boolean; fieldClass: string;
-}) {
-  const upd = (patch: Partial<ExplorationForm["hipotesis"]>) =>
-    onChange({ ...form, hipotesis: { ...form.hipotesis, ...patch } });
-
-  return (
-    <div className="space-y-3">
-      <SectionField label="Hipótesis Estratégica Inicial" required
-        hint="La premisa central que F3 validará o corregirá. Debe ser clara, auditable y falseable.">
-        <AutoResizeTextarea value={form.hipotesis.enunciado}
-          onChange={(v) => upd({ enunciado: v })} disabled={readOnly}
-          placeholder='"Si el proyecto se posiciona en el eje de la seguridad y aprovecha el descontento con el partido gobernante, puede capitalizar el voto independiente en el distrito norte..."'
-          minRows={3} maxRows={8} className={fieldClass} />
-      </SectionField>
-      <SectionField label="Premisas que la sostienen"
-        hint="Los supuestos sobre los cuales descansa la hipótesis.">
-        <AutoResizeTextarea value={form.hipotesis.premisas}
-          onChange={(v) => upd({ premisas: v })} disabled={readOnly}
-          placeholder="¿Qué supuestos hacen que esta hipótesis sea plausible?"
-          minRows={3} maxRows={7} className={fieldClass} />
-      </SectionField>
-      <SectionField label="Implicaciones estratégicas"
-        hint="¿Qué significa para el proyecto si la hipótesis es correcta o incorrecta?">
-        <AutoResizeTextarea value={form.hipotesis.implicaciones}
-          onChange={(v) => upd({ implicaciones: v })} disabled={readOnly}
-          placeholder="Si es correcta: ... Si es incorrecta o parcial: ..."
-          minRows={2} maxRows={6} className={fieldClass} />
       </SectionField>
     </div>
   );
@@ -1499,8 +1521,6 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
 // ==========================================
 
 function isSectionFilled(form: ExplorationForm, section: PestlSection): boolean {
-  if (section === "hipotesis") return form.hipotesis.enunciado.trim().length > 0;
-  if (section === "semaforo") return form.semaforo.actores.length > 0 || form.semaforo.resumen.trim().length > 0;
   const dim = form.pestl[section as keyof ExplorationForm["pestl"]];
   return dim ? dim.contexto.trim().length > 0 : false;
 }

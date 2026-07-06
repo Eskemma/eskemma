@@ -217,6 +217,15 @@ export interface PhaseState {
   };
   // DVS de Exploración (F2) — generado por generate-dvs
   dvs?: DVSF2;
+  // DVS pre-generado pendiente de aprobación por motor (F2 nuevo flujo)
+  draftDVS?: DVSF2;
+  // Estado de aprobación secuencial por motor M2→M5 (F2 nuevo flujo)
+  motorAprobaciones?: {
+    M2?: boolean;
+    M3?: boolean;
+    M4?: boolean;
+    M5?: boolean;
+  };
   // ID del análisis PESTEL vinculado (F2)
   pestAnalysisId?: string;
   // ID del proyecto PESTEL vinculado (F2) — para navegar de vuelta a Centinela
