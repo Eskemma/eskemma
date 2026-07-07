@@ -90,21 +90,35 @@ export function evaluarCriteriosDVS(dvs: DVSF2, mapaPESTEL?: MapaPESTEL): Criter
       id: "especificidad-escaneo",
       descripcion:
         "Especificidad del escaneo — ¿El PESTEL se lee en función del proyecto específico, no genéricamente?",
-      satisfecho: dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1),
+      // Proxy: argumentaciones con substancia (>50 chars) indican análisis situado, no genérico
+      satisfecho: dvs.contrasteXPCTO.every((c) => c.argumentacion.trim().length > 50),
       severidad: "advertencia",
     },
     {
       id: "pesos-tipo-proyecto",
       descripcion:
         "Pesos por tipo de proyecto — ¿Las dimensiones prioritarias corresponden al tipo heredado del EPP?",
-      satisfecho: dvs.contrasteXPCTO.some((c) => c.veredicto === "requiere_investigacion"),
+      // Proxy: al menos 3 dimensiones con clasificación definida (OPORTUNIDAD o AMENAZA)
+      satisfecho: mapaPESTEL
+        ? Object.values(mapaPESTEL).filter(
+            (d) => d?.clasificacion === "OPORTUNIDAD" || d?.clasificacion === "AMENAZA"
+          ).length >= 3
+        : dvs.contrasteXPCTO.filter((c) => c.veredicto !== "coherente").length >= 2,
       severidad: "advertencia",
     },
     {
       id: "trazabilidad-hallazgos",
       descripcion:
         "Trazabilidad de hallazgos — ¿Cada señal indica fuente, fecha de corte y nivel de confianza?",
-      satisfecho: dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1),
+      // Si hay mapaPESTEL, verificar campos de trazabilidad en señales; si no, verificar que el contraste tenga señales
+      satisfecho: mapaPESTEL
+        ? Object.values(mapaPESTEL).every((d) =>
+            d === undefined ||
+            [...(d.senalesFavorables ?? []), ...(d.senalesAdversas ?? []), ...(d.senalesInciertas ?? [])].every(
+              (s) => s.fuente.trim().length > 0 && s.fechaCorte.trim().length > 0
+            )
+          )
+        : dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1),
       severidad: "advertencia",
     },
 

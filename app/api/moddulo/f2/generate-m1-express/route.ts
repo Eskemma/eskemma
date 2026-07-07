@@ -67,6 +67,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Garantizar origenInternacional: boolean en todas las señales (F2Senal lo requiere)
+  const SIGNAL_KEYS = ["senalesFavorables", "senalesAdversas", "senalesInciertas"] as const;
+  for (const dimKey of Object.keys(mapaPESTEL)) {
+    const dim = (mapaPESTEL as Record<string, unknown>)[dimKey];
+    if (!dim || typeof dim !== "object") continue;
+    for (const key of SIGNAL_KEYS) {
+      const arr = (dim as Record<string, unknown>)[key];
+      if (!Array.isArray(arr)) continue;
+      (dim as Record<string, unknown>)[key] = arr.map((s: unknown) => ({
+        ...(s as object),
+        origenInternacional:
+          typeof (s as { origenInternacional?: unknown }).origenInternacional === "boolean"
+            ? (s as { origenInternacional: boolean }).origenInternacional
+            : false,
+      }));
+    }
+  }
+
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.mapaPESTEL": mapaPESTEL,
     updatedAt: FieldValue.serverTimestamp(),

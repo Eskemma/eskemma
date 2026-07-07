@@ -5,6 +5,7 @@ import TableOfContents, { TocItem } from "../components/legal/TableOfContents";
 import LegalSection from "../components/legal/LegalSection";
 import LegalHero from "../components/legal/LegalHero";
 import CookieConfigButton from "../components/legal/CookieConfigButton";
+import CloseModalsOnMount from "../components/legal/CloseModalsOnMount";
 
 export const metadata = {
   title: "Política de Cookies | Eskemma",
@@ -37,6 +38,7 @@ const tocItems: TocItem[] = [
 export default function PoliticaDeCookiesPage() {
   return (
     <div className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
+      <CloseModalsOnMount />
       {/* Hero Section */}
       <LegalHero
         title="Política de Cookies"

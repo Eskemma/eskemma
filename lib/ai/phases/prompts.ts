@@ -439,20 +439,42 @@ O — Justificación: ${x.justificacion ?? ""}
 Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
 - Infiere el contexto político-territorial a partir del hito, sujeto y tipo de proyecto.
 - clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
-- 2–4 señales por categoría (favorables/adversas/inciertas); solo las relevantes para este proyecto específico.
 - narrativa: 2–3 oraciones de síntesis directamente vinculadas al hito y sujeto XPCTO.
 - confidence: 50 (análisis de escritorio sin datos de campo).
-- Cada señal: descripcion específica al proyecto, fuente: "Análisis Moddulo (sin campo)", fechaCorte: "${new Date().toISOString().slice(0, 7)}", nivelConfianza: "bajo".
+- Genera 2–4 señales por categoría (favorables/adversas/inciertas) específicas a este proyecto.
+  OBLIGATORIO: cada dimensión debe tener al menos 1 señal en senalesFavorables O senalesAdversas.
+  Un array completamente vacío en las 3 categorías es un error de análisis — el valor del path express está en las señales.
+- Cada señal debe tener estos campos exactos:
+  { "descripcion": "descripción específica al hito y sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }
 
-Responde con este JSON exacto (las 6 claves en el nivel raíz):
+Responde con este JSON exacto (las 6 claves en el nivel raíz, con señales reales en CADA dimensión):
 {
-  "P": { "code": "P", "label": "Político", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
-  "E": { "code": "E", "label": "Económico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
-  "S": { "code": "S", "label": "Social", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
-  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
-  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 },
-  "L": { "code": "L", "label": "Legal", "clasificacion": "NEUTRAL", "senalesFavorables": [], "senalesAdversas": [], "senalesInciertas": [], "narrativa": "", "confidence": 50 }
-}`;
+  "P": { "code": "P", "label": "Político", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción política específica al proyecto...", "confidence": 50,
+    "senalesFavorables": [{ "descripcion": "señal política favorable específica al hito del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal política adversa específica al sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesInciertas": [] },
+  "E": { "code": "E", "label": "Económico", "clasificacion": "AMENAZA", "narrativa": "Descripción económica específica al proyecto...", "confidence": 50,
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal económica adversa específica al hito del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesInciertas": [{ "descripcion": "señal económica incierta para el proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }] },
+  "S": { "code": "S", "label": "Social", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción social específica al proyecto...", "confidence": 50,
+    "senalesFavorables": [{ "descripcion": "señal social favorable específica al sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesAdversas": [],
+    "senalesInciertas": [] },
+  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción tecnológica específica al proyecto...", "confidence": 50,
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesInciertas": [] },
+  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": 50,
+    "senalesFavorables": [],
+    "senalesAdversas": [],
+    "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }] },
+  "L": { "code": "L", "label": "Legal", "clasificacion": "AMENAZA", "narrativa": "Descripción legal específica al tipo de proyecto...", "confidence": 50,
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal legal adversa al hito o sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesInciertas": [] }
+}
+RECUERDA: rellena TODAS las dimensiones con señales reales y específicas al XPCTO — NO son señales genéricas. Cada dimensión debe tener al menos 1 señal en senalesFavorables O senalesAdversas O senalesInciertas.`;
 
   return { system, user };
 }

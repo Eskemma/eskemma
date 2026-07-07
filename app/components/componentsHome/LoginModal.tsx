@@ -61,8 +61,8 @@ export default function LoginModal({
     } catch (error: any) {
       console.error("Error al iniciar sesión:", error.message);
 
-      if (error.message.includes("registrado con Google") || 
-          error.message.includes("contraseña configurada")) {
+      if (error.message.includes("registrado con Google") ||
+        error.message.includes("contraseña configurada")) {
         setError(
           "Este usuario se registró con Google. Por favor, usa el botón de 'Iniciar sesión con Google' a continuación."
         );
@@ -76,7 +76,7 @@ export default function LoginModal({
 
   const handleGoogleSignIn = () => {
     setError(null);
-    
+
     signInWithGoogle()
       .then(() => {
         onClose();
@@ -100,7 +100,7 @@ export default function LoginModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div
         ref={modalRef as React.RefObject<HTMLDivElement>}
         role="dialog"
         aria-modal="true"
@@ -143,7 +143,7 @@ export default function LoginModal({
         <form onSubmit={handleSubmit} className="space-y-4 max-sm:space-y-3">
           <div>
             <label htmlFor="login-username" className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1">
-              Usuario
+              Correo electrónico o nombre de usuario
             </label>
             <input
               type="text"
@@ -153,7 +153,7 @@ export default function LoginModal({
               onChange={handleChange}
               required
               disabled={loading}
-              placeholder="Correo o nombre de usuario"
+              placeholder="---"
               className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
             />
           </div>
@@ -177,8 +177,8 @@ export default function LoginModal({
 
           {/* Mensaje de error con role="alert" */}
           {error && (
-            <div 
-              role="alert" 
+            <div
+              role="alert"
               aria-live="assertive"
               className="text-red-500 text-sm max-sm:text-xs p-3 max-sm:p-2 bg-red-50 border border-red-200 rounded"
             >
@@ -198,17 +198,15 @@ export default function LoginModal({
         {/* Separador */}
         <div className="flex items-center my-4 max-sm:my-3">
           <hr className="flex-grow border-gray-300 dark:border-white/10" />
-          <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">O</span>
+          <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
           <hr className="flex-grow border-gray-300 dark:border-white/10" />
         </div>
 
         {/* Mensaje informativo */}
         <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center mb-3 max-sm:mb-2 px-2 max-sm:px-1">
           <span className="font-medium text-bluegreen-eske dark:text-[#6BA4C6]">
-            ¿Te registraste con tu cuenta de Google?
+            O continua con Google
           </span>
-          <br />
-          Inicia sesión con el siguiente botón.
         </p>
 
         {/* Botón de inicio de sesión con Google */}
@@ -239,7 +237,7 @@ export default function LoginModal({
             rel="noopener noreferrer"
             className="text-bluegreen-eske underline hover:text-bluegreen-eske-70 focus-ring-primary rounded"
           >
-            políticas de privacidad
+            política de privacidad
             <span className="sr-only"> (se abre en nueva ventana)</span>
           </Link>{" "}
           de Eskemma.
@@ -249,7 +247,7 @@ export default function LoginModal({
         <hr className="border-gray-300 dark:border-white/10 my-4 max-sm:my-3" />
 
         <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center">
-          ¿Aún no te has registrado?{" "}
+          ¿Aún no tienes cuenta?{" "}
           <button
             type="button"
             className="text-bluegreen-eske underline cursor-pointer hover:text-bluegreen-eske-70 bg-transparent border-none p-0 focus-ring-primary rounded"

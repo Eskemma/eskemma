@@ -123,9 +123,8 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
     <>
       {/* Modal de Registro */}
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${
-          isOpen ? "" : "hidden"
-        }`}
+        className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${isOpen ? "" : "hidden"
+          }`}
         style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
         role="presentation"
         onClick={(e) => {
@@ -165,7 +164,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
 
           {/* Título */}
           <h2 id="signin-modal-title" className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske dark:text-[#6BA4C6] text-center mb-6 max-sm:mb-4">
-            Registro
+            Acceder al ecosistema
           </h2>
 
           {/* Contenedor con scroll */}
@@ -181,7 +180,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
             {/* Separador */}
             <div className="flex items-center my-4 max-sm:my-3">
               <hr className="flex-grow border-gray-300 dark:border-white/10" />
-              <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">O</span>
+              <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
               <hr className="flex-grow border-gray-300 dark:border-white/10" />
             </div>
 
@@ -266,7 +265,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
 
               {/* Iniciar Sesión */}
               <p className="text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0] text-center">
-                ¿Ya te has registrado?{" "}
+                ¿Ya tienes cuenta?{" "}
                 <button
                   type="button"
                   onClick={handleLoginClick}

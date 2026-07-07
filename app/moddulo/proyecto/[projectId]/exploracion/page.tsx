@@ -108,6 +108,9 @@ export default function ExploracionPage() {
   // DVS y MapaPESTEL (C2, C3, C4)
   const [dvs, setDvs] = useState<DVSF2 | null>(null);
   const [generandoDVS, setGenerandoDVS] = useState(false);
+  const [isExpressAnalyzing, setIsExpressAnalyzing] = useState(false);
+  const [expressStartTime, setExpressStartTime] = useState<Date | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
   const [showReporte, setShowReporte] = useState(false);
   // Nuevo flujo de motores secuenciales (Iter 2+)
@@ -199,12 +202,19 @@ export default function ExploracionPage() {
         const savedReport = p.phases?.exploracion?.reportText;
         if (savedReport) setReportText(savedReport);
 
+        // Read mapaPESTEL first — needed to decide showReporte default
+        const savedMapa = p.phases?.exploracion?.mapaPESTEL;
+
         // Cargar DVS si existe
         const savedDvs = p.phases?.exploracion?.dvs;
         if (savedDvs) {
           setDvs(savedDvs as DVSF2);
           setShowLanding(false);
-          setShowReporte(true);
+          // If mapaPESTEL exists, Estado B is the default view (motors first).
+          // Without mapaPESTEL, auto-show DVSView (legacy flow).
+          if (!savedMapa) {
+            setShowReporte(true);
+          }
         }
 
         // Cargar draftDVS y motorAprobaciones (nuevo flujo de motores)
@@ -215,8 +225,6 @@ export default function ExploracionPage() {
           savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
         );
 
-        // Cargar MapaPESTEL si existe
-        const savedMapa = p.phases?.exploracion?.mapaPESTEL;
         if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
 
         // Cargar referencia al proyecto PESTEL vinculado
@@ -341,12 +349,37 @@ export default function ExploracionPage() {
     return () => clearTimeout(timer);
   }, [form, autoSave, isLoaded, mode]);
 
-  // Auto-generar draftDVS cuando mapaPESTEL llega y no hay draft ni DVS final
+  // Contador de segundos para el estado de carga express
   useEffect(() => {
-    if (mapaPESTEL !== null && draftDVS === null && dvs === null && isLoaded) {
+    if (!isExpressAnalyzing || !expressStartTime) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - expressStartTime.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isExpressAnalyzing, expressStartTime]);
+
+  // Tracks whether the initial Firestore load has completed. Prevents auto-generate
+  // from firing on page mount when mapaPESTEL was already saved (not newly set).
+  const isInitialLoad = useRef(true);
+
+  // Auto-generate draftDVS when mapaPESTEL is newly set during the session.
+  // isInitialLoad guard prevents firing on page mount when mapaPESTEL was
+  // already in Firestore — only fires when mapaPESTEL changes after load.
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      // First fire: mark initial load done (only after isLoaded is true)
+      if (isLoaded) {
+        isInitialLoad.current = false;
+      }
+      return;
+    }
+    if (mapaPESTEL !== null && draftDVS === null && isLoaded) {
       generarDraftDVS();
     }
-  // generarDraftDVS es estable (useCallback sin deps que cambien en runtime)
+  // generarDraftDVS es estable (useCallback con dep projectId que no cambia en runtime)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapaPESTEL, isLoaded]);
 
@@ -441,8 +474,13 @@ export default function ExploracionPage() {
     });
   }, []);
 
+  // Ref para prevenir doble llamada concurrente (evita stale closure en useCallback)
+  const generatingRef = useRef(false);
+
   // Genera draftDVS a partir del mapaPESTEL actual (PESTEL app path o express path)
   const generarDraftDVS = useCallback(async () => {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setIsGeneratingMotors(true);
     setMotorGenerationError(null);
     try {
@@ -467,20 +505,18 @@ export default function ExploracionPage() {
     } catch {
       setMotorGenerationError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
+      generatingRef.current = false;
       setIsGeneratingMotors(false);
     }
   }, [projectId]);
 
-  // C5 — Express path: genera mapaPESTEL con Claude, luego draft DVS
+  // Express path: generate mapaPESTEL with Claude.
+  // On success, setMapaPESTEL triggers the auto-generate useEffect → generarDraftDVS.
+  // Identical handoff pattern as the Centinela import-pestel path.
   const handleGenerarDVS = async () => {
-    setGenerandoDVS(true);
+    setIsExpressAnalyzing(true);
+    setExpressStartTime(new Date());
     try {
-      // Si ya hay mapaPESTEL (PESTEL app path), solo generar draft
-      if (mapaPESTEL !== null) {
-        await generarDraftDVS();
-        return;
-      }
-      // Express path: generar mapaPESTEL primero
       const mR = await fetch("/api/moddulo/f2/generate-m1-express", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -491,10 +527,13 @@ export default function ExploracionPage() {
       const mData = await mR.json();
       if (mData.mapaPESTEL) {
         setMapaPESTEL(mData.mapaPESTEL as MapaPESTEL);
-        // generarDraftDVS se ejecuta via useEffect cuando mapaPESTEL cambia
+        // auto-generate useEffect takes over from here
       }
-    } catch {/* silencioso */} finally {
-      setGenerandoDVS(false);
+    } catch {
+      // silencioso
+    } finally {
+      setIsExpressAnalyzing(false);
+      setExpressStartTime(null);
     }
   };
 
@@ -735,7 +774,7 @@ export default function ExploracionPage() {
       {!showLanding && (
         <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
           {[
-            { id: "chat" as const, label: showReporte && dvs !== null && mode !== "editing" ? "Reporte F2" : mapaPESTEL !== null && dvs === null && mode !== "editing" ? "Motores" : "Chat" },
+            { id: "chat" as const, label: showReporte && dvs !== null && mode !== "editing" ? "Reporte F2" : mapaPESTEL !== null && mode !== "editing" ? "Motores" : "Chat" },
             { id: "form" as const, label: "Análisis PESTEL" },
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
@@ -782,8 +821,28 @@ export default function ExploracionPage() {
               </div>
             </div>
 
-          /* Estado B — mapaPESTEL disponible, DVS aún no finalizado */
-          ) : mapaPESTEL !== null && dvs === null && mode !== "editing" ? (
+          /* Estado de carga — express path: Claude analizando entorno */
+          ) : isExpressAnalyzing ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
+              <div className="w-8 h-8 border-4 border-bluegreen-eske/20 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden />
+              <div className="text-center space-y-1">
+                <p className="text-sm font-semibold text-black-eske dark:text-white">
+                  Analizando el entorno político…
+                </p>
+                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
+                  {elapsedSeconds}s transcurridos · Este proceso tarda entre 20 y 40 segundos
+                </p>
+              </div>
+              <div className="w-full max-w-xs h-1.5 bg-gray-eske-20 dark:bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full w-1/3 bg-bluegreen-eske animate-pulse rounded-full" />
+              </div>
+              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] text-center max-w-xs">
+                Claude infiere el contexto político, económico y social a partir del XPCTO del proyecto.
+              </p>
+            </div>
+
+          /* Estado B — mapaPESTEL disponible (con o sin DVS previo) */
+          ) : mapaPESTEL !== null && mode !== "editing" ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="shrink-0 mb-3 flex items-center justify-between gap-2">
                 <div>
@@ -829,7 +888,7 @@ export default function ExploracionPage() {
                 onMessagesChange={setChatMessages}
                 className="flex-1 overflow-hidden"
                 renderAfterWelcome={
-                  headerState === "en_progreso" ? (
+                  headerState === "en_progreso" && !isExpressAnalyzing ? (
                     <div className="flex justify-start mt-2 ml-10">
                       <button
                         onClick={handleGenerarDVS}
@@ -872,6 +931,7 @@ export default function ExploracionPage() {
             projectType={projectType}
             sefixData={sefixData}
             mapaPESTEL={mapaPESTEL}
+            isAnalyzing={isExpressAnalyzing}
           />
         </div>
         </>)}
@@ -906,8 +966,22 @@ export default function ExploracionPage() {
 // PANEL DEL FORMULARIO PEST-L
 // ==========================================
 
+function SkeletonDimension() {
+  return (
+    <div className="space-y-3 animate-pulse py-1">
+      <div className="h-4 w-20 bg-gray-eske-20 dark:bg-white/10 rounded" />
+      <div className="h-3 w-full bg-gray-eske-10 dark:bg-white/5 rounded" />
+      <div className="h-3 w-4/5 bg-gray-eske-10 dark:bg-white/5 rounded" />
+      <div className="h-3 w-3/5 bg-gray-eske-10 dark:bg-white/5 rounded" />
+      <div className="mt-3 h-8 w-full bg-gray-eske-10 dark:bg-white/5 rounded-lg" />
+      <div className="h-8 w-full bg-gray-eske-10 dark:bg-white/5 rounded-lg" />
+    </div>
+  );
+}
+
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
+  isAnalyzing = false,
 }: {
   form: ExplorationForm;
   onChange: (f: ExplorationForm) => void;
@@ -917,6 +991,7 @@ function ExplorationFormPanel({
   projectType: ProjectType;
   sefixData: SefixData | null;
   mapaPESTEL: MapaPESTEL | null;
+  isAnalyzing?: boolean;
 }) {
   const fieldClass =
     "w-full px-3 py-2 text-sm font-normal rounded-lg border border-gray-eske-20 dark:border-white/10 " +
@@ -947,8 +1022,12 @@ function ExplorationFormPanel({
               }`}>
               <span className="hidden sm:inline">{sec.label}</span>
               <span className="sm:hidden">{sec.short}</span>
-              {hasSignals && <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Señales PESTEL importadas" />}
-              {!hasSignals && filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />}
+              {isAnalyzing
+                ? <span className="w-1.5 h-1.5 rounded-full bg-gray-eske-30 dark:bg-white/20 animate-pulse shrink-0" />
+                : hasSignals
+                  ? <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Señales PESTEL importadas" />
+                  : filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />
+              }
             </button>
           );
         })}
@@ -957,13 +1036,25 @@ function ExplorationFormPanel({
       {/* Contenido de la sección */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {activeSection === "politico" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["P"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
+            <div className="space-y-4">
+              <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
+              {sefixData && (projectType === "electoral" || projectType === "gubernamental") && (
+                <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
+                  <p className="text-xs font-semibold text-gray-eske-50 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
+                    Contexto Electoral
+                  </p>
+                  <SefixWidget data={sefixData} projectType={projectType} />
+                </div>
+              )}
+            </div>
           ) : (
             <PoliticoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} projectType={projectType} sefixData={sefixData} />
           )
         )}
         {activeSection === "economico" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["E"] ? (
             <TripartiteSignalsPanel dim={mapaPESTEL["E"]} />
           ) : (
@@ -981,6 +1072,7 @@ function ExplorationFormPanel({
           )
         )}
         {activeSection === "social" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["S"] ? (
             <TripartiteSignalsPanel dim={mapaPESTEL["S"]} />
           ) : (
@@ -1000,6 +1092,7 @@ function ExplorationFormPanel({
           )
         )}
         {activeSection === "tecnologico" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["T"] ? (
             <TripartiteSignalsPanel dim={mapaPESTEL["T"]} />
           ) : (
@@ -1015,6 +1108,7 @@ function ExplorationFormPanel({
           )
         )}
         {activeSection === "ecologico" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["Ec"] ? (
             <TripartiteSignalsPanel dim={mapaPESTEL["Ec"]} />
           ) : (
@@ -1030,6 +1124,7 @@ function ExplorationFormPanel({
           )
         )}
         {activeSection === "legal" && (
+          isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["L"] ? (
             <TripartiteSignalsPanel dim={mapaPESTEL["L"]} />
           ) : (

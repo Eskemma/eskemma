@@ -165,21 +165,21 @@ const Header = () => {
             {!user && (
               <div className="flex items-center space-x-4 max-sm:space-x-2">
                 <button
-                  className="text-10px max-sm:text-xs font-semibold hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
+                  className="text-10px max-sm:text-xs font-medium hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
                   onClick={() => setIsSignInModalOpen(true)}
                   aria-label="Abrir formulario de registro"
                 >
-                  REGISTRO
+                  Acceder al ecosistema
                 </button>
                 <button
-                  className="text-10px max-sm:text-xs font-semibold hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
+                  className="text-10px max-sm:text-xs font-medium hover:text-blue-eske-80 dark:hover:text-[#6FC3EC] cursor-pointer bg-transparent border-none p-1 focus-ring-primary rounded"
                   onClick={() => setIsLoginModalOpen(true)}
                   aria-label="Abrir formulario de inicio de sesión"
                 >
-                  INICIO
+                  Iniciar sesión
                 </button>
               </div>
-            )}            
+            )}
 
             {/* Ícono de Hamburguesa */}
             <button
@@ -190,8 +190,8 @@ const Header = () => {
               aria-controls="main-navigation"
             >
               <Bars3Icon className="h-6 w-6 max-sm:h-6 max-sm:w-6 text-black-eske hover:text-blue-eske-80 dark:text-[#EAF2F8]" aria-hidden="true" />
-            </button>                     
-          
+            </button>
+
             {/* Avatar (Visible después de iniciar sesión) */}
             {user && (
               <div className="relative">
@@ -217,7 +217,7 @@ const Header = () => {
 
                 {/* Menú Desplegable del Avatar */}
                 {isAvatarMenuOpen && (
-                  <div 
+                  <div
                     className="absolute top-full right-0 mt-2 w-48 bg-white shadow-md rounded-lg overflow-hidden z-[110] avatar-dropdown dark:bg-[#18324A] dark:border dark:border-white/10 dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
                     role="menu"
                     aria-label="Menú de usuario"
@@ -264,9 +264,8 @@ const Header = () => {
           {/* Menú Desplegable (Hamburguesa) */}
           <div
             id="main-navigation"
-            className={`absolute top-full right-0 bg-white-eske shadow-md mt-2 py-4 z-[110] text-base max-sm:text-sm transition-all duration-300 menu-dropdown dark:bg-[#18324A] dark:text-[#C7D6E0] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ${
-              isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
-            }`}
+            className={`absolute top-full right-0 bg-white-eske shadow-md mt-2 py-4 z-[110] text-base max-sm:text-sm transition-all duration-300 menu-dropdown dark:bg-[#18324A] dark:text-[#C7D6E0] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+              }`}
             role="menu"
             aria-label="Menú principal de navegación"
           >

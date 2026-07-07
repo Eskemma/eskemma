@@ -57,7 +57,7 @@ export default function OnboardingModal({
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div 
+      <div
         ref={modalRef as React.RefObject<HTMLDivElement>}
         role="dialog"
         aria-modal="true"
@@ -89,7 +89,7 @@ export default function OnboardingModal({
 
         {/* Título Personalizado */}
         <h2 id="onboarding-modal-title" className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske dark:text-[#6BA4C6] text-center mb-6 max-sm:mb-4">
-          ¡Hola, {userName}!
+          Hola, {userName}
         </h2>
 
         {/* Mensaje de Introducción */}
@@ -97,12 +97,12 @@ export default function OnboardingModal({
           Te damos la bienvenida a{" "}<br></br>
           <span className="text-blue-eske font-bold">Eskemma</span> <br></br>{" "}
           <span className="text-center text-[13px] max-sm:text-xs text-bluegreen-eske dark:text-[#6BA4C6] font-semibold">
-            El ecosistema digital para tu proyecto político
+            Este es tu ecosistema político.
           </span>
         </p>
 
         <p className="text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
-          Aquí tienes nuestras sugerencias para comenzar:
+          Por dónde quieres empezar:
         </p>
 
         {/* Botones de Acción */}
@@ -113,7 +113,7 @@ export default function OnboardingModal({
             onClick={handleExploreResources}
           />
           <Button
-            label="CONSULTAR ESTADÍSTICAS ELECTORALES"
+            label="VER DATOS ELECTORALES EN SEFIX"
             variant="primary"
             onClick={handleScheduleConsultationSefix}
           />
@@ -135,7 +135,7 @@ export default function OnboardingModal({
             aria-describedby="show-onboarding-description"
           />
           <label htmlFor="showOnLogin" className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] cursor-pointer">
-            Mostrar este mensaje al iniciar sesión
+            Mostrar esto cada vez que inicio sesión.
           </label>
         </div>
         <p id="show-onboarding-description" className="sr-only">

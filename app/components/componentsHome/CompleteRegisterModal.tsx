@@ -35,7 +35,7 @@ export default function CompleteRegisterModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div
         ref={modalRef as React.RefObject<HTMLDivElement>}
         role="dialog"
         aria-modal="true"
@@ -67,15 +67,15 @@ export default function CompleteRegisterModal({
 
         {/* Título */}
         <h2 id="complete-register-title" className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske text-center mb-6 max-sm:mb-4">
-          ¡Correo verificado con éxito!
+          Listo
         </h2>
 
         {/* Mensaje */}
         <p className="text-[18px] max-sm:text-base text-black-eske dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
-          ¡Gracias por verificar tu correo electrónico!
+          Ya estás dentro
         </p>
         <p className="text-[18px] max-sm:text-base text-black-eske dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
-          Ahora puedes completar tu registro proporcionando información adicional de tu perfil.
+          Solo necesitamos un poco más de información para personalizar tu experiencia.
         </p>
 
         {/* Botón Continuar */}

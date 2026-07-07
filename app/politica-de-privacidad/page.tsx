@@ -5,6 +5,7 @@ import LegalHero from "../components/legal/LegalHero";
 import LegalSection from "../components/legal/LegalSection";
 import TableOfContents, { TocItem } from "../components/legal/TableOfContents";
 import Button from "../components/Button";
+import CloseModalsOnMount from "../components/legal/CloseModalsOnMount";
 
 export const metadata: Metadata = {
   title: "Política de Privacidad | Eskemma",
@@ -32,6 +33,7 @@ export default function PoliticaPrivacidad() {
 
   return (
     <div className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
+      <CloseModalsOnMount />
       {/* Hero Section */}
       <LegalHero
         title="Política de Privacidad"

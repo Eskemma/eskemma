@@ -8,6 +8,7 @@ import LegalHero from "../components/legal/LegalHero";
 import LegalSection from "../components/legal/LegalSection";
 import TableOfContents, { TocItem } from "../components/legal/TableOfContents";
 import Button from "../components/Button";
+import CloseModalsOnMount from "../components/legal/CloseModalsOnMount";
 import ScheduleDate from "../components/componentsHome/ScheduleDate";
 import ResponseDate from "../components/componentsHome/ReponseDate";
 
@@ -57,6 +58,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
 
   return (
     <div className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
+      <CloseModalsOnMount />
       {/* Hero Section */}
       <LegalHero
         title="Condiciones de Uso para Sesiones de Diagnóstico Gratuitas"

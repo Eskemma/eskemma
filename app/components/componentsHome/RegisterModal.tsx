@@ -214,17 +214,17 @@ export default function RegisterModal({
       // Filtrar roles e intereses
       const finalRoles: string[] = formData.roles.includes("Otro")
         ? [
-            ...formData.roles.filter((role) => role !== "Otro"),
-            formData.otherRole || "",
-          ].filter((role) => role !== "")
+          ...formData.roles.filter((role) => role !== "Otro"),
+          formData.otherRole || "",
+        ].filter((role) => role !== "")
         : formData.roles;
       const finalInterests: string[] = formData.interests.includes("Otro")
         ? [
-            ...new Set([
-              ...formData.interests.filter((interest) => interest !== "Otro"),
-              formData.otherInterest || "",
-            ]),
-          ].filter((interest) => interest !== "")
+          ...new Set([
+            ...formData.interests.filter((interest) => interest !== "Otro"),
+            formData.otherInterest || "",
+          ]),
+        ].filter((interest) => interest !== "")
         : [...new Set(formData.interests)];
       const calculatedRole = calculateUserRole({
         emailVerified: emailVerified,
@@ -301,8 +301,7 @@ export default function RegisterModal({
     } catch (error: any) {
       console.error("❌ Error durante el registro:", error);
       alert(
-        `Ocurrió un error al completar tu perfil: ${
-          error.message || "Inténtalo de nuevo."
+        `Ocurrió un error al completar tu perfil: ${error.message || "Inténtalo de nuevo."
         }`
       );
     } finally {
@@ -364,7 +363,7 @@ export default function RegisterModal({
           id="register-modal-title"
           className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske text-center mb-6 max-sm:mb-4"
         >
-          Completar Registro
+          Un paso más antes de empezar.
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4 max-sm:space-y-3">
           <div>
@@ -426,9 +425,8 @@ export default function RegisterModal({
                     ? "userName-suggestion"
                     : undefined
               }
-              className={`w-full px-3 py-2 max-sm:py-1.5 border ${
-                !isUserNameValid ? "border-red-500" : "border-gray-300 dark:border-white/10"
-              } rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm`}
+              className={`w-full px-3 py-2 max-sm:py-1.5 border ${!isUserNameValid ? "border-red-500" : "border-gray-300 dark:border-white/10"
+                } rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm`}
             />
             {!isUserNameValid && (
               <p
@@ -498,8 +496,7 @@ export default function RegisterModal({
           <div>
             <hr className="border-bluegreen-eske my-4 max-sm:my-3" />
             <p className="text-[16px] max-sm:text-sm font-medium text-bluegreen-eske text-center mb-6 max-sm:mb-4">
-              La siguiente información nos permite ofrecerte un mejor servicio,
-              acorde con tu perfil e intereses.
+              La siguiente información nos ayuda a mostrarte los recursos y herramientas más relevantes para tu trabajo.
             </p>
           </div>
           <div>
@@ -598,7 +595,7 @@ export default function RegisterModal({
 
           <Button
             label={
-              isSubmitting ? "COMPLETANDO REGISTRO..." : "COMPLETAR REGISTRO"
+              isSubmitting ? "COMPLETANDO REGISTRO..." : "COMPLETAR MI PERFIL"
             }
             variant="primary"
             disabled={isSubmitting}
@@ -630,7 +627,7 @@ export default function RegisterModal({
 
           <hr className="border-gray-300 my-4 max-sm:my-3" />
           <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center">
-            ¿Ya te has registrado?{" "}
+            ¿Ya tienes cuenta?{" "}
             <button
               type="button"
               onClick={handleLoginClick}

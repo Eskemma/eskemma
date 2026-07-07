@@ -16,11 +16,11 @@ export default function VerifyEmailModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const { 
-    user, 
-    isVerifyEmailModalOpen, 
+  const {
+    user,
+    isVerifyEmailModalOpen,
     setIsVerifyEmailModalOpen,
-    setIsCompleteRegisterModalOpen 
+    setIsCompleteRegisterModalOpen
   } = useAuth();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [isCheckingVerification, setIsCheckingVerification] = useState(false);
@@ -53,7 +53,7 @@ export default function VerifyEmailModal({
 
       try {
         await currentUser.reload();
-        
+
         if (currentUser.emailVerified) {
           await updateEmailVerifiedInFirestore(currentUser.uid);
           setIsVerifyEmailModalOpen(false);
@@ -80,7 +80,7 @@ export default function VerifyEmailModal({
     try {
       setIsCheckingVerification(true);
       await currentUser.reload();
-      
+
       if (currentUser.emailVerified) {
         await updateEmailVerifiedInFirestore(currentUser.uid);
         setIsVerifyEmailModalOpen(false);
@@ -133,7 +133,7 @@ export default function VerifyEmailModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div
         ref={modalRef as React.RefObject<HTMLDivElement>}
         role="dialog"
         aria-modal="true"
@@ -165,21 +165,19 @@ export default function VerifyEmailModal({
 
         {/* Título */}
         <h2 id="verify-email-title" className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske text-center mb-6 max-sm:mb-4">
-          ¡Registro exitoso!
+          Revisa tu bandeja de entrada
         </h2>
 
         {/* Mensaje */}
         <p className="text-[18px] max-sm:text-base text-black-eske dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
-          Hemos enviado un correo de verificación a tu dirección de email.
+          Te enviamos un enlace de confirmación a tu dirección de correo.
         </p>
         <p className="text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
-          Por favor, revisa tu bandeja de entrada (o en tu carpeta de correos no
-          deseados) y haz clic en el enlace que te hemos enviado para continuar
-          con tu registro.
+          Abre el enlace de confirmación para continuar. (Si no lo encuentras en los próximos minutos, revisa la carpeta de spam.)
         </p>
 
         {/* Indicador de verificación automática */}
-        <div 
+        <div
           className="bg-blue-100 dark:bg-blue-900/20 border-l-4 border-blue-eske p-3 max-sm:p-2 mb-4 max-sm:mb-3"
           role="status"
           aria-live="polite"

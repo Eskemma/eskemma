@@ -5,6 +5,7 @@ import LegalHero from "../components/legal/LegalHero";
 import LegalSection from "../components/legal/LegalSection";
 import TableOfContents, { TocItem } from "../components/legal/TableOfContents";
 import Button from "../components/Button";
+import CloseModalsOnMount from "../components/legal/CloseModalsOnMount";
 
 export const metadata: Metadata = {
   title: "Condiciones de Uso | Eskemma",
@@ -29,6 +30,7 @@ export default function CondicionesDeUso() {
 
   return (
     <div className="min-h-screen bg-white-eske dark:bg-[#0B1620]">
+      <CloseModalsOnMount />
       {/* Hero Section */}
       <LegalHero
         title="Condiciones de Uso"
