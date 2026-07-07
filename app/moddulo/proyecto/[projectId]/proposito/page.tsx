@@ -115,6 +115,12 @@ export default function PropositoPage() {
           setShowLanding(false);
         }
 
+        // Cargar historial del chat
+        const chatHistory = p.phases?.proposito?.chatHistory;
+        if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+          setChatMessages(chatHistory as ChatMessage[]);
+        }
+
         // Cargar reportText (siempre, no solo cuando está completada)
         // Detectar el caso legacy donde se almacenó el JSON completo como reportText
         const savedDictamen = p.phases?.proposito?.dictamen as Dictamen | undefined;
@@ -451,7 +457,7 @@ export default function PropositoPage() {
               ) : (
                 <button
                   onClick={handleVerResumen}
-                  disabled={headerState === "en_progreso" || isGeneratingReport}
+                  disabled={!formComplete || isGeneratingReport}
                   className={`${btnBase} flex items-center gap-1`}
                 >
                   {isGeneratingReport ? (
@@ -472,18 +478,18 @@ export default function PropositoPage() {
               ) : (
                 <button
                   onClick={handleStartEdit}
-                  disabled={headerState === "en_progreso"}
+                  disabled={!formComplete}
                   className={btnBase}
                 >
                   Editar variables
                 </button>
               )}
 
-              {/* Botón 3: Cerrar Fase 1 */}
+              {/* Botón 3: Cerrar Fase 1 — requiere reporte generado */}
               <button
                 onClick={() => setShowReview(true)}
-                disabled={headerState !== "lista"}
-                className={headerState === "lista" ? btnClose : `${btnBase} border-bluegreen-eske-60`}
+                disabled={!formComplete || reportText === null}
+                className={formComplete && reportText !== null ? btnClose : `${btnBase} border-bluegreen-eske-60`}
               >
                 Cerrar Fase 1
               </button>
@@ -561,8 +567,10 @@ export default function PropositoPage() {
             </div>
           ) : (
             <ModduloChat
+              key={isLoaded ? "loaded" : "loading"}
               phaseId="proposito"
               projectId={projectId}
+              initialMessages={chatMessages}
               currentFormData={currentFormData}
               onDataExtracted={handleDataExtracted}
               onMessagesChange={setChatMessages}
