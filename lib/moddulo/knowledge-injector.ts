@@ -204,7 +204,7 @@ function formatRAE(axiomas: RAEAxioma[], version: string): string {
   ];
 
   for (const a of axiomas) {
-    lines.push(`${a.id}: ${a.nombre}`);
+    lines.push(a.nombre);
     lines.push(`Axioma: ${a.axioma_original}`);
     if (a.variable_xpcto.length > 0) {
       lines.push(`Variable XPCTO: ${a.variable_xpcto.join(", ")}`);

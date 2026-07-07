@@ -8,7 +8,7 @@ import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { PhaseId, ChatRequest, ChatAttachment } from "@/types/moddulo.types";
+import type { PhaseId, ChatRequest, ChatAttachment, XPCTO } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
 export async function POST(
@@ -58,7 +58,28 @@ export async function POST(
       kpisSeleccionados,
     });
 
-    const baseSystemPrompt = getPhaseSystemPrompt(phaseId as PhaseId, currentFormData, xpctoContext);
+    // Build XPCTO context server-side from Firestore on every request.
+    // Prevents stale client state from causing Claude to lose F1 project data
+    // across browser sessions — same pattern as generate-m1-express/route.ts.
+    const serverXpcto = project.xpcto as XPCTO | undefined;
+    const mergedXpctoContext: Record<string, unknown> | undefined =
+      serverXpcto || xpctoContext
+        ? {
+            ...(xpctoContext ?? {}),        // client extras: sefix, etc.
+            tipoProyecto: project.type,     // always from Firestore
+            ...(serverXpcto
+              ? {
+                  hito: serverXpcto.hito,
+                  sujeto: serverXpcto.sujeto,
+                  capacidades: serverXpcto.capacidades,
+                  tiempo: serverXpcto.tiempo,
+                  justificacion: serverXpcto.justificacion,
+                }
+              : {}),
+          }
+        : undefined;
+
+    const baseSystemPrompt = getPhaseSystemPrompt(phaseId as PhaseId, currentFormData, mergedXpctoContext);
     const systemPrompt = knowledgeContext
       ? `${knowledgeContext}\n\n${baseSystemPrompt}`
       : baseSystemPrompt;

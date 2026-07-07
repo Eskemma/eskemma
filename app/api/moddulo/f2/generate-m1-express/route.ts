@@ -37,9 +37,21 @@ export async function POST(request: NextRequest) {
 
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
+  // Include any documents the consultant shared in F2 chat as enrichment context
+  type ArchivoAdjunto = { nombre: string; textoExtraido?: string };
+  type ProjectWithArchivos = {
+    phases?: { exploracion?: { archivosAdjuntos?: ArchivoAdjunto[] } };
+  };
+  const archivosRaw =
+    ((project as unknown) as ProjectWithArchivos).phases?.exploracion?.archivosAdjuntos ?? [];
+  const archivos = archivosRaw
+    .filter((a) => a.textoExtraido && a.textoExtraido.trim().length > 0)
+    .map((a) => ({ nombre: a.nombre, textoExtraido: a.textoExtraido as string }));
+
   const { system, user } = getMapaPESTELExpressPrompt(
     project.type,
-    xpcto as Record<string, unknown>
+    xpcto as Record<string, unknown>,
+    archivos.length > 0 ? archivos : undefined
   );
 
   const response = await anthropic.messages.create({

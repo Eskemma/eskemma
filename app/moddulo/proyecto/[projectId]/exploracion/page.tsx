@@ -447,8 +447,16 @@ export default function ExploracionPage() {
       }
     : undefined;
 
+  // Stable ref to handleGenerarDVS — allows handleDataExtracted to call it without ordering issues
+  const handleGenerarDVSRef = useRef<() => void>(() => {});
+
   // Extracción de datos del chat → formulario
   const handleDataExtracted = useCallback((data: Record<string, unknown>) => {
+    // When Claude confirms express path, trigger the express analysis automatically
+    if (data["__action"] === "start_express") {
+      handleGenerarDVSRef.current();
+      return;
+    }
     setForm((prev) => {
       const next = structuredClone(prev);
       if (typeof data["pestl.politico.contexto"] === "string")       next.pestl.politico.contexto = data["pestl.politico.contexto"];
@@ -513,7 +521,7 @@ export default function ExploracionPage() {
   // Express path: generate mapaPESTEL with Claude.
   // On success, setMapaPESTEL triggers the auto-generate useEffect → generarDraftDVS.
   // Identical handoff pattern as the Centinela import-pestel path.
-  const handleGenerarDVS = async () => {
+  const handleGenerarDVS = useCallback(async () => {
     setIsExpressAnalyzing(true);
     setExpressStartTime(new Date());
     try {
@@ -535,7 +543,10 @@ export default function ExploracionPage() {
       setIsExpressAnalyzing(false);
       setExpressStartTime(null);
     }
-  };
+  }, [projectId]);
+
+  // Keep the ref in sync so handleDataExtracted can call it without stale closure
+  useEffect(() => { handleGenerarDVSRef.current = handleGenerarDVS; }, [handleGenerarDVS]);
 
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
@@ -823,22 +834,26 @@ export default function ExploracionPage() {
 
           /* Estado de carga — express path: Claude analizando entorno */
           ) : isExpressAnalyzing ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
-              <div className="w-8 h-8 border-4 border-bluegreen-eske/20 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden />
-              <div className="text-center space-y-1">
-                <p className="text-sm font-semibold text-black-eske dark:text-white">
-                  Analizando el entorno político…
-                </p>
-                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
-                  {elapsedSeconds}s transcurridos · Este proceso tarda entre 20 y 40 segundos
-                </p>
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-gray-eske-20 dark:border-white/10 p-8 flex flex-col items-center gap-4 w-full max-w-md">
+                <div className="w-10 h-10 border-4 border-bluegreen-eske border-t-transparent rounded-full animate-spin" aria-hidden />
+                <div className="text-center">
+                  <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Analizando con IA…</p>
+                  <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
+                    F2 está procesando las 6 dimensiones. Este proceso tarda varios minutos. Por favor, espera.
+                  </p>
+                  {elapsedSeconds > 0 && (
+                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-2">
+                      Tiempo transcurrido:{" "}
+                      {Math.floor(elapsedSeconds / 60) > 0 ? `${Math.floor(elapsedSeconds / 60)} min ` : ""}
+                      {elapsedSeconds % 60} seg
+                    </p>
+                  )}
+                </div>
+                <div className="w-full max-w-xs h-1.5 bg-gray-eske-20 dark:bg-[#21425E] rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-bluegreen-eske rounded-full animate-pulse w-2/3" />
+                </div>
               </div>
-              <div className="w-full max-w-xs h-1.5 bg-gray-eske-20 dark:bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full w-1/3 bg-bluegreen-eske animate-pulse rounded-full" />
-              </div>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] text-center max-w-xs">
-                Claude infiere el contexto político, económico y social a partir del XPCTO del proyecto.
-              </p>
             </div>
 
           /* Estado B — mapaPESTEL disponible (con o sin DVS previo) */
@@ -887,21 +902,7 @@ export default function ExploracionPage() {
                 onDataExtracted={handleDataExtracted}
                 onMessagesChange={setChatMessages}
                 className="flex-1 overflow-hidden"
-                renderAfterWelcome={
-                  headerState === "en_progreso" && !isExpressAnalyzing ? (
-                    <div className="flex justify-start mt-2 ml-10">
-                      <button
-                        onClick={handleGenerarDVS}
-                        disabled={generandoDVS}
-                        className="flex items-center gap-1.5 text-sm font-semibold rounded-full px-4 py-1.5 bg-bluegreen-eske text-white hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50"
-                      >
-                        {generandoDVS ? (
-                          <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />Generando DVS…</>
-                        ) : "Generar DVS"}
-                      </button>
-                    </div>
-                  ) : null
-                }
+                renderAfterWelcome={null}
               />
               {/* Botón PESTEL — posición inferior */}
               {(dvs === null || pestlVia === "pestel") && mode !== "editing" && (
@@ -1147,6 +1148,25 @@ function ExplorationFormPanel({
 }
 
 // ==========================================
+// MARKDOWN INLINE RENDERER
+// ==========================================
+
+function InlineMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**"))
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("*") && part.endsWith("*"))
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+// ==========================================
 // SEÑALES TRIPARTITAS (C4)
 // ==========================================
 
@@ -1217,7 +1237,7 @@ function SignalGroup({
       <ul className="divide-y divide-gray-eske-20 dark:divide-white/5">
         {signals.map((s, i) => (
           <li key={i} className="px-3 py-2 space-y-0.5">
-            <p className="text-xs text-black-eske dark:text-[#EAF2F8]">{s.descripcion}</p>
+            <p className="text-xs text-black-eske dark:text-[#EAF2F8]"><InlineMarkdown text={s.descripcion} /></p>
             <div className="flex items-center gap-2 text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
               <span>{s.fuente}</span>
               {s.fechaCorte && <span>· {s.fechaCorte}</span>}
