@@ -44,12 +44,12 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
         ></div>
         <div className="relative z-10 text-center text-white-eske px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
           <h1 className="text-[38px] max-sm:text-xl leading-tight font-bold max-sm:font-semibold">
-            Tu proyecto político, con el método que merece.
+            Tu proyecto político con el método que merece.
           </h1>
           <p className="mt-8 max-sm:mt-4 text-[20px] max-sm:text-sm leading-relaxed font-light max-w-3xl mx-auto">
-            El ecosistema digital que te da certeza.
+            El ecosistema digital para tu proyecto político.
             <br />
-            Sin partido, sin agenda. Solo tu proyecto.
+            Sin partido, sin agenda, sólo tu proyecto.
           </p>
           <div className="mt-10 max-sm:mt-6">
             <Link

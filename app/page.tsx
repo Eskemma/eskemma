@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     "Eskemma es el ecosistema digital que combina inteligencia artificial, datos electorales históricos y monitoreo de entorno político en tiempo real. Para candidatos, funcionarios, consultores y organizaciones ciudadanas en México y Latinoamérica.",
   robots: { index: true, follow: true },
   openGraph: {
-    title: "Eskemma — Tu proyecto político, con el método que merece",
+    title: "Eskemma — Tu proyecto político con el método que merece",
     description:
       "El ecosistema digital de estrategia política para México y Latinoamérica. Datos electorales, monitoreo en tiempo real e inteligencia artificial para tomar mejores decisiones desde el primer día.",
     url: SITE_URL,
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Eskemma — Tu proyecto político, con el método que merece",
+    title: "Eskemma — Tu proyecto político con el método que merece",
     description:
       "El ecosistema digital de estrategia política para México y Latinoamérica. Datos electorales, monitoreo en tiempo real e inteligencia artificial para tomar mejores decisiones desde el primer día.",
     images: [`${SITE_URL}/images/blog-hero.jpg`],
