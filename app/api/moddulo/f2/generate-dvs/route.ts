@@ -129,7 +129,10 @@ export async function POST(request: NextRequest) {
   const mapaPESTEL = project.phases?.exploracion?.mapaPESTEL as Record<string, unknown> | undefined;
 
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
-    return runMultiMotorPath(projectId, project.type, xpcto, mapaPESTEL, saveas);
+    return runMultiMotorPath(
+      projectId, project.type, xpcto, mapaPESTEL, saveas,
+      JSON.stringify(project.xpcto ?? {})
+    );
   }
 
   // ── Fallback: legacy single-call (pestel_analyses o form data) ────────────
@@ -143,7 +146,8 @@ async function runMultiMotorPath(
   projectType: string,
   xpcto: Partial<XPCTO>,
   mapaPESTEL: Record<string, unknown>,
-  saveas: "draft" | "final"
+  saveas: "draft" | "final",
+  xpctoSnapshot: string
 ): Promise<NextResponse> {
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
@@ -245,7 +249,7 @@ async function runMultiMotorPath(
     pip: m5.pip,
   };
 
-  return persistAndReturn(projectId, dvs, saveas);
+  return persistAndReturn(projectId, dvs, saveas, xpctoSnapshot);
 }
 
 // ── Legacy single-call path ───────────────────────────────────────────────────
@@ -365,7 +369,8 @@ function sanitizeDVS(dvs: DVSF2): DVSF2 {
 async function persistAndReturn(
   projectId: string,
   rawDvs: DVSF2,
-  saveas: "draft" | "final"
+  saveas: "draft" | "final",
+  xpctoSnapshot?: string
 ): Promise<NextResponse> {
   const dvs = sanitizeDVS(rawDvs);
 
@@ -373,6 +378,9 @@ async function persistAndReturn(
     await adminDb.collection("moddulo_projects").doc(projectId).update({
       "phases.exploracion.draftDVS": dvs,
       "phases.exploracion.motorAprobaciones": {},
+      ...(xpctoSnapshot !== undefined && {
+        "phases.exploracion.xpctoSnapshotAtGeneration": xpctoSnapshot,
+      }),
       updatedAt: FieldValue.serverTimestamp(),
     });
   } else {

@@ -80,6 +80,43 @@ const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?
 ];
 
 // ==========================================
+// STALENESS DETECTION — F1 → F2
+// ==========================================
+
+interface XpctoDiff {
+  field: string;
+  from: string;
+  to: string;
+}
+
+function diffXpcto(old: Partial<XPCTO>, next: Partial<XPCTO>): XpctoDiff[] {
+  const diffs: XpctoDiff[] = [];
+  const labelMap: Record<string, string> = {
+    hito: "Hito",
+    sujeto: "Sujeto",
+    justificacion: "Justificación",
+  };
+
+  for (const key of ["hito", "sujeto", "justificacion"] as const) {
+    const a = (old[key] ?? "") as string;
+    const b = (next[key] ?? "") as string;
+    if (a !== b) diffs.push({ field: labelMap[key], from: a || "(vacío)", to: b || "(vacío)" });
+  }
+
+  for (const sub of ["financiero", "humano", "logistico"] as const) {
+    const a = old.capacidades?.[sub] ?? "";
+    const b = next.capacidades?.[sub] ?? "";
+    if (a !== b) diffs.push({ field: `Capacidad ${sub}`, from: a || "(vacío)", to: b || "(vacío)" });
+  }
+
+  const ta = old.tiempo?.fechaLimite ?? "";
+  const tb = next.tiempo?.fechaLimite ?? "";
+  if (ta !== tb) diffs.push({ field: "Fecha límite", from: ta || "(vacío)", to: tb || "(vacío)" });
+
+  return diffs;
+}
+
+// ==========================================
 // PÁGINA PRINCIPAL
 // ==========================================
 
@@ -122,6 +159,7 @@ export default function ExploracionPage() {
   const [isGeneratingMotors, setIsGeneratingMotors] = useState(false);
   const [motorGenerationError, setMotorGenerationError] = useState<string | null>(null);
   const [dvsChecklist, setDvsChecklist] = useState<CriterioDVS[]>([]);
+  const [xpctoStaleChanges, setXpctoStaleChanges] = useState<XpctoDiff[]>([]);
 
   // RDA heredado de F1 (C8)
   const [rdaActivo, setRdaActivo] = useState(false);
@@ -227,6 +265,18 @@ export default function ExploracionPage() {
         );
 
         if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
+
+        // Detect F1→F2 staleness: compare XPCTO used at generation vs. current
+        const savedSnapshot = p.phases?.exploracion?.xpctoSnapshotAtGeneration as string | undefined;
+        if (savedSnapshot && savedMapa && !p.phases?.exploracion?.pestAnalysisId) {
+          const currentXpcto = JSON.stringify(p.xpcto ?? {});
+          if (savedSnapshot !== currentXpcto) {
+            setXpctoStaleChanges(diffXpcto(
+              JSON.parse(savedSnapshot) as Partial<XPCTO>,
+              (p.xpcto ?? {}) as Partial<XPCTO>
+            ));
+          }
+        }
 
         // Cargar referencia al proyecto PESTEL vinculado
         const savedPestProjectId = p.phases?.exploracion?.pestProjectId;
@@ -846,7 +896,7 @@ export default function ExploracionPage() {
                 <div className="text-center">
                   <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Analizando con IA…</p>
                   <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
-                    F2 está consultando fuentes de datos reales y procesando las 6 dimensiones PEST-L. El proceso tarda entre 30 y 60 segundos.
+                    Moddulo está procesando las 6 dimensiones PESTEL. El proceso tarda varios minutos. Por favor, espera.
                   </p>
                   {elapsedSeconds > 0 && (
                     <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-2">
@@ -883,6 +933,41 @@ export default function ExploracionPage() {
                   </button>
                 )}
               </div>
+              {xpctoStaleChanges.length > 0 && (
+                <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+                        El XPCTO fue actualizado en F1. Este análisis puede estar desactualizado.
+                      </p>
+                      <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
+                        {xpctoStaleChanges.slice(0, 3).map((d) => (
+                          <li key={d.field}>
+                            <span className="font-medium">{d.field}:</span>{" "}
+                            <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
+                            {" → "}
+                            {d.to.slice(0, 40)}
+                          </li>
+                        ))}
+                        {xpctoStaleChanges.length > 3 && (
+                          <li className="opacity-60">+{xpctoStaleChanges.length - 3} campos más</li>
+                        )}
+                      </ul>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setXpctoStaleChanges([]);
+                        setMotorAprobaciones({});
+                        setDraftDVS(null);
+                        generarDraftDVS();
+                      }}
+                      className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
+                    >
+                      Regenerar análisis ↺
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 <MotoresSequentialView
                   projectId={projectId}
