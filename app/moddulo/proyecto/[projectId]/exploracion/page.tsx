@@ -111,6 +111,7 @@ export default function ExploracionPage() {
   const [isExpressAnalyzing, setIsExpressAnalyzing] = useState(false);
   const [expressStartTime, setExpressStartTime] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [expressError, setExpressError] = useState<string | null>(null);
   const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
   const [showReporte, setShowReporte] = useState(false);
   // Nuevo flujo de motores secuenciales (Iter 2+)
@@ -524,6 +525,7 @@ export default function ExploracionPage() {
   const handleGenerarDVS = useCallback(async () => {
     setIsExpressAnalyzing(true);
     setExpressStartTime(new Date());
+    setExpressError(null);
     try {
       const mR = await fetch("/api/moddulo/f2/generate-m1-express", {
         method: "POST",
@@ -531,14 +533,18 @@ export default function ExploracionPage() {
         credentials: "include",
         body: JSON.stringify({ projectId }),
       });
-      if (!mR.ok) return;
+      if (!mR.ok) {
+        setExpressError("El análisis express no pudo completarse. Intenta de nuevo.");
+        return;
+      }
       const mData = await mR.json();
       if (mData.mapaPESTEL) {
         setMapaPESTEL(mData.mapaPESTEL as MapaPESTEL);
-        // auto-generate useEffect takes over from here
+      } else {
+        setExpressError("El análisis no devolvió datos válidos. Intenta de nuevo.");
       }
     } catch {
-      // silencioso
+      setExpressError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setIsExpressAnalyzing(false);
       setExpressStartTime(null);
@@ -888,6 +894,34 @@ export default function ExploracionPage() {
                   onApprove={handleApproveMotor}
                   onDraftChange={setDraftDVS}
                 />
+              </div>
+            </div>
+
+          /* Error express — análisis falló, mostrar panel con Reintentar */
+          ) : expressError !== null ? (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-red-eske/20 dark:border-red-800/30 p-8 flex flex-col items-center gap-4 w-full max-w-md">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Análisis no completado</p>
+                  <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] mt-1">{expressError}</p>
+                </div>
+                <button
+                  onClick={() => { setExpressError(null); handleGenerarDVS(); }}
+                  className="px-4 py-2 bg-bluegreen-eske text-white-eske rounded-lg text-sm font-medium hover:bg-bluegreen-eske/90 transition-colors"
+                >
+                  Reintentar análisis express
+                </button>
+                <button
+                  onClick={() => setExpressError(null)}
+                  className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors"
+                >
+                  Volver al chat
+                </button>
               </div>
             </div>
 
