@@ -938,7 +938,7 @@ export default function ExploracionPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
-                        El XPCTO fue actualizado en F1. Este análisis puede estar desactualizado.
+                        El XPCTO fue modificado en F1. El contraste con el entorno está desactualizado.
                       </p>
                       <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
                         {xpctoStaleChanges.slice(0, 3).map((d) => (
@@ -953,6 +953,9 @@ export default function ExploracionPage() {
                           <li className="opacity-60">+{xpctoStaleChanges.length - 3} campos más</li>
                         )}
                       </ul>
+                      <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
+                        El escaneo de fuentes (Google News, DOF, INEGI, Banxico, Sefix) no se repite — solo se actualizan el contraste XPCTO-Entorno y los motores dependientes.
+                      </p>
                     </div>
                     <button
                       onClick={() => {
@@ -963,7 +966,7 @@ export default function ExploracionPage() {
                       }}
                       className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
                     >
-                      Regenerar análisis ↺
+                      Actualizar contraste XPCTO ↺
                     </button>
                   </div>
                 </div>
