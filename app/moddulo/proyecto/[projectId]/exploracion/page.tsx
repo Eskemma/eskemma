@@ -846,7 +846,7 @@ export default function ExploracionPage() {
                 <div className="text-center">
                   <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Analizando con IA…</p>
                   <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
-                    F2 está procesando las 6 dimensiones. Este proceso tarda varios minutos. Por favor, espera.
+                    F2 está consultando fuentes de datos reales y procesando las 6 dimensiones PEST-L. El proceso tarda entre 30 y 60 segundos.
                   </p>
                   {elapsedSeconds > 0 && (
                     <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-2">

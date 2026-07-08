@@ -415,10 +415,115 @@ Responde con este JSON exacto (sin campos adicionales):
 // EXPRESS PATH — MapaPESTEL desde formulario
 // ==========================================
 
+// Types for real data sources injected into the express prompt
+interface ExpressNewsItem { title: string; link: string; pubDate: string; content: string; }
+interface ExpressInegiPoint { serieId: string; value: number; date: string; }
+interface ExpressBanxicoPoint { serieId: string; date: string; value: number; }
+interface ExpressSefixResultado {
+  cargo: string; anio: number; participacion: number;
+  partidos: { partido: string; porcentaje: number }[];
+}
+interface ExpressContext {
+  news: ExpressNewsItem[];
+  dof: ExpressNewsItem[];
+  inegi: ExpressInegiPoint[];
+  banxico: ExpressBanxicoPoint[];
+  sefix: { resultadosList: ExpressSefixResultado[]; padron: unknown } | null;
+}
+
+const INEGI_LABEL: Record<string, string> = {
+  "628229": "INPC (inflación)",
+  "444612": "Tasa de desocupación",
+  "381016": "IGAE",
+};
+
+const BANXICO_LABEL: Record<string, string> = {
+  SP1: "INPC Banxico",
+  SF43718: "Tipo de cambio Fix (MXN/USD)",
+  SF61745: "Tasa objetivo de política monetaria",
+};
+
+function buildSourcesSection(ctx: ExpressContext): string {
+  const lines: string[] = ["== FUENTES CONSULTADAS =="];
+  lines.push(
+    "Construye las señales ÚNICAMENTE con base en estos datos. " +
+    "Si una dimensión no tiene información respaldada en estas fuentes, deja sus arrays de señales vacíos " +
+    "y explícalo en 'narrativa'."
+  );
+
+  // Google News
+  const news = ctx.news.slice(0, 30);
+  if (news.length > 0) {
+    lines.push("\n[NOTICIAS — Google News, últimos 7 días]");
+    for (const n of news) {
+      const date = n.pubDate ? n.pubDate.slice(0, 10) : "";
+      lines.push(`- "${n.title}" (${date})`);
+    }
+  } else {
+    lines.push("\n[NOTICIAS — Google News]: no disponible en esta ejecución");
+  }
+
+  // DOF
+  const dof = ctx.dof.slice(0, 15);
+  if (dof.length > 0) {
+    lines.push("\n[DIARIO OFICIAL DE LA FEDERACIÓN — últimos 7 días]");
+    for (const d of dof) {
+      const date = d.pubDate ? d.pubDate.slice(0, 10) : "";
+      lines.push(`- "${d.title}" (${date})`);
+    }
+  } else {
+    lines.push("\n[DIARIO OFICIAL DE LA FEDERACIÓN]: no disponible en esta ejecución");
+  }
+
+  // INEGI
+  if (ctx.inegi.length > 0) {
+    lines.push("\n[INEGI — Indicadores económicos]");
+    for (const p of ctx.inegi) {
+      const label = INEGI_LABEL[p.serieId] ?? `Serie ${p.serieId}`;
+      lines.push(`- ${label}: ${p.value} (${p.date})`);
+    }
+  } else {
+    lines.push("\n[INEGI]: no disponible en esta ejecución");
+  }
+
+  // Banxico
+  if (ctx.banxico.length > 0) {
+    lines.push("\n[BANXICO — Banco de México]");
+    for (const p of ctx.banxico) {
+      const label = BANXICO_LABEL[p.serieId] ?? `Serie ${p.serieId}`;
+      lines.push(`- ${label}: ${p.value} (${p.date})`);
+    }
+  } else {
+    lines.push("\n[BANXICO]: no disponible en esta ejecución");
+  }
+
+  // Sefix / INE
+  if (ctx.sefix && ctx.sefix.resultadosList.length > 0) {
+    lines.push("\n[INE/SEFIX — Resultados electorales por cargo]");
+    for (const r of ctx.sefix.resultadosList) {
+      const partidos = r.partidos
+        .map((p) => `${p.partido} ${p.porcentaje.toFixed(1)}%`)
+        .join(", ");
+      lines.push(`- ${r.cargo} ${r.anio}: ${partidos} — Participación: ${r.participacion.toFixed(1)}%`);
+    }
+    const padron = ctx.sefix.padron as { listaNominal?: number; padronElectoral?: number } | null;
+    if (padron?.listaNominal) {
+      lines.push(
+        `- Padrón electoral: ${padron.listaNominal.toLocaleString("es-MX")} lista nominal`
+      );
+    }
+  } else {
+    lines.push("\n[INE/SEFIX — datos electorales]: no disponible en esta ejecución");
+  }
+
+  return lines.join("\n");
+}
+
 export function getMapaPESTELExpressPrompt(
   projectType: string,
   xpcto: Record<string, unknown>,
-  archivos?: { nombre: string; textoExtraido: string }[]
+  archivos?: { nombre: string; textoExtraido: string }[],
+  context?: ExpressContext
 ): { system: string; user: string } {
   const x = xpcto as {
     hito?: string; sujeto?: string; justificacion?: string;
@@ -428,17 +533,37 @@ export function getMapaPESTELExpressPrompt(
   const cap = x.capacidades ?? {};
   const t = x.tiempo ?? {};
 
+  const hasRealData = !!context;
+
   const system = `Eres un analista político experto en metodología PEST-L aplicada a consultoría política.
 Tu tarea es generar un MapaPESTEL tripartito completo para un proyecto de tipo "${projectType}".
 Este MapaPESTEL es la lectura inicial del entorno que realiza Moddulo cuando el consultor no utiliza la app PESTEL.
 Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques de código.`;
 
-  const archivosSection = archivos && archivos.length > 0
-    ? `\n== DOCUMENTOS DE CONTEXTO APORTADOS POR EL CONSULTOR ==\nUsa esta información para enriquecer el análisis. Prioriza estos datos sobre inferencias genéricas del XPCTO.\n${archivos.map((a, i) => `[Documento ${i + 1}: ${a.nombre}]\n${a.textoExtraido.slice(0, 3000)}`).join("\n\n---\n\n")}\n`
+  const archivosSection =
+    archivos && archivos.length > 0
+      ? `\n== DOCUMENTOS DE CONTEXTO APORTADOS POR EL CONSULTOR ==\nUsa esta información para enriquecer el análisis.\n${archivos.map((a, i) => `[Documento ${i + 1}: ${a.nombre}]\n${a.textoExtraido.slice(0, 3000)}`).join("\n\n---\n\n")}\n`
+      : "";
+
+  const sourcesSection = context
+    ? `\n${buildSourcesSection(context)}\n`
     : "";
 
-  const user = `Genera el MapaPESTEL para este proyecto. El análisis debe ser específico al hito, el sujeto y el contexto político-territorial implícito en el XPCTO.${archivosSection}
+  const antiFabricacionRule = hasRealData
+    ? `
+REGLA ABSOLUTA SOBRE FUENTES:
+- El campo "fuente" de cada señal DEBE referenciar una de las fuentes de la sección FUENTES CONSULTADAS.
+  Formatos válidos: "Google News, YYYY-MM", "DOF, YYYY-MM-DD", "INEGI, YYYY-MM", "Banxico, YYYY-MM-DD", "INE/SEFIX, YYYY"
+- Prohibido citar como fuente: "Análisis Moddulo", "inferido del XPCTO", "conocimiento general" o cualquier variante autorreferida.
+- Si una dimensión no tiene señales respaldadas por las fuentes consultadas: deja senalesFavorables, senalesAdversas y senalesInciertas como arrays vacíos y explícalo en 'narrativa'.
+- El campo "nivelConfianza" es "medio" cuando la señal se apoya en datos numéricos (INEGI, Banxico, Sefix) o en artículos de noticias verificables; "bajo" solo para inferencias del XPCTO sin respaldo en las fuentes.
+`
+    : "";
 
+  const confidenceValue = hasRealData ? 65 : 50;
+  const currentYearMonth = new Date().toISOString().slice(0, 7);
+
+  const user = `Genera el MapaPESTEL para este proyecto. El análisis debe ser específico al hito, el sujeto y el contexto político-territorial.${archivosSection}${sourcesSection}
 == XPCTO DEL PROYECTO ==
 X — Hito: ${x.hito ?? ""}
 P — Sujeto político: ${x.sujeto ?? ""}
@@ -447,47 +572,45 @@ C — Capacidad humana: ${cap.humano ?? ""}
 C — Capacidad logística: ${cap.logistico ?? ""}
 T — Fecha límite: ${t.fechaLimite ?? ""} (${t.duracionMeses ?? "?"} meses)
 O — Justificación: ${x.justificacion ?? ""}
-
+${antiFabricacionRule}
 == INSTRUCCIONES ==
 Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
-- Infiere el contexto político-territorial a partir del hito, sujeto y tipo de proyecto.
 - clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
-- narrativa: 2–3 oraciones de síntesis directamente vinculadas al hito y sujeto XPCTO.
-- confidence: 50 (análisis de escritorio sin datos de campo).
+- narrativa: 2–3 oraciones de síntesis vinculadas al hito, sujeto y fuentes disponibles.
+- confidence: ${confidenceValue}.
 - Genera 2–4 señales por categoría (favorables/adversas/inciertas) específicas a este proyecto.
-  OBLIGATORIO: cada dimensión debe tener al menos 1 señal en senalesFavorables O senalesAdversas.
-  Un array completamente vacío en las 3 categorías es un error de análisis — el valor del path express está en las señales.
+  OBLIGATORIO: cada dimensión debe tener al menos 1 señal (en cualquier categoría) O explicar en narrativa por qué no hay datos.
 - Cada señal debe tener estos campos exactos:
-  { "descripcion": "descripción específica al hito y sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }
+  { "descripcion": "descripción específica al hito y sujeto del proyecto", "fuente": "Fuente: nombre, fecha", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }
 
-Responde con este JSON exacto (las 6 claves en el nivel raíz, con señales reales en CADA dimensión):
+Responde con este JSON exacto (las 6 claves en el nivel raíz):
 {
-  "P": { "code": "P", "label": "Político", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción política específica al proyecto...", "confidence": 50,
-    "senalesFavorables": [{ "descripcion": "señal política favorable específica al hito del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
-    "senalesAdversas": [{ "descripcion": "señal política adversa específica al sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+  "P": { "code": "P", "label": "Político", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción política específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [{ "descripcion": "señal política favorable específica al hito del proyecto", "fuente": "Fuente: INE/SEFIX, 2024", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal política adversa específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
     "senalesInciertas": [] },
-  "E": { "code": "E", "label": "Económico", "clasificacion": "AMENAZA", "narrativa": "Descripción económica específica al proyecto...", "confidence": 50,
+  "E": { "code": "E", "label": "Económico", "clasificacion": "AMENAZA", "narrativa": "Descripción económica específica al proyecto...", "confidence": ${confidenceValue},
     "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal económica adversa específica al hito del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
-    "senalesInciertas": [{ "descripcion": "señal económica incierta para el proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }] },
-  "S": { "code": "S", "label": "Social", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción social específica al proyecto...", "confidence": 50,
-    "senalesFavorables": [{ "descripcion": "señal social favorable específica al sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal económica adversa específica al hito del proyecto", "fuente": "Fuente: INEGI, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesInciertas": [{ "descripcion": "señal económica incierta para el proyecto", "fuente": "Fuente: Banxico, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] },
+  "S": { "code": "S", "label": "Social", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción social específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [{ "descripcion": "señal social favorable específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
     "senalesAdversas": [],
     "senalesInciertas": [] },
-  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción tecnológica específica al proyecto...", "confidence": 50,
+  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción tecnológica específica al proyecto...", "confidence": ${confidenceValue},
     "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
     "senalesInciertas": [] },
-  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": 50,
+  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": ${confidenceValue},
     "senalesFavorables": [],
     "senalesAdversas": [],
-    "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }] },
-  "L": { "code": "L", "label": "Legal", "clasificacion": "AMENAZA", "narrativa": "Descripción legal específica al tipo de proyecto...", "confidence": 50,
+    "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] },
+  "L": { "code": "L", "label": "Legal", "clasificacion": "AMENAZA", "narrativa": "Descripción legal específica al tipo de proyecto...", "confidence": ${confidenceValue},
     "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal legal adversa al hito o sujeto del proyecto", "fuente": "Análisis Moddulo (inferido del XPCTO)", "fechaCorte": "${new Date().toISOString().slice(0, 7)}", "nivelConfianza": "bajo", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal legal adversa al hito o sujeto del proyecto", "fuente": "Fuente: DOF, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
     "senalesInciertas": [] }
 }
-RECUERDA: rellena TODAS las dimensiones con señales reales y específicas al XPCTO — NO son señales genéricas. Cada dimensión debe tener al menos 1 señal en senalesFavorables O senalesAdversas O senalesInciertas.`;
+RECUERDA: señales reales y específicas al XPCTO. Cada dimensión necesita al menos 1 señal O narrativa explicando la ausencia de datos.`;
 
   return { system, user };
 }
