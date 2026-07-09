@@ -726,12 +726,21 @@ export default function MotoresSequentialView({
         return (
           <div key={motor.id} className={`rounded-xl border transition-all ${containerCls}`}>
             {/* ── Accordion header ── */}
-            <button
-              type="button"
+            {/* div en vez de button para permitir button anidado (badge "Aprobado") */}
+            <div
+              role="button"
+              tabIndex={isLocked ? -1 : 0}
+              aria-expanded={isExpanded}
+              aria-disabled={isLocked}
               onClick={() => toggleExpand(motor.id, state)}
-              disabled={isLocked}
+              onKeyDown={(e) => {
+                if (!isLocked && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  toggleExpand(motor.id, state);
+                }
+              }}
               className={`w-full px-4 py-3 flex items-start justify-between gap-3 text-left transition-colors rounded-xl ${
-                isLocked ? "cursor-default" : "hover:bg-gray-eske-10/50 dark:hover:bg-white/[0.03]"
+                isLocked ? "cursor-default" : "hover:bg-gray-eske-10/50 dark:hover:bg-white/[0.03] cursor-pointer"
               }`}
             >
               <div className="flex items-start gap-2.5 min-w-0">
@@ -759,7 +768,7 @@ export default function MotoresSequentialView({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleStartReEdit(motor.id); }}
                     aria-label={`Re-editar ${motor.label}`}
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40 hover:bg-green-eske-30 dark:hover:bg-green-eske/30 transition-colors cursor-pointer"
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40 hover:bg-green-eske-30 dark:hover:bg-green-eske/30 transition-colors"
                   >
                     Aprobado
                   </button>
@@ -773,7 +782,7 @@ export default function MotoresSequentialView({
                   </svg>
                 )}
               </div>
-            </button>
+            </div>
 
             {/* ── Accordion body ── */}
             {isExpanded && !isLocked && (
