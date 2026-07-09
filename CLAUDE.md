@@ -5,6 +5,35 @@ Contexto e instrucciones para el desarrollo del proyecto.
 
 ---
 
+## Protocolo de Fuentes Externas (IDs de Series/Indicadores)
+
+**Aplica a toda integración con APIs externas: INEGI, Banxico, y cualquier
+fuente que se agregue en desarrollos futuros (Fase 3 - Investigación, etc.)**
+
+Antes del primer uso en producción de cualquier ID de serie o indicador externo:
+
+1. **Verificar con llamada real** al endpoint de metadatos de la API.
+2. **Documentar en el código** (comentario junto a la constante):
+   - Fecha de verificación
+   - Campo y valor exacto que confirma la identidad (texto literal de la respuesta)
+   - Nunca solo el label inferido — siempre la evidencia de la API
+
+Formato de comentario obligatorio:
+```ts
+// Verificado YYYY-MM-DD vía GET <endpoint-metadatos>
+// ID_SERIE → campo:"valor literal de la API"  →  descripción legible
+```
+
+**Nunca asumir un ID por inferencia, plausibilidad o documentación de
+terceros sin confirmar contra la API real.** Si el token no está disponible
+en local, dejar el ID marcado con `⚠️ PENDIENTE DE VERIFICACIÓN` y la
+fecha, en vez de asumir.
+
+Referencia de implementación: `lib/centinela/pestel/scraper/banxico.ts`
+(verificado 2026-07-08).
+
+---
+
 ## Idioma y Commits
 
 - Responder siempre en **español**
