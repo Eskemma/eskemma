@@ -8,10 +8,17 @@ export interface BanxicoDataPoint {
   value: number;
 }
 
-// Series SIE:
-// SP1     = INPC (inflación Banxico)
-// SF43718 = Tipo de cambio Fix (pesos/dólar)
-// SF61745 = Tasa objetivo de política monetaria
+// PROTOCOLO: Todo ID de serie externa debe verificarse con una llamada real
+// a la API antes de su primer uso en producción. Documentar: fecha + campo
+// de metadato exacto que confirma la identidad. Nunca asumir por plausibilidad.
+//
+// Series SIE — verificadas el 2026-07-08 vía:
+//   GET /SieAPIRest/service/v1/series/{id}  →  campo "titulo" + "cifra" + "unidad"
+// SP1     → titulo:"IPC Por objeto del gasto Nacional I n d i c e G e n e r a l"
+//            cifra:"Indices"  unidad:"Sin Unidad"  periodicidad:"Mensual"  → INPC
+// SF43718 → titulo:"Tipo de cambio Pesos por dólar E.U.A. ... FIX"
+//            cifra:"Tipo de Cambio"  unidad:"Pesos por Dólar"  → Tipo de cambio FIX
+// SF61745 → titulo:"Tasa objetivo"  → Tasa objetivo de política monetaria
 export const BANXICO_DEFAULT_SERIES = ["SP1", "SF43718", "SF61745"];
 
 interface BanxicoResponse {

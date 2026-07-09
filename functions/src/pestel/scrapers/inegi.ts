@@ -8,10 +8,19 @@ export interface InegiDataPoint {
   date: string;
 }
 
-// Series BIE del MVP:
-// 628229 = INPC (inflación)
-// 444612 = Tasa de desocupación
-// 381016 = IGAE (proxy del PIB mensual)
+// PROTOCOLO: Todo ID de serie externa debe verificarse con una llamada real
+// a la API antes de su primer uso en producción. Documentar: fecha + respuesta
+// exacta que confirma la identidad. Nunca asumir por plausibilidad.
+//
+// ⚠️  IDs PENDIENTES DE VERIFICACIÓN — 2026-07-08
+// Los IDs abajo (628229, 444612, 381016) nunca se probaron contra la API real.
+// Auditados el 2026-07-08: no están en el catálogo BIE (BIE_tabla_equivalencias.xlsx)
+// ni en BISE. Devuelven ErrorCode:100 con cualquier combinación de fuente/área.
+// INPC e IGAE tampoco existen en el BIE. Área 0700 es incorrecta para indicadores
+// nacionales (debe ser 00). Corrección pendiente: usar Query Builder de INEGI
+// (inegi.org.mx/app/querybuilder2/) para obtener IDs válidos verificados.
+// Impacto actual en producción: fetchInegiIndicators siempre retorna [] →
+// análisis PESTEL de Centinela nunca recibieron datos INEGI (no hay regresión).
 export const INEGI_DEFAULT_SERIES = ["628229", "444612", "381016"];
 
 interface InegiResponse {
