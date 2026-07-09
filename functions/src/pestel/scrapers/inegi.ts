@@ -1,5 +1,5 @@
 // functions/src/pestel/scrapers/inegi.ts
-// Obtiene indicadores del INEGI vía la API BIE.
+// Obtiene indicadores del INEGI vía la API BIE o BISE.
 // Requiere INEGI_TOKEN. Si no está configurado, retorna [] sin error.
 
 export interface InegiDataPoint {
@@ -13,15 +13,25 @@ export interface InegiDataPoint {
 // exacta que confirma la identidad. Nunca asumir por plausibilidad.
 //
 // ⚠️  IDs PENDIENTES DE VERIFICACIÓN — 2026-07-08
-// Los IDs abajo (628229, 444612, 381016) nunca se probaron contra la API real.
-// Auditados el 2026-07-08: no están en el catálogo BIE (BIE_tabla_equivalencias.xlsx)
-// ni en BISE. Devuelven ErrorCode:100 con cualquier combinación de fuente/área.
-// INPC e IGAE tampoco existen en el BIE. Área 0700 es incorrecta para indicadores
-// nacionales (debe ser 00). Corrección pendiente: usar Query Builder de INEGI
-// (inegi.org.mx/app/querybuilder2/) para obtener IDs válidos verificados.
-// Impacto actual en producción: fetchInegiIndicators siempre retorna [] →
-// análisis PESTEL de Centinela nunca recibieron datos INEGI (no hay regresión).
+// IDs abajo (628229, 444612, 381016) nunca se probaron contra la API real.
+// Auditados 2026-07-08: no están en catálogo BIE ni BISE.
+// ErrorCode:100 con cualquier combinación fuente/área.
+// IMPORTANTE: corregir el área de 0700 a 00 NO resolvería el problema;
+// los IDs simplemente no existen en ningún catálogo de INEGI.
+// Corrección pendiente: Query Builder (inegi.org.mx/app/querybuilder2/).
+// Impacto en producción: fetchInegiIndicators retorna [] para BIE.
 export const INEGI_DEFAULT_SERIES = ["628229", "444612", "381016"];
+
+// IDs BISE verificados 2026-07-08
+// GET /INDICATOR/{id}/es/14/false/BISE/2.0/{TOKEN}
+// 1002000001 → pob. total: 126,014,024 nacional, 8,948,653 Jalisco
+// 1002000002 → pob. masculina (~49% del total por entidad)
+// 1002000003 → pob. femenina  (~51% del total por entidad)
+// Sistema censal: actualiza cada 5-10 años.
+// Usar con fuente="BISE" y area=cveEntidad (ej. "14" Jalisco).
+export const BISE_POBLACION_SERIES = [
+  "1002000001", "1002000002", "1002000003",
+];
 
 interface InegiResponse {
   Series?: Array<{
@@ -33,12 +43,16 @@ interface InegiResponse {
 }
 
 /**
- * Obtiene el valor más reciente de cada serie BIE del INEGI.
+ * Obtiene el valor más reciente de cada serie del INEGI (BIE o BISE).
  * @param {string[]} seriesIds IDs de las series a consultar
+ * @param {"BIE"|"BISE"} fuente Sistema INEGI: BIE (económico) o BISE (censal)
+ * @param {string} area Clave geográfica: "00" nacional, "14" Jalisco, etc.
  * @return {Promise<InegiDataPoint[]>}
  */
 export async function fetchInegiIndicators(
-  seriesIds: string[]
+  seriesIds: string[],
+  fuente: "BIE" | "BISE" = "BIE",
+  area = "0700"
 ): Promise<InegiDataPoint[]> {
   const token = process.env.INEGI_TOKEN;
   if (!token) {
@@ -51,7 +65,7 @@ export async function fetchInegiIndicators(
   for (const serieId of seriesIds) {
     const url =
       "https://www.inegi.org.mx/app/api/indicadores/desarrolladores" +
-      `/jsonxml/INDICATOR/${serieId}/es/0700/false/BIE/2.0/${token}` +
+      `/jsonxml/INDICATOR/${serieId}/es/${area}/false/${fuente}/2.0/${token}` +
       "?type=json";
 
     try {

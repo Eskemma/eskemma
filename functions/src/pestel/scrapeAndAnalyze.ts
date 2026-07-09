@@ -10,7 +10,9 @@ import {fetchDOFRSS} from "./scrapers/dof";
 import {
   fetchInegiIndicators,
   INEGI_DEFAULT_SERIES,
+  BISE_POBLACION_SERIES,
 } from "./scrapers/inegi";
+import {getCveEntidad} from "../utils/estadoCveMap";
 import {
   fetchBanxicoSeries,
   BANXICO_DEFAULT_SERIES,
@@ -64,6 +66,7 @@ export const scrapeAndAnalyze = onRequest(
 
     // ----- Resolve territory and data for scraping -----
     let territorioNombre = "México";
+    let estadoRaw: string | null = null;
     let projectData: Record<string, unknown> | null = null;
 
     if (isV2) {
@@ -78,8 +81,10 @@ export const scrapeAndAnalyze = onRequest(
       }
       projectData = projectSnap.data() as Record<string, unknown>;
       const territorio =
-        projectData.territorio as {nombre?: string} | undefined;
+        projectData.territorio as
+          {nombre?: string; estado?: string} | undefined;
       territorioNombre = territorio?.nombre ?? "México";
+      estadoRaw = territorio?.estado ?? null;
     } else {
       const configSnap = await db
         .collection("pestel_configs")
@@ -168,7 +173,8 @@ export const scrapeAndAnalyze = onRequest(
       }
 
       // ----- Scrapers in parallel -----
-      const [newsResult, dofResult, inegiResult, banxicoResult] =
+      const cveEntidad = estadoRaw ? getCveEntidad(estadoRaw) : null;
+      const [newsResult, dofResult, inegiResult, banxicoResult, biseResult] =
         await Promise.allSettled([
           fetchGoogleNewsRSS(territorioNombre, newsTopics),
           fetchDOFRSS(),
@@ -176,6 +182,9 @@ export const scrapeAndAnalyze = onRequest(
           Promise.all(
             BANXICO_DEFAULT_SERIES.map((s) => fetchBanxicoSeries(s))
           ),
+          cveEntidad ?
+            fetchInegiIndicators(BISE_POBLACION_SERIES, "BISE", cveEntidad) :
+            Promise.resolve([]),
         ]);
 
       const articles = [
@@ -189,6 +198,8 @@ export const scrapeAndAnalyze = onRequest(
         banxicoResult.status === "fulfilled" ?
           banxicoResult.value.flat() :
           [];
+      const biseData =
+        biseResult.status === "fulfilled" ? biseResult.value : [];
 
       if (newsResult.status === "rejected") {
         console.error("[scrapeAndAnalyze] Google News:", newsResult.reason);
@@ -202,6 +213,9 @@ export const scrapeAndAnalyze = onRequest(
       if (banxicoResult.status === "rejected") {
         console.error("[scrapeAndAnalyze] Banxico:", banxicoResult.reason);
       }
+      if (biseResult.status === "rejected") {
+        console.error("[scrapeAndAnalyze] BISE:", biseResult.reason);
+      }
 
       // ----- Save raw articles -----
       await db.collection("pestel_raw_articles").doc(jobId).set({
@@ -211,7 +225,11 @@ export const scrapeAndAnalyze = onRequest(
         territorio: territorioNombre,
         generadoEn: admin.firestore.FieldValue.serverTimestamp(),
         articles,
-        economicData: {inegi: inegiData, banxico: banxicoData},
+        economicData: {
+          inegi: inegiData,
+          banxico: banxicoData,
+          bise: biseData,
+        },
         articlesCount: articles.length,
       });
 

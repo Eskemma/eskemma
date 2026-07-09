@@ -284,15 +284,27 @@ export default function DVSView({ dvs }: DVSViewProps) {
                 {item.numero}
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-black-eske dark:text-white leading-snug">
-                  {item.pregunta}
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  <p className="text-sm font-medium text-black-eske dark:text-white leading-snug">
+                    {item.pregunta}
+                  </p>
+                  {item.profundidad && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-bluegreen-eske-10 text-bluegreen-eske-70 dark:bg-bluegreen-eske-80/20 dark:text-bluegreen-eske-30 shrink-0">
+                      {item.profundidad}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
                   Método: {item.metodo}
                 </p>
                 <p className="text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6] mt-0.5">
                   Vínculo: {item.vinculoHito}
                 </p>
+                {item.orden !== undefined && item.orden !== item.numero && (
+                  <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40 mt-0.5">
+                    Prioridad de ejecución: {item.orden}
+                  </p>
+                )}
               </div>
             </li>
           ))}

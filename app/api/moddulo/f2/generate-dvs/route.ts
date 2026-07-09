@@ -360,6 +360,12 @@ function sanitizeDVS(dvs: DVSF2): DVSF2 {
       pregunta: str(p.pregunta),
       metodo: str(p.metodo),
       vinculoHito: str(p.vinculoHito),
+      orden: typeof p.orden === "number" ? p.orden
+        : typeof p.numero === "number" ? p.numero : idx + 1,
+      profundidad: (["exploratoria", "confirmatoria", "descriptiva"] as const)
+        .includes(p.profundidad as PIPItem["profundidad"])
+        ? (p.profundidad as PIPItem["profundidad"])
+        : "exploratoria",
     })),
   };
 }

@@ -689,10 +689,21 @@ export default function ExploracionPage() {
         setDvs(data.dvs as DVSF2);
         setDraftDVS(null);
         setMotorAprobaciones({});
-        setShowReporte(true);
         if (mode !== "completed") setMode("completed");
+        // showReporte queda en false — el usuario ve el panel "Análisis completo"
+        // y decide cuándo abrir el Reporte F2
       }
     } catch {/* silencioso */}
+  };
+
+  const handleSaveMotorEdit = (_motor: "M2" | "M3" | "M4" | "M5") => {
+    if (!draftDVS) return;
+    fetch("/api/moddulo/f2/save-draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ projectId, draftDVS }),
+    }).catch(() => {});
   };
 
   const handleStartEdit = () => { setEditForm(structuredClone(form)); setMode("editing"); };
@@ -776,40 +787,59 @@ export default function ExploracionPage() {
           const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
           const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
 
+          const MOTOR_LABELS: Record<string, string> = {
+            M2: "M2 — Contraste XPCTO",
+            M3: "M3 — Semáforo de Veto",
+            M4: "M4 — Incertidumbres",
+            M5: "M5 — Hipótesis + PIP",
+          };
+          const pendingMotors = dvs === null && mapaPESTEL !== null
+            ? (["M2", "M3", "M4", "M5"] as const).filter((m) => !motorAprobaciones[m])
+            : [];
+
           return (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {/* Chip 1: Reporte F2 / Cancelar */}
-              {headerState === "editando" ? (
-                <button onClick={handleCancelEdit} className={btnBase}>Cancelar</button>
-              ) : (
+            <div className="mt-2">
+              <div className="flex flex-wrap gap-1.5">
+                {/* Chip 1: Reporte F2 / Cancelar */}
+                {headerState === "editando" ? (
+                  <button onClick={handleCancelEdit} className={btnBase}>Cancelar</button>
+                ) : (
+                  <button
+                    onClick={() => setShowReporte(true)}
+                    disabled={headerState === "en_progreso"}
+                    className={btnBase}
+                  >
+                    Reporte F2
+                  </button>
+                )}
+
+                {/* Chip 2: Editar análisis / Guardar cambios */}
+                {headerState === "editando" ? (
+                  <button onClick={handleSaveEdit} disabled={isSaving || generandoDVS} className={btnBase}>
+                    {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                ) : (
+                  <button onClick={handleStartEdit} disabled={headerState === "en_progreso"} className={btnBase}>
+                    Editar análisis
+                  </button>
+                )}
+
+                {/* Chip 3: Cerrar Fase 2 */}
                 <button
-                  onClick={() => setShowReporte(true)}
-                  disabled={headerState === "en_progreso"}
-                  className={btnBase}
+                  onClick={handleOpenReview}
+                  disabled={headerState !== "lista"}
+                  className={headerState === "lista" ? btnClose : btnBase}
                 >
-                  Reporte F2
+                  Cerrar Fase 2
                 </button>
-              )}
+              </div>
 
-              {/* Chip 2: Editar análisis / Guardar cambios */}
-              {headerState === "editando" ? (
-                <button onClick={handleSaveEdit} disabled={isSaving || generandoDVS} className={btnBase}>
-                  {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
-                </button>
-              ) : (
-                <button onClick={handleStartEdit} disabled={headerState === "en_progreso"} className={btnBase}>
-                  Editar análisis
-                </button>
+              {pendingMotors.length > 0 && headerState !== "editando" && (
+                <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40 mt-1.5">
+                  Aprueba los motores pendientes antes de continuar:{" "}
+                  {pendingMotors.map((m) => MOTOR_LABELS[m]).join(", ")}
+                </p>
               )}
-
-              {/* Chip 3: Cerrar Fase 2 */}
-              <button
-                onClick={handleOpenReview}
-                disabled={headerState !== "lista"}
-                className={headerState === "lista" ? btnClose : btnBase}
-              >
-                Cerrar Fase 2
-              </button>
             </div>
           );
         })()}
@@ -972,16 +1002,38 @@ export default function ExploracionPage() {
                 </div>
               )}
               <div className="flex-1 overflow-y-auto">
-                <MotoresSequentialView
-                  projectId={projectId}
-                  draftDVS={draftDVS}
-                  motorAprobaciones={motorAprobaciones}
-                  isGenerating={isGeneratingMotors}
-                  generationError={motorGenerationError}
-                  onRetry={generarDraftDVS}
-                  onApprove={handleApproveMotor}
-                  onDraftChange={setDraftDVS}
-                />
+                {mode === "completed" && dvs !== null && !showReporte ? (
+                  <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">
+                    <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-2">
+                      Análisis de exploración completo
+                    </p>
+                    <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed mb-5">
+                      El Documento de Viabilidad Situacional está listo. Genera el Reporte F2
+                      para revisar el análisis completo, edítalo si lo necesitas y, cuando estés
+                      conforme, cierra la fase para avanzar a{" "}
+                      <strong className="text-black-eske dark:text-[#EAF2F8]">F3 — Investigación</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowReporte(true)}
+                      className="px-5 py-2 bg-bluegreen-eske text-white rounded-full text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors"
+                    >
+                      Generar Reporte F2
+                    </button>
+                  </div>
+                ) : (
+                  <MotoresSequentialView
+                    projectId={projectId}
+                    draftDVS={draftDVS}
+                    motorAprobaciones={motorAprobaciones}
+                    isGenerating={isGeneratingMotors}
+                    generationError={motorGenerationError}
+                    onRetry={generarDraftDVS}
+                    onApprove={handleApproveMotor}
+                    onDraftChange={setDraftDVS}
+                    onSaveEdit={handleSaveMotorEdit}
+                  />
+                )}
               </div>
             </div>
 

@@ -106,7 +106,7 @@ export interface EconomicDataPoint {
   value?: number | string;
   date?: string;
   period?: string;
-  source?: "INEGI" | "Banxico";
+  source?: "INEGI" | "Banxico" | "BISE";
 }
 
 const DIMENSION_NAMES: Record<DimensionCode, string> = {
@@ -197,6 +197,7 @@ function formatEconomicData(points: EconomicDataPoint[]): string {
  * @param {string} params.rawData Articles and manual data as text
  * @param {EconomicDataPoint[]} params.inegiData INEGI indicators (dim E)
  * @param {EconomicDataPoint[]} params.banxicoData Banxico series (dim E)
+ * @param {EconomicDataPoint[]} params.biseData BISE population data (dim S)
  * @return {string} Formatted prompt
  */
 function buildDimensionPrompt(params: {
@@ -208,10 +209,11 @@ function buildDimensionPrompt(params: {
   rawData: string;
   inegiData?: EconomicDataPoint[];
   banxicoData?: EconomicDataPoint[];
+  biseData?: EconomicDataPoint[];
 }): string {
   const {
     code, tipo, territorio, horizonte, variables, rawData,
-    inegiData, banxicoData,
+    inegiData, banxicoData, biseData,
   } = params;
   const dimName = DIMENSION_NAMES[code];
   const tipoDesc = TIPO_DESCRIPTIONS[tipo] ?? tipo;
@@ -231,6 +233,13 @@ function buildDimensionPrompt(params: {
     "\nDATOS ECONÓMICOS CUANTITATIVOS (INEGI/Banxico):\n" +
     (inegiText ? `INEGI:\n${inegiText}\n` : "") +
     (banxicoText ? `Banxico:\n${banxicoText}\n` : "") :
+    "";
+
+  const biseText = formatEconomicData(biseData ?? []);
+  const biseBlock = code === "S" && biseText ?
+    "\nDATOS DEMOGRÁFICOS (INEGI/BISE — Censo de Población" +
+    " y Vivienda, datos quinquenales/decenales):\n" +
+    biseText :
     "";
 
   const ecologicoCtx = code === "Ec" ? `
@@ -260,7 +269,7 @@ ${varsText}
 
 DATOS RECOLECTADOS:
 ${rawData || "Sin datos disponibles para este período."}
-${economicBlock}
+${economicBlock}${biseBlock}
 INSTRUCCIONES:
 - Cuando menciones un hecho específico en la narrativa, cita la \
 fuente entre paréntesis: (Fuente: nombre, fecha). Máx. 3-4 citas.
@@ -309,6 +318,7 @@ Sin datos suficientes asigna confianza menor a 50.`;
  * @param {string} params.rawData Scraped + manual data as text
  * @param {EconomicDataPoint[]} params.inegiData INEGI indicators (E dim)
  * @param {EconomicDataPoint[]} params.banxicoData Banxico series (E dim)
+ * @param {EconomicDataPoint[]} params.biseData BISE population data (S dim)
  * @param {string} params.anthropicKey Anthropic API key
  * @return {Promise<DimensionAnalysisResult>} Dimension analysis
  */
@@ -321,6 +331,7 @@ export async function analyzeDimension(params: {
   rawData: string;
   inegiData?: EconomicDataPoint[];
   banxicoData?: EconomicDataPoint[];
+  biseData?: EconomicDataPoint[];
   anthropicKey: string;
 }): Promise<DimensionAnalysisResult> {
   const {code, anthropicKey} = params;

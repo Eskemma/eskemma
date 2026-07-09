@@ -344,6 +344,8 @@ export interface PIPItem {
   pregunta: string;
   metodo: string;
   vinculoHito: string;
+  orden: number;
+  profundidad: "exploratoria" | "confirmatoria" | "descriptiva";
 }
 
 export interface DVSF2 {

@@ -1,7 +1,7 @@
 // app/api/moddulo/f2/generate-m1-express/route.ts
 // POST { projectId }
 // Generates a complete tripartite MapaPESTEL from real data sources (Google News,
-// DOF, INEGI, Banxico, Sefix/INE) plus the project's XPCTO.
+// DOF, INEGI, Banxico, Sefix/INE, BISE population) plus the project's XPCTO.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -20,6 +20,7 @@ import { fetchDOFRSS } from "@/lib/centinela/pestel/scraper/dof";
 import {
   fetchInegiIndicators,
   INEGI_DEFAULT_SERIES,
+  BISE_POBLACION_SERIES,
   type InegiDataPoint,
 } from "@/lib/centinela/pestel/scraper/inegi";
 import {
@@ -31,6 +32,24 @@ import {
   buildSefixContext,
   type SefixContextData,
 } from "@/lib/sefix/sefixContext";
+import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import type { Territorio } from "@/types/pestel.types";
+
+function getNewsTerritory(territorio: Territorio | undefined): string {
+  if (!territorio) return "";
+  if (territorio.nivel === "municipal" && territorio.municipio) {
+    return territorio.municipio;
+  }
+  return territorio.estado ?? territorio.nombre ?? "";
+}
+
+function getCveEntidad(estadoNombre: string): string | null {
+  const normalized = estadoNombre
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  return ESTADO_CVE_MAP[normalized] ?? null;
+}
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -75,15 +94,22 @@ export async function POST(request: NextRequest) {
   const estadoNombre = project.territorio?.estado ?? null;
   const nivelTerritorial = project.territorio?.nivel ?? "estatal";
 
+  const newsTerritorioNombre = getNewsTerritory(
+    project.territorio as Territorio | undefined
+  );
   const newsTopics = getNewsTopicsForProject(tipoProyecto, nivelTerritorial);
+  const cveEntidad = estadoNombre ? getCveEntidad(estadoNombre) : null;
 
-  const [newsResult, dofResult, inegiResult, banxicoResult, sefixResult] =
+  const [newsResult, dofResult, inegiResult, banxicoResult, sefixResult, biseResult] =
     await Promise.allSettled([
-      fetchGoogleNewsRSS(territorioNombre, newsTopics),
+      fetchGoogleNewsRSS(newsTerritorioNombre, newsTopics),
       fetchDOFRSS(),
       fetchInegiIndicators(INEGI_DEFAULT_SERIES),
       fetchBanxicoSeries(BANXICO_DEFAULT_SERIES),
       buildSefixContext({ tipoProyecto, estadoNombre, nivelTerritorial }),
+      cveEntidad
+        ? fetchInegiIndicators(BISE_POBLACION_SERIES, "BISE", cveEntidad)
+        : Promise.resolve([] as InegiDataPoint[]),
     ]);
 
   const news: NewsItem[] =
@@ -96,11 +122,23 @@ export async function POST(request: NextRequest) {
     banxicoResult.status === "fulfilled" ? banxicoResult.value : [];
   const sefix: SefixContextData | null =
     sefixResult.status === "fulfilled" ? sefixResult.value : null;
+  const bise: InegiDataPoint[] =
+    biseResult.status === "fulfilled" ? biseResult.value : [];
+
+  const fuentesConsultadas = {
+    googleNews: news.length > 0,
+    dof: dof.length > 0,
+    inegi: inegi.length > 0,
+    banxico: banxico.length > 0,
+    sefix: sefix !== null,
+    bise: bise.length > 0,
+  };
 
   console.log(
     `[generate-m1-express] Sources: news=${news.length}, dof=${dof.length}, ` +
       `inegi=${inegi.length}, banxico=${banxico.length}, ` +
-      `sefix=${sefix ? sefix.resultadosList.length + " cargos" : "no disponible"}`
+      `sefix=${sefix ? sefix.resultadosList.length + " cargos" : "no disponible"}, ` +
+      `bise=${bise.length}`
   );
 
   // ── Build prompt and call Claude ──────────────────────────────
@@ -108,7 +146,7 @@ export async function POST(request: NextRequest) {
     tipoProyecto,
     xpcto as Record<string, unknown>,
     archivos.length > 0 ? archivos : undefined,
-    { news, dof, inegi, banxico, sefix }
+    { news, dof, inegi, banxico, sefix, bise }
   );
 
   const response = await anthropic.messages.create({
@@ -163,8 +201,10 @@ export async function POST(request: NextRequest) {
 
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.mapaPESTEL": mapaPESTEL,
+    "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
+    "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  return NextResponse.json({ mapaPESTEL }, { status: 200 });
+  return NextResponse.json({ mapaPESTEL, fuentesConsultadas }, { status: 200 });
 }

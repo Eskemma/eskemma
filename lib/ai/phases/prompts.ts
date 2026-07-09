@@ -394,10 +394,12 @@ ${pestelContext}
    - destino: "F3" (resoluble en F3-Investigación) | "SIP" (no resoluble a corto plazo)
 
 5. PIP — Programa de Investigación Profunda (array "pip", mínimo 4 máximo 8 elementos):
-   - numero: Número de orden por prioridad (1 = más urgente)
+   - numero: identificador de display (1, 2, 3...)
    - pregunta: La pregunta de investigación específica y auditable
    - metodo: Método para responderla (ej. "Encuesta de opinión", "Entrevistas a profundidad", "Análisis documental", "Trabajo de campo")
    - vinculoHito: Qué variable XPCTO o factor PEST-L afecta directamente esta pregunta
+   - orden: entero 1–N indicando el orden recomendado de ejecución (1 = ejecutar primero); puede diferir de numero si la urgencia de M4 lo justifica
+   - profundidad: "exploratoria" (terreno desconocido, investigación abierta) | "confirmatoria" (hipótesis a validar con datos específicos) | "descriptiva" (caracterizar fenómeno conocido con precisión)
 
 Responde con este JSON exacto (sin campos adicionales):
 {
@@ -405,7 +407,7 @@ Responde con este JSON exacto (sin campos adicionales):
   "contrasteXPCTO": [{ "dimension": "X", "veredicto": "coherente", "argumentacion": "", "senalesPESTEL": [] }, ...],
   "semaforo": [{ "nombre": "", "tipo": "", "nivelRiesgo": "rojo", "capacidadVeto": "", "motivacion": "", "requiereInvestigacion": true }, ...],
   "incertidumbres": [{ "descripcion": "", "urgencia": "alta", "resolucion": "media", "destino": "F3" }, ...],
-  "pip": [{ "numero": 1, "pregunta": "", "metodo": "", "vinculoHito": "" }, ...]
+  "pip": [{ "numero": 1, "pregunta": "", "metodo": "", "vinculoHito": "", "orden": 1, "profundidad": "exploratoria" }, ...]
 }`;
 
   return { system, user };
@@ -429,6 +431,7 @@ interface ExpressContext {
   inegi: ExpressInegiPoint[];
   banxico: ExpressBanxicoPoint[];
   sefix: { resultadosList: ExpressSefixResultado[]; padron: unknown } | null;
+  bise?: ExpressInegiPoint[];
 }
 
 const INEGI_LABEL: Record<string, string> = {
@@ -441,6 +444,13 @@ const BANXICO_LABEL: Record<string, string> = {
   SP1: "INPC Banxico",
   SF43718: "Tipo de cambio Fix (MXN/USD)",
   SF61745: "Tasa objetivo de política monetaria",
+};
+
+// BISE IDs verified 2026-07-08 — census system, updates every 5-10 years
+const BISE_LABEL: Record<string, string> = {
+  "1002000001": "Población total",
+  "1002000002": "Población masculina",
+  "1002000003": "Población femenina",
 };
 
 function buildSourcesSection(ctx: ExpressContext): string {
@@ -495,6 +505,20 @@ function buildSourcesSection(ctx: ExpressContext): string {
     }
   } else {
     lines.push("\n[BANXICO]: no disponible en esta ejecución");
+  }
+
+  // BISE — Population data by state (census, quinquennial/decennial)
+  if (ctx.bise && ctx.bise.length > 0) {
+    lines.push(
+      "\n[INEGI/BISE — Población por entidad (Censo de Población y Vivienda," +
+      " datos quinquenales/decenales)]"
+    );
+    for (const p of ctx.bise) {
+      const label = BISE_LABEL[p.serieId] ?? `Serie BISE ${p.serieId}`;
+      lines.push(
+        `- ${label}: ${Number(p.value).toLocaleString("es-MX")} personas (${p.date})`
+      );
+    }
   }
 
   // Sefix / INE
@@ -860,11 +884,13 @@ ${incAltas}
 - Prioriza preguntas vinculadas a las incertidumbres de alta urgencia de M4.
 - metodo: específico (ej. "Encuesta cuantitativa a 400 votantes", "12 entrevistas a líderes comunitarios").
 - vinculoHito: variable XPCTO o señal PEST-L que afecta directamente esta pregunta.
+- orden: entero 1–N indicando el orden recomendado de ejecución (1 = ejecutar primero); puede diferir de numero si la urgencia de M4 lo justifica.
+- profundidad: "exploratoria" (terreno desconocido, investigación abierta) | "confirmatoria" (hipótesis a validar con datos específicos) | "descriptiva" (caracterizar fenómeno conocido con precisión).
 
 Responde SOLO con este JSON:
 {
   "hei": { "tensionCentral": "...", "contexto": "...", "condicionesFavorables": [], "condicionesAdversas": [], "premisaEstrategica": "..." },
-  "pip": [{ "numero": 1, "pregunta": "...", "metodo": "...", "vinculoHito": "..." }]
+  "pip": [{ "numero": 1, "pregunta": "...", "metodo": "...", "vinculoHito": "...", "orden": 1, "profundidad": "exploratoria" }]
 }`,
   };
 }

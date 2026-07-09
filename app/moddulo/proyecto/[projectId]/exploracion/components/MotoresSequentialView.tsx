@@ -31,6 +31,7 @@ export interface MotoresSequentialViewProps {
   onRetry?: () => void;
   onApprove: (motor: MotorId) => void;
   onDraftChange: (updated: DVSF2) => void;
+  onSaveEdit?: (motor: MotorId) => void;
 }
 
 // ── Motor metadata ─────────────────────────────────────────────────────────────
@@ -480,7 +481,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
   onHEIChange: (h: HEIF2) => void; onPIPChange: (p: PIPItem[]) => void;
 }) {
   const updatePIP   = (i: number, patch: Partial<PIPItem>) => { const n = [...pip]; n[i] = { ...n[i], ...patch }; onPIPChange(n); };
-  const addPIP      = () => onPIPChange([...pip, { numero: pip.length + 1, pregunta: "", metodo: "", vinculoHito: "" }]);
+  const addPIP      = () => onPIPChange([...pip, { numero: pip.length + 1, pregunta: "", metodo: "", vinculoHito: "", orden: pip.length + 1, profundidad: "exploratoria" }]);
   const removePIP   = (i: number) => onPIPChange(pip.filter((_, idx) => idx !== i).map((p, idx) => ({ ...p, numero: idx + 1 })));
 
   return (
@@ -557,12 +558,33 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         </svg>
                       </button>
                     </div>
+                    <select
+                      value={item.profundidad ?? "exploratoria"}
+                      onChange={(e) => updatePIP(i, { profundidad: e.target.value as PIPItem["profundidad"] })}
+                      className="text-xs px-2 py-1 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white focus:outline-none focus:ring-1 focus:ring-bluegreen-eske"
+                    >
+                      <option value="exploratoria">Exploratoria</option>
+                      <option value="confirmatoria">Confirmatoria</option>
+                      <option value="descriptiva">Descriptiva</option>
+                    </select>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-black-eske dark:text-white leading-snug">{item.pregunta}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-sm font-medium text-black-eske dark:text-white leading-snug">{item.pregunta}</p>
+                      {item.profundidad && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-bluegreen-eske-10 text-bluegreen-eske-70 dark:bg-bluegreen-eske-80/20 dark:text-bluegreen-eske-30 shrink-0">
+                          {item.profundidad}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">Método: {item.metodo}</p>
                     <p className="text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6]">Vínculo: {item.vinculoHito}</p>
+                    {item.orden !== undefined && item.orden !== item.numero && (
+                      <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
+                        Prioridad de ejecución: {item.orden}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
@@ -627,15 +649,29 @@ export default function MotoresSequentialView({
   onRetry,
   onApprove,
   onDraftChange,
+  onSaveEdit,
 }: MotoresSequentialViewProps) {
   // Accordion: M2 starts expanded, rest collapsed
   const [expanded, setExpanded] = useState<Record<MotorId, boolean>>({ M2: true, M3: false, M4: false, M5: false });
+  // Re-editing: tracks which approved motors are open for editing
+  const [reEditing, setReEditing] = useState<Partial<Record<MotorId, boolean>>>({});
 
   const handleApprove = (motor: MotorId) => {
     const idx = ORDER.indexOf(motor);
     const next = ORDER[idx + 1] as MotorId | undefined;
     setExpanded((prev) => ({ ...prev, [motor]: false, ...(next ? { [next]: true } : {}) }));
     onApprove(motor);
+  };
+
+  const handleStartReEdit = (motor: MotorId) => {
+    setReEditing((prev) => ({ ...prev, [motor]: true }));
+    setExpanded((prev) => ({ ...prev, [motor]: true }));
+  };
+
+  const handleSaveReEdit = (motor: MotorId) => {
+    setReEditing((prev) => ({ ...prev, [motor]: false }));
+    setExpanded((prev) => ({ ...prev, [motor]: false }));
+    onSaveEdit?.(motor);
   };
 
   const toggleExpand = (motor: MotorId, state: MotorState) => {
@@ -673,11 +709,12 @@ export default function MotoresSequentialView({
   return (
     <div className="space-y-2 pb-4">
       {MOTORS.map((motor) => {
-        const state   = getMotorState(motor.id, motorAprobaciones);
+        const state      = getMotorState(motor.id, motorAprobaciones);
         const isActive   = state === "active";
         const isApproved = state === "approved";
         const isLocked   = state === "locked";
         const isExpanded = expanded[motor.id];
+        const isReEditing = isApproved && !!reEditing[motor.id];
 
         // Border/background per state
         const containerCls = isLocked
@@ -718,9 +755,14 @@ export default function MotoresSequentialView({
 
               <div className="flex items-center gap-2 shrink-0">
                 {isApproved && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleStartReEdit(motor.id); }}
+                    aria-label={`Re-editar ${motor.label}`}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40 hover:bg-green-eske-30 dark:hover:bg-green-eske/30 transition-colors cursor-pointer"
+                  >
                     Aprobado
-                  </span>
+                  </button>
                 )}
                 {!isLocked && (
                   <svg
@@ -739,25 +781,30 @@ export default function MotoresSequentialView({
                 {!isApproved && (
                   <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">{motor.description}</p>
                 )}
+                {isReEditing && (
+                  <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
+                    Editando motor aprobado — los motores posteriores no se actualizan automáticamente.
+                  </p>
+                )}
 
                 {motor.id === "M2" && (
                   <M2Panel
                     items={draftDVS.contrasteXPCTO}
-                    editable={isActive}
+                    editable={isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, contrasteXPCTO: updated })}
                   />
                 )}
                 {motor.id === "M3" && (
                   <M3Panel
                     actores={draftDVS.semaforo}
-                    editable={isActive}
+                    editable={isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, semaforo: updated })}
                   />
                 )}
                 {motor.id === "M4" && (
                   <M4Panel
                     items={draftDVS.incertidumbres}
-                    editable={isActive}
+                    editable={isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, incertidumbres: updated })}
                   />
                 )}
@@ -765,14 +812,23 @@ export default function MotoresSequentialView({
                   <M5Panel
                     hei={draftDVS.hei}
                     pip={draftDVS.pip}
-                    editable={isActive}
+                    editable={isActive || isReEditing}
                     onHEIChange={(h) => onDraftChange({ ...draftDVS, hei: h })}
                     onPIPChange={(p) => onDraftChange({ ...draftDVS, pip: p })}
                   />
                 )}
 
-                {isActive && (
-                  <div className="flex justify-end pt-1">
+                <div className="flex justify-end pt-1 gap-2">
+                  {isReEditing && (
+                    <button
+                      type="button"
+                      onClick={() => handleSaveReEdit(motor.id)}
+                      className="px-5 py-1.5 bg-bluegreen-eske text-white rounded-full text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors"
+                    >
+                      Guardar cambios
+                    </button>
+                  )}
+                  {isActive && (
                     <button
                       type="button"
                       onClick={() => handleApprove(motor.id)}
@@ -780,8 +836,8 @@ export default function MotoresSequentialView({
                     >
                       {APPROVE_LABEL[motor.id]}
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -5,7 +5,8 @@
 import Parser from "rss-parser";
 import type { NewsItem } from "./googleNewsRSS";
 
-const DOF_RSS_URL = "https://www.dof.gob.mx/rss/rss.php";
+// URL verificada 2026-07-08 — /rss/rss.php retorna HTTP 404 desde esa fecha.
+const DOF_RSS_URL = "https://www.dof.gob.mx/sumario.xml";
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function fetchDOFRSS(): Promise<NewsItem[]> {

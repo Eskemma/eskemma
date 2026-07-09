@@ -1,5 +1,5 @@
 // lib/centinela/pestel/scraper/inegi.ts
-// Fetches economic indicators from the INEGI BIE API.
+// Fetches indicators from the INEGI API (BIE or BISE).
 // Requires INEGI_TOKEN env var. Returns [] without error if token is absent.
 
 export interface InegiDataPoint {
@@ -16,11 +16,20 @@ export interface InegiDataPoint {
 // Los IDs abajo (628229, 444612, 381016) nunca se probaron contra la API real.
 // Auditados el 2026-07-08: no están en el catálogo BIE (BIE_tabla_equivalencias.xlsx)
 // ni en BISE. Devuelven ErrorCode:100 con cualquier combinación de fuente/área.
-// INPC e IGAE tampoco existen en el BIE. Área 0700 es incorrecta para indicadores
-// nacionales (debe ser 00). Corrección pendiente: usar Query Builder de INEGI
-// (inegi.org.mx/app/querybuilder2/) para obtener IDs válidos verificados.
+// IMPORTANTE: corregir el área de 0700 a 00 NO resolvería el problema — los IDs
+// simplemente no existen en ningún catálogo de INEGI (BIE ni BISE).
+// Corrección pendiente: usar Query Builder (inegi.org.mx/app/querybuilder2/)
+// para obtener IDs válidos verificados antes de producción.
 // Impacto actual: fetchInegiIndicators siempre retorna [] con estos IDs.
 export const INEGI_DEFAULT_SERIES = ["628229", "444612", "381016"];
+
+// IDs BISE verificados 2026-07-08 vía GET /INDICATOR/{id}/es/14/false/BISE/2.0/{TOKEN}
+// 1002000001 → pob. total: nacional 126,014,024 (2020), Jalisco 8,948,653 (area=14)
+// 1002000002 → pob. masculina (confirmado por magnitud, ~49% del total por entidad)
+// 1002000003 → pob. femenina  (confirmado por magnitud, ~51% del total por entidad)
+// Sistema censal: actualiza cada 5-10 años (Censo / Conteo de Población y Vivienda).
+// Usar con fuente="BISE" y area=cveEntidad (ej. "14" para Jalisco).
+export const BISE_POBLACION_SERIES = ["1002000001", "1002000002", "1002000003"];
 
 interface InegiResponse {
   Series?: Array<{
@@ -32,7 +41,9 @@ interface InegiResponse {
 }
 
 export async function fetchInegiIndicators(
-  seriesIds: string[]
+  seriesIds: string[],
+  fuente: "BIE" | "BISE" = "BIE",
+  area: string = "0700"
 ): Promise<InegiDataPoint[]> {
   const token = process.env.INEGI_TOKEN;
   if (!token) {
@@ -44,7 +55,7 @@ export async function fetchInegiIndicators(
     seriesIds.map(async (serieId): Promise<InegiDataPoint | null> => {
       const url =
         "https://www.inegi.org.mx/app/api/indicadores/desarrolladores" +
-        `/jsonxml/INDICATOR/${serieId}/es/0700/false/BIE/2.0/${token}` +
+        `/jsonxml/INDICATOR/${serieId}/es/${area}/false/${fuente}/2.0/${token}` +
         "?type=json";
 
       const response = await fetch(url, { signal: AbortSignal.timeout(10000) });

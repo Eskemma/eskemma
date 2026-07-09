@@ -36,6 +36,7 @@ interface RawArticlesDoc {
   economicData: {
     inegi: InegiDataPoint[];
     banxico: BanxicoDataPoint[];
+    bise?: InegiDataPoint[];
   };
   territorio: string;
 }
@@ -250,6 +251,8 @@ export async function generateAnalysisV2(params: {
     (rawDoc?.economicData?.inegi as EconomicDataPoint[] | undefined) ?? [];
   const banxicoData: EconomicDataPoint[] =
     (rawDoc?.economicData?.banxico as EconomicDataPoint[] | undefined) ?? [];
+  const biseData: EconomicDataPoint[] =
+    (rawDoc?.economicData?.bise as EconomicDataPoint[] | undefined) ?? [];
 
   // 2. Read manual data sources
   const sourcesSnap = await db
@@ -383,6 +386,7 @@ export async function generateAnalysisV2(params: {
           rawData: rawDataPerDim[code],
           inegiData: code === "E" ? inegiData : undefined,
           banxicoData: code === "E" ? banxicoData : undefined,
+          biseData: code === "S" ? biseData : undefined,
           anthropicKey,
         }).then((result) => {
           console.log(

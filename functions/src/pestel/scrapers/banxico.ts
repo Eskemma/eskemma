@@ -7,17 +7,15 @@ export interface BanxicoDataPoint {
   value: number;
 }
 
-// PROTOCOLO: Todo ID de serie externa debe verificarse con una llamada real
-// a la API antes de su primer uso en producción. Documentar: fecha + campo
-// de metadato exacto que confirma la identidad. Nunca asumir por plausibilidad.
+// PROTOCOLO: Todo ID externo debe verificarse con llamada real antes de
+// producción. Documentar: fecha + campo de metadato exacto que confirma
+// la identidad. Nunca asumir por plausibilidad.
 //
-// Series SIE — verificadas el 2026-07-08 vía:
-//   GET /SieAPIRest/service/v1/series/{id}  →  campo "titulo" + "cifra" + "unidad"
-// SP1     → titulo:"IPC Por objeto del gasto Nacional I n d i c e G e n e r a l"
-//            cifra:"Indices"  unidad:"Sin Unidad"  periodicidad:"Mensual"  → INPC
-// SF43718 → titulo:"Tipo de cambio Pesos por dólar E.U.A. ... FIX"
-//            cifra:"Tipo de Cambio"  unidad:"Pesos por Dólar"  → Tipo de cambio FIX
-// SF61745 → titulo:"Tasa objetivo"  → Tasa objetivo de política monetaria
+// Series SIE verificadas 2026-07-08
+// GET /SieAPIRest/service/v1/series/{id}
+// SP1    → "IPC ... Índice General" | Mensual → INPC
+// SF43718 → "Tipo de cambio ... FIX" | Pesos/Dólar
+// SF61745 → "Tasa objetivo" | política monetaria
 export const BANXICO_DEFAULT_SERIES = ["SP1", "SF43718", "SF61745"];
 
 interface BanxicoResponse {
