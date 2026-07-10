@@ -80,7 +80,8 @@ export default function TerritorySelector({
 
   const esMexico = pais === "México";
   const requiresEstado = nivel !== "nacional";
-  const requiresMunicipio = nivel === "municipal" || nivel === "distrito";
+  const esDistrito = nivel === "distrito_federal" || nivel === "distrito_local" || nivel === "distrito";
+  const requiresMunicipio = nivel === "municipal" || esDistrito;
 
   // Construir nombre legible y emitir cambio
   useEffect(() => {
@@ -192,7 +193,8 @@ export default function TerritorySelector({
             <option value="nacional">Nacional</option>
             <option value="estatal">Estatal</option>
             <option value="municipal">Municipal</option>
-            <option value="distrito">Distrito electoral</option>
+            <option value="distrito_federal">Distrito electoral federal</option>
+            <option value="distrito_local">Distrito electoral local</option>
           </select>
         </div>
       )}
@@ -224,10 +226,10 @@ export default function TerritorySelector({
       {esMexico && requiresMunicipio && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="municipio-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
-            {nivel === "distrito" ? "Distrito / descripción" : "Municipio"}
+            {esDistrito ? "Distrito / descripción" : "Municipio"}
             <InfoTooltip
               content="Permite segmentar los datos al nivel más específico posible dentro del estado."
-              example={nivel === "distrito" ? "Distrito 02 Jiutepec" : "Jiutepec"}
+              example={esDistrito ? "Distrito 02 Jiutepec" : "Jiutepec"}
             />
           </label>
           <input
@@ -235,7 +237,7 @@ export default function TerritorySelector({
             type="text"
             value={municipio}
             onChange={(e) => setMunicipio(e.target.value)}
-            placeholder={nivel === "distrito" ? "ej. Distrito 5 — Atizapán de Zaragoza" : "ej. Atizapán de Zaragoza"}
+            placeholder={esDistrito ? "ej. Distrito 5 — Atizapán de Zaragoza" : "ej. Atizapán de Zaragoza"}
             className={inputClass}
           />
         </div>
@@ -246,7 +248,7 @@ export default function TerritorySelector({
         <div className="flex flex-col gap-1.5">
           <label htmlFor="estado-texto" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0]">
             {nivel === "estatal" ? "Estado / Provincia / Región" :
-             nivel === "distrito" ? "Circunscripción / Distrito" :
+             esDistrito ? "Circunscripción / Distrito" :
              "Estado o región"}
           </label>
           <input
@@ -263,14 +265,14 @@ export default function TerritorySelector({
       {!esMexico && pais && requiresMunicipio && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="municipio-texto" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0]">
-            {nivel === "distrito" ? "Distrito / circunscripción" : "Municipio / localidad"}
+            {esDistrito ? "Distrito / circunscripción" : "Municipio / localidad"}
           </label>
           <input
             id="municipio-texto"
             type="text"
             value={municipioTexto}
             onChange={(e) => setMunicipioTexto(e.target.value)}
-            placeholder={nivel === "distrito" ? "ej. Circunscripción 3" : "ej. La Plata"}
+            placeholder={esDistrito ? "ej. Circunscripción 3" : "ej. La Plata"}
             className={inputClass}
           />
         </div>

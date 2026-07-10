@@ -271,8 +271,11 @@ DATOS RECOLECTADOS:
 ${rawData || "Sin datos disponibles para este período."}
 ${economicBlock}${biseBlock}
 INSTRUCCIONES:
-- Cuando menciones un hecho específico en la narrativa, cita la \
-fuente entre paréntesis: (Fuente: nombre, fecha). Máx. 3-4 citas.
+- Cuando menciones un hecho específico en la narrativa, cita entre \
+paréntesis al final de la afirmación: (Nombre fuente, mes año) — \
+ej. (Google News, julio 2026) o (INEGI/BISE, Censo 2020). Solo \
+para datos y hechos externos; el análisis estratégico no necesita \
+cita. Máx. 3 citas.
 - Si no hay fuente clara para un hecho, no cites.
 - Usa solo terminología vigente para el contexto mexicano.
 - En señalesFavorables/Adversas/Inciertas: fuente = nombre del medio \

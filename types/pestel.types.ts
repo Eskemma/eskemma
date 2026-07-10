@@ -6,10 +6,12 @@ import type { Timestamp } from "firebase/firestore";
 // ==========================================
 
 export type NivelTerritorial =
-  | "nacional"    // Todo México
-  | "estatal"     // Un estado (ej. Jalisco)
-  | "municipal"   // Un municipio (ej. Zapopan)
-  | "distrito";   // Un distrito electoral específico
+  | "nacional"           // Todo México
+  | "estatal"            // Un estado (ej. Jalisco)
+  | "municipal"          // Un municipio (ej. Zapopan)
+  | "distrito"           // legacy — alias de distrito_federal (proyectos en Firestore pre-renaming)
+  | "distrito_federal"   // Distrito electoral federal (Diputados Federales)
+  | "distrito_local";    // Distrito electoral local (Diputados Locales)
 
 /** @deprecated Use TipoProyecto instead */
 export type ModoAnalisis =
@@ -86,6 +88,7 @@ export interface Territorio {
   estado?: string;
   municipio?: string;
   nombre: string;
+  cve_distrito?: string;
 }
 
 export interface AlertasConfig {

@@ -7,6 +7,14 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "generadoEn", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pestel_indicator_cache",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cacheKey", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

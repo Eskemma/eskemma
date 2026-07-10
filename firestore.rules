@@ -431,6 +431,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ========== PESTEL: Cache de indicadores externos ==========
+    // Gestionado exclusivamente por Admin SDK (Cloud Functions + Next.js server).
+    match /pestel_indicator_cache/{docId} {
+      allow read, write: if false;
+    }
+
     // ========== Cola de Emails (Firebase Extension: Trigger Email) ==========
     match /mail/{mailId} {
       allow read, write: if false;

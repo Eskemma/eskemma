@@ -422,8 +422,9 @@ interface ExpressNewsItem { title: string; link: string; pubDate: string; conten
 interface ExpressInegiPoint { serieId: string; value: number; date: string; }
 interface ExpressBanxicoPoint { serieId: string; date: string; value: number; }
 interface ExpressSefixResultado {
-  cargo: string; anio: number; participacion: number;
+  cargo: string; anio: number; participacion: number; estado?: string;
   partidos: { partido: string; porcentaje: number }[];
+  distrito?: string | null;
 }
 interface ExpressContext {
   news: ExpressNewsItem[];
@@ -528,7 +529,12 @@ function buildSourcesSection(ctx: ExpressContext): string {
       const partidos = r.partidos
         .map((p) => `${p.partido} ${p.porcentaje.toFixed(1)}%`)
         .join(", ");
-      lines.push(`- ${r.cargo} ${r.anio}: ${partidos} — Participación: ${r.participacion.toFixed(1)}%`);
+      const geo = r.distrito
+        ? `[${r.distrito}]`
+        : r.estado === "NACIONAL"
+        ? "[Elección de mayoría relativa a nivel Nacional]"
+        : `[Promedio ponderado de votación en ${r.estado ?? ""}]`;
+      lines.push(`- ${r.cargo} ${r.anio} ${geo}: ${partidos} — Participación: ${r.participacion.toFixed(1)}%`);
     }
     const padron = ctx.sefix.padron as { listaNominal?: number; padronElectoral?: number } | null;
     if (padron?.listaNominal) {
@@ -601,6 +607,10 @@ ${antiFabricacionRule}
 Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
 - clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
 - narrativa: 2–3 oraciones de síntesis vinculadas al hito, sujeto y fuentes disponibles.
+  Cuando afirmes un hecho específico proveniente de una fuente consultada, cita entre paréntesis
+  al final de la afirmación: (Nombre fuente, mes año) — ej. (Google News, julio 2026) o
+  (INEGI/BISE, Censo 2020). Solo para datos y hechos externos; el análisis estratégico no
+  necesita cita. Máx. 2–3 citas por narrativa.
 - confidence: ${confidenceValue}.
 - Genera 2–4 señales por categoría (favorables/adversas/inciertas) específicas a este proyecto.
   OBLIGATORIO: cada dimensión debe tener al menos 1 señal (en cualquier categoría) O explicar en narrativa por qué no hay datos.
@@ -680,7 +690,10 @@ export function serializeMapaPESTEL(mapa: Record<string, unknown>): string {
     const sorted = sortByConfidence(valid);
     const top = sorted.slice(0, MAX_SIGNALS);
     const omitted = valid.length - top.length;
-    const lines = top.map((s) => `    ${symbol} ${truncate(s.descripcion!)}`).join("\n");
+    const lines = top.map((s) => {
+      const cita = s.fuente ? ` (Fuente: ${s.fuente})` : "";
+      return `    ${symbol} ${truncate(s.descripcion!)}${cita}`;
+    }).join("\n");
     const extra = omitted > 0 ? `\n    (+ ${omitted} señales adicionales omitidas)` : "";
     return lines ? `\n  ${label}:\n${lines}${extra}` : "";
   };
@@ -753,7 +766,8 @@ Para cada una de las 5 variables XPCTO (X, P, C, T, O):
    - "coherente": el entorno apoya o no obstaculiza esta variable
    - "requiere_ajuste": fricción moderada que el proyecto puede gestionar
    - "requiere_investigacion": riesgo importante o falta información crítica
-3. argumentacion: 2–3 oraciones específicas.
+3. argumentacion: 2–3 oraciones específicas. Si citas un hecho factual tomado
+   de las señales PEST-L, incluye la fuente al final de la oración: (Fuente: ...).
 4. senalesPESTEL: 1–3 FRAGMENTOS TEXTUALES EXACTOS copiados de las señales listadas arriba.
    REGLA ABSOLUTA: no parafrasees ni inventes. Si no hay señal directamente relevante, usa [].
 
@@ -793,6 +807,8 @@ ${mapaSerialized}
 4. motivacion: por qué actuaría en contra o a favor (1–2 oraciones).
 5. requiereInvestigacion: true si no hay datos suficientes para confirmar su posición.
 6. Incluye 3–6 actores; prioriza los de mayor riesgo.
+7. Cuando capacidadVeto o motivacion citen un hecho factual tomado de las señales
+   PEST-L, incluye la fuente al final de la oración: (Fuente: ...).
 
 Responde SOLO con este JSON:
 [{ "nombre": "...", "tipo": "...", "nivelRiesgo": "rojo", "capacidadVeto": "...", "motivacion": "...", "requiereInvestigacion": true }]`,
@@ -810,7 +826,8 @@ export function getDVSM4Prompt(
   return {
     system: `Eres un analista político especializado en gestión de incertidumbre estratégica.
 Tu tarea es el Mapa de Incertidumbres (M4) del DVS F2.
-Respondes SOLO con JSON válido — array de objetos, sin markdown, sin texto adicional.`,
+Respondes SOLO con JSON válido — array de objetos, sin markdown, sin texto adicional.
+Nota: las incertidumbres son brechas de información, no afirmaciones factuales — la descripción no requiere cita de fuente.`,
     user: `Identifica qué no sabemos y necesitamos saber para continuar con el proyecto.
 
 == VEREDICTOS CONTRASTE XPCTO (M2) ==
@@ -874,9 +891,13 @@ ${incAltas}
 
 == INSTRUCCIONES HEI ==
 - tensionCentral: tensión política central ESPECÍFICA al proyecto y tipo "${projectType}"; incluye el eje de disputa concreto.
-- contexto: 2–3 oraciones del entorno inmediato relevante al hito XPCTO.
+- contexto: 2–3 oraciones del entorno inmediato relevante al hito XPCTO. Si citas un dato
+  factual específico (porcentaje, cifra, fecha) tomado del PEST-L, incluye la fuente al final
+  de la oración: (Fuente: ...).
 - condicionesFavorables: 2–4 factores del PEST-L que favorecen el hito (específicos, no genéricos).
-- condicionesAdversas: 2–4 factores que obstaculizan el hito.
+  Cuando cites un dato factual específico (porcentaje, cifra, fecha) tomado del PEST-L, incluye
+  la fuente al final: (Fuente: ...).
+- condicionesAdversas: 2–4 factores que obstaculizan el hito. Misma regla de cita.
 - premisaEstrategica: enunciado auditable y falseable: "Si [condición del entorno]… entonces [hito] es viable porque [razón estratégica concreta]"
 
 == INSTRUCCIONES PIP ==

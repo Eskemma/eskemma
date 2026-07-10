@@ -18,6 +18,7 @@ import {
   BANXICO_DEFAULT_SERIES,
 } from "./scrapers/banxico";
 import {generateAnalysisV2, generateFeedFromRawData} from "./generateFeed";
+import {fetchWithCache, CACHE_TTL} from "./cache/indicatorCache";
 
 export const scrapeAndAnalyze = onRequest(
   {
@@ -172,18 +173,45 @@ export const scrapeAndAnalyze = onRequest(
         // ciudadano → use default topics from the scraper
       }
 
-      // ----- Scrapers in parallel -----
+      // ----- Scrapers in parallel (with cache) -----
       const cveEntidad = estadoRaw ? getCveEntidad(estadoRaw) : null;
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const month = today.slice(0, 7); // YYYY-MM
+      const normTerr = territorioNombre.toLowerCase().replace(/\W+/g, "_");
+
       const [newsResult, dofResult, inegiResult, banxicoResult, biseResult] =
         await Promise.allSettled([
-          fetchGoogleNewsRSS(territorioNombre, newsTopics),
-          fetchDOFRSS(),
+          fetchWithCache(
+            "google_news",
+            `google_news_${normTerr}_${today}`,
+            CACHE_TTL.TTL_24H,
+            () => fetchGoogleNewsRSS(territorioNombre, newsTopics)
+          ),
+          fetchWithCache(
+            "dof",
+            `dof_${today}`,
+            CACHE_TTL.TTL_24H,
+            () => fetchDOFRSS()
+          ),
+          // BIE omitido — IDs sin verificar, retorna []
           fetchInegiIndicators(INEGI_DEFAULT_SERIES),
-          Promise.all(
-            BANXICO_DEFAULT_SERIES.map((s) => fetchBanxicoSeries(s))
+          fetchWithCache(
+            "banxico",
+            `banxico_${month}`,
+            CACHE_TTL.TTL_24H,
+            () => Promise.all(
+              BANXICO_DEFAULT_SERIES.map((s) => fetchBanxicoSeries(s))
+            )
           ),
           cveEntidad ?
-            fetchInegiIndicators(BISE_POBLACION_SERIES, "BISE", cveEntidad) :
+            fetchWithCache(
+              "inegi_bise",
+              `inegi_bise_${cveEntidad}_${month}`,
+              CACHE_TTL.TTL_7D,
+              () => fetchInegiIndicators(
+                BISE_POBLACION_SERIES, "BISE", cveEntidad
+              )
+            ) :
             Promise.resolve([]),
         ]);
 

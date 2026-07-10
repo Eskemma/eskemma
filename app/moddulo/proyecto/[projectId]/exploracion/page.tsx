@@ -22,6 +22,7 @@ import type {
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
+import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
 
 // ==========================================
 // TIPOS SEFIX
@@ -42,18 +43,68 @@ interface SefixPadron {
   estado: string;
   corte: string;
   listaNominal: number;
+  listaNominalHombres?: number;
+  listaNominalMujeres?: number;
   padronElectoral: number;
   padronHombres: number;
   padronMujeres: number;
   fuente: string;
 }
 
+type FedKey  = "diputados" | "senadores" | "presidencia";
+type LocKey  = "gubernatura" | "dip_loc" | "ayun";
+type ElecKey = FedKey | LocKey;
+type SefixScope = "entidad" | "nacional";
+
+interface SefixContrasteEntry { key: ElecKey; scope: SefixScope }
+
+interface SefixEleccion {
+  key: ElecKey;
+  label: string;
+  resultados: SefixResultados | null;
+  granularity: string;
+}
+
 interface SefixData {
   estado: string;
-  resultados: SefixResultados | null;
   padron: SefixPadron | null;
-  gubernatura?: SefixResultados | null;
-  nivel?: string;
+  primary: SefixEleccion;
+  contraste: SefixEleccion[];
+}
+
+const ELEC_LABELS: Record<ElecKey, string> = {
+  diputados:   "Diputados Federales",
+  senadores:   "Senadores",
+  presidencia: "Presidencia",
+  gubernatura: "Gubernatura",
+  dip_loc:     "Diputados Locales",
+  ayun:        "Ayuntamiento",
+};
+
+const CONTRASTE_BY_PRIMARY: Record<ElecKey, SefixContrasteEntry[]> = {
+  diputados:   [{ key: "presidencia", scope: "nacional" }, { key: "senadores", scope: "entidad" }, { key: "gubernatura", scope: "entidad" }],
+  senadores:   [{ key: "presidencia", scope: "nacional" }, { key: "diputados", scope: "entidad" }, { key: "gubernatura", scope: "entidad" }],
+  presidencia: [{ key: "senadores", scope: "nacional" }, { key: "diputados", scope: "nacional" }],
+  gubernatura: [{ key: "dip_loc", scope: "entidad" }, { key: "ayun", scope: "entidad" }, { key: "diputados", scope: "entidad" }],
+  dip_loc:     [{ key: "gubernatura", scope: "entidad" }, { key: "ayun", scope: "entidad" }, { key: "diputados", scope: "entidad" }],
+  ayun:        [{ key: "dip_loc", scope: "entidad" }, { key: "gubernatura", scope: "entidad" }],
+};
+
+function getPrimaryKey(tipo: string, nivel: string): ElecKey {
+  if (tipo === "electoral") {
+    if (nivel === "nacional") return "presidencia";
+    if (nivel === "estatal") return "gubernatura";
+    if (nivel === "municipal") return "ayun";
+    // "distrito" es alias legacy de distrito_federal
+    if (nivel === "distrito_federal" || nivel === "distrito") return "diputados";
+    if (nivel === "distrito_local") return "dip_loc";
+  }
+  if (tipo === "gubernamental") return "gubernatura";
+  if (tipo === "legislativo") {
+    if (nivel === "estatal") return "senadores";
+    if (nivel === "municipal" || nivel === "distrito_local") return "dip_loc";
+  }
+  return "diputados";
 }
 
 // ==========================================
@@ -116,6 +167,17 @@ function diffXpcto(old: Partial<XPCTO>, next: Partial<XPCTO>): XpctoDiff[] {
   return diffs;
 }
 
+const FULL_REGEN_FIELDS = new Set([
+  "Sujeto",
+  "Capacidad financiero",
+  "Capacidad humano",
+  "Capacidad logistico",
+]);
+
+function getRegenerationType(diffs: XpctoDiff[]): "full" | "partial" {
+  return diffs.some((d) => FULL_REGEN_FIELDS.has(d.field)) ? "full" : "partial";
+}
+
 // ==========================================
 // PÁGINA PRINCIPAL
 // ==========================================
@@ -139,6 +201,7 @@ export default function ExploracionPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
+  const [showConfirmReanalisis, setShowConfirmReanalisis] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
   const [sefixData, setSefixData] = useState<SefixData | null>(null);
 
@@ -350,27 +413,42 @@ export default function ExploracionPage() {
 
   // Cargar datos Sefix
   useEffect(() => {
-    if (!isLoaded || !["electoral", "gubernamental"].includes(projectType)) return;
-    // Preferir estado del territorio del proyecto; fallback a detección por XPCTO
+    if (!isLoaded || !["electoral", "gubernamental", "legislativo"].includes(projectType)) return;
     const estadoSefix = projectTerritory?.estado ?? (xpcto ? detectEstadoFromXpcto(xpcto) : null);
     if (!estadoSefix) return;
 
     const fetchSefix = async () => {
       try {
-        const [resR, padR, gobR] = await Promise.all([
-          fetch(`/api/sefix/resultados?estado=${encodeURIComponent(estadoSefix)}&cargo=diputados`, { credentials: "include" }),
-          fetch(`/api/sefix/padron?estado=${encodeURIComponent(estadoSefix)}`, { credentials: "include" }),
-          fetch(`/api/sefix/resultados?estado=${encodeURIComponent(estadoSefix)}&cargo=gobernador`, { credentials: "include" }),
+        const tipo = projectType ?? "electoral";
+        const nivel = projectTerritory?.nivel ?? "estatal";
+        const primaryKey = getPrimaryKey(tipo, nivel);
+        const primaryScope: SefixScope = primaryKey === "presidencia" ? "nacional" : "entidad";
+        const contrasteEntries = CONTRASTE_BY_PRIMARY[primaryKey];
+
+        const [padR, primaryResult, ...contrasteResults] = await Promise.allSettled([
+          fetch(`/api/sefix/padron?estado=${encodeURIComponent(estadoSefix)}`, { credentials: "include" })
+            .then(r => r.ok ? r.json() : null),
+          fetchSefixEleccion(estadoSefix, primaryKey, true, primaryScope, projectTerritory),
+          ...contrasteEntries.map(({ key, scope }) =>
+            fetchSefixEleccion(estadoSefix, key, false, scope, projectTerritory)
+          ),
         ]);
-        const resJson = resR.ok ? await resR.json() : null;
-        const padJson = padR.ok ? await padR.json() : null;
-        const gobJson = gobR.ok ? await gobR.json() : null;
+
+        const padJson = padR.status === "fulfilled" ? padR.value : null;
+        const primary = primaryResult.status === "fulfilled"
+          ? primaryResult.value
+          : { key: primaryKey, label: ELEC_LABELS[primaryKey], resultados: null, granularity: "" };
+        const contraste = contrasteResults.map((r, i) =>
+          r.status === "fulfilled"
+            ? r.value
+            : { key: contrasteEntries[i].key, label: ELEC_LABELS[contrasteEntries[i].key], resultados: null, granularity: "" }
+        );
+
         setSefixData({
           estado: estadoSefix,
-          resultados: resJson?.resultados ?? null,
           padron: padJson?.padron ?? null,
-          gubernatura: gobJson?.resultados ?? null,
-          nivel: projectTerritory?.nivel ?? undefined,
+          primary,
+          contraste,
         });
       } catch { /* no-op */ }
     };
@@ -471,21 +549,23 @@ export default function ExploracionPage() {
           ? {
               sefix: {
                 estado: sefixData.estado,
-                resultados: sefixData.resultados
+                resultados: sefixData.primary.resultados
                   ? {
-                      anio: sefixData.resultados.anio,
-                      cargo: sefixData.resultados.cargo,
-                      totalVotos: sefixData.resultados.totalVotos,
-                      lne: sefixData.resultados.lne,
-                      participacion: sefixData.resultados.participacion,
-                      top4: sefixData.resultados.partidos.slice(0, 4),
-                      fuente: sefixData.resultados.fuente,
+                      anio: sefixData.primary.resultados.anio,
+                      cargo: sefixData.primary.resultados.cargo,
+                      totalVotos: sefixData.primary.resultados.totalVotos,
+                      lne: sefixData.primary.resultados.lne,
+                      participacion: sefixData.primary.resultados.participacion,
+                      top4: sefixData.primary.resultados.partidos.slice(0, 4),
+                      fuente: sefixData.primary.resultados.fuente,
                     }
                   : null,
                 padron: sefixData.padron
                   ? {
                       corte: sefixData.padron.corte,
                       listaNominal: sefixData.padron.listaNominal,
+                      listaNominalHombres: sefixData.padron.listaNominalHombres,
+                      listaNominalMujeres: sefixData.padron.listaNominalMujeres,
                       padronElectoral: sefixData.padron.padronElectoral,
                       padronHombres: sefixData.padron.padronHombres,
                       padronMujeres: sefixData.padron.padronMujeres,
@@ -837,7 +917,9 @@ export default function ExploracionPage() {
               {pendingMotors.length > 0 && headerState !== "editando" && (
                 <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40 mt-1.5">
                   Aprueba los motores pendientes antes de continuar:{" "}
-                  {pendingMotors.map((m) => MOTOR_LABELS[m]).join(", ")}
+                  <span className="text-black-eske-80 dark:text-[#C7D6E0]">
+                    {pendingMotors.map((m) => MOTOR_LABELS[m]).join(", ")}
+                  </span>
                 </p>
               )}
             </div>
@@ -963,44 +1045,56 @@ export default function ExploracionPage() {
                   </button>
                 )}
               </div>
-              {xpctoStaleChanges.length > 0 && (
-                <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
-                        El XPCTO fue modificado en F1. El contraste con el entorno está desactualizado.
-                      </p>
-                      <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
-                        {xpctoStaleChanges.slice(0, 3).map((d) => (
-                          <li key={d.field}>
-                            <span className="font-medium">{d.field}:</span>{" "}
-                            <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
-                            {" → "}
-                            {d.to.slice(0, 40)}
-                          </li>
-                        ))}
-                        {xpctoStaleChanges.length > 3 && (
-                          <li className="opacity-60">+{xpctoStaleChanges.length - 3} campos más</li>
-                        )}
-                      </ul>
-                      <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
-                        El escaneo de fuentes (Google News, DOF, INEGI, Banxico, Sefix) no se repite — solo se actualizan el contraste XPCTO-Entorno y los motores dependientes.
-                      </p>
+              {xpctoStaleChanges.length > 0 && (() => {
+                const regenType = getRegenerationType(xpctoStaleChanges);
+                return (
+                  <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+                          {regenType === "full"
+                            ? "Cambios en el sujeto o capacidades requieren regenerar el análisis completo."
+                            : "El XPCTO fue modificado en F1. El contraste con el entorno está desactualizado."}
+                        </p>
+                        <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
+                          {xpctoStaleChanges.slice(0, 3).map((d) => (
+                            <li key={d.field}>
+                              <span className="font-medium">{d.field}:</span>{" "}
+                              <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
+                              {" → "}
+                              {d.to.slice(0, 40)}
+                            </li>
+                          ))}
+                          {xpctoStaleChanges.length > 3 && (
+                            <li className="opacity-60">+{xpctoStaleChanges.length - 3} campos más</li>
+                          )}
+                        </ul>
+                        <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
+                          {regenType === "full"
+                            ? "Se regenerará el escaneo PESTEL completo (M1) y el contraste XPCTO-Entorno."
+                            : "El escaneo de fuentes no se repite — solo se actualiza el contraste XPCTO-Entorno."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setXpctoStaleChanges([]);
+                          setMotorAprobaciones({});
+                          setDraftDVS(null);
+                          if (regenType === "full") {
+                            setMapaPESTEL(null);
+                            handleGenerarDVSRef.current();
+                          } else {
+                            generarDraftDVS();
+                          }
+                        }}
+                        className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
+                      >
+                        {regenType === "full" ? "Regenerar análisis completo ↺" : "Actualizar contraste XPCTO ↺"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setXpctoStaleChanges([]);
-                        setMotorAprobaciones({});
-                        setDraftDVS(null);
-                        generarDraftDVS();
-                      }}
-                      className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
-                    >
-                      Actualizar contraste XPCTO ↺
-                    </button>
                   </div>
-                </div>
-              )}
+                );
+              })()}
               <div className="flex-1 overflow-y-auto">
                 {mode === "completed" && dvs !== null && !showReporte ? (
                   <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">
@@ -1107,10 +1201,27 @@ export default function ExploracionPage() {
             sefixData={sefixData}
             mapaPESTEL={mapaPESTEL}
             isAnalyzing={isExpressAnalyzing}
+            pestProjectId={pestProjectId}
+            onNuevoAnalisis={pestProjectId === null ? () => setShowConfirmReanalisis(true) : undefined}
           />
         </div>
         </>)}
       </div>
+
+      {/* Modal confirmación nuevo análisis */}
+      {showConfirmReanalisis && (
+        <ConfirmReanalisisModal
+          onCancel={() => setShowConfirmReanalisis(false)}
+          onConfirm={() => {
+            setShowConfirmReanalisis(false);
+            setMapaPESTEL(null);
+            setExpressError(null);
+            setMotorAprobaciones({});
+            setDraftDVS(null);
+            handleGenerarDVSRef.current();
+          }}
+        />
+      )}
 
       {/* Modal de revisión al cerrar */}
       {showReview && (
@@ -1156,7 +1267,7 @@ function SkeletonDimension() {
 
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
-  isAnalyzing = false,
+  isAnalyzing = false, onNuevoAnalisis, pestProjectId,
 }: {
   form: ExplorationForm;
   onChange: (f: ExplorationForm) => void;
@@ -1167,6 +1278,8 @@ function ExplorationFormPanel({
   sefixData: SefixData | null;
   mapaPESTEL: MapaPESTEL | null;
   isAnalyzing?: boolean;
+  onNuevoAnalisis?: () => void;
+  pestProjectId?: string | null;
 }) {
   const fieldClass =
     "w-full px-3 py-2 text-sm font-normal rounded-lg border border-gray-eske-20 dark:border-white/10 " +
@@ -1180,7 +1293,26 @@ function ExplorationFormPanel({
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
         <h2 className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
-        <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">{readOnly ? "Solo lectura" : "Auto-rellena via chat"}</span>
+        {readOnly ? (
+          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Solo lectura</span>
+        ) : pestProjectId ? (
+          <Link
+            href={`/centinela/pestel/${pestProjectId}`}
+            className="text-xs text-bluegreen-eske hover:underline font-medium"
+          >
+            Ver en Centinela →
+          </Link>
+        ) : onNuevoAnalisis ? (
+          <button
+            type="button"
+            onClick={onNuevoAnalisis}
+            className="text-xs text-bluegreen-eske hover:underline font-medium"
+          >
+            Nuevo análisis ↺
+          </button>
+        ) : (
+          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Auto-rellena via chat</span>
+        )}
       </div>
 
       {/* Tabs de secciones */}
@@ -1551,6 +1683,45 @@ function AutoResizeTextarea({ value, onChange, disabled, placeholder, minRows = 
 // MODAL BACK-PROPAGATION
 // ==========================================
 
+function ConfirmReanalisisModal({ onCancel, onConfirm }: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
+      <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="font-bold text-black-eske dark:text-[#EAF2F8]">¿Relanzar el análisis PESTEL?</h2>
+            <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-1">
+              Se descartarán el mapa de dimensiones, los motores generados y las aprobaciones actuales. Esta acción no se puede deshacer.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors"
+          >
+            Relanzar análisis
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BackPropagationModal({ affectedPhases, onDismiss }: {
   affectedPhases: PhaseId[]; onDismiss: () => void;
 }) {
@@ -1694,28 +1865,71 @@ function DownloadButton({ form, reportText, chatMessages }: {
 // SEFIX WIDGET
 // ==========================================
 
+function EleccionCard({
+  eleccion,
+  isPrimary,
+}: {
+  eleccion: SefixEleccion;
+  isPrimary: boolean;
+}) {
+  const fmtN = (n: number) =>
+    n >= 1_000_000
+      ? `${(n / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`
+      : n >= 1_000
+      ? `${(n / 1_000).toFixed(0)}K`
+      : String(n);
+
+  const { resultados, label, granularity } = eleccion;
+
+  const wrapCls = isPrimary
+    ? "rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3 space-y-2"
+    : "rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230] p-3 space-y-1.5";
+  const headerCls = isPrimary
+    ? "text-xs font-bold uppercase tracking-widest text-bluegreen-eske"
+    : "text-xs font-semibold uppercase tracking-wider text-black-eske-80 dark:text-[#C7D6E0]";
+
+  return (
+    <div className={wrapCls}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className={headerCls}>
+            {label}{resultados ? ` ${resultados.anio}` : ""}
+          </p>
+          {granularity && (
+            <p className="text-xs text-black-eske-80 dark:text-[#C7D6E0] mt-0.5">{granularity}</p>
+          )}
+        </div>
+        {isPrimary && <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] shrink-0">INE · DERFE</span>}
+      </div>
+
+      {!resultados ? (
+        <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] italic">Datos no disponibles</p>
+      ) : (
+        <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2 space-y-1.5">
+          <div className="flex gap-3 flex-wrap">
+            {resultados.partidos.slice(0, 3).map((p) => (
+              <div key={p.partido} className="text-xs">
+                <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
+                <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+            Participación: {resultados.participacion}%
+            {isPrimary && resultados.totalVotos > 0 && ` · ${fmtN(resultados.totalVotos)} votos`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SefixWidget({ data, projectType }: { data: SefixData; projectType?: ProjectType }) {
-  const { resultados, padron, gubernatura, nivel } = data;
-  if (!resultados && !padron && !gubernatura) return null;
+  const { padron, primary, contraste } = data;
+  const hasAnyData = padron || primary.resultados || contraste.some(c => c.resultados);
+  if (!hasAnyData) return null;
 
   const isElectoral = !projectType || projectType === "electoral";
-  const esNivelEstatal = nivel === "Estatal";
-  const esNivelMunicipal = ["Municipal", "Local", "Distrital"].includes(nivel ?? "");
-
-  // Para proyectos estatales: gubernatura es el primario, diputados es el contraste
-  // Para proyectos municipales: padrón es primario; gubernatura + diputados son contraste
-  // Para proyectos federales / default: diputados es primario; gubernatura es contraste
-  const labelPrimario = esNivelEstatal
-    ? "DATOS ELECTORALES — ESTATAL"
-    : esNivelMunicipal
-    ? `DATOS ELECTORALES — MUNICIPAL`
-    : `DATOS SEFIX — ${data.estado.toUpperCase()}`;
-
-  const labelContraste = esNivelEstatal
-    ? "CONTRASTE — FEDERAL"
-    : "CONTRASTE — GUBERNATURA";
-
-  const contextLabel = isElectoral ? null : "Contexto electoral de referencia";
 
   const fmtN = (n: number) =>
     n >= 1_000_000
@@ -1724,83 +1938,46 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
       ? `${(n / 1_000).toFixed(0)}K`
       : String(n);
 
-  const top3primary = (esNivelEstatal ? gubernatura : resultados)?.partidos.slice(0, 3) ?? [];
-  const primaryEleccion = esNivelEstatal ? gubernatura : resultados;
-  const contrasteEleccion = esNivelEstatal ? resultados : gubernatura;
-
   return (
     <div className="space-y-2">
-      {/* Sección primaria */}
-      <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">
-            {contextLabel ?? labelPrimario}
-          </p>
-          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">INE · DERFE</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {padron && (
-            <>
-              <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
-                <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
-                <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">al {padron.corte}</p>
-              </div>
-              <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-                <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
-                <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
-                <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
-                  H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
-                </p>
-              </div>
-            </>
-          )}
-          {primaryEleccion && (
-            <div className="col-span-2 bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-              <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-1">
-                Última elección — {primaryEleccion.cargo} {primaryEleccion.anio}
-              </p>
-              <div className="flex gap-3 flex-wrap">
-                {top3primary.map((p) => (
-                  <div key={p.partido} className="text-xs">
-                    <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
-                    <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-1">
-                Participación: {primaryEleccion.participacion}% · {fmtN(primaryEleccion.totalVotos)} votos
+      {/* Padrón */}
+      {padron && (
+        <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">
+              {isElectoral ? `LNE y Padrón Electoral — ${data.estado}` : "Contexto electoral de referencia"}
+            </p>
+            <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">INE · DERFE</span>
+          </div>
+          <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-2">al {padron.corte}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+              <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
+              <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
+              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+                {padron.listaNominalHombres && padron.listaNominalMujeres
+                  ? `H: ${fmtN(padron.listaNominalHombres)} · M: ${fmtN(padron.listaNominalMujeres)}`
+                  : "Desglose no disponible"}
               </p>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sección contraste — solo si hay datos */}
-      {contrasteEleccion && (
-        <div className="rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230] p-3 space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
-            {labelContraste}
-          </p>
-          <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-            <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-1">
-              {contrasteEleccion.cargo} {contrasteEleccion.anio}
-            </p>
-            <div className="flex gap-3 flex-wrap">
-              {contrasteEleccion.partidos.slice(0, 3).map((p) => (
-                <div key={p.partido} className="text-xs">
-                  <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
-                  <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
-                </div>
-              ))}
+            <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
+              <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
+              <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
+              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+                H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
+              </p>
             </div>
-            <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-1">
-              Participación: {contrasteEleccion.participacion}%
-            </p>
           </div>
         </div>
       )}
+
+      {/* Elección primaria */}
+      <EleccionCard eleccion={primary} isPrimary />
+
+      {/* Contrastes */}
+      {contraste.map((c) => (
+        <EleccionCard key={c.key} eleccion={c} isPrimary={false} />
+      ))}
     </div>
   );
 }
@@ -1825,6 +2002,138 @@ function mergePhaseData(base: ExplorationForm, data: Record<string, unknown>): E
   if (data.semaforo && typeof data.semaforo === "object") Object.assign(merged.semaforo, data.semaforo);
   if (data.hipotesis && typeof data.hipotesis === "object") Object.assign(merged.hipotesis, data.hipotesis);
   return merged;
+}
+
+async function resolveGeoFilter(
+  estado: string,
+  key: ElecKey,
+  territorio: Territorio | null,
+  anio: number
+): Promise<{ cabecera?: string; municipio?: string } | null> {
+  if (!territorio) return null;
+
+  if (key === "ayun") {
+    return territorio.municipio ? { municipio: territorio.municipio } : null;
+  }
+
+  if (key === "diputados") {
+    const geoUrl = `/api/sefix/elecciones-geo?nivel=distritos&cargo=dip&anio=${anio}&estado=${encodeURIComponent(estado)}`;
+    try {
+      const res = await fetch(geoUrl, { credentials: "include" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const opciones: { cve: string; nombre: string }[] = json?.opciones ?? [];
+      const cabecera = matchDistrito(opciones, territorio);
+      if (cabecera) return { cabecera };
+    } catch { /* no-op */ }
+    return null;
+  }
+
+  if (key === "dip_loc") {
+    const geoUrl = `/api/sefix/elecciones-locales-geo?nivel=distritos&cargo=dip_loc&anio=${anio}&estado=${encodeURIComponent(estado)}`;
+    try {
+      const res = await fetch(geoUrl, { credentials: "include" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const opciones: { cve: string; nombre: string }[] = json?.opciones ?? [];
+      const cabecera = matchDistrito(opciones, territorio);
+      if (cabecera) return { cabecera };
+    } catch { /* no-op */ }
+    return null;
+  }
+
+  return null;
+}
+
+async function fetchSefixEleccion(
+  estado: string,
+  key: ElecKey,
+  isPrimary: boolean,
+  scope: SefixScope,
+  territorio: Territorio | null
+): Promise<SefixEleccion> {
+  const label = ELEC_LABELS[key];
+  const empty: SefixEleccion = { key, label, resultados: null, granularity: "" };
+  const isFed = (["diputados", "senadores", "presidencia"] as ElecKey[]).includes(key);
+  const isNac = scope === "nacional";
+
+  try {
+    if (isFed) {
+      const estadoParam = isNac ? "" : `&estado=${encodeURIComponent(estado)}`;
+      const baseUrl = `/api/sefix/resultados?cargo=${key}${estadoParam}`;
+      const baseRes = await fetch(baseUrl, { credentials: "include" });
+      if (!baseRes.ok) return empty;
+      const baseJson = await baseRes.json();
+      const baseResultados: SefixResultados | null = baseJson?.resultados ?? null;
+      if (!baseResultados) return empty;
+
+      const year = baseResultados.anio;
+      let resultados = baseResultados;
+      let granularity =
+        key === "presidencia"
+          ? "Elección de mayoría relativa a nivel Nacional"
+          : isNac
+          ? "Promedio ponderado de votación a nivel Nacional"
+          : key === "senadores"
+          ? `Elección de mayoría relativa en ${estado}`
+          : `Promedio ponderado de votación en ${estado}`;
+
+      if (isPrimary && !isNac && key === "diputados" && territorio) {
+        const geo = await resolveGeoFilter(estado, key, territorio, year);
+        if (geo?.cabecera) {
+          const filtUrl = `/api/sefix/resultados?cargo=${key}&estado=${encodeURIComponent(estado)}&cabecera=${encodeURIComponent(geo.cabecera)}&anio=${year}`;
+          const filtRes = await fetch(filtUrl, { credentials: "include" });
+          if (filtRes.ok) {
+            const filtJson = await filtRes.json();
+            if (filtJson?.resultados) {
+              resultados = filtJson.resultados;
+              granularity = formatDistritoCabecera(geo.cabecera, "federal");
+            }
+          }
+        }
+      }
+
+      return { key, label, resultados, granularity };
+    } else {
+      // Local cargo — first resolve year
+      const locCargoKey = key === "gubernatura" ? "gob" : key;
+      const yearsUrl = `/api/sefix/elecciones-locales-resultados?years_for_cargo&cargo=${locCargoKey}&estado=${encodeURIComponent(estado)}`;
+      const yearsRes = await fetch(yearsUrl, { credentials: "include" });
+      if (!yearsRes.ok) return empty;
+      const yearsJson = await yearsRes.json();
+      const years: number[] = yearsJson?.availableYears ?? [];
+      if (years.length === 0) return empty;
+      const maxYear = Math.max(...years);
+
+      let geoParam = "";
+      let granularity = key === "gubernatura"
+        ? `Elección de mayoría relativa en ${estado}`
+        : `Promedio ponderado de votación en ${estado}`;
+
+      if (isPrimary && territorio) {
+        if (key === "ayun" && territorio.municipio) {
+          geoParam = `&municipio=${encodeURIComponent(territorio.municipio)}`;
+          granularity = territorio.municipio;
+        } else if (key === "dip_loc") {
+          const geo = await resolveGeoFilter(estado, key, territorio, maxYear);
+          if (geo?.cabecera) {
+            geoParam = `&cabecera=${encodeURIComponent(geo.cabecera)}`;
+            granularity = formatDistritoCabecera(geo.cabecera, "local");
+          }
+        }
+      }
+
+      const resultUrl = `/api/sefix/elecciones-locales-resultados?cargo=${locCargoKey}&anio=${maxYear}&estado=${encodeURIComponent(estado)}${geoParam}`;
+      const resultRes = await fetch(resultUrl, { credentials: "include" });
+      if (!resultRes.ok) return empty;
+      const resultJson = await resultRes.json();
+      const resultados: SefixResultados | null = resultJson?.resultados ?? null;
+
+      return { key, label, resultados, granularity };
+    }
+  } catch {
+    return empty;
+  }
 }
 
 function calcularMesesAlHito(fechaLimite?: string): number {

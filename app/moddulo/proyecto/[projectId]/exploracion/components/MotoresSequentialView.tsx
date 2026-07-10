@@ -301,10 +301,25 @@ function M3Panel({ actores, editable, onChange }: {
     <div className="space-y-3">
       {actores.map((actor, i) => (
         <div key={i} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
-            {editable ? (
-              <>
+          {editable ? (
+            <>
+              {/* Row 1 (editable): select de nivel (izq) + botón eliminar (der) */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <SelectField value={actor.nivelRiesgo} onChange={(v) => update(i, { nivelRiesgo: v })} options={NIVEL_RIESGO_OPTS} />
+                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] max-w-[240px] leading-snug">
+                    {NIVEL_RIESGO_DESC[actor.nivelRiesgo]}
+                  </p>
+                </div>
+                <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0 mt-0.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Row 2 (editable): dot + título completo (ancho libre) */}
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
                 <input
                   type="text"
                   value={actor.nombre}
@@ -312,25 +327,22 @@ function M3Panel({ actores, editable, onChange }: {
                   placeholder="Nombre del actor"
                   className="flex-1 text-sm font-semibold bg-transparent border-b border-gray-eske-20 dark:border-white/20 focus:outline-none py-0.5 text-black-eske dark:text-white placeholder:font-normal placeholder:text-gray-eske-40"
                 />
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  <SelectField value={actor.nivelRiesgo} onChange={(v) => update(i, { nivelRiesgo: v })} options={NIVEL_RIESGO_OPTS} />
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] text-right max-w-[200px] leading-snug">
-                    {NIVEL_RIESGO_DESC[actor.nivelRiesgo]}
-                  </p>
-                </div>
-                <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </>
-            ) : (
-              <>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Row 1 (lectura): descripción de nivel */}
+              <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] leading-snug">
+                {NIVEL_RIESGO_DESC[actor.nivelRiesgo]}
+              </p>
+              {/* Row 2 (lectura): dot + nombre + tipo */}
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
                 <span className="text-sm font-semibold text-black-eske dark:text-white">{actor.nombre}</span>
                 <span className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">{actor.tipo}</span>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
           {editable ? (
             <div className="space-y-1.5">
               <input
@@ -354,7 +366,6 @@ function M3Panel({ actores, editable, onChange }: {
               {actor.requiereInvestigacion && (
                 <span className="inline-block text-xs px-2 py-0.5 bg-orange-eske-10 text-orange-eske-80 rounded-full dark:bg-orange-eske/20">Requiere investigación de campo</span>
               )}
-              <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] leading-snug">{NIVEL_RIESGO_DESC[actor.nivelRiesgo]}</p>
             </>
           )}
         </div>

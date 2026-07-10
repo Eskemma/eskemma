@@ -33,21 +33,26 @@ async function fetchTopicWithTimeout(
 
   try {
     const feed = await parser.parseURL(url);
-    return (feed.items ?? []).map((item) => ({
+    const items = (feed.items ?? []).map((item) => ({
       title: item.title ?? "",
       link: item.link ?? "",
       pubDate: item.pubDate ?? item.isoDate ?? "",
       content: item.contentSnippet ?? item.content ?? item.title ?? "",
     }));
+    if (items.length === 0) {
+      console.warn(`[googleNewsRSS] Feed vacío para query "${query}" — posible bloqueo o RSS sin resultados. URL: ${url}`);
+    }
+    return items;
   } catch (err) {
-    console.warn(`[googleNewsRSS] Error en query "${query}":`, err);
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.warn(`[googleNewsRSS] Error en query "${query}": ${msg}. URL: ${url}`);
     return [];
   }
 }
 
 /**
- * Returns news articles for all provided topics in parallel.
- * Individual topic failures are swallowed — the rest still succeed.
+ * Returns news articles for all provided topics, executed sequentially with
+ * a 500ms delay between requests to avoid Google News rate-limiting.
  */
 export async function fetchGoogleNewsRSS(
   territorio: string,
@@ -60,11 +65,15 @@ export async function fetchGoogleNewsRSS(
     timeout: 15000,
   });
 
-  const results = await Promise.allSettled(
-    topics.map((topic) => fetchTopicWithTimeout(parser, territorio, topic))
-  );
-
-  return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const articles: NewsItem[] = [];
+  for (let i = 0; i < topics.length; i++) {
+    const items = await fetchTopicWithTimeout(parser, territorio, topics[i]);
+    articles.push(...items);
+    if (i < topics.length - 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  return articles;
 }
 
 // ── Topic sets by project type ─────────────────────────────────

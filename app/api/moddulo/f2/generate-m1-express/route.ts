@@ -30,10 +30,12 @@ import {
 } from "@/lib/centinela/pestel/scraper/banxico";
 import {
   buildSefixContext,
+  resolveDistrictCabecera,
   type SefixContextData,
 } from "@/lib/sefix/sefixContext";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/pestel.types";
+import { fetchWithCache, CACHE_TTL } from "@/lib/centinela/pestel/cache/indicatorCache";
 
 function getNewsTerritory(territorio: Territorio | undefined): string {
   if (!territorio) return "";
@@ -94,21 +96,64 @@ export async function POST(request: NextRequest) {
   const estadoNombre = project.territorio?.estado ?? null;
   const nivelTerritorial = project.territorio?.nivel ?? "estatal";
 
-  const newsTerritorioNombre = getNewsTerritory(
-    project.territorio as Territorio | undefined
-  );
+  // Resolve district cabecera once — shared by Google News (territory focus)
+  // and Sefix (district-scoped electoral data). Avoids two calls to getEleccionesGeo.
+  const resolvedCabecera =
+    estadoNombre &&
+    (nivelTerritorial === "distrito_federal" ||
+      nivelTerritorial === "distrito_local" ||
+      nivelTerritorial === "distrito")
+      ? await resolveDistrictCabecera(
+          estadoNombre,
+          nivelTerritorial,
+          project.territorio as Territorio
+        )
+      : null;
+
+  // For district projects, use the resolved cabecera city name as the Google News
+  // territory. Strip the numeric district code prefix from the CSV value
+  // (e.g., "1405 PUERTO VALLARTA" → "PUERTO VALLARTA") — Sefix needs the full
+  // key, but Google News should search the city name only.
+  const newsTerritorioNombre = resolvedCabecera
+    ? resolvedCabecera.replace(/^\d+\s+/, "")
+    : getNewsTerritory(project.territorio as Territorio | undefined);
+
   const newsTopics = getNewsTopicsForProject(tipoProyecto, nivelTerritorial);
   const cveEntidad = estadoNombre ? getCveEntidad(estadoNombre) : null;
 
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const month = today.slice(0, 7); // YYYY-MM
+  const normTerr = newsTerritorioNombre.toLowerCase().replace(/\W+/g, "_");
+
   const [newsResult, dofResult, inegiResult, banxicoResult, sefixResult, biseResult] =
     await Promise.allSettled([
-      fetchGoogleNewsRSS(newsTerritorioNombre, newsTopics),
-      fetchDOFRSS(),
-      fetchInegiIndicators(INEGI_DEFAULT_SERIES),
-      fetchBanxicoSeries(BANXICO_DEFAULT_SERIES),
-      buildSefixContext({ tipoProyecto, estadoNombre, nivelTerritorial }),
+      fetchWithCache(
+        "google_news",
+        `google_news_${normTerr}_${today}`,
+        CACHE_TTL.TTL_24H,
+        () => fetchGoogleNewsRSS(newsTerritorioNombre, newsTopics)
+      ),
+      fetchWithCache(
+        "dof",
+        `dof_${today}`,
+        CACHE_TTL.TTL_24H,
+        () => fetchDOFRSS()
+      ),
+      fetchInegiIndicators(INEGI_DEFAULT_SERIES), // BIE omitido — IDs sin verificar
+      fetchWithCache(
+        "banxico",
+        `banxico_${month}`,
+        CACHE_TTL.TTL_24H,
+        () => fetchBanxicoSeries(BANXICO_DEFAULT_SERIES)
+      ),
+      buildSefixContext({ tipoProyecto, estadoNombre, nivelTerritorial, resolvedCabecera }),
       cveEntidad
-        ? fetchInegiIndicators(BISE_POBLACION_SERIES, "BISE", cveEntidad)
+        ? fetchWithCache(
+            "inegi_bise",
+            `inegi_bise_${cveEntidad}_${month}`,
+            CACHE_TTL.TTL_7D,
+            () => fetchInegiIndicators(BISE_POBLACION_SERIES, "BISE", cveEntidad)
+          )
         : Promise.resolve([] as InegiDataPoint[]),
     ]);
 

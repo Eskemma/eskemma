@@ -405,6 +405,8 @@ export interface PadronEstado {
   padronHombres: number;
   padronMujeres: number;
   padronNoBinario: number;
+  listaNominalHombres: number;
+  listaNominalMujeres: number;
   fuente: string;
 }
 
@@ -453,26 +455,32 @@ export async function getPadronByEstado(
   let padronHombres = 0;
   let padronMujeres = 0;
   let padronNoBinario = 0;
+  let listaNominalHombres = 0;
+  let listaNominalMujeres = 0;
 
   if (isSemanal) {
     // Semanal _sexo: nombre_entidad, padron_hombres, padron_mujeres, padron_no_binario, padron_electoral, lista_hombres, lista_mujeres, lista_no_binario, lista_nominal
     await streamCsvRows(targetPath, (row) => {
       if (row.nombre_entidad !== estadoNombre) return;
-      padronElectoral += parseInt(row.padron_electoral ?? "0") || 0;
-      listaNominal += parseInt(row.lista_nominal ?? "0") || 0;
-      padronHombres += parseInt(row.padron_hombres ?? "0") || 0;
-      padronMujeres += parseInt(row.padron_mujeres ?? "0") || 0;
-      padronNoBinario += parseInt(row.padron_no_binario ?? "0") || 0;
+      padronElectoral      += parseInt(row.padron_electoral  ?? "0") || 0;
+      listaNominal         += parseInt(row.lista_nominal     ?? "0") || 0;
+      padronHombres        += parseInt(row.padron_hombres    ?? "0") || 0;
+      padronMujeres        += parseInt(row.padron_mujeres    ?? "0") || 0;
+      padronNoBinario      += parseInt(row.padron_no_binario ?? "0") || 0;
+      listaNominalHombres  += parseInt(row.lista_hombres     ?? "0") || 0;
+      listaNominalMujeres  += parseInt(row.lista_mujeres     ?? "0") || 0;
     });
   } else {
-    // Histórico _base: nombre_entidad, padron_nacional_hombres, padron_nacional_mujeres, padron_nacional_no_binario, padron_nacional, lista_nacional
+    // Histórico _base: nombre_entidad, padron_nacional_hombres, padron_nacional_mujeres, padron_nacional_no_binario, padron_nacional, lista_nacional, lista_nacional_hombres, lista_nacional_mujeres
     await streamCsvRows(targetPath, (row) => {
       if (row.nombre_entidad !== estadoNombre) return;
-      padronElectoral += parseInt(row.padron_nacional ?? "0") || 0;
-      listaNominal += parseInt(row.lista_nacional ?? "0") || 0;
-      padronHombres += parseInt(row.padron_nacional_hombres ?? "0") || 0;
-      padronMujeres += parseInt(row.padron_nacional_mujeres ?? "0") || 0;
-      padronNoBinario += parseInt(row.padron_nacional_no_binario ?? "0") || 0;
+      padronElectoral     += parseInt(row.padron_nacional          ?? "0") || 0;
+      listaNominal        += parseInt(row.lista_nacional           ?? "0") || 0;
+      padronHombres       += parseInt(row.padron_nacional_hombres  ?? "0") || 0;
+      padronMujeres       += parseInt(row.padron_nacional_mujeres  ?? "0") || 0;
+      padronNoBinario     += parseInt(row.padron_nacional_no_binario ?? "0") || 0;
+      listaNominalHombres += parseInt(row.lista_nacional_hombres   ?? "0") || 0;
+      listaNominalMujeres += parseInt(row.lista_nacional_mujeres   ?? "0") || 0;
     });
   }
 
@@ -487,6 +495,8 @@ export async function getPadronByEstado(
     padronHombres,
     padronMujeres,
     padronNoBinario,
+    listaNominalHombres,
+    listaNominalMujeres,
     fuente: `DERFE — Padrón Electoral al ${fecha}`,
   };
 
@@ -3212,3 +3222,63 @@ export async function getGanadorPorFeatureLoc(params: {
   setCache(cacheKey, result);
   return result;
 }
+
+// ==========================================
+// LNE POR DISTRITO — DESGLOSE POR GÉNERO
+// ==========================================
+
+export interface LneDistrito {
+  lneHombres: number;
+  lneMujeres: number;
+  lneTotal: number;
+  cve_distrito: string;
+}
+
+/**
+ * Agrega lista nominal por género para un distrito electoral federal.
+ * Lee el _sexo.csv semanal más reciente y filtra por cve_distrito + entidad.
+ * @param {string} estadoNombre Nombre del estado (ej. "Jalisco")
+ * @param {string} cveDistrito CVE del distrito como string (ej. "5")
+ * @return {Promise<LneDistrito | null>}
+ */
+export async function getLneByDistrito(
+  estadoNombre: string,
+  cveDistrito: string
+): Promise<LneDistrito | null> {
+  const cacheKey = `lne:distrito:${estadoNombre}:${cveDistrito}`;
+  const cached = getCached<LneDistrito>(cacheKey);
+  if (cached) return cached;
+
+  const paths = await getSemanalPaths("sexo");
+  if (paths.length === 0) return null;
+  const targetPath = paths[0];
+
+  const derfeNombre = toDerfeNombre(estadoNombre);
+  let lneHombres = 0;
+  let lneMujeres = 0;
+  let lneTotal = 0;
+
+  await streamCsvRows(targetPath, (row) => {
+    if (row.nombre_entidad !== derfeNombre) return;
+    if (row.cve_distrito?.trim() !== cveDistrito) return;
+    if (row.cabecera_distrital?.toUpperCase().includes("RESIDENTES EXTRANJERO")) return;
+    const h = parseFloat(row.lista_hombres ?? "0");
+    const m = parseFloat(row.lista_mujeres ?? "0");
+    const t = parseFloat(row.lista_nominal ?? "0");
+    if (!isNaN(h)) lneHombres += h;
+    if (!isNaN(m)) lneMujeres += m;
+    if (!isNaN(t)) lneTotal += t;
+  });
+
+  if (lneTotal === 0) return null;
+
+  const result: LneDistrito = {
+    lneHombres,
+    lneMujeres,
+    lneTotal,
+    cve_distrito: cveDistrito,
+  };
+  setCache(cacheKey, result);
+  return result;
+}
+

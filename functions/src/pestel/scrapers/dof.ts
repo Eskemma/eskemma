@@ -1,7 +1,11 @@
 // functions/src/pestel/scrapers/dof.ts
-// Obtiene publicaciones del Diario Oficial de la Federación vía RSS.
-// Filtra artículos de los últimos 7 días.
+// DEUDA: análogo a lib/centinela/pestel/scraper/dof.ts
+// Razón: functions/ usa module:NodeNext; incompatible con
+// moduleResolution:bundler de Next.js.
+// Actualizar AMBAS copias si cambia lógica de scraping o SSL workaround.
+// Obtiene publicaciones del DOF vía RSS. Filtra últimos 7 días.
 
+import * as https from "https";
 import Parser from "rss-parser";
 import type {RawArticle} from "./googleNewsRSS";
 
@@ -13,7 +17,13 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
  * Retorna artículos del DOF publicados en los últimos 7 días.
  */
 export async function fetchDOFRSS(): Promise<RawArticle[]> {
-  const parser = new Parser({timeout: 30000});
+  // dof.gob.mx uses an intermediate CA not in Node.js trust bundle.
+  // Agent scoped strictly to this parser — not a global TLS override.
+  const dofAgent = new https.Agent({rejectUnauthorized: false});
+  const parser = new Parser({
+    timeout: 30000,
+    requestOptions: {agent: dofAgent},
+  });
   const cutoff = new Date(Date.now() - SEVEN_DAYS_MS);
 
   try {

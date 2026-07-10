@@ -1,5 +1,8 @@
 // functions/src/pestel/scrapers/googleNewsRSS.ts
-// Obtiene artículos desde Google News RSS para un territorio y tópicos.
+// DEUDA: análogo a lib/centinela/pestel/scraper/googleNewsRSS.ts
+// Razón: functions/ usa module:NodeNext; incompatible con
+// moduleResolution:bundler de Next.js.
+// Actualizar AMBAS copias si cambia lógica de scraping.
 // Rate limit: 2s entre queries. Retry: 3 intentos con backoff exponencial.
 
 import Parser from "rss-parser";
@@ -93,7 +96,14 @@ export async function fetchGoogleNewsRSS(
 
     try {
       const feed = await withRetry(() => parser.parseURL(url));
-      for (const item of feed.items || []) {
+      const items = feed.items || [];
+      if (items.length === 0) {
+        console.warn(
+          `[googleNewsRSS] Feed vacío para query "${query}" — ` +
+          "posible bloqueo o RSS sin resultados"
+        );
+      }
+      for (const item of items) {
         articles.push({
           title: item.title || "",
           link: item.link || "",
@@ -103,7 +113,9 @@ export async function fetchGoogleNewsRSS(
         });
       }
     } catch (error) {
-      console.warn(`[googleNewsRSS] Error en query "${query}":`, error);
+      const msg = error instanceof Error ?
+        `${error.name}: ${error.message}` : String(error);
+      console.warn(`[googleNewsRSS] Error en query "${query}": ${msg}`);
     }
 
     // Rate limit: 2s entre requests

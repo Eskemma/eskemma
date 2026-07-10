@@ -2,6 +2,7 @@
 // Fetches recent DOF (Diario Oficial de la Federación) publications via RSS.
 // Filters items from the last 7 days.
 
+import https from "https";
 import Parser from "rss-parser";
 import type { NewsItem } from "./googleNewsRSS";
 
@@ -10,24 +11,32 @@ const DOF_RSS_URL = "https://www.dof.gob.mx/sumario.xml";
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function fetchDOFRSS(): Promise<NewsItem[]> {
-  const parser = new Parser({ timeout: 15000 });
+  // dof.gob.mx uses an intermediate CA not in Node.js's trust bundle.
+  // Agent is scoped strictly to this parser instance — not a global TLS setting.
+  const dofAgent = new https.Agent({ rejectUnauthorized: false });
+  const parser = new Parser({ timeout: 15000, requestOptions: { agent: dofAgent } });
   const cutoff = new Date(Date.now() - SEVEN_DAYS_MS);
 
   try {
     const feed = await parser.parseURL(DOF_RSS_URL);
-    return (feed.items ?? [])
-      .filter((item) => {
-        if (!item.pubDate) return true;
-        return new Date(item.pubDate) >= cutoff;
-      })
-      .map((item) => ({
-        title: item.title ?? "",
-        link: item.link ?? "",
-        pubDate: item.pubDate ?? item.isoDate ?? "",
-        content: item.contentSnippet ?? item.content ?? item.title ?? "",
-      }));
+    const allItems = feed.items ?? [];
+    const recent = allItems.filter((item) => {
+      if (!item.pubDate) return true;
+      return new Date(item.pubDate) >= cutoff;
+    });
+    console.log(
+      `[dof] RSS: ${allItems.length} entradas totales, ` +
+      `${recent.length} recientes (≥ ${cutoff.toISOString().slice(0, 10)})`
+    );
+    return recent.map((item) => ({
+      title: item.title ?? "",
+      link: item.link ?? "",
+      pubDate: item.pubDate ?? item.isoDate ?? "",
+      content: item.contentSnippet ?? item.content ?? item.title ?? "",
+    }));
   } catch (err) {
-    console.warn("[dof] Error al obtener RSS del DOF:", err);
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.warn(`[dof] Error al obtener RSS: ${msg}. URL: ${DOF_RSS_URL}`);
     return [];
   }
 }

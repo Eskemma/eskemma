@@ -35,7 +35,7 @@ export default function NuevoProyectoPage() {
     const tipoParam = searchParams.get("tipo") as TipoProyecto | null;
     const modduloProjectId = searchParams.get("moddulo_project_id") ?? undefined;
 
-    const VALID_NIVELES: NivelTerritorial[] = ["nacional", "estatal", "municipal", "distrito"];
+    const VALID_NIVELES: NivelTerritorial[] = ["nacional", "estatal", "municipal", "distrito", "distrito_federal", "distrito_local"];
     const nivelParam = searchParams.get("nivel") as NivelTerritorial | null;
     const nivelTerritorio = VALID_NIVELES.includes(nivelParam as NivelTerritorial) ? nivelParam! : null;
     const estadoParam = searchParams.get("estado") ?? "";
