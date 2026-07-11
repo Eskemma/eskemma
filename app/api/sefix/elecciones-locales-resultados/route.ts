@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Años disponibles para un cargo dado (para gráfica histórica G3)
+    // Años disponibles para un cargo+estado dado (para gráfica histórica G3)
     if (searchParams.has("years_for_cargo")) {
-      const years = await getResultadosLocalesYearsForCargo(cargo);
+      const years = await getResultadosLocalesYearsForCargo(cargo, estado);
       return NextResponse.json(
         { availableYears: years },
         { headers: { "Cache-Control": "public, max-age=1800, stale-while-revalidate=3600" } }

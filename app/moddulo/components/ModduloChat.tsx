@@ -439,10 +439,10 @@ function MarkdownContent({ content }: { content: string }) {
           <em className="italic text-gray-700 dark:text-[#9AAEBE]">{children}</em>
         ),
         ul: ({ children }) => (
-          <ul className="list-disc list-inside space-y-1 mb-2 text-sm text-gray-800 dark:text-[#C7D6E0]">{children}</ul>
+          <ul className="list-disc list-outside pl-5 space-y-1 mb-2 text-sm text-gray-800 dark:text-[#C7D6E0]">{children}</ul>
         ),
         ol: ({ children }) => (
-          <ol className="list-decimal list-inside space-y-1 mb-2 text-sm text-gray-800 dark:text-[#C7D6E0]">{children}</ol>
+          <ol className="list-decimal list-outside pl-5 space-y-1 mb-2 text-sm text-gray-800 dark:text-[#C7D6E0]">{children}</ol>
         ),
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
         hr: () => <hr className="border-gray-200 dark:border-white/10 my-3" />,

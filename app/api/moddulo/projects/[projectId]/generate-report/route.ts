@@ -246,5 +246,9 @@ El campo "reportText" debe contener este reporte en markdown:
 
 [3-5 puntos concretos sobre qué debe atenderse en Exploración, Investigación y Diagnóstico basándose en las fortalezas y riesgos identificados en el XPCTO]
 
-Sé preciso, directo y estratégico. No uses frases genéricas. Basa cada análisis en los datos específicos del proyecto. Recuerda: responde ÚNICAMENTE con el objeto JSON, sin ningún texto adicional.`;
+Sé preciso, directo y estratégico. No uses frases genéricas. Basa cada análisis en los datos específicos del proyecto.
+
+FORMATO NUMÉRICO: Al citar o mencionar cifras en el reporte, usa siempre la convención mexicana: coma para miles (ej. "1,000 voluntarios", "2,500,000 pesos"), punto para decimales. Si el dato original usa punto como separador de miles (ej. "1.000"), normalízalo a "1,000" antes de citarlo.
+
+Recuerda: responde ÚNICAMENTE con el objeto JSON, sin ningún texto adicional.`;
 }

@@ -8,7 +8,9 @@ import {
   getResultadosFiltered,
   getEleccionesGeo,
   getEleccionesLocalesGeo,
+  getResultadosLocalesAvailableYears,
   getPadronByEstado,
+  getPadronNacional,
   getResultadosLocalesFiltered,
 } from "@/lib/sefix/storage";
 import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
@@ -54,7 +56,8 @@ const CARGO_DISPLAY: Partial<Record<SefixCargoKey, string>> = {
   jef_gob: "JEFE DE GOBIERNO",
 };
 
-const LOCAL_YEARS_DESC = [2025, 2024, 2021, 2015];
+// Fallback used only when no state-specific year list is available
+const LOCAL_YEARS_FALLBACK = [2025, 2024, 2021, 2015];
 
 // ── Priority table ─────────────────────────────────────────────
 
@@ -105,8 +108,10 @@ export async function resolveDistrictCabecera(
       return matchDistrito(opciones, territorio);
     }
     if (nivelTerritorial === "distrito_local" || nivelTerritorial === "distrital") {
-      // Iterate descending until geo options are found (same as LOCAL_YEARS_DESC)
-      for (const year of LOCAL_YEARS_DESC) {
+      const years = await getResultadosLocalesAvailableYears(estadoNombre).catch(
+        () => LOCAL_YEARS_FALLBACK
+      );
+      for (const year of [...years].sort((a, b) => b - a)) {
         const opciones = await getEleccionesLocalesGeo("distritos", year, "dip_loc", estadoNombre);
         if (opciones.length > 0) return matchDistrito(opciones, territorio);
       }
@@ -122,7 +127,8 @@ export async function resolveDistrictCabecera(
 async function fetchCargoPESTEL(
   estadoNombre: string,
   cargoKey: SefixCargoKey,
-  cabecera?: string | null
+  cabecera?: string | null,
+  localYears?: number[]
 ): Promise<SefixResultadoNorm | null> {
   const federalCargo = FEDERAL_CARGO_MAP[cargoKey];
   if (federalCargo) {
@@ -168,7 +174,10 @@ async function fetchCargoPESTEL(
   }
 
   // Local cargo — try years descending until data is found
-  for (const year of LOCAL_YEARS_DESC) {
+  const yearsDesc = localYears
+    ? [...localYears].sort((a, b) => b - a)
+    : LOCAL_YEARS_FALLBACK;
+  for (const year of yearsDesc) {
     const r = await getResultadosLocalesFiltered({
       estadoNombre,
       cargoKey,
@@ -218,15 +227,39 @@ export async function buildSefixContext(
   params: SefixProjectParams
 ): Promise<SefixContextData | null> {
   const { tipoProyecto, estadoNombre, nivelTerritorial, resolvedCabecera } = params;
-  if (!estadoNombre || nivelTerritorial === "nacional") return null;
+  if (!estadoNombre && nivelTerritorial !== "nacional") return null;
+
+  // For national-scope projects (Presidencia), return national padron with no electoral results
+  if (nivelTerritorial === "nacional" || !estadoNombre) {
+    const padron = await getPadronNacional().catch(() => null);
+    if (!padron) return null;
+    // Federal national cargos use regular fetchCargoPESTEL with empty estadoNombre
+    const priorityCargos = getSefixPriority(tipoProyecto, nivelTerritorial);
+    const resultadosList: SefixResultadoNorm[] = [];
+    for (const cargoKey of priorityCargos) {
+      if (resultadosList.length >= 4) break;
+      try {
+        const r = await fetchCargoPESTEL("", cargoKey, resolvedCabecera);
+        if (r) resultadosList.push(r);
+      } catch (e) {
+        console.warn(`[sefixContext] Nacional fetch failed for ${cargoKey}:`, e);
+      }
+    }
+    return { resultadosList, padron };
+  }
 
   const priorityCargos = getSefixPriority(tipoProyecto, nivelTerritorial);
   const resultadosList: SefixResultadoNorm[] = [];
 
+  // Fetch available years for this state once — avoids N Firebase listings for N cargos
+  const localYears = await getResultadosLocalesAvailableYears(estadoNombre).catch(
+    () => LOCAL_YEARS_FALLBACK
+  );
+
   for (const cargoKey of priorityCargos) {
     if (resultadosList.length >= 4) break;
     try {
-      const r = await fetchCargoPESTEL(estadoNombre, cargoKey, resolvedCabecera);
+      const r = await fetchCargoPESTEL(estadoNombre, cargoKey, resolvedCabecera, localYears);
       if (r) resultadosList.push(r);
     } catch (e) {
       console.warn(`[sefixContext] Sefix fetch failed for ${cargoKey}:`, e);

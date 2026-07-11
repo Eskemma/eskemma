@@ -504,6 +504,72 @@ export async function getPadronByEstado(
   return result;
 }
 
+/**
+ * Returns the national Padrón Electoral by summing all states in a single CSV pass.
+ * Same cost as getPadronByEstado — no extra requests needed.
+ */
+export async function getPadronNacional(): Promise<PadronEstado | null> {
+  const cacheKey = "padron:NACIONAL";
+  const cached = getCached<PadronEstado>(cacheKey);
+  if (cached) return cached;
+
+  const semanalPath = await getLatestSemanalPath();
+  const targetPath = semanalPath ?? (await getLatestHistoricoPath());
+  if (!targetPath) return null;
+
+  const isSemanal = targetPath.includes("/semanal/");
+  const fecha = extractFecha(targetPath);
+
+  let padronElectoral = 0;
+  let listaNominal = 0;
+  let padronHombres = 0;
+  let padronMujeres = 0;
+  let padronNoBinario = 0;
+  let listaNominalHombres = 0;
+  let listaNominalMujeres = 0;
+
+  if (isSemanal) {
+    await streamCsvRows(targetPath, (row) => {
+      padronElectoral      += parseInt(row.padron_electoral  ?? "0") || 0;
+      listaNominal         += parseInt(row.lista_nominal     ?? "0") || 0;
+      padronHombres        += parseInt(row.padron_hombres    ?? "0") || 0;
+      padronMujeres        += parseInt(row.padron_mujeres    ?? "0") || 0;
+      padronNoBinario      += parseInt(row.padron_no_binario ?? "0") || 0;
+      listaNominalHombres  += parseInt(row.lista_hombres     ?? "0") || 0;
+      listaNominalMujeres  += parseInt(row.lista_mujeres     ?? "0") || 0;
+    });
+  } else {
+    await streamCsvRows(targetPath, (row) => {
+      padronElectoral     += parseInt(row.padron_nacional          ?? "0") || 0;
+      listaNominal        += parseInt(row.lista_nacional           ?? "0") || 0;
+      padronHombres       += parseInt(row.padron_nacional_hombres  ?? "0") || 0;
+      padronMujeres       += parseInt(row.padron_nacional_mujeres  ?? "0") || 0;
+      padronNoBinario     += parseInt(row.padron_nacional_no_binario ?? "0") || 0;
+      listaNominalHombres += parseInt(row.lista_nacional_hombres   ?? "0") || 0;
+      listaNominalMujeres += parseInt(row.lista_nacional_mujeres   ?? "0") || 0;
+    });
+  }
+
+  if (padronElectoral === 0 && listaNominal === 0) return null;
+
+  const result: PadronEstado = {
+    estado: "NACIONAL",
+    corte: fecha,
+    tipo: isSemanal ? "semanal" : "historico",
+    padronElectoral,
+    listaNominal,
+    padronHombres,
+    padronMujeres,
+    padronNoBinario,
+    listaNominalHombres,
+    listaNominalMujeres,
+    fuente: `DERFE — Padrón Electoral Nacional al ${fecha}`,
+  };
+
+  setCache(cacheKey, result);
+  return result;
+}
+
 // ==========================================
 // SERIES HISTÓRICAS AGREGADAS (G1 / G2 / G3)
 // ==========================================
@@ -2899,13 +2965,25 @@ export async function getResultadosLocalesAvailableCargos(
     .sort();
 }
 
-/** Returns available years for a local cargo across all states (used for historico G3). */
+/**
+ * Returns available years for a local cargo, optionally filtered by state.
+ * When `estadoNombre` is supplied, only years that have a file for that state
+ * are returned — fixes the case where a global max year is used for states
+ * that lack data for that year.
+ */
 export async function getResultadosLocalesYearsForCargo(
-  cargoKey: string
+  cargoKey: string,
+  estadoNombre?: string
 ): Promise<number[]> {
   const allFiles = await listStorageFiles("sefix/results/locals/");
-  const years = allFiles
-    .filter((f) => f.includes(`_pel_${cargoKey}_`))
+  const locKeys = estadoNombre ? getLocKeys(estadoNombre) : null;
+  const cargoFiles = allFiles.filter((f) => {
+    const name = f.split("/").pop() ?? "";
+    if (!name.includes(`_pel_${cargoKey}_`)) return false;
+    if (locKeys?.length) return locKeys.some((k) => name.startsWith(`${k}_`));
+    return true;
+  });
+  const years = cargoFiles
     .map((f) => parseInt(f.match(/_(\d{4})\.csv$/)?.[1] ?? "0"))
     .filter((y) => y > 0);
   return [...new Set(years)].sort();

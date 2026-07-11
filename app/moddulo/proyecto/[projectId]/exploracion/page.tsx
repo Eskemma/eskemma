@@ -915,9 +915,11 @@ export default function ExploracionPage() {
               </div>
 
               {pendingMotors.length > 0 && headerState !== "editando" && (
-                <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40 mt-1.5">
-                  Aprueba los motores pendientes antes de continuar:{" "}
-                  <span className="text-black-eske-80 dark:text-[#C7D6E0]">
+                <p className="text-xs mt-1.5">
+                  <span className="font-semibold text-black-eske-80 dark:text-[#C7D6E0]">
+                    Aprueba los motores pendientes antes de continuar:{" "}
+                  </span>
+                  <span className="font-normal text-black-eske-80 dark:text-[#C7D6E0]">
                     {pendingMotors.map((m) => MOTOR_LABELS[m]).join(", ")}
                   </span>
                 </p>
@@ -1008,7 +1010,10 @@ export default function ExploracionPage() {
                 <div className="text-center">
                   <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Analizando con IA…</p>
                   <p className="text-sm text-black-eske dark:text-[#C7D6E0] mt-1">
-                    Moddulo está procesando las 6 dimensiones PESTEL. El proceso tarda varios minutos. Por favor, espera.
+                    Moddulo está procesando las 6 dimensiones PESTEL.
+                  </p>
+                  <p className="text-sm text-black-eske dark:text-[#C7D6E0]">
+                    El proceso tarda varios minutos. Por favor, espera.
                   </p>
                   {elapsedSeconds > 0 && (
                     <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-2">

@@ -457,8 +457,8 @@ export default function PropositoPage() {
               ) : (
                 <button
                   onClick={handleVerResumen}
-                  disabled={!formComplete || isGeneratingReport}
-                  className={`${btnBase} flex items-center gap-1`}
+                  disabled={!formComplete}
+                  className={`${btnBase} flex items-center gap-1${isGeneratingReport ? " pointer-events-none" : ""}`}
                 >
                   {isGeneratingReport ? (
                     <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden="true" /> Generando</>
