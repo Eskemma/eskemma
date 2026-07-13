@@ -5,7 +5,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getPhaseSystemPrompt } from "@/lib/ai/phases/prompts";
 import { appendChatMessage, getProject } from "@/lib/moddulo/project";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
-import { extractTextPerFile } from "@/lib/moddulo/attachments";
+import { extractTextPerFile, isExtractionError } from "@/lib/moddulo/attachments";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PhaseId, ChatRequest, ChatAttachment, XPCTO } from "@/types/moddulo.types";
@@ -99,14 +99,13 @@ export async function POST(
     // Preparar mensaje: si hay adjuntos, extraer texto (una sola vez) e inyectarlo
     let userMessageContent = message;
     if (attachments && attachments.length > 0) {
-      // Extraer texto por archivo — usado tanto para el chat como para persistencia
-      const perFileResults = await Promise.allSettled(attachments.map(extractTextPerFile));
-      const perFileTexts = perFileResults.map((r) =>
-        r.status === "fulfilled" ? r.value : "[Error procesando archivo]"
-      );
-      const attachmentTexts = perFileTexts.join("\n\n---\n\n");
+      const { content: attachmentTexts, failedFiles, perFileTexts } =
+        await extractTextFromAttachments(attachments);
       if (attachmentTexts) {
-        userMessageContent = attachmentTexts + (message ? `\n\n---\n\n${message}` : "");
+        const failedNote = failedFiles.length > 0
+          ? `[Nota del sistema: No se pudo procesar: ${failedFiles.join(", ")}]\n\n`
+          : "";
+        userMessageContent = failedNote + attachmentTexts + (message ? `\n\n---\n\n${message}` : "");
       }
       // Guardar refs + texto extraído en F2 (fire-and-forget)
       if (phaseId === "exploracion") {
@@ -173,13 +172,14 @@ export async function POST(
         }
 
         // Guardar el mensaje de Moddulo en Firestore (sin bloquear el stream)
+        // Omit optional fields when falsy — Firestore rejects undefined in arrayUnion
         const assistantMessage = {
           id: crypto.randomUUID(),
           role: "assistant" as const,
           content: fullText,
           timestamp: new Date().toISOString(),
-          extractedData: extractedData ?? undefined,
-          reasoning: reasoning ?? undefined,
+          ...(extractedData && Object.keys(extractedData).length > 0 ? { extractedData } : {}),
+          ...(reasoning ? { reasoning } : {}),
         };
 
         appendChatMessage(projectId, phaseId as PhaseId, assistantMessage).catch(
@@ -252,11 +252,45 @@ export async function POST(
 // ADJUNTOS — EXTRACCIÓN DE TEXTO
 // ==========================================
 
-async function extractTextFromAttachments(attachments: ChatAttachment[]): Promise<string> {
+interface ExtractionResult {
+  content: string;
+  failedFiles: string[];
+  perFileTexts: string[];
+}
+
+async function extractTextFromAttachments(attachments: ChatAttachment[]): Promise<ExtractionResult> {
   const parts = await Promise.allSettled(attachments.map(extractTextPerFile));
-  return parts
-    .map((r) => (r.status === "fulfilled" ? r.value : `[Error procesando archivo]`))
-    .join("\n\n---\n\n");
+  const perFileTexts = parts.map((r) =>
+    r.status === "fulfilled" ? r.value : "[Error procesando archivo]"
+  );
+  const failedFiles: string[] = [];
+  const validTexts: string[] = [];
+  perFileTexts.forEach((text, i) => {
+    if (isExtractionError(text)) {
+      failedFiles.push(attachments[i].nombre);
+    } else {
+      validTexts.push(text);
+    }
+  });
+  return {
+    content: validTexts.join("\n\n---\n\n"),
+    failedFiles,
+    perFileTexts,
+  };
+}
+
+function streamErrorSSE(message: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(c) {
+      c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: message })}\n\n`));
+      c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+      c.close();
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+  });
 }
 
 // ==========================================
@@ -325,30 +359,52 @@ async function handleXpctoExtraction(
   const encoder = new TextEncoder();
 
   try {
-    const contenidoDocumentos = await extractTextFromAttachments(attachments);
+    const { content, failedFiles } = await extractTextFromAttachments(attachments);
+
+    if (!content.trim()) {
+      return streamErrorSSE(
+        "No se pudo leer ningún archivo adjunto. Verifica que sean PDF, Word o TXT válidos y vuelve a intentarlo."
+      );
+    }
+
+    const contenidoParaClaude = failedFiles.length > 0
+      ? `[Nota del sistema: No se pudo procesar: ${failedFiles.join(", ")}. Extrae XPCTO solo del contenido disponible.]\n\n${content}`
+      : content;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[XPCTO extraction] contenido enviado a Claude (primeros 500 chars):", contenidoParaClaude.substring(0, 500));
+      if (failedFiles.length > 0) console.log("[XPCTO extraction] archivos fallidos:", failedFiles);
+    }
 
     const extraction = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 2000,
       system: XPCTO_EXTRACTION_SYSTEM,
-      messages: [{ role: "user", content: contenidoDocumentos }],
+      messages: [{ role: "user", content: contenidoParaClaude }],
     });
 
-    const rawText = extraction.content[0].type === "text" ? extraction.content[0].text : "{}";
+    let rawText = extraction.content[0].type === "text" ? extraction.content[0].text : "{}";
+
+    // Strip markdown fences — Claude may wrap JSON despite explicit instructions
+    const fence = rawText.trim().match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+    if (fence) {
+      rawText = fence[1].trim();
+    } else {
+      // Second pass: extract first { ... last } (covers preamble text before the block)
+      const firstBrace = rawText.indexOf("{");
+      const lastBrace = rawText.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        rawText = rawText.slice(firstBrace, lastBrace + 1);
+      }
+    }
 
     let xpctoExtraido: XpctoExtraido;
     try {
       xpctoExtraido = JSON.parse(rawText) as XpctoExtraido;
     } catch {
-      const fallback = "No se pudo extraer el JSON. Por favor, intenta de nuevo con el documento.";
-      const stream = new ReadableStream({
-        start(c) {
-          c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: fallback })}\n\n`));
-          c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
-          c.close();
-        },
-      });
-      return new Response(stream, { headers: SSE_HEADERS });
+      return streamErrorSSE(
+        "No se pudo extraer el JSON del documento. Por favor, intenta de nuevo con un archivo diferente."
+      );
     }
 
     // Guardar borrador en Firestore
@@ -387,14 +443,7 @@ async function handleXpctoExtraction(
     return new Response(readableStream, { headers: SSE_HEADERS });
   } catch (error) {
     console.error("[chat/route] Error en extracción XPCTO:", error);
-    const stream = new ReadableStream({
-      start(c) {
-        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: "Hubo un error al procesar el documento. ¿Puedes intentarlo de nuevo?" })}\n\n`));
-        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
-        c.close();
-      },
-    });
-    return new Response(stream, { headers: SSE_HEADERS });
+    return streamErrorSSE("Hubo un error al procesar el documento. ¿Puedes intentarlo de nuevo?");
   }
 }
 

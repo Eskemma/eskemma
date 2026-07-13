@@ -2,10 +2,12 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
 
 let adminApp: App;
 let adminAuth: Auth;
 let adminDb: Firestore;
+let adminStorage: Storage;
 
 try {
   // Inicializar solo si no existe
@@ -48,6 +50,7 @@ try {
 
     adminApp = initializeApp({
       credential: cert(serviceAccount as any),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
 
     console.log('✅ [firebase-admin] Firebase Admin inicializado correctamente');
@@ -58,11 +61,12 @@ try {
 
   adminAuth = getAuth(adminApp);
   adminDb = getFirestore(adminApp);
-  
-  console.log('✅ [firebase-admin] Auth y Firestore inicializados');
+  adminStorage = getStorage(adminApp);
+
+  console.log('✅ [firebase-admin] Auth, Firestore y Storage inicializados');
 } catch (error) {
   console.error('❌ [firebase-admin] Error al inicializar Firebase Admin:', error);
   throw error;
 }
 
-export { adminApp, adminAuth, adminDb };
+export { adminApp, adminAuth, adminDb, adminStorage };

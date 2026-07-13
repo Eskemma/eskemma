@@ -48,6 +48,7 @@ interface SefixPadron {
   padronElectoral: number;
   padronHombres: number;
   padronMujeres: number;
+  granularidadReal?: string;
   fuente: string;
 }
 
@@ -67,6 +68,8 @@ interface SefixEleccion {
 
 interface SefixData {
   estado: string;
+  padronLabel: string;
+  nivel: string;
   padron: SefixPadron | null;
   primary: SefixEleccion;
   contraste: SefixEleccion[];
@@ -425,8 +428,23 @@ export default function ExploracionPage() {
         const primaryScope: SefixScope = primaryKey === "presidencia" ? "nacional" : "entidad";
         const contrasteEntries = CONTRASTE_BY_PRIMARY[primaryKey];
 
+        const padronParams = new URLSearchParams({ estado: estadoSefix });
+        if (projectTerritory) {
+          const niv = projectTerritory.nivel;
+          if (niv === "distrito_federal" || niv === "distrito") {
+            const cve = parseCveDistritoFed(projectTerritory);
+            if (cve) padronParams.set("cveDistrito", cve);
+          } else if (niv === "distrito_local") {
+            if (projectTerritory.cve_distrito) {
+              padronParams.set("cabeceraLocal", projectTerritory.cve_distrito);
+            }
+          } else if (niv === "municipal" && projectTerritory.municipio) {
+            padronParams.set("municipioNombre", projectTerritory.municipio.toUpperCase());
+          }
+        }
+
         const [padR, primaryResult, ...contrasteResults] = await Promise.allSettled([
-          fetch(`/api/sefix/padron?estado=${encodeURIComponent(estadoSefix)}`, { credentials: "include" })
+          fetch("/api/sefix/padron?" + padronParams, { credentials: "include" })
             .then(r => r.ok ? r.json() : null),
           fetchSefixEleccion(estadoSefix, primaryKey, true, primaryScope, projectTerritory),
           ...contrasteEntries.map(({ key, scope }) =>
@@ -446,6 +464,8 @@ export default function ExploracionPage() {
 
         setSefixData({
           estado: estadoSefix,
+          padronLabel: buildPadronLabel(projectTerritory ?? null, estadoSefix),
+          nivel: projectTerritory?.nivel ?? "estatal",
           padron: padJson?.padron ?? null,
           primary,
           contraste,
@@ -867,16 +887,6 @@ export default function ExploracionPage() {
           const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
           const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
 
-          const MOTOR_LABELS: Record<string, string> = {
-            M2: "M2 — Contraste XPCTO",
-            M3: "M3 — Semáforo de Veto",
-            M4: "M4 — Incertidumbres",
-            M5: "M5 — Hipótesis + PIP",
-          };
-          const pendingMotors = dvs === null && mapaPESTEL !== null
-            ? (["M2", "M3", "M4", "M5"] as const).filter((m) => !motorAprobaciones[m])
-            : [];
-
           return (
             <div className="mt-2">
               <div className="flex flex-wrap gap-1.5">
@@ -914,16 +924,6 @@ export default function ExploracionPage() {
                 </button>
               </div>
 
-              {pendingMotors.length > 0 && headerState !== "editando" && (
-                <p className="text-xs mt-1.5">
-                  <span className="font-semibold text-black-eske-80 dark:text-[#C7D6E0]">
-                    Aprueba los motores pendientes antes de continuar:{" "}
-                  </span>
-                  <span className="font-normal text-black-eske-80 dark:text-[#C7D6E0]">
-                    {pendingMotors.map((m) => MOTOR_LABELS[m]).join(", ")}
-                  </span>
-                </p>
-              )}
             </div>
           );
         })()}
@@ -1037,8 +1037,8 @@ export default function ExploracionPage() {
                   <p className="text-sm font-semibold text-black-eske dark:text-white">
                     Análisis por motores
                   </p>
-                  <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
-                    Revisa y aprueba cada sección antes de generar el DVS final.
+                  <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                    Revisa y aprueba cada sección antes de generar el Reporte F2.
                   </p>
                 </div>
                 {pestlVia === "pestel" && pestProjectId && (
@@ -1297,7 +1297,7 @@ function ExplorationFormPanel({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
         {readOnly ? (
           <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Solo lectura</span>
         ) : pestProjectId ? (
@@ -1354,7 +1354,7 @@ function ExplorationFormPanel({
               <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
               {sefixData && (projectType === "electoral" || projectType === "gubernamental") && (
                 <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
-                  <p className="text-xs font-semibold text-gray-eske-50 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
+                  <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
                     Contexto Electoral
                   </p>
                   <SefixWidget data={sefixData} projectType={projectType} />
@@ -1655,7 +1655,7 @@ function SectionField({ label, hint, required, children }: {
 }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-gray-eske-60 dark:text-[#9AAEBE] block mb-1">
+      <label className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] block mb-1">
         {label}{required && <span className="ml-1 text-red-500">*</span>}
       </label>
       {hint && <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-1">{hint}</p>}
@@ -1915,11 +1915,11 @@ function EleccionCard({
             {resultados.partidos.slice(0, 3).map((p) => (
               <div key={p.partido} className="text-xs">
                 <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
-                <span className="ml-1 text-gray-eske-50 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
+                <span className="ml-1 text-black-eske-80 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+          <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
             Participación: {resultados.participacion}%
             {isPrimary && resultados.totalVotos > 0 && ` · ${fmtN(resultados.totalVotos)} votos`}
           </p>
@@ -1927,6 +1927,134 @@ function EleccionCard({
       )}
     </div>
   );
+}
+
+// ── Padrón label helpers ───────────────────────────────────────────────────────
+
+function normalizeParaAbrev(s: string): string {
+  return s.toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+const ESTADOS_ABREV: Record<string, string> = {
+  aguascalientes:                  "AGS.",
+  baja_california:                 "BC.",
+  baja_california_sur:             "BCS.",
+  campeche:                        "CAMP.",
+  chiapas:                         "CHIS.",
+  chihuahua:                       "CHIH.",
+  coahuila:                        "COAH.",
+  coahuila_de_zaragoza:            "COAH.",
+  colima:                          "COL.",
+  cdmx:                            "CDMX",
+  ciudad_de_mexico:                "CDMX",
+  df:                              "CDMX",
+  durango:                         "DGO.",
+  estado_de_mexico:                "EDOMEX.",
+  edomex:                          "EDOMEX.",
+  mexico:                          "EDOMEX.",
+  guanajuato:                      "GTO.",
+  guerrero:                        "GRO.",
+  hidalgo:                         "HGO.",
+  jalisco:                         "JAL.",
+  michoacan:                       "MICH.",
+  michoacan_de_ocampo:             "MICH.",
+  morelos:                         "MOR.",
+  nayarit:                         "NAY.",
+  nuevo_leon:                      "NL.",
+  oaxaca:                          "OAX.",
+  puebla:                          "PUE.",
+  queretaro:                       "QRO.",
+  quintana_roo:                    "Q.ROO.",
+  san_luis_potosi:                 "SLP.",
+  sinaloa:                         "SIN.",
+  sonora:                          "SON.",
+  tabasco:                         "TAB.",
+  tamaulipas:                      "TAMS.",
+  tlaxcala:                        "TLAX.",
+  veracruz:                        "VER.",
+  veracruz_de_ignacio_de_la_llave: "VER.",
+  yucatan:                         "YUC.",
+  zacatecas:                       "ZAC.",
+};
+
+function romanToInt(s: string): number | null {
+  const map: Record<string, number> = {
+    I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000,
+  };
+  if (!/^[IVXLCDM]+$/.test(s)) return null;
+  let result = 0;
+  for (let i = 0; i < s.length; i++) {
+    const cur = map[s[i]], next = map[s[i + 1]];
+    result += next && next > cur ? -cur : cur;
+  }
+  return result;
+}
+
+function parseCveDistritoFed(
+  territory: import("@/types/pestel.types").Territorio
+): string | null {
+  if (territory.cve_distrito && /^\d+$/.test(territory.cve_distrito)) {
+    return territory.cve_distrito;
+  }
+  const haystack = (territory.municipio ?? "") + " " + (territory.nombre ?? "");
+  const m = haystack.match(/Distrito\s+Electoral\s+Federal\s+([IVX\d]+)/i);
+  if (!m) return null;
+  const raw = m[1].toUpperCase();
+  if (/^\d+$/.test(raw)) return raw;
+  const n = romanToInt(raw);
+  return n !== null ? String(n) : null;
+}
+
+function nivelEquivalente(a?: string, b?: string): boolean {
+  const norm = (n?: string) => (n === "distrito" ? "distrito_federal" : n);
+  return norm(a) === norm(b);
+}
+
+function buildPadronLabel(territory: import("@/types/pestel.types").Territorio | null, estado: string): string {
+  if (!territory) return estado.toUpperCase();
+  const nivel = territory.nivel;
+
+  if (nivel === "nacional") return "NACIONAL";
+  if (nivel === "estatal") return (territory.estado ?? estado).toUpperCase();
+
+  if (nivel === "municipal") {
+    const mun = (territory.municipio ?? territory.nombre).toUpperCase();
+    const abrev = ESTADOS_ABREV[normalizeParaAbrev(territory.estado ?? estado)]
+      ?? (territory.estado ?? estado).slice(0, 3).toUpperCase() + ".";
+    return `${mun}, ${abrev}`;
+  }
+
+  // distrito_federal | distrito_local | distrito (legacy)
+  // NOTE: parsing depends on the user having followed the standard format
+  // "Distrito Electoral Federal/Local {num} con cabecera en {ciudad}".
+  // If the free-text field was filled differently, the fallback returns
+  // the raw text uppercased — acceptable degradation, not an error.
+  const haystack = territory.municipio ?? territory.nombre ?? "";
+  const fallback  = territory.nombre ?? "";
+
+  const fedRe = /Distrito\s+Electoral\s+Federal\s+([IVX\d]+)(?:\s+con\s+cabecera\s+en\s+([^,]+))?/i;
+  const locRe = /Distrito\s+Electoral\s+Local\s+([IVX\d]+)(?:\s+(.+?))?(?:,|$)/i;
+
+  const fedMatch = haystack.match(fedRe) ?? fallback.match(fedRe);
+  if (fedMatch) {
+    const raw = fedMatch[1].toUpperCase();
+    const n   = /^\d+$/.test(raw) ? parseInt(raw, 10) : (romanToInt(raw) ?? 0);
+    return "DTTO. FED. " + String(n).padStart(2, "0") + " " +
+      (territory.estado ?? estado).toUpperCase();
+  }
+
+  const locMatch = haystack.match(locRe) ?? fallback.match(locRe);
+  if (locMatch) {
+    const raw = locMatch[1].toUpperCase();
+    const n   = /^\d+$/.test(raw) ? parseInt(raw, 10) : (romanToInt(raw) ?? 0);
+    return "DTTO. LOC. " + String(n).padStart(2, "0") + " " +
+      (territory.estado ?? estado).toUpperCase();
+  }
+
+  return haystack.toUpperCase() || fallback.toUpperCase();
 }
 
 function SefixWidget({ data, projectType }: { data: SefixData; projectType?: ProjectType }) {
@@ -1948,18 +2076,17 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
       {/* Padrón */}
       {padron && (
         <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">
-              {isElectoral ? `LNE y Padrón Electoral — ${data.estado}` : "Contexto electoral de referencia"}
-            </p>
-            <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">INE · DERFE</span>
-          </div>
-          <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-2">al {padron.corte}</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske leading-snug">
+            {isElectoral ? `LNE y Padrón Electoral — ${data.padronLabel}` : "Contexto Electoral de Referencia"}
+          </p>
+          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-2">
+            INE / DERFE · al {padron.corte}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
               <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
               <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+              <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
                 {padron.listaNominalHombres && padron.listaNominalMujeres
                   ? `H: ${fmtN(padron.listaNominalHombres)} · M: ${fmtN(padron.listaNominalMujeres)}`
                   : "Desglose no disponible"}
@@ -1968,11 +2095,18 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
             <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
               <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
               <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
-              <p className="text-xs text-gray-eske-40 dark:text-[#6D8294]">
+              <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
                 H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
               </p>
             </div>
           </div>
+          {padron?.granularidadReal &&
+           !nivelEquivalente(padron.granularidadReal, data.nivel) && (
+            <p className="text-[10px] text-gray-eske-80 dark:text-[#6D8294] mt-1.5 italic">
+              Cifras a nivel estatal. No se encontraron datos a nivel{" "}
+              {data.nivel.replace(/_/g, " ")}.
+            </p>
+          )}
         </div>
       )}
 

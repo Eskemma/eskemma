@@ -38,6 +38,12 @@ export default function ModduloPage() {
     );
   }
 
+  function handleMetaChange(id: string, meta: Pick<ModduloProject, "name" | "description" | "color">) {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, ...meta } : p))
+    );
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-eske-10 dark:bg-[#112230]">
@@ -104,6 +110,7 @@ export default function ModduloPage() {
                   project={project}
                   onDeleted={handleDeleted}
                   onStatusChange={handleStatusChange}
+                  onMetaChange={handleMetaChange}
                 />
               ))}
             </div>
@@ -134,20 +141,53 @@ const STATUS_LABELS: Record<ModduloProject["status"], string> = {
   archived: "Archivado",
 };
 
+const META_COLOR_SWATCHES = ["#026988", "#248cc1", "#ffa366", "#649941", "#ffd14a", "#d10f3f", "#474747"];
+
 function ProjectCard({
   project,
   onDeleted,
   onStatusChange,
+  onMetaChange,
 }: {
   project: ModduloProject;
   onDeleted: (id: string) => void;
   onStatusChange: (id: string, status: ModduloProject["status"]) => void;
+  onMetaChange: (id: string, meta: Pick<ModduloProject, "name" | "description" | "color">) => void;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditingMeta, setIsEditingMeta] = useState(false);
+  const [metaDraft, setMetaDraft] = useState({ name: project.name, description: project.description ?? "", color: project.color ?? "#026988" });
+  const [isSavingMeta, setIsSavingMeta] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
   const borderColor = project.color ?? "#026988";
+
+  function openEditMeta() {
+    setKebabOpen(false);
+    setMetaDraft({ name: project.name, description: project.description ?? "", color: project.color ?? "#026988" });
+    setIsEditingMeta(true);
+  }
+
+  async function handleMetaSave() {
+    const name = metaDraft.name.trim();
+    if (!name || name.length < 3) return;
+    setIsSavingMeta(true);
+    try {
+      const r = await fetch(`/api/moddulo/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, description: metaDraft.description.trim(), color: metaDraft.color }),
+      });
+      if (r.ok) {
+        onMetaChange(project.id!, { name, description: metaDraft.description.trim(), color: metaDraft.color });
+        setIsEditingMeta(false);
+      }
+    } catch {} finally {
+      setIsSavingMeta(false);
+    }
+  }
 
   useEffect(() => {
     if (!kebabOpen) return;
@@ -187,7 +227,9 @@ function ProjectCard({
     }
   }
 
-  const menuItems: { label: string; onClick: () => void; danger?: boolean }[] = [];
+  const menuItems: { label: string; onClick: () => void; danger?: boolean }[] = [
+    { label: "Editar", onClick: openEditMeta },
+  ];
   if (project.status === "active") {
     menuItems.push({ label: "Pausar", onClick: () => handleStatusPatch("paused") });
     menuItems.push({ label: "Archivar", onClick: () => handleStatusPatch("archived") });
@@ -235,7 +277,10 @@ function ProjectCard({
             </span>
             <span aria-hidden="true">·</span>
             <span>Fase: {PHASE_NAMES[project.currentPhase]}</span>
-            <span className={`ml-auto shrink-0 font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
+          </div>
+          {/* Status — esquina inferior derecha */}
+          <div className="flex justify-end mt-2">
+            <span className={`shrink-0 font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
               {STATUS_LABELS[project.status]}
             </span>
           </div>
@@ -293,6 +338,85 @@ function ProjectCard({
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}
         />
+      )}
+      {isEditingMeta && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsEditingMeta(false); }}
+        >
+          <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <h3 className="font-semibold text-black-eske dark:text-[#C7D6E0] text-base">
+              Editar proyecto
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="meta-name" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                  Nombre <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="meta-name"
+                  type="text"
+                  value={metaDraft.name}
+                  onChange={(e) => setMetaDraft((d) => ({ ...d, name: e.target.value }))}
+                  maxLength={100}
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white focus:outline-none focus:ring-1 focus:ring-bluegreen-eske"
+                />
+                <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-0.5">{metaDraft.name.length}/100</p>
+              </div>
+              <div>
+                <label htmlFor="meta-desc" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                  Descripción
+                </label>
+                <textarea
+                  id="meta-desc"
+                  value={metaDraft.description}
+                  onChange={(e) => setMetaDraft((d) => ({ ...d, description: e.target.value }))}
+                  maxLength={300}
+                  rows={3}
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white focus:outline-none focus:ring-1 focus:ring-bluegreen-eske resize-none"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-2">Color</p>
+                <div className="flex gap-2 flex-wrap">
+                  {META_COLOR_SWATCHES.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setMetaDraft((d) => ({ ...d, color: hex }))}
+                      style={{ backgroundColor: hex }}
+                      className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                        metaDraft.color === hex ? "border-black-eske scale-110" : "border-transparent"
+                      }`}
+                      aria-label={`Color ${hex}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsEditingMeta(false)}
+                disabled={isSavingMeta}
+                className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleMetaSave}
+                disabled={isSavingMeta || metaDraft.name.trim().length < 3}
+                className="px-4 py-2 text-sm font-medium bg-bluegreen-eske text-white rounded-lg hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSavingMeta && (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

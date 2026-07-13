@@ -14,6 +14,9 @@ interface PhaseReportViewProps {
   /** Si es false (borrador), muestra el banner de siguiente paso. Default: true */
   isCompleted?: boolean;
   onStartEdit?: () => void;
+  /** Callback para regenerar el reporte — muestra ↺ en el encabezado cuando se provee */
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
   className?: string;
   /** Dictamen de Coherencia XPCTO — solo F1 */
   dictamen?: Dictamen | null;
@@ -237,6 +240,8 @@ export default function PhaseReportView({
   reportText,
   isCompleted = true,
   onStartEdit,
+  onRegenerate,
+  isRegenerating = false,
   className = "",
   dictamen,
   xpcto,
@@ -285,9 +290,28 @@ export default function PhaseReportView({
           </div>
           <span className="text-sm font-semibold text-green-800 dark:text-green-300">{getReportLabel(phaseId)}</span>
         </div>
-        <span className="text-xs text-green-600 font-medium">
-          {isCompleted ? "Fase completada" : "Borrador generado"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-green-600 font-medium">
+            {isCompleted ? "Fase completada" : "Borrador generado"}
+          </span>
+          {onRegenerate && !isCompleted && (
+            <button
+              onClick={onRegenerate}
+              disabled={isRegenerating}
+              className="p-1 rounded text-bluegreen-eske hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
+              aria-label="Regenerar reporte"
+              title="Regenerar reporte"
+            >
+              <svg
+                className={`w-3.5 h-3.5 ${isRegenerating ? "animate-spin" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Contenido del reporte — scrollable */}
@@ -338,7 +362,7 @@ export default function PhaseReportView({
               ),
             }}
           >
-            {reportText}
+            {reportText?.replace(/^(\d+)\.\s*\n+(?=\*\*)/gm, "$1. ")}
           </ReactMarkdown>
         </div>
 

@@ -446,6 +446,7 @@ export interface ChatAttachment {
   nombre: string;
   url: string;
   tipo: string;
+  storagePath?: string;
 }
 
 export interface ChatRequest {

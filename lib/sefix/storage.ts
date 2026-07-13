@@ -5,6 +5,7 @@ import { getStorage } from "firebase-admin/storage";
 import { createInterface } from "readline";
 import { PARTIDOS_MAPPING } from "@/lib/sefix/eleccionesConstants";
 import { PARTIDOS_MAPPING_LOC } from "@/lib/sefix/eleccionesLocalesConstants";
+import type { NivelTerritorial } from "@/types/pestel.types";
 
 const BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 
@@ -407,6 +408,8 @@ export interface PadronEstado {
   padronNoBinario: number;
   listaNominalHombres: number;
   listaNominalMujeres: number;
+  listaNominalNoBinario?: number;
+  granularidadReal?: NivelTerritorial;
   fuente: string;
 }
 
@@ -3360,3 +3363,155 @@ export async function getLneByDistrito(
   return result;
 }
 
+// ==========================================
+// PADRÓN POR GEO (DISTRITO FEDERAL / MUNICIPIO)
+// ==========================================
+
+export interface PadronGeoFilter {
+  cveDistrito?: string;
+  municipioNombre?: string;
+}
+
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+export async function getPadronByGeo(
+  estadoInput: string,
+  geo: PadronGeoFilter
+): Promise<PadronEstado | null> {
+  if (!geo.cveDistrito && !geo.municipioNombre) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+
+  const estadoNombre = resolveEstadoName(estadoInput);
+  if (!estadoNombre) return null;
+  const derfeNombre = toDerfeNombre(estadoNombre);
+
+  const geoKey = geo.cveDistrito ? "d:" + geo.cveDistrito : "m:" + geo.municipioNombre;
+  const cacheKey = "padron_geo:" + estadoNombre + ":" + geoKey;
+  const cached = getCached<PadronEstado>(cacheKey);
+  if (cached) return cached;
+
+  const semanalPath = await getLatestSemanalPath();
+  if (!semanalPath) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+  const fecha = extractFecha(semanalPath);
+
+  let padronElectoral = 0, listaNominal = 0;
+  let padronHombres = 0, padronMujeres = 0, padronNoBinario = 0;
+  let listaNominalHombres = 0, listaNominalMujeres = 0, listaNominalNoBinario = 0;
+
+  const munNorm = geo.municipioNombre
+    ? stripAccents(geo.municipioNombre.toUpperCase())
+    : null;
+  const cvdInt = geo.cveDistrito ? parseInt(geo.cveDistrito, 10) : NaN;
+
+  await streamCsvRows(semanalPath, (row) => {
+    if (row.nombre_entidad !== derfeNombre) return;
+    if (!isNaN(cvdInt) && parseInt(row.cve_distrito ?? "", 10) !== cvdInt) return;
+    if (munNorm && stripAccents(row.nombre_municipio?.trim().toUpperCase() ?? "") !== munNorm) return;
+    padronElectoral       += parseInt(row.padron_electoral  ?? "0") || 0;
+    listaNominal          += parseInt(row.lista_nominal     ?? "0") || 0;
+    padronHombres         += parseInt(row.padron_hombres    ?? "0") || 0;
+    padronMujeres         += parseInt(row.padron_mujeres    ?? "0") || 0;
+    padronNoBinario       += parseInt(row.padron_no_binario ?? "0") || 0;
+    listaNominalHombres   += parseInt(row.lista_hombres     ?? "0") || 0;
+    listaNominalMujeres   += parseInt(row.lista_mujeres     ?? "0") || 0;
+    listaNominalNoBinario += parseInt(row.lista_no_binario  ?? "0") || 0;
+  });
+
+  if (padronElectoral === 0 && listaNominal === 0) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+
+  const granularidadReal: NivelTerritorial =
+    geo.cveDistrito ? "distrito_federal" : "municipal";
+  const result: PadronEstado = {
+    estado: estadoNombre, corte: fecha, tipo: "semanal",
+    padronElectoral, listaNominal,
+    padronHombres, padronMujeres, padronNoBinario,
+    listaNominalHombres, listaNominalMujeres, listaNominalNoBinario,
+    granularidadReal,
+    fuente: "DERFE — Padrón Electoral al " + fecha,
+  };
+  setCache(cacheKey, result);
+  return result;
+}
+
+// ==========================================
+// PADRÓN POR DISTRITO LOCAL (vía secciones)
+// ==========================================
+
+export async function getPadronByDistritoLocal(
+  estadoInput: string,
+  cabecera: string
+): Promise<PadronEstado | null> {
+  const estadoNombre = resolveEstadoName(estadoInput);
+  if (!estadoNombre) return null;
+  const derfeNombre = toDerfeNombre(estadoNombre);
+
+  const cacheKey = "padron_dloc:" + estadoNombre + ":" + cabecera;
+  const cached = getCached<PadronEstado>(cacheKey);
+  if (cached) return cached;
+
+  const years = await getResultadosLocalesYearsForCargo("dip_loc", estadoNombre);
+  if (years.length === 0) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+  const latestYear = years[years.length - 1];
+
+  const secOpciones = await getEleccionesLocalesGeo(
+    "secciones", latestYear, "dip_loc", estadoNombre, cabecera
+  );
+  if (secOpciones.length === 0) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+  const secSet = new Set(secOpciones.map((s) => normSec(s.cve)));
+
+  const semanalPath = await getLatestSemanalPath();
+  if (!semanalPath) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+  const fecha = extractFecha(semanalPath);
+
+  let padronElectoral = 0, listaNominal = 0;
+  let padronHombres = 0, padronMujeres = 0, padronNoBinario = 0;
+  let listaNominalHombres = 0, listaNominalMujeres = 0, listaNominalNoBinario = 0;
+
+  await streamCsvRows(semanalPath, (row) => {
+    if (row.nombre_entidad !== derfeNombre) return;
+    if (!secSet.has(normSec(row.seccion ?? ""))) return;
+    padronElectoral       += parseInt(row.padron_electoral  ?? "0") || 0;
+    listaNominal          += parseInt(row.lista_nominal     ?? "0") || 0;
+    padronHombres         += parseInt(row.padron_hombres    ?? "0") || 0;
+    padronMujeres         += parseInt(row.padron_mujeres    ?? "0") || 0;
+    padronNoBinario       += parseInt(row.padron_no_binario ?? "0") || 0;
+    listaNominalHombres   += parseInt(row.lista_hombres     ?? "0") || 0;
+    listaNominalMujeres   += parseInt(row.lista_mujeres     ?? "0") || 0;
+    listaNominalNoBinario += parseInt(row.lista_no_binario  ?? "0") || 0;
+  });
+
+  if (padronElectoral === 0 && listaNominal === 0) {
+    const r = await getPadronByEstado(estadoInput);
+    return r ? { ...r, granularidadReal: "estatal" } : null;
+  }
+
+  const result: PadronEstado = {
+    estado: estadoNombre, corte: fecha, tipo: "semanal",
+    padronElectoral, listaNominal,
+    padronHombres, padronMujeres, padronNoBinario,
+    listaNominalHombres, listaNominalMujeres, listaNominalNoBinario,
+    granularidadReal: "distrito_local",
+    fuente: "DERFE — Padrón Electoral al " + fecha,
+  };
+  setCache(cacheKey, result);
+  return result;
+}

@@ -1,8 +1,12 @@
 // app/api/sefix/padron/route.ts
-// Devuelve datos de Padrón Electoral y Lista Nominal por estado
+// Devuelve datos de Padrón Electoral y Lista Nominal por estado, distrito o municipio
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { getPadronByEstado } from "@/lib/sefix/storage";
+import {
+  getPadronByEstado,
+  getPadronByGeo,
+  getPadronByDistritoLocal,
+} from "@/lib/sefix/storage";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +25,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const padron = await getPadronByEstado(estado);
+    const cveDistrito   = searchParams.get("cveDistrito")    ?? undefined;
+    const cabeceraLocal = searchParams.get("cabeceraLocal")  ?? undefined;
+    const municipioNom  = searchParams.get("municipioNombre") ?? undefined;
+
+    const padron = cabeceraLocal
+      ? await getPadronByDistritoLocal(estado, cabeceraLocal)
+      : cveDistrito || municipioNom
+      ? await getPadronByGeo(estado, { cveDistrito, municipioNombre: municipioNom })
+      : await getPadronByEstado(estado);
 
     if (!padron) {
       return NextResponse.json(

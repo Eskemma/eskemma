@@ -58,10 +58,20 @@ export async function POST(
       let dictamen: Dictamen | null = null;
 
       try {
-        // Strip markdown code fences that Claude sometimes adds despite instructions
         let jsonToParse = rawText.trim();
+
+        // Pass 1: strip anchored markdown fences
         const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-        if (fenceMatch) jsonToParse = fenceMatch[1].trim();
+        if (fenceMatch) {
+          jsonToParse = fenceMatch[1].trim();
+        } else {
+          // Pass 2: extract first { … last } (handles preamble text before the block)
+          const firstBrace = jsonToParse.indexOf("{");
+          const lastBrace = jsonToParse.lastIndexOf("}");
+          if (firstBrace !== -1 && lastBrace > firstBrace) {
+            jsonToParse = jsonToParse.slice(firstBrace, lastBrace + 1);
+          }
+        }
 
         const parsed = JSON.parse(jsonToParse) as { reportText: string; dictamen: Dictamen };
         if (parsed.reportText && typeof parsed.reportText === "string") {
@@ -69,7 +79,6 @@ export async function POST(
         }
         dictamen = parsed.dictamen ?? null;
       } catch {
-        // Fallback: treat entire response as reportText, no dictamen
         reportText = rawText;
       }
 
@@ -244,7 +253,13 @@ El campo "reportText" debe contener este reporte en markdown:
 
 ## IMPLICACIONES PARA LAS SIGUIENTES FASES
 
-[3-5 puntos concretos sobre qué debe atenderse en Exploración, Investigación y Diagnóstico basándose en las fortalezas y riesgos identificados en el XPCTO]
+Escribe entre 3 y 5 párrafos con este formato exacto — el número va DENTRO de las negritas, seguido inmediatamente del texto, todo en la misma línea:
+
+**1. [Etiqueta estratégica — Fase afectada (código)]:** [implicación concreta en 2-3 oraciones]
+**2. [Etiqueta estratégica — Fase afectada (código)]:** [implicación concreta en 2-3 oraciones]
+**3. [Etiqueta estratégica — Fase afectada (código)]:** [implicación concreta en 2-3 oraciones]
+
+NO uses listas markdown (no pongas el número antes de las negritas). Cada punto es un párrafo independiente que empieza con **N.** en negrita.
 
 Sé preciso, directo y estratégico. No uses frases genéricas. Basa cada análisis en los datos específicos del proyecto.
 

@@ -100,7 +100,7 @@ export default function ModduloChat({
           pendingFiles.map(async (file) => {
             const path = `moddulo/${user.uid}/${projectId}/fases/${phaseId}/attachments/${crypto.randomUUID()}-${file.name}`;
             const url = await uploadMedia(file, path);
-            return { nombre: file.name, url, tipo: file.type };
+            return { nombre: file.name, url, tipo: file.type, storagePath: path };
           })
         );
       } finally {

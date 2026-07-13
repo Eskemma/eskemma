@@ -51,7 +51,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
 
             {/* Back link */}
             <Link
-              href="/moddulo/proyecto"
+              href="/moddulo"
               className="text-sm text-white-eske/70 hover:text-white-eske inline-flex items-center gap-1 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

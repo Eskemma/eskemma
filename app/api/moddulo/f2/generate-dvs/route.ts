@@ -380,6 +380,15 @@ async function persistAndReturn(
 ): Promise<NextResponse> {
   const dvs = sanitizeDVS(rawDvs);
 
+  const hasM5Content = dvs.hei?.tensionCentral || dvs.hei?.contexto || (dvs.pip?.length ?? 0) > 0;
+  if (!hasM5Content) {
+    // Option B: log and continue — M5 will be editable manually in the frontend
+    console.error("[generate-dvs] M5 returned empty after sanitization", {
+      rawHei: rawDvs.hei,
+      pipCount: rawDvs.pip?.length ?? 0,
+    });
+  }
+
   if (saveas === "draft") {
     await adminDb.collection("moddulo_projects").doc(projectId).update({
       "phases.exploracion.draftDVS": dvs,

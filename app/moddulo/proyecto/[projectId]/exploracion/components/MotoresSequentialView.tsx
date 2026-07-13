@@ -88,7 +88,18 @@ function getMotorSummary(id: MotorId, dvs: DVSF2): string {
 // ── Shared field helpers ───────────────────────────────────────────────────────
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold text-gray-eske-60 dark:text-[#9AAEBE] mb-1">{children}</p>;
+  return <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">{children}</p>;
+}
+
+function DescTwoLines({ text, className }: { text: string; className: string }) {
+  const dotIdx = text.indexOf(". ");
+  if (dotIdx === -1) return <p className={className}>{text}</p>;
+  return (
+    <p className={className}>
+      <span className="block">{text.slice(0, dotIdx + 1)}</span>
+      <span className="block">{text.slice(dotIdx + 2)}</span>
+    </p>
+  );
 }
 
 function PencilIcon() {
@@ -113,18 +124,19 @@ function InlineEdit({
   rows?: number;
   className?: string;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(value === "");
   const [draft, setDraft] = useState(value);
 
   if (editing) {
     return (
-      <div className="space-y-1.5">
+      <div className={`space-y-1.5 ${className}`}>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={rows}
           autoFocus
-          className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-bluegreen-eske dark:border-bluegreen-eske/60 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white placeholder:text-gray-eske-40 focus:outline-none focus:ring-1 focus:ring-bluegreen-eske resize-none"
+          placeholder={placeholder}
+          className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-bluegreen-eske dark:border-bluegreen-eske/60 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white placeholder:text-gray-eske-80 focus:outline-none focus:ring-1 focus:ring-bluegreen-eske resize-none"
         />
         <div className="flex gap-2">
           <button
@@ -149,7 +161,7 @@ function InlineEdit({
   return (
     <div className={`group flex items-start gap-1.5 ${className}`}>
       <p className="flex-1 text-sm text-black-eske dark:text-[#C5D8E8] leading-relaxed">
-        {value || <span className="text-gray-eske-40 italic">{placeholder}</span>}
+        {value || <span className="text-gray-eske-80 italic">{placeholder}</span>}
       </p>
       <button
         type="button"
@@ -200,9 +212,10 @@ const VEREDICTO_DESC: Record<ContrasteXPCTO["veredicto"], string> = {
 };
 
 const VEREDICTO_BADGE = {
-  coherente:              "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40",
-  requiere_ajuste:        "bg-yellow-eske-20 text-black-eske dark:bg-yellow-eske/20 dark:text-yellow-eske-70",
-  requiere_investigacion: "bg-red-eske-20 text-red-eske-80 dark:bg-red-eske/20 dark:text-red-eske-40",
+  coherente:              "bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40",
+  // text-black-eske (no amarillo): amarillo sobre fondo transparente no alcanza 4.5:1 (WCAG AA).
+  requiere_ajuste:        "bg-transparent border border-yellow-eske-60 text-black-eske dark:border-yellow-eske-40 dark:text-yellow-eske-70",
+  requiere_investigacion: "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-red-eske-40 dark:text-red-eske-40",
 } as const;
 
 function M2Panel({ items, editable, onChange }: {
@@ -223,32 +236,24 @@ function M2Panel({ items, editable, onChange }: {
     <div className="space-y-3">
       {items.map((item, i) => (
         <div key={item.dimension} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-semibold text-black-eske dark:text-white">
               {XPCTO_LABELS[item.dimension] ?? item.dimension}
             </span>
             {editable ? (
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <SelectField
-                  value={item.veredicto}
-                  onChange={(v) => update(i, { veredicto: v })}
-                  options={VEREDICTO_OPTS}
-                />
-                <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] text-right max-w-[220px] leading-snug">
-                  {VEREDICTO_DESC[item.veredicto]}
-                </p>
-              </div>
+              <SelectField
+                value={item.veredicto}
+                onChange={(v) => update(i, { veredicto: v })}
+                options={VEREDICTO_OPTS}
+              />
             ) : (
-              <div className="flex flex-col items-end gap-0.5 shrink-0">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${VEREDICTO_BADGE[item.veredicto]}`}>
-                  {VEREDICTO_OPTS.find((o) => o.value === item.veredicto)?.label}
-                </span>
-                <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] text-right max-w-[200px] leading-snug">
-                  {VEREDICTO_DESC[item.veredicto]}
-                </p>
-              </div>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-sm shrink-0 ${VEREDICTO_BADGE[item.veredicto]}`}>
+                {VEREDICTO_OPTS.find((o) => o.value === item.veredicto)?.label}
+              </span>
             )}
           </div>
+          {/* Description spans full card width — two lines split at period */}
+          <DescTwoLines text={VEREDICTO_DESC[item.veredicto]} className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-40 text-right" />
           {editable ? (
             <InlineEdit
               value={item.argumentacion}
@@ -303,38 +308,36 @@ function M3Panel({ actores, editable, onChange }: {
         <div key={i} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
           {editable ? (
             <>
-              {/* Row 1 (editable): select de nivel (izq) + botón eliminar (der) */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <SelectField value={actor.nivelRiesgo} onChange={(v) => update(i, { nivelRiesgo: v })} options={NIVEL_RIESGO_OPTS} />
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] max-w-[240px] leading-snug">
-                    {NIVEL_RIESGO_DESC[actor.nivelRiesgo]}
-                  </p>
+              {/* Two-column layout: dot+nombre LEFT, select+X+desc RIGHT */}
+              <div className="flex items-start gap-2">
+                {/* LEFT: dot + nombre */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
+                  <input
+                    type="text"
+                    value={actor.nombre}
+                    onChange={(e) => update(i, { nombre: e.target.value })}
+                    placeholder="Nombre del actor"
+                    className="flex-1 text-sm font-semibold bg-transparent border-b border-gray-eske-20 dark:border-white/20 focus:outline-none py-0.5 text-black-eske dark:text-white placeholder:font-normal placeholder:text-gray-eske-40"
+                  />
                 </div>
-                <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0 mt-0.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                {/* RIGHT: select + delete button */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <SelectField value={actor.nivelRiesgo} onChange={(v) => update(i, { nivelRiesgo: v })} options={NIVEL_RIESGO_OPTS} />
+                  <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0 mt-0.5">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              {/* Row 2 (editable): dot + título completo (ancho libre) */}
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
-                <input
-                  type="text"
-                  value={actor.nombre}
-                  onChange={(e) => update(i, { nombre: e.target.value })}
-                  placeholder="Nombre del actor"
-                  className="flex-1 text-sm font-semibold bg-transparent border-b border-gray-eske-20 dark:border-white/20 focus:outline-none py-0.5 text-black-eske dark:text-white placeholder:font-normal placeholder:text-gray-eske-40"
-                />
-              </div>
+              {/* Description at full card width — two lines split at period */}
+              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 text-right" />
             </>
           ) : (
             <>
               {/* Row 1 (lectura): descripción de nivel */}
-              <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] leading-snug">
-                {NIVEL_RIESGO_DESC[actor.nivelRiesgo]}
-              </p>
+              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] leading-snug" />
               {/* Row 2 (lectura): dot + nombre + tipo */}
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
@@ -408,10 +411,16 @@ const RESOLUCION_DESC: Record<IncertidumbreF2["resolucion"], string> = {
   baja:  "Difícil de resolver — requiere tiempo o acceso privilegiado.",
 };
 
+const DESTINO_DESC: Record<IncertidumbreF2["destino"], string> = {
+  F3:  "Esta incertidumbre será resuelta en la fase de investigación.",
+  SIP: "Esta incertidumbre amerita formar parte del Sistema de Investigación Permanente.",
+};
+
 const NIVEL_BADGE = {
-  alta:  "bg-red-eske-20 text-red-eske-80 dark:bg-red-eske/20 dark:text-red-eske-40",
-  media: "bg-yellow-eske-20 text-black-eske dark:bg-yellow-eske/20 dark:text-yellow-eske-70",
-  baja:  "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40",
+  alta:  "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-red-eske-40 dark:text-red-eske-40",
+  // text-black-eske (no amarillo): amarillo sobre fondo transparente no alcanza 4.5:1 (WCAG AA).
+  media: "bg-transparent border border-yellow-eske-60 text-black-eske dark:border-yellow-eske-40 dark:text-yellow-eske-70",
+  baja:  "bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40",
 } as const;
 
 function M4Panel({ items, editable, onChange }: {
@@ -431,31 +440,32 @@ function M4Panel({ items, editable, onChange }: {
   return (
     <div className="space-y-3">
       {items.map((item, i) => (
-        <div key={i} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
+        <div key={i} className="relative bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
+          {editable && (
+            <button type="button" onClick={() => remove(i)} aria-label="Eliminar incertidumbre" className="absolute top-2 right-2 text-gray-eske-40 hover:text-red-eske transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
           {editable ? (
             <>
-              <div className="flex items-start gap-2">
-                <InlineEdit value={item.descripcion} onChange={(v) => update(i, { descripcion: v })} placeholder="Descripción de la incertidumbre…" rows={2} className="flex-1" />
-                <button type="button" onClick={() => remove(i)} aria-label="Eliminar incertidumbre" className="mt-0.5 text-gray-eske-40 hover:text-red-eske transition-colors shrink-0">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+              <InlineEdit value={item.descripcion} onChange={(v) => update(i, { descripcion: v })} placeholder="Descripción de la incertidumbre…" rows={2} className="w-full pr-5" />
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Urgencia</p>
                   <SelectField value={item.urgencia}   onChange={(v) => update(i, { urgencia: v })}   options={URGENCIA_OPTS} />
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mt-1 leading-snug">{URGENCIA_DESC[item.urgencia]}</p>
+                  <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Resolución</p>
                   <SelectField value={item.resolucion} onChange={(v) => update(i, { resolucion: v })} options={RESOLUCION_OPTS} />
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mt-1 leading-snug">{RESOLUCION_DESC[item.resolucion]}</p>
+                  <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Destino</p>
                   <SelectField value={item.destino}    onChange={(v) => update(i, { destino: v })}    options={DESTINO_OPTS} />
+                  <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
                 </div>
               </div>
             </>
@@ -463,8 +473,8 @@ function M4Panel({ items, editable, onChange }: {
             <>
               <p className="text-sm text-black-eske dark:text-white">{item.descripcion}</p>
               <div className="flex flex-wrap gap-1.5">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${NIVEL_BADGE[item.urgencia]}`}>Urgencia {item.urgencia}</span>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${NIVEL_BADGE[item.resolucion]}`}>Resolución {item.resolucion}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${NIVEL_BADGE[item.urgencia]}`}>Urgencia {item.urgencia}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${NIVEL_BADGE[item.resolucion]}`}>Resolución {item.resolucion}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.destino === "F3" ? "bg-bluegreen-eske-10 text-bluegreen-eske-80 dark:bg-bluegreen-eske/20 dark:text-[#6BA4C6]" : "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10 dark:text-[#9AAEBE]"}`}>
                   → {item.destino === "F3" ? "F3 — Investigación" : "SIP (largo plazo)"}
                 </span>
@@ -495,7 +505,26 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
   const addPIP      = () => onPIPChange([...pip, { numero: pip.length + 1, pregunta: "", metodo: "", vinculoHito: "", orden: pip.length + 1, profundidad: "exploratoria" }]);
   const removePIP   = (i: number) => onPIPChange(pip.filter((_, idx) => idx !== i).map((p, idx) => ({ ...p, numero: idx + 1 })));
 
+  const isEmpty = !hei.tensionCentral && !hei.contexto && pip.length === 0;
+
+  // Empty + not editable: show notice only (motor approved but blank)
+  if (isEmpty && !editable) {
+    return (
+      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 p-4 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+        No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
+        {/* TODO: botón regenerar M5 — implementar en sprint posterior */}
+      </div>
+    );
+  }
+
   return (
+    <>
+    {isEmpty && editable && (
+      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 px-4 py-3 mb-3 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+        No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
+        {/* TODO: botón regenerar M5 — implementar en sprint posterior */}
+      </div>
+    )}
     <div className="space-y-4">
       {/* HEI */}
       <div className="rounded-xl p-4 bg-bluegreen-eske-10/60 border-l-4 border-bluegreen-eske dark:bg-bluegreen-eske/10 space-y-3">
@@ -589,7 +618,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">Método: {item.metodo}</p>
+                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Método: {item.metodo}</p>
                     <p className="text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6]">Vínculo: {item.vinculoHito}</p>
                     {item.orden !== undefined && item.orden !== item.numero && (
                       <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
@@ -612,6 +641,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -774,14 +804,34 @@ export default function MotoresSequentialView({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {isActive && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-transparent border border-brown-eske-60 text-brown-eske-80 dark:border-yellow-eske-40 dark:text-yellow-eske-40">
+                    Aprobación pendiente
+                  </span>
+                )}
                 {isApproved && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40">
+                    Aprobado
+                  </span>
+                )}
+                {isApproved && !isReEditing && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleStartReEdit(motor.id); }}
-                    aria-label={`Re-editar ${motor.label}`}
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-green-eske-40 hover:bg-green-eske-30 dark:hover:bg-green-eske/30 transition-colors"
+                    aria-label={`Editar ${motor.label}`}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-bluegreen-eske text-white hover:bg-bluegreen-eske/90 transition-colors"
                   >
-                    Aprobado
+                    Editar
+                  </button>
+                )}
+                {isApproved && isReEditing && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleSaveReEdit(motor.id); }}
+                    aria-label={`Guardar cambios en ${motor.label}`}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-bluegreen-eske text-white hover:bg-bluegreen-eske/90 transition-colors"
+                  >
+                    Guardar
                   </button>
                 )}
                 {!isLocked && (
@@ -838,17 +888,8 @@ export default function MotoresSequentialView({
                   />
                 )}
 
-                <div className="flex justify-end pt-1 gap-2">
-                  {isReEditing && (
-                    <button
-                      type="button"
-                      onClick={() => handleSaveReEdit(motor.id)}
-                      className="px-5 py-1.5 bg-bluegreen-eske text-white rounded-full text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors"
-                    >
-                      Guardar cambios
-                    </button>
-                  )}
-                  {isActive && (
+                {isActive && (
+                  <div className="flex justify-end pt-1">
                     <button
                       type="button"
                       onClick={() => handleApprove(motor.id)}
@@ -856,8 +897,8 @@ export default function MotoresSequentialView({
                     >
                       {APPROVE_LABEL[motor.id]}
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

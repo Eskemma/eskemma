@@ -91,7 +91,7 @@ function NuevoProyectoContent() {
       <div className="bg-bluegreen-eske text-white-eske py-4 px-6">
         <div className="max-w-2xl mx-auto flex items-center gap-4">
           <Link
-            href="/moddulo/proyecto"
+            href="/moddulo"
             className="text-white-eske/70 hover:text-white-eske text-sm flex items-center gap-1 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

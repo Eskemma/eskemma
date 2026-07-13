@@ -122,24 +122,49 @@ export default function PropositoPage() {
         }
 
         // Cargar reportText (siempre, no solo cuando está completada)
-        // Detectar el caso legacy donde se almacenó el JSON completo como reportText
+        // El campo puede llegar en tres formas:
+        //   A) Objeto JS (Firestore Map legacy): {reportText:"...", dictamen:{...}}
+        //   B) String con JSON completo: '{"reportText":"...","dictamen":{...}}'
+        //   C) String de markdown limpio (formato actual)
         const savedDictamen = p.phases?.proposito?.dictamen as Dictamen | undefined;
-        const rawSavedReport = p.phases?.proposito?.reportText as string | undefined;
-        if (rawSavedReport) {
+        const rawSavedReport = p.phases?.proposito?.reportText;
+        let cleanReport: string | null = null;
+        let cleanDictamen: Dictamen | null = null;
+
+        if (rawSavedReport && typeof rawSavedReport === "object") {
+          // Caso A: Firestore Map almacenado como objeto
+          const obj = rawSavedReport as unknown as { reportText?: string; dictamen?: Dictamen };
+          if (obj.reportText && typeof obj.reportText === "string") {
+            cleanReport = obj.reportText;
+            cleanDictamen = obj.dictamen ?? null;
+          }
+        } else if (rawSavedReport && typeof rawSavedReport === "string") {
           try {
             let jsonToParse = rawSavedReport.trim();
             const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
             if (fenceMatch) jsonToParse = fenceMatch[1].trim();
             const maybeJson = JSON.parse(jsonToParse) as { reportText?: string; dictamen?: Dictamen };
             if (maybeJson?.reportText && typeof maybeJson.reportText === "string") {
-              setReportText(maybeJson.reportText);
-              if (!savedDictamen && maybeJson.dictamen) setDictamen(maybeJson.dictamen);
-            } else {
-              setReportText(rawSavedReport);
+              // Caso B: JSON string con campo reportText extraíble
+              cleanReport = maybeJson.reportText;
+              cleanDictamen = maybeJson.dictamen ?? null;
+            } else if (!jsonToParse.startsWith("{") && !jsonToParse.startsWith("[")) {
+              // Caso C dentro del try: JSON.parse lo procesó como primitivo — es texto plano
+              cleanReport = rawSavedReport;
             }
           } catch {
-            setReportText(rawSavedReport);
+            // JSON.parse falló — solo mostrar si no parece JSON corrupto
+            if (!rawSavedReport.trim().startsWith("{")) {
+              cleanReport = rawSavedReport; // Caso C: markdown limpio
+            }
+            // Si empieza con "{" pero falla el parse: dato corrupto — dejar null para regenerar
           }
+        }
+
+        if (cleanReport) {
+          setReportText(cleanReport);
+          if (!savedDictamen && cleanDictamen) setDictamen(cleanDictamen);
+          setShowReport(true);
         }
 
         // Cargar dictamen si existe en Firestore por separado
@@ -255,7 +280,19 @@ export default function PropositoPage() {
       if (!r.ok) return null;
       const data = await r.json();
       if (data.dictamen) setDictamen(data.dictamen);
-      return data.reportText ?? null;
+      let reportText: string | null = data.reportText ?? null;
+      // Client-side safety: if the API fell back to returning raw JSON, extract reportText here
+      if (reportText && reportText.trim().startsWith("{")) {
+        try {
+          const firstBrace = reportText.indexOf("{");
+          const lastBrace = reportText.lastIndexOf("}");
+          const parsed = JSON.parse(reportText.slice(firstBrace, lastBrace + 1)) as { reportText?: string };
+          if (parsed.reportText && typeof parsed.reportText === "string") {
+            reportText = parsed.reportText;
+          }
+        } catch { /* use as-is */ }
+      }
+      return reportText;
     } catch {
       return null;
     } finally {
@@ -461,7 +498,7 @@ export default function PropositoPage() {
                   className={`${btnBase} flex items-center gap-1${isGeneratingReport ? " pointer-events-none" : ""}`}
                 >
                   {isGeneratingReport ? (
-                    <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden="true" /> Generando</>
+                    <><div className="w-3 h-3 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin" aria-hidden="true" /> <span className="text-red-eske">Generando</span></>
                   ) : "Reporte F1"}
                 </button>
               )}
@@ -551,6 +588,11 @@ export default function PropositoPage() {
                 projectId={projectId}
                 isCompleted={mode === "completed"}
                 onStartEdit={mode !== "editing" ? handleStartEdit : undefined}
+                onRegenerate={mode !== "completed" && mode !== "editing" ? async () => {
+                  const newReport = await generateReport(form);
+                  if (newReport) setReportText(newReport);
+                } : undefined}
+                isRegenerating={isGeneratingReport}
                 dictamen={dictamen}
                 xpcto={form}
                 className="flex-1 overflow-hidden"
