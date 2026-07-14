@@ -32,6 +32,8 @@ export interface MotoresSequentialViewProps {
   onApprove: (motor: MotorId) => void;
   onDraftChange: (updated: DVSF2) => void;
   onSaveEdit?: (motor: MotorId) => void;
+  /** Cuando true, todos los motores arrancan expandidos y editables sin aprobación previa */
+  editMode?: boolean;
 }
 
 // ── Motor metadata ─────────────────────────────────────────────────────────────
@@ -507,12 +509,10 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
 
   const isEmpty = !hei.tensionCentral && !hei.contexto && pip.length === 0;
 
-  // Empty + not editable: show notice only (motor approved but blank)
   if (isEmpty && !editable) {
     return (
       <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 p-4 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
         No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
-        {/* TODO: botón regenerar M5 — implementar en sprint posterior */}
       </div>
     );
   }
@@ -522,7 +522,6 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
     {isEmpty && editable && (
       <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 px-4 py-3 mb-3 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
         No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
-        {/* TODO: botón regenerar M5 — implementar en sprint posterior */}
       </div>
     )}
     <div className="space-y-4">
@@ -538,19 +537,43 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
               <InlineEdit value={hei.contexto} onChange={(v) => onHEIChange({ ...hei, contexto: v })} placeholder="Descripción del entorno inmediato…" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Condiciones favorables (una por línea)</FieldLabel>
-                <textarea rows={3} value={hei.condicionesFavorables.join("\n")}
-                  onChange={(e) => onHEIChange({ ...hei, condicionesFavorables: e.target.value.split("\n").filter(Boolean) })}
-                  placeholder="+ Factor favorable…"
-                  className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white placeholder:text-gray-eske-40 focus:outline-none focus:ring-1 focus:ring-bluegreen-eske resize-none"
-                />
+              <div>
+                <FieldLabel>Condiciones favorables</FieldLabel>
+                <ul className="space-y-1 mb-1">
+                  {hei.condicionesFavorables.map((c, i) => (
+                    <li key={i} className="flex items-center gap-1.5">
+                      <span className="text-green-eske-70 shrink-0 select-none">•</span>
+                      <input
+                        value={c}
+                        onChange={(e) => { const a = [...hei.condicionesFavorables]; a[i] = e.target.value; onHEIChange({ ...hei, condicionesFavorables: a }); }}
+                        className="flex-1 text-xs bg-transparent border-b border-gray-eske-20 dark:border-white/10 focus:outline-none focus:border-bluegreen-eske text-black-eske dark:text-[#C5D8E8] py-0.5"
+                      />
+                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: hei.condicionesFavorables.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-30 hover:text-red-eske shrink-0 transition-colors">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: [...hei.condicionesFavorables, ""] })} className="text-xs text-bluegreen-eske hover:underline">+ Añadir condición</button>
               </div>
-              <div><FieldLabel>Condiciones adversas (una por línea)</FieldLabel>
-                <textarea rows={3} value={hei.condicionesAdversas.join("\n")}
-                  onChange={(e) => onHEIChange({ ...hei, condicionesAdversas: e.target.value.split("\n").filter(Boolean) })}
-                  placeholder="− Factor adverso…"
-                  className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white placeholder:text-gray-eske-40 focus:outline-none focus:ring-1 focus:ring-bluegreen-eske resize-none"
-                />
+              <div>
+                <FieldLabel>Condiciones adversas</FieldLabel>
+                <ul className="space-y-1 mb-1">
+                  {hei.condicionesAdversas.map((c, i) => (
+                    <li key={i} className="flex items-center gap-1.5">
+                      <span className="text-red-eske-70 shrink-0 select-none">•</span>
+                      <input
+                        value={c}
+                        onChange={(e) => { const a = [...hei.condicionesAdversas]; a[i] = e.target.value; onHEIChange({ ...hei, condicionesAdversas: a }); }}
+                        className="flex-1 text-xs bg-transparent border-b border-gray-eske-20 dark:border-white/10 focus:outline-none focus:border-bluegreen-eske text-black-eske dark:text-[#C5D8E8] py-0.5"
+                      />
+                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: hei.condicionesAdversas.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-30 hover:text-red-eske shrink-0 transition-colors">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: [...hei.condicionesAdversas, ""] })} className="text-xs text-bluegreen-eske hover:underline">+ Añadir condición</button>
               </div>
             </div>
             <div><FieldLabel>Premisa estratégica</FieldLabel>
@@ -564,11 +587,11 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="font-semibold text-green-eske-70 dark:text-[#7BC47C] mb-1">Condiciones favorables</p>
-                <ul className="space-y-1">{hei.condicionesFavorables.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">+ {c}</li>)}</ul>
+                <ul className="space-y-1 list-disc list-inside">{hei.condicionesFavorables.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
               <div>
                 <p className="font-semibold text-red-eske-70 dark:text-[#E07070] mb-1">Condiciones adversas</p>
-                <ul className="space-y-1">{hei.condicionesAdversas.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">− {c}</li>)}</ul>
+                <ul className="space-y-1 list-disc list-inside">{hei.condicionesAdversas.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
             </div>
             <p className="text-xs italic text-black-eske-70 dark:text-[#9AAEBE] border-t border-bluegreen-eske/30 pt-2">{hei.premisaEstrategica}</p>
@@ -682,7 +705,7 @@ function GeneratingSkeleton() {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function MotoresSequentialView({
-  projectId: _projectId,
+  projectId,
   draftDVS,
   motorAprobaciones,
   isGenerating,
@@ -691,10 +714,15 @@ export default function MotoresSequentialView({
   onApprove,
   onDraftChange,
   onSaveEdit,
+  editMode = false,
 }: MotoresSequentialViewProps) {
-  // Accordion: M2 starts expanded, rest collapsed
-  const [expanded, setExpanded] = useState<Record<MotorId, boolean>>({ M2: true, M3: false, M4: false, M5: false });
-  // Re-editing: tracks which approved motors are open for editing
+  // Accordion: in editMode all start expanded; otherwise M2 only
+  const [expanded, setExpanded] = useState<Record<MotorId, boolean>>(
+    editMode
+      ? { M2: true, M3: true, M4: true, M5: true }
+      : { M2: true, M3: false, M4: false, M5: false }
+  );
+  // Re-editing: tracks which approved motors are open for editing (not used in editMode)
   const [reEditing, setReEditing] = useState<Partial<Record<MotorId, boolean>>>({});
 
   const handleApprove = (motor: MotorId) => {
@@ -751,18 +779,20 @@ export default function MotoresSequentialView({
     <div className="space-y-2 pb-4">
       {MOTORS.map((motor) => {
         const state      = getMotorState(motor.id, motorAprobaciones);
-        const isActive   = state === "active";
+        const isActive   = !editMode && state === "active";
         const isApproved = state === "approved";
-        const isLocked   = state === "locked";
+        const isLocked   = !editMode && state === "locked";
         const isExpanded = expanded[motor.id];
-        const isReEditing = isApproved && !!reEditing[motor.id];
+        const isReEditing = !editMode && isApproved && !!reEditing[motor.id];
 
         // Border/background per state
-        const containerCls = isLocked
-          ? "border-gray-eske-20 dark:border-white/5 opacity-50"
-          : isApproved
-            ? "border-green-eske-30 dark:border-green-eske/30"
-            : "border-bluegreen-eske-30 dark:border-bluegreen-eske/40";
+        const containerCls = editMode
+          ? "border-bluegreen-eske-30 dark:border-bluegreen-eske/40"
+          : isLocked
+            ? "border-gray-eske-20 dark:border-white/5 opacity-50"
+            : isApproved
+              ? "border-green-eske-30 dark:border-green-eske/30"
+              : "border-bluegreen-eske-30 dark:border-bluegreen-eske/40";
 
         return (
           <div key={motor.id} className={`rounded-xl border transition-all ${containerCls}`}>
@@ -804,17 +834,17 @@ export default function MotoresSequentialView({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {isActive && (
+                {!editMode && isActive && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-transparent border border-brown-eske-60 text-brown-eske-80 dark:border-yellow-eske-40 dark:text-yellow-eske-40">
                     Aprobación pendiente
                   </span>
                 )}
-                {isApproved && (
+                {!editMode && isApproved && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40">
                     Aprobado
                   </span>
                 )}
-                {isApproved && !isReEditing && (
+                {!editMode && isApproved && !isReEditing && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleStartReEdit(motor.id); }}
@@ -824,7 +854,7 @@ export default function MotoresSequentialView({
                     Editar
                   </button>
                 )}
-                {isApproved && isReEditing && (
+                {!editMode && isApproved && isReEditing && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleSaveReEdit(motor.id); }}
@@ -848,10 +878,10 @@ export default function MotoresSequentialView({
             {/* ── Accordion body ── */}
             {isExpanded && !isLocked && (
               <div className="px-4 pb-4 space-y-4 border-t border-gray-eske-20/60 dark:border-white/5 pt-3">
-                {!isApproved && (
+                {!editMode && !isApproved && (
                   <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">{motor.description}</p>
                 )}
-                {isReEditing && (
+                {!editMode && isReEditing && (
                   <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
                     Editando motor aprobado — los motores posteriores no se actualizan automáticamente.
                   </p>
@@ -860,21 +890,21 @@ export default function MotoresSequentialView({
                 {motor.id === "M2" && (
                   <M2Panel
                     items={draftDVS.contrasteXPCTO}
-                    editable={isActive || isReEditing}
+                    editable={editMode || isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, contrasteXPCTO: updated })}
                   />
                 )}
                 {motor.id === "M3" && (
                   <M3Panel
                     actores={draftDVS.semaforo}
-                    editable={isActive || isReEditing}
+                    editable={editMode || isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, semaforo: updated })}
                   />
                 )}
                 {motor.id === "M4" && (
                   <M4Panel
                     items={draftDVS.incertidumbres}
-                    editable={isActive || isReEditing}
+                    editable={editMode || isActive || isReEditing}
                     onChange={(updated) => onDraftChange({ ...draftDVS, incertidumbres: updated })}
                   />
                 )}
@@ -882,7 +912,7 @@ export default function MotoresSequentialView({
                   <M5Panel
                     hei={draftDVS.hei}
                     pip={draftDVS.pip}
-                    editable={isActive || isReEditing}
+                    editable={editMode || isActive || isReEditing}
                     onHEIChange={(h) => onDraftChange({ ...draftDVS, hei: h })}
                     onPIPChange={(p) => onDraftChange({ ...draftDVS, pip: p })}
                   />

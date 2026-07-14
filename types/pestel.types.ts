@@ -198,6 +198,8 @@ export interface DimensionAnalysis {
   senalesFavorables?: Senal[];
   senalesAdversas?: Senal[];
   senalesInciertas?: Senal[];
+  // Set when all model parse attempts failed with rawData present
+  processingError?: true;
 }
 
 export interface ImpactChain {

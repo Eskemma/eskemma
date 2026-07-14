@@ -514,9 +514,18 @@ function DimensionPanel({ dim }: { dim: DimensionAnalysis }) {
           tracking-wide mb-2">
           Narrativa
         </h4>
-        <div className="text-sm text-black-eske dark:text-[#C7D6E0] leading-relaxed whitespace-pre-line">
-          {dim.narrative}
-        </div>
+        {dim.processingError ? (
+          <div className="text-sm text-yellow-eske-80 dark:text-yellow-eske bg-[#FFF2CC]
+            dark:bg-yellow-eske/10 rounded-md px-3 py-2 leading-relaxed">
+            Error al procesar esta dimensión. Los datos fueron recibidos pero
+            la respuesta del modelo fue inválida. Puedes relanzar el análisis
+            para obtener resultados.
+          </div>
+        ) : (
+          <div className="text-sm text-black-eske dark:text-[#C7D6E0] leading-relaxed whitespace-pre-line">
+            {dim.narrative}
+          </div>
+        )}
       </div>
     </div>
   );

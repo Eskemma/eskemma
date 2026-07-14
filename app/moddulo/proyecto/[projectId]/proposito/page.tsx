@@ -515,7 +515,7 @@ export default function PropositoPage() {
               ) : (
                 <button
                   onClick={handleStartEdit}
-                  disabled={!formComplete}
+                  disabled={!formComplete || reportText === null}
                   className={btnBase}
                 >
                   Editar variables

@@ -776,12 +776,13 @@ Para cada una de las 5 variables XPCTO (X, P, C, T, O):
    - "requiere_investigacion": riesgo importante o falta información crítica
 3. argumentacion: 2–3 oraciones específicas. Si citas un hecho factual tomado
    de las señales PEST-L, incluye la fuente al final de la oración: (Fuente: ...).
-4. senalesPESTEL: 1–3 FRAGMENTOS TEXTUALES EXACTOS copiados de las señales listadas arriba.
-   REGLA ABSOLUTA: no parafrasees ni inventes. Si no hay señal directamente relevante, usa [].
+4. senalesPESTEL: 1–3 oraciones completas (máx. 120 caracteres cada una) que sinteticen
+   las señales PEST-L más relevantes para esa variable. Escribe oraciones propias, sin truncar,
+   sin puntos suspensivos. Si no hay señal directamente relevante, usa [].
 
 Responde SOLO con este JSON (array de exactamente 5 elementos):
 [
-  { "dimension": "X", "veredicto": "coherente", "argumentacion": "...", "senalesPESTEL": ["fragmento textual exacto"] },
+  { "dimension": "X", "veredicto": "coherente", "argumentacion": "...", "senalesPESTEL": ["Oración completa que sintetiza la señal relevante."] },
   { "dimension": "P", "veredicto": "requiere_ajuste", "argumentacion": "...", "senalesPESTEL": [] },
   { "dimension": "C", "veredicto": "...", "argumentacion": "...", "senalesPESTEL": [] },
   { "dimension": "T", "veredicto": "...", "argumentacion": "...", "senalesPESTEL": [] },

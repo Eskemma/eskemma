@@ -278,24 +278,28 @@ export async function generateAnalysisV2(params: {
 
   const dimKeywords: Record<DimensionCode, string[]> = {
     P: [
-      "político", "gobierno", "partido", "elección", "candidato",
-      "congreso", "diputado", "senador", "presidente",
+      "política", "político", "gobierno", "gubernamental", "partido",
+      "elección", "elecciones", "candidato", "congreso",
+      "diputado", "senador", "presidente", "presidenta",
     ],
     E: [
-      "economía", "inflación", "empleo", "desempleo", "peso",
-      "inversión", "pib", "precio", "banco", "finanza",
+      "economía", "económico", "inflación", "empleo", "desempleo",
+      "peso", "inversión", "pib", "precio", "banco", "finanza",
     ],
     S: [
       "social", "inseguridad", "violencia", "comunidad", "salud",
-      "educación", "pobreza", "migración", "protesta",
+      "educación", "educativo", "pobreza", "migración", "migrante",
+      "protesta",
     ],
     T: [
-      "tecnología", "digital", "internet", "red social", "app",
-      "ia", "inteligencia artificial", "datos", "ciberseguridad",
+      // "ia" removed — too short, matches "había"/"hacía"/"sería"/etc.
+      "tecnología", "digital", "internet", "redes sociales",
+      "red social", "app", "inteligencia artificial", "datos",
+      "ciberseguridad",
     ],
     L: [
-      "ley", "legal", "reforma", "constitución", "decreto",
-      "reglamento", "norma", "resolución", "jurídico",
+      "ley", "legal", "reforma", "constitución", "constitucional",
+      "decreto", "reglamento", "norma", "resolución", "jurídico",
     ],
     Ec: [
       "ambiental", "medio ambiente", "clima", "sequía", "inundación",
@@ -363,6 +367,13 @@ export async function generateAnalysisV2(params: {
   // 6-parallel caused rate-limit failures; pure sequential caused timeouts.
   // 2 concurrent per round balances speed vs. API rate limits (~5 min total).
   const BATCH_SIZE_DIM = 2;
+
+  for (const code of CODES) {
+    const articleCount = (rawDataPerDim[code] || "")
+      .split("\n").filter((l) => l.trim().startsWith("[")).length;
+    console.log(`[generateFeed] dim ${code}: ${articleCount} articles routed`);
+  }
+
   console.log(
     "[generateFeed] Starting dimension analyses " +
     `(${BATCH_SIZE_DIM} concurrent per batch)...`

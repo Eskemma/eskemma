@@ -74,6 +74,8 @@ export interface DimensionAnalysisResult {
   senalesFavorables?: Senal[];
   senalesAdversas?: Senal[];
   senalesInciertas?: Senal[];
+  // Set when all parse attempts failed with rawData present (not "no data")
+  processingError?: true;
 }
 
 export interface ImpactChainResult {
@@ -213,7 +215,7 @@ function buildDimensionPrompt(params: {
 }): string {
   const {
     code, tipo, territorio, horizonte, variables, rawData,
-    inegiData, banxicoData, biseData,
+    banxicoData, biseData,
   } = params;
   const dimName = DIMENSION_NAMES[code];
   const tipoDesc = TIPO_DESCRIPTIONS[tipo] ?? tipo;
@@ -224,15 +226,18 @@ function buildDimensionPrompt(params: {
   const useLegalCtx =
     tipo === "electoral" || tipo === "gubernamental";
 
-  const inegiText = formatEconomicData(inegiData ?? []);
   const banxicoText = formatEconomicData(banxicoData ?? []);
-  const hasEconomicData = code === "E" &&
-    (inegiText.length > 0 || banxicoText.length > 0);
 
-  const economicBlock = hasEconomicData ?
-    "\nDATOS ECONÓMICOS CUANTITATIVOS (INEGI/Banxico):\n" +
-    (inegiText ? `INEGI:\n${inegiText}\n` : "") +
-    (banxicoText ? `Banxico:\n${banxicoText}\n` : "") :
+  // Always include the economic block for dim E so Claude knows INEGI BIE
+  // is unavailable and never cites it.
+  const economicBlock = code === "E" ?
+    "\nBANXICO (Banco de México — series verificadas SP1/SF43718/SF61745):\n" +
+    (banxicoText ?
+      banxicoText + "\n" :
+      "(sin datos disponibles en esta consulta)\n") +
+    "INEGI indicadores económicos: NO DISPONIBLE " +
+    "(IDs de series BIE inválidos — datos no obtenidos). " +
+    "No cites INEGI como fuente de datos económicos.\n" :
     "";
 
   const biseText = formatEconomicData(biseData ?? []);
@@ -271,17 +276,29 @@ DATOS RECOLECTADOS:
 ${rawData || "Sin datos disponibles para este período."}
 ${economicBlock}${biseBlock}
 INSTRUCCIONES:
-- Cuando menciones un hecho específico en la narrativa, cita entre \
-paréntesis al final de la afirmación: (Nombre fuente, mes año) — \
-ej. (Google News, julio 2026) o (INEGI/BISE, Censo 2020). Solo \
-para datos y hechos externos; el análisis estratégico no necesita \
-cita. Máx. 3 citas.
-- Si no hay fuente clara para un hecho, no cites.
 - Usa solo terminología vigente para el contexto mexicano.
-- En señalesFavorables/Adversas/Inciertas: fuente = nombre del medio \
-o institución; fechaCorte = fecha de la noticia en formato YYYY-MM-DD \
-o "sin fecha"; origenInternacional = true solo si la fuente es \
-extranjera.
+- CITAS EN NARRATIVA — REGLAS OBLIGATORIAS:
+  * Cita solo fuentes presentes en los bloques de datos anteriores.
+  * La fecha en la cita debe ser EXACTAMENTE el campo 'período' del \
+dato citado (ej. el período de la serie Banxico). Nunca la fecha \
+actual ni una fecha inferida. Si el dato no tiene período propio, \
+omite la fecha de la cita.
+  * Formatos válidos ÚNICAMENTE: 'Banxico, YYYY-MM-DD' | \
+'Google News, YYYY-MM' | 'DOF, YYYY-MM-DD' | \
+'INEGI/BISE, año' (solo datos de población).
+  * NO cites 'INEGI' ni 'INEGI/Banxico' para datos económicos: \
+esa fuente no tiene datos en esta consulta.
+  * Si no puedes atribuir un dato a alguna de esas fuentes, \
+no cites — no inventes fuentes ni fechas.
+  * Máx. 3 citas por narrativa.
+- En señalesFavorables/Adversas/Inciertas:
+  * fuente: usa SOLO 'Banxico', 'Google News', 'DOF', o 'INEGI/BISE' \
+(esta última solo para datos de población). Si el dato no proviene \
+de ninguno de esos bloques, deja fuente = ''.
+  * fechaCorte: usa el campo 'período' del dato si es de Banxico o \
+INEGI/BISE, o la fecha de la noticia si es de Google News/DOF. \
+Nunca la fecha actual. Si no hay fecha disponible, escribe 'sin fecha'.
+  * origenInternacional: true solo si la fuente es extranjera.
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
 {
@@ -350,16 +367,18 @@ export async function analyzeDimension(params: {
     confianza: 0,
   };
 
+  let currentMaxTokens = 2048;
+  let parsedSuccessfully = false;
   const MAX_ATTEMPTS = 3;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
-    // 90 s gives Claude room to complete ~2048 output tokens under API load.
+    // 90 s gives Claude room to complete output tokens under API load.
     const timeoutId = setTimeout(() => controller.abort(), 90_000);
     try {
       const response = await client.messages.create(
         {
           model: CLAUDE_MODEL,
-          max_tokens: 2048,
+          max_tokens: currentMaxTokens,
           messages: [{role: "user", content: prompt}],
         },
         {signal: controller.signal}
@@ -375,6 +394,7 @@ export async function analyzeDimension(params: {
 
       if (parsed && typeof parsed === "object") {
         raw = {...raw, ...parsed};
+        parsedSuccessfully = true;
         break; // valid JSON received — done
       }
 
@@ -386,6 +406,18 @@ export async function analyzeDimension(params: {
         `response_snippet=${text.slice(0, 120)}`
       );
       if (attempt >= MAX_ATTEMPTS) break;
+
+      if (response.stop_reason === "max_tokens") {
+        // Deterministic truncation: scale tokens so next attempt completes.
+        currentMaxTokens = Math.min(currentMaxTokens * 2, 4096);
+        console.warn(
+          `[claudePESTL] dim ${code} truncated, retrying with ` +
+          `max_tokens=${currentMaxTokens}`
+        );
+      } else {
+        // Non-deterministic parse failure: brief delay before retry.
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     } catch (error) {
       clearTimeout(timeoutId);
       const isRetryable =
@@ -425,6 +457,8 @@ export async function analyzeDimension(params: {
     senalesFavorables: raw.señalesFavorables ?? [],
     senalesAdversas: raw.señalesAdversas ?? [],
     senalesInciertas: raw.señalesInciertas ?? [],
+    ...(!parsedSuccessfully && !!params.rawData?.trim() ?
+      {processingError: true as const} : {}),
   };
 }
 

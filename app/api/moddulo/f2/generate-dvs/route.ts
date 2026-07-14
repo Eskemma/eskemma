@@ -171,6 +171,7 @@ async function runMultiMotorPath(
     m3Raw = extractText(resM3);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error("[generate-dvs] M2/M3 error:", msg, err);
     return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3" }, { status: 500 });
   }
 
@@ -224,21 +225,48 @@ async function runMultiMotorPath(
     destino: i.destino ?? "",
   }));
 
-  let m5Raw: string;
-  try {
-    const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres);
-    const resM5 = await callClaude(system, user, 3000);
-    m5Raw = extractText(resM5);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5" }, { status: 500 });
+  const isM5Empty = (parsed: { hei?: Partial<HEIF2>; pip?: unknown[] }) =>
+    !parsed?.hei?.tensionCentral && !parsed?.hei?.contexto && !(parsed?.pip?.length);
+
+  let m5: { hei: HEIF2; pip: PIPItem[] } | null = null;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let m5Raw: string;
+    try {
+      const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres);
+      const resM5 = await callClaude(system, user, 5000);
+      m5Raw = extractText(resM5);
+      console.log(`[generate-dvs] M5 attempt ${attempt} raw (200 chars):`, m5Raw.slice(0, 200));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[generate-dvs] M5 attempt ${attempt} Claude error:`, msg);
+      if (attempt === 2) {
+        return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5" }, { status: 500 });
+      }
+      continue;
+    }
+
+    try {
+      const parsed = parseJSON<{ hei: HEIF2; pip: PIPItem[] }>(m5Raw, "M5");
+      if (isM5Empty(parsed)) {
+        console.error(`[generate-dvs] M5 attempt ${attempt} returned empty content`);
+        if (attempt === 2) {
+          return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5" }, { status: 500 });
+        }
+        continue;
+      }
+      m5 = parsed;
+      break;
+    } catch {
+      console.error(`[generate-dvs] M5 attempt ${attempt} parse failure. Raw:`, m5Raw.slice(0, 300));
+      if (attempt === 2) {
+        return NextResponse.json({ error: "M5: no se pudo parsear la respuesta de Claude.", motor: "M5" }, { status: 500 });
+      }
+    }
   }
 
-  let m5: { hei: HEIF2; pip: PIPItem[] };
-  try {
-    m5 = parseJSON<{ hei: HEIF2; pip: PIPItem[] }>(m5Raw, "M5");
-  } catch {
-    return NextResponse.json({ error: `M5: no se pudo parsear la respuesta`, motor: "M5", raw: m5Raw.slice(0, 400) }, { status: 500 });
+  if (!m5) {
+    return NextResponse.json({ error: "M5: falló después de 2 intentos.", motor: "M5" }, { status: 500 });
   }
 
   const dvs: DVSF2 = {
@@ -382,11 +410,8 @@ async function persistAndReturn(
 
   const hasM5Content = dvs.hei?.tensionCentral || dvs.hei?.contexto || (dvs.pip?.length ?? 0) > 0;
   if (!hasM5Content) {
-    // Option B: log and continue — M5 will be editable manually in the frontend
-    console.error("[generate-dvs] M5 returned empty after sanitization", {
-      rawHei: rawDvs.hei,
-      pipCount: rawDvs.pip?.length ?? 0,
-    });
+    console.error("[generate-dvs] M5 empty after sanitization — aborting save", { rawHei: rawDvs.hei });
+    return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5" }, { status: 500 });
   }
 
   if (saveas === "draft") {

@@ -323,8 +323,11 @@ export default function ExploracionPage() {
         }
 
         // Cargar draftDVS y motorAprobaciones (nuevo flujo de motores)
-        const savedDraftDVS = p.phases?.exploracion?.draftDVS;
-        if (savedDraftDVS) setDraftDVS(savedDraftDVS as DVSF2);
+        // Descartar draftDVS si M5 está vacío: estado inválido, forzar regeneración completa
+        const savedDraftDVS = p.phases?.exploracion?.draftDVS as Record<string, unknown> | undefined;
+        const draftHei = savedDraftDVS?.hei as Record<string, unknown> | undefined;
+        const draftM5Valid = !!(draftHei?.tensionCentral || draftHei?.contexto || (Array.isArray(savedDraftDVS?.pip) && (savedDraftDVS.pip as unknown[]).length > 0));
+        if (savedDraftDVS && draftM5Valid) setDraftDVS(savedDraftDVS as unknown as DVSF2);
         const savedMotorAprobaciones = p.phases?.exploracion?.motorAprobaciones;
         if (savedMotorAprobaciones) setMotorAprobaciones(
           savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
@@ -704,6 +707,38 @@ export default function ExploracionPage() {
   // Keep the ref in sync so handleDataExtracted can call it without stale closure
   useEffect(() => { handleGenerarDVSRef.current = handleGenerarDVS; }, [handleGenerarDVS]);
 
+  const [isRegeneratingReport, setIsRegeneratingReport] = useState(false);
+  const [reportRegenError, setReportRegenError] = useState<string | null>(null);
+
+  const handleRegenerarReporteF2 = useCallback(async () => {
+    setIsRegeneratingReport(true);
+    setReportRegenError(null);
+    try {
+      const r = await fetch("/api/moddulo/f2/generate-dvs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId, saveas: "final" }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.dvs) setDvs(data.dvs as DVSF2);
+      } else {
+        const err = await r.json().catch(() => ({}));
+        const motor = (err as { motor?: string }).motor;
+        setReportRegenError(
+          motor
+            ? `Error en ${motor}. Intenta de nuevo.`
+            : "No se pudo regenerar el reporte. Intenta de nuevo."
+        );
+      }
+    } catch {
+      setReportRegenError("Error de red. Verifica tu conexión e intenta de nuevo.");
+    } finally {
+      setIsRegeneratingReport(false);
+    }
+  }, [projectId]);
+
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
     if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs));
@@ -806,10 +841,57 @@ export default function ExploracionPage() {
     }).catch(() => {});
   };
 
-  const handleStartEdit = () => { setEditForm(structuredClone(form)); setMode("editing"); };
-  const handleCancelEdit = () => { setMode(dvs ? "completed" : "active"); if (dvs) setShowReporte(true); };
+  const handleStartEdit = () => {
+    if (dvs) {
+      // Modo edición de motores: copia dvs actual a draftDVS con todos pre-aprobados
+      setDraftDVS(structuredClone(dvs));
+      setMotorAprobaciones({ M2: true, M3: true, M4: true, M5: true });
+    } else {
+      setEditForm(structuredClone(form));
+    }
+    setMode("editing");
+  };
+
+  const handleCancelEdit = () => {
+    if (dvs) {
+      // Restaurar draftDVS y aprobaciones al estado previo a la edición
+      setDraftDVS(null);
+      setMotorAprobaciones({});
+      setShowReporte(true);
+    }
+    setMode(dvs ? "completed" : "active");
+  };
 
   const handleSaveEdit = async () => {
+    // ── Modo edición de motores (dvs ya existe) ──────────────────────────────
+    if (dvs !== null) {
+      if (!draftDVS) return;
+      setIsSaving(true);
+      try {
+        const r = await fetch("/api/moddulo/f2/finalize-dvs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId, draftDVS }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.dvs) {
+            setDvs(data.dvs as DVSF2);
+            setDraftDVS(null);
+            setMotorAprobaciones({});
+            setMode("completed");
+            setShowReporte(true);
+            setLastSaved(new Date());
+          }
+        }
+      } catch {/* silencioso */} finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    // ── Modo edición de formulario (dvs aún no existe) ───────────────────────
     setIsSaving(true);
     try {
       await fetch(`/api/moddulo/projects/${projectId}`, {
@@ -821,7 +903,6 @@ export default function ExploracionPage() {
       setForm(structuredClone(editForm));
       setLastSaved(new Date());
 
-      // Re-generar DVS con los nuevos datos
       setGenerandoDVS(true);
       const r = await fetch("/api/moddulo/f2/generate-dvs", {
         method: "POST",
@@ -955,7 +1036,7 @@ export default function ExploracionPage() {
       {!showLanding && (
         <div className="lg:hidden shrink-0 flex border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
           {[
-            { id: "chat" as const, label: showReporte && dvs !== null && mode !== "editing" ? "Reporte F2" : mapaPESTEL !== null && mode !== "editing" ? "Motores" : "Chat" },
+            { id: "chat" as const, label: mode === "editing" && dvs !== null ? "Editando motores" : showReporte && dvs !== null ? "Reporte F2" : mapaPESTEL !== null && mode !== "editing" ? "Motores" : "Chat" },
             { id: "form" as const, label: "Análisis PESTEL" },
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
@@ -988,17 +1069,68 @@ export default function ExploracionPage() {
           {/* Reporte F2 — DVS finalizado */}
           {showReporte && dvs !== null && mode !== "editing" ? (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <button
-                onClick={() => setShowReporte(false)}
-                className="shrink-0 mb-3 flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Volver al chat
-              </button>
+              <div className="shrink-0 mb-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setShowReporte(false)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Volver al chat
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {isRegeneratingReport ? (
+                      <span className="text-xs text-gray-eske-50 dark:text-[#6D8294]">Regenerando...</span>
+                    ) : (
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">Reporte generado</span>
+                    )}
+                    <button
+                      onClick={handleRegenerarReporteF2}
+                      disabled={isRegeneratingReport}
+                      className="p-1 rounded text-bluegreen-eske hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
+                      aria-label="Regenerar reporte F2"
+                      title="Regenerar reporte F2"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 ${isRegeneratingReport ? "animate-spin" : ""}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                {reportRegenError && (
+                  <p className="text-xs text-red-eske text-right">{reportRegenError}</p>
+                )}
+              </div>
               <div className="flex-1 overflow-y-auto">
                 <DVSView dvs={dvs} />
+              </div>
+            </div>
+
+          /* Modo edición de motores — dvs existe y se está editando */
+          ) : mode === "editing" && dvs !== null ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="shrink-0 mb-2 px-1">
+                <p className="text-xs text-bluegreen-eske/60 dark:text-[#6BA4C6]/70">
+                  Edita los motores y guarda los cambios para actualizar el reporte.
+                </p>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <MotoresSequentialView
+                  projectId={projectId}
+                  draftDVS={draftDVS}
+                  motorAprobaciones={motorAprobaciones}
+                  isGenerating={false}
+                  editMode={true}
+                  onApprove={handleApproveMotor}
+                  onDraftChange={setDraftDVS}
+                  onSaveEdit={handleSaveMotorEdit}
+                />
               </div>
             </div>
 

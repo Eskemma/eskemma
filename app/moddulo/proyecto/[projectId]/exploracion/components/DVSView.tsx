@@ -13,13 +13,13 @@ interface DVSViewProps {
 
 type SubTab = "M2" | "M3" | "M4";
 
-// ── Veredicto badge ────────────────────────────────────────────
+// ── Veredicto badge — borde, sin fondo ─────────────────────────
 
 function VeredictoM2Badge({ v }: { v: ContrasteXPCTO["veredicto"] }) {
   const map = {
-    coherente: { label: "Coherente", classes: "bg-green-eske-20 text-green-eske-80" },
-    requiere_ajuste: { label: "Requiere ajuste", classes: "bg-purple-100 text-purple-700 dark:bg-yellow-eske-20 dark:text-black-eske" },
-    requiere_investigacion: { label: "Requiere investigación", classes: "bg-red-eske-20 text-red-eske-80" },
+    coherente: { label: "Coherente", classes: "border border-green-eske-60 text-green-eske-80" },
+    requiere_ajuste: { label: "Requiere ajuste", classes: "border border-purple-400 text-purple-700 dark:border-yellow-eske-60 dark:text-yellow-eske-70" },
+    requiere_investigacion: { label: "Requiere investigación", classes: "border border-red-eske-40 text-red-eske-80" },
   } as const;
   const { label, classes } = map[v];
   return (
@@ -46,13 +46,13 @@ function NivelRiesgoBadge({ nivel }: { nivel: ActorVetoF2["nivelRiesgo"] }) {
   );
 }
 
-// ── Urgencia / Resolución badge ────────────────────────────────
+// ── Urgencia / Resolución badge — borde, sin fondo ─────────────
 
 function NivelBadge({ level, label }: { level: "alta" | "media" | "baja"; label: string }) {
   const colors = {
-    alta: "bg-red-eske-20 text-red-eske-80",
-    media: "bg-purple-100 text-purple-700 dark:bg-yellow-eske-20 dark:text-black-eske",
-    baja: "bg-green-eske-20 text-green-eske-80",
+    alta: "border border-red-eske-40 text-red-eske-80",
+    media: "border border-purple-400 text-purple-700 dark:border-yellow-eske-60 dark:text-yellow-eske-70",
+    baja: "border border-green-eske-40 text-green-eske-80",
   } as const;
   return (
     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${colors[level]}`}>
@@ -89,16 +89,13 @@ function M2Panel({ items }: { items: ContrasteXPCTO[] }) {
             {item.argumentacion}
           </p>
           {item.senalesPESTEL.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <ul className="space-y-0.5 mt-1.5 list-disc list-inside">
               {item.senalesPESTEL.map((s, i) => (
-                <span
-                  key={i}
-                  className="text-xs px-2 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-80 rounded-full dark:bg-bluegreen-eske/20 dark:text-[#6BA4C6]"
-                >
+                <li key={i} className="text-xs text-bluegreen-eske dark:text-[#6BA4C6] leading-snug">
                   {s}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       ))}
@@ -133,11 +130,11 @@ function M3Panel({ actores }: { actores: ActorVetoF2[] }) {
           <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8] mb-1">
             <span className="font-medium">Capacidad de veto:</span> {actor.capacidadVeto}
           </p>
-          <p className="text-xs text-gray-eske-70 dark:text-[#9AAEBE]">
+          <p className="text-xs text-bluegreen-eske/60 dark:text-[#6BA4C6]/80">
             <span className="font-medium">Motivación:</span> {actor.motivacion}
           </p>
           {actor.requiereInvestigacion && (
-            <span className="inline-block mt-1.5 text-xs px-2 py-0.5 bg-orange-eske-10 text-orange-eske-80 rounded-full dark:bg-orange-eske/20">
+            <span className="inline-block mt-1.5 text-xs px-2 py-0.5 border border-orange-eske-40 text-orange-eske-80 rounded-full dark:border-orange-eske/40">
               Requiere investigación de campo
             </span>
           )}
@@ -161,19 +158,19 @@ function M4Panel({ items }: { items: IncertidumbreF2[] }) {
           className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10"
         >
           <p className="text-sm text-black-eske dark:text-white mb-2">{item.descripcion}</p>
-          <div className="flex flex-wrap gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2">
             <NivelBadge level={item.urgencia} label="Urgencia" />
             <NivelBadge level={item.resolucion} label="Resolución" />
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+                item.destino === "F3"
+                  ? "border-bluegreen-eske-40 text-bluegreen-eske-80 dark:border-bluegreen-eske/40"
+                  : "border-gray-eske-40 text-gray-eske-70 dark:border-white/20 dark:text-[#9AAEBE]"
+              }`}
+            >
+              → {item.destino === "F3" ? "F3 — Investigación" : "SIP (largo plazo)"}
+            </span>
           </div>
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-              item.destino === "F3"
-                ? "bg-bluegreen-eske-10 text-bluegreen-eske-80 dark:bg-bluegreen-eske/20"
-                : "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10 dark:text-[#9AAEBE]"
-            }`}
-          >
-            → {item.destino === "F3" ? "F3 — Investigación" : "SIP (largo plazo)"}
-          </span>
         </div>
       ))}
     </div>
@@ -207,27 +204,28 @@ export default function DVSView({ dvs }: DVSViewProps) {
         <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] mb-3">
           {dvs.hei.contexto}
         </p>
-        <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+        <hr className="border-gray-eske-20 dark:border-white/10 my-3" />
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <p className="font-semibold text-green-eske-70 dark:text-[#7BC47C] mb-1">
+            <p className="font-semibold text-sm text-green-eske-70 dark:text-[#7BC47C] mb-1">
               Condiciones favorables
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-1 list-disc list-inside">
               {dvs.hei.condicionesFavorables.map((c, i) => (
-                <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">
-                  + {c}
+                <li key={i} className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+                  {c}
                 </li>
               ))}
             </ul>
           </div>
           <div>
-            <p className="font-semibold text-red-eske-70 dark:text-[#E07070] mb-1">
+            <p className="font-semibold text-sm text-red-eske-70 dark:text-[#E07070] mb-1">
               Condiciones adversas
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-1 list-disc list-inside">
               {dvs.hei.condicionesAdversas.map((c, i) => (
-                <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">
-                  − {c}
+                <li key={i} className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+                  {c}
                 </li>
               ))}
             </ul>
@@ -272,7 +270,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
         {activeTab === "M4" && <M4Panel items={dvs.incertidumbres} />}
       </div>
 
-      {/* PIP — Programa de Investigación Profunda (fixed, not collapsible) */}
+      {/* PIP — Programa de Investigación Profunda */}
       <div className="rounded-xl p-4 bg-gray-eske-10 dark:bg-[#1A3347] border-t-2 border-bluegreen-eske">
         <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-3">
           Programa de Investigación Profunda → F3
@@ -289,7 +287,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
                     {item.pregunta}
                   </p>
                   {item.profundidad && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-bluegreen-eske-10 text-bluegreen-eske-70 dark:bg-bluegreen-eske-80/20 dark:text-bluegreen-eske-30 shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full border border-bluegreen-eske-40 text-bluegreen-eske-70 dark:border-bluegreen-eske/40 dark:text-bluegreen-eske-30 shrink-0">
                       {item.profundidad}
                     </span>
                   )}
