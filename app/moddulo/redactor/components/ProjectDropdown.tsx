@@ -82,7 +82,7 @@ export default function ProjectDropdown({
         </svg>
 
         {/* Nombre del proyecto */}
-        <span className="font-medium text-gray-eske-90 dark:text-[#C7D6E0] max-w-37.5 truncate">
+        <span className="font-medium text-gray-eske-90 dark:text-[#C7D6E0] max-w-37.5 truncate min-w-0">
           {currentProject.name}
         </span>
 

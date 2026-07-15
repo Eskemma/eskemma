@@ -296,7 +296,7 @@ export default function HistoricoPartidosLoc({
                   <label key={pid} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${checked ? "text-black-eske dark:text-[#EAF2F8]" : "text-black-eske-60/60 dark:text-[#6D8294]"}`}>
                     <input type="checkbox" checked={checked} onChange={() => togglePartido(pid)} className="shrink-0 accent-blue-eske" />
                     <span className="shrink-0 w-2.5 h-2.5 rounded-sm border border-black/10 dark:border-white/10" style={{ backgroundColor: color }} aria-hidden="true" />
-                    <span className="truncate">{getPartidoLabelLoc(pid)}</span>
+                    <span className="truncate min-w-0">{getPartidoLabelLoc(pid)}</span>
                   </label>
                 );
               })}

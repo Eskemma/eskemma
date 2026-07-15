@@ -476,7 +476,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
                       style={{ backgroundColor: color }}
                       aria-hidden="true"
                     />
-                    <span className="truncate">{getPLabel(pid)}</span>
+                    <span className="truncate min-w-0">{getPLabel(pid)}</span>
                   </label>
                 );
               })}

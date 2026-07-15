@@ -91,7 +91,7 @@ export default function PESTELStageNav({
               ].join(" ");
 
               const labelClass = [
-                "text-xs font-medium hidden sm:block ml-2 truncate max-w-[80px]",
+                "text-xs font-medium hidden sm:block ml-2 truncate max-w-[80px] min-w-0",
                 isActive
                   ? "text-bluegreen-eske-80 font-semibold"
                   : status === "completed"

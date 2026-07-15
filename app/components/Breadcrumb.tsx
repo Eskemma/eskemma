@@ -17,7 +17,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
-            <li key={index} className="flex items-center gap-1">
+            <li key={index} className="flex items-center gap-1 min-w-0">
               {index > 0 && (
                 <span aria-hidden="true" className="select-none">/</span>
               )}

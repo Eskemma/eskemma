@@ -130,6 +130,15 @@ de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.
 - **PT Sans** — captions y texto pequeño
 - **Philosopher** — títulos en el blog
 
+### Flex + `truncate`: regla Safari
+
+`truncate` requiere `min-w-0` en el elemento mismo (o en su flex/grid parent directo)
+cuando está dentro de un flex o grid container. Sin él, Safari desborda el texto;
+Chromium lo oculta casualmente.
+- Alternativa válida: `max-w-*` en el elemento con `truncate`.
+- Contexto bloque (elemento dentro de `block` o `block-link`): `min-w-0` no aplica;
+  el ancho de bloque ya constrae el elemento. No se necesita `min-w-0`.
+
 ---
 
 ## SEO — Estándar de Construcción (Vertiente B)

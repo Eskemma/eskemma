@@ -271,7 +271,7 @@ function PickerModal({
                   }
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <span className="font-medium text-sm text-gray-eske-80 dark:text-[#C7D6E0] truncate">
                         {p.name}
                       </span>

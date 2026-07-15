@@ -259,7 +259,7 @@ function ProjectCard({
           style={{ borderLeft: `4px solid ${borderColor}` }}
         >
           {/* Title + description — pr-8 reserves space for kebab */}
-          <div className="flex-1 min-w-0 mb-3 pr-8">
+          <div className="min-w-0 mb-3 pr-8">
             <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] truncate">
               {project.name}
             </h3>

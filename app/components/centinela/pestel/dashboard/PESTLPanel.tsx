@@ -129,7 +129,7 @@ function FactorCard({factor}: {factor: Factor}) {
           </a>
         )}
         {medium && !url && (
-          <span className="text-[11px] text-gray-400 dark:text-[#6D8294] truncate">
+          <span className="text-[11px] text-gray-400 dark:text-[#6D8294] truncate min-w-0">
             {medium}
           </span>
         )}

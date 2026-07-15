@@ -149,7 +149,7 @@ function ProjectCard({
               >
                 {project.nombre}
               </h3>
-              <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
+              <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5 truncate">
                 {TYPE_LABELS[project.tipo] ?? project.tipo} ·{" "}
                 {project.territorio?.nombre ?? ""}
               </p>

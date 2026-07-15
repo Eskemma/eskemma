@@ -327,25 +327,29 @@ export default function AnalisisPage() {
                   {formatDate(analysis.analyzedAt)}
                 </p>
               </div>
-              {(analysis.status === "REVIEWED" ||
-                analysis.status === "APPROVED") && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/centinela/pestel/${projectId}/interpretacion`
-                    )
-                  }
-                  className="px-5 py-2 bg-orange-eske text-white rounded-lg
-                    text-sm font-semibold hover:bg-orange-eske-60 transition-colors
-                    shadow-sm shrink-0"
-                >
-                  {analysis.status === "APPROVED"
-                    ? "Ver interpretación →"
-                    : "Continuar a Interpretación →"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/centinela/pestel/${projectId}/interpretacion`
+                  )
+                }
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm shrink-0 ${
+                  analysis.status === "PENDING_REVIEW"
+                    ? "bg-yellow-eske/10 text-black-eske border border-yellow-eske/30 hover:bg-yellow-eske/20 dark:text-yellow-eske-70"
+                    : "bg-orange-eske text-white hover:bg-orange-eske-60"
+                }`}
+              >
+                {analysis.status === "APPROVED"
+                  ? "Ver interpretación →"
+                  : "Continuar a Interpretación →"}
+              </button>
             </div>
+            {analysis.status === "PENDING_REVIEW" && (
+              <p className="text-xs text-black-eske-70 dark:text-yellow-eske-70 -mt-1">
+                Confianza por debajo del umbral recomendado — puedes continuar, pero considera agregar más fuentes primero.
+              </p>
+            )}
             <PESTLPanelV2
               analysis={analysis}
               onAcknowledgeBias={handleAcknowledgeBias}
