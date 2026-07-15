@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PESTLPanelV2 from "@/app/components/centinela/pestel/dashboard/PESTLPanelV2";
+import ModduloButton from "@/app/components/centinela/pestel/ModduloButton";
 import type {
   PESTELProject,
   PestlAnalysisV2,
@@ -350,6 +351,14 @@ export default function AnalisisPage() {
               onAcknowledgeBias={handleAcknowledgeBias}
               onChainAdded={analysis.id ? () => loadAnalysis(analysis.id!) : undefined}
             />
+            <div className="flex justify-end pt-2">
+              <ModduloButton
+                project={project}
+                projectId={projectId}
+                analysisId={analysis.id}
+                onLinked={loadProject}
+              />
+            </div>
           </div>
         )}
 

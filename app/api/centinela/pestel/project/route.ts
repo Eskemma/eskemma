@@ -59,6 +59,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "tipo inválido" }, { status: 400 });
   }
 
+  // Dedup: if a pestel_project with this modduloProjectId already exists, return it
+  // and retry the write-back (the most likely cause of a dedup hit is a prior failed write-back).
+  if (modduloProjectId) {
+    try {
+      const existingSnap = await adminDb
+        .collection("pestel_projects")
+        .where("userId", "==", session.uid)
+        .where("modduloProjectId", "==", modduloProjectId)
+        .get();
+
+      if (!existingSnap.empty) {
+        const existing = existingSnap.docs.sort((a, b) => {
+          const at = (a.data().createdAt as { _seconds?: number })?._seconds ?? 0;
+          const bt = (b.data().createdAt as { _seconds?: number })?._seconds ?? 0;
+          return bt - at;
+        })[0];
+
+        try {
+          await adminDb
+            .collection("moddulo_projects")
+            .doc(modduloProjectId)
+            .update({
+              "phases.exploracion.pestProjectId": existing.id,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+        } catch (wbErr) {
+          console.error(
+            "[pestel/project POST] write-back retry falló para modduloProjectId:",
+            modduloProjectId, "→ pestProjectId:", existing.id, wbErr
+          );
+        }
+
+        return NextResponse.json({ projectId: existing.id }, { status: 200 });
+      }
+    } catch (err) {
+      console.error(
+        "[pestel/project POST] dedup query falló para modduloProjectId:", modduloProjectId, err
+      );
+      // Permissive: proceed with creation rather than block on query failure.
+    }
+  }
+
   const projectRef = adminDb.collection("pestel_projects").doc();
   const now = FieldValue.serverTimestamp();
 
@@ -85,6 +127,22 @@ export async function POST(request: NextRequest) {
   if (modduloOrigenEscenario) projectData.modduloOrigenEscenario = modduloOrigenEscenario;
 
   await projectRef.set(projectData);
+
+  // Write-back: let Moddulo know about the linked PESTEL project immediately,
+  // without waiting for the round-trip import (pest_analysis_id in URL).
+  if (modduloProjectId) {
+    try {
+      await adminDb
+        .collection("moddulo_projects")
+        .doc(modduloProjectId)
+        .update({
+          "phases.exploracion.pestProjectId": projectRef.id,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+    } catch {
+      // Non-fatal: the fallback query in F2 covers this case.
+    }
+  }
 
   return NextResponse.json({ projectId: projectRef.id }, { status: 201 });
 }

@@ -89,9 +89,32 @@ export async function createProject(
 
   if (input.pestelProjectId) {
     data.pestelProjectId = input.pestelProjectId;
+    (data.phases as Record<string, unknown>).exploracion = {
+      ...((data.phases as Record<string, Record<string, unknown>>).exploracion ?? emptyPhaseState()),
+      pestProjectId: input.pestelProjectId,
+      ...(input.pestAnalysisId ? { pestAnalysisId: input.pestAnalysisId } : {}),
+    };
   }
 
   const ref = await adminDb.collection(COLLECTION).add(data);
+
+  if (input.pestelProjectId) {
+    try {
+      await adminDb
+        .collection("pestel_projects")
+        .doc(input.pestelProjectId)
+        .update({
+          modduloProjectId: ref.id,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+    } catch (err) {
+      console.error(
+        `[createProject] write-back a pestel_projects/${input.pestelProjectId} falló:`,
+        err
+      );
+    }
+  }
+
   const snap = await ref.get();
   return { id: ref.id, ...snap.data() } as ModduloProject;
 }
@@ -282,5 +305,19 @@ export async function deleteProject(projectId: string, userId: string): Promise<
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (collaborator?.role !== "owner") throw new Error("Solo el dueño puede eliminar el proyecto.");
 
+  const pestProjectId = project.phases?.["exploracion"]?.pestProjectId;
+
   await adminDb.collection(COLLECTION).doc(projectId).delete();
+
+  // Non-fatal cleanup: remove the back-link in Centinela after the Moddulo project is gone.
+  // If this fails, OrphanRecoveryView handles the stale link gracefully.
+  if (pestProjectId) {
+    try {
+      await adminDb.collection("pestel_projects").doc(pestProjectId).update({
+        modduloProjectId: FieldValue.delete(),
+      });
+    } catch (err) {
+      console.error("[deleteProject] write-back cleanup falló para pestProjectId:", pestProjectId, err);
+    }
+  }
 }

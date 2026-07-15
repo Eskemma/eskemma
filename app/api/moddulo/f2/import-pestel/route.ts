@@ -8,30 +8,8 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { DIMENSION_META } from "@/types/pestel.types";
-import type {
-  MapaPESTEL,
-  F2DimensionPESTEL,
-  F2Senal,
-} from "@/types/moddulo.types";
-
-type RawSenal = {
-  descripcion?: string;
-  fuente?: string;
-  fechaCorte?: string;
-  nivelConfianza?: "alto" | "medio" | "bajo";
-  origenInternacional?: boolean;
-};
-
-function toF2Senal(s: RawSenal): F2Senal {
-  return {
-    descripcion: s.descripcion ?? "",
-    fuente: s.fuente ?? "",
-    fechaCorte: s.fechaCorte ?? "",
-    nivelConfianza: s.nivelConfianza ?? "medio",
-    origenInternacional: s.origenInternacional ?? false,
-  };
-}
+import type { MapaPESTEL } from "@/types/moddulo.types";
+import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -82,36 +60,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sin permisos para este análisis PESTEL" }, { status: 403 });
   }
 
-  // Transform DimensionAnalysis[] → MapaPESTEL
-  const dimensions = (analysis.dimensions ?? []) as Array<{
-    code: string;
-    classification: "OPORTUNIDAD" | "NEUTRAL" | "AMENAZA";
-    narrative?: string;
-    confidence?: number;
-    senalesFavorables?: RawSenal[];
-    senalesAdversas?: RawSenal[];
-    senalesInciertas?: RawSenal[];
-  }>;
+  // Guard: if mapaPESTEL already exists, do not overwrite.
+  const existingAnalysisId = project.phases?.exploracion?.pestAnalysisId as string | undefined;
+  const existingMapa = project.phases?.exploracion?.mapaPESTEL as MapaPESTEL | undefined;
 
-  const mapaPESTEL: MapaPESTEL = {};
-
-  for (const dim of dimensions) {
-    const code = dim.code;
-    const label = DIMENSION_META[code as keyof typeof DIMENSION_META]?.label ?? code;
-
-    const entry: F2DimensionPESTEL = {
-      code,
-      label,
-      clasificacion: dim.classification ?? "NEUTRAL",
-      senalesFavorables: (dim.senalesFavorables ?? []).map(toF2Senal),
-      senalesAdversas: (dim.senalesAdversas ?? []).map(toF2Senal),
-      senalesInciertas: (dim.senalesInciertas ?? []).map(toF2Senal),
-      narrativa: dim.narrative,
-      confidence: dim.confidence,
-    };
-
-    mapaPESTEL[code] = entry;
+  if (existingMapa) {
+    if (existingAnalysisId === pestAnalysisId) {
+      // Same analysis already imported — return existing data idempotently.
+      const existingPestProjectId = project.phases?.exploracion?.pestProjectId as string | undefined;
+      return NextResponse.json({ pestProjectId: existingPestProjectId, mapaPESTEL: existingMapa }, { status: 200 });
+    }
+    return NextResponse.json(
+      { error: "conflict", message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte." },
+      { status: 409 }
+    );
   }
+
+  const mapaPESTEL: MapaPESTEL = transformToMapaPESTEL(
+    (analysis.dimensions ?? []) as RawDimension[]
+  );
 
   const pestProjectId = analysis.projectId as string;
 

@@ -335,6 +335,7 @@ function ProjectCard({
         <DeleteModal
           projectName={project.name}
           isDeleting={isDeleting}
+          hasPestelLink={!!project.phases?.exploracion?.pestProjectId}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}
         />
@@ -429,11 +430,13 @@ function ProjectCard({
 function DeleteModal({
   projectName,
   isDeleting,
+  hasPestelLink,
   onConfirm,
   onCancel,
 }: {
   projectName: string;
   isDeleting: boolean;
+  hasPestelLink?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -443,14 +446,31 @@ function DeleteModal({
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
-        <div>
+        <div className="flex flex-col gap-3">
           <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] text-base">
             ¿Eliminar «{projectName}»?
           </h3>
-          <p className="text-sm text-gray-eske-60 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
+          <p className="text-sm text-gray-eske-60 dark:text-[#9AAEBE] leading-relaxed">
             Esta acción es permanente y no se puede deshacer. Se perderá todo el historial
             de conversaciones y fases del proyecto.
           </p>
+          {hasPestelLink && (
+            <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-yellow-eske-80 dark:text-yellow-eske/90">
+              <svg
+                className="shrink-0 mt-0.5 w-4 h-4"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <span>
+                Este proyecto tiene un análisis PESTEL vinculado en Centinela. El análisis
+                seguirá ahí, pero para usarlo en un nuevo proyecto de Moddulo tendrás que
+                pasar por el flujo de recuperación y volver a capturar las variables de Propósito.
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-end gap-3">
           <button

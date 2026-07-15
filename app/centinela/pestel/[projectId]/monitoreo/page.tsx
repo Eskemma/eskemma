@@ -11,6 +11,7 @@ import DimensionStatusGrid from "@/app/components/centinela/pestel/monitoreo/Dim
 import HistoryChart from "@/app/components/centinela/pestel/monitoreo/HistoryChart";
 import AlertsFeed from "@/app/components/centinela/pestel/monitoreo/AlertsFeed";
 import CrisisBanner from "@/app/components/centinela/pestel/monitoreo/CrisisBanner";
+import ModduloButton from "@/app/components/centinela/pestel/ModduloButton";
 import type {
   PESTELProject,
   PestlAnalysisV2,
@@ -57,55 +58,6 @@ function TokenCostEstimate({ tipo, horizonte }: { tipo: string; horizonte: numbe
       px-3 py-2 rounded-lg">
       Con el intervalo sugerido de {intervalo} h: ~{tokensPerMonth.toLocaleString("es-MX")} tokens/mes
     </p>
-  );
-}
-
-function ModduloButton({
-  project,
-  projectId,
-  analysisId,
-}: {
-  project: PESTELProject | null;
-  projectId: string;
-  analysisId: string | undefined;
-}) {
-  const router = useRouter();
-  if (!project) return null;
-
-  if (project.modduloOrigenEscenario === "A" && project.modduloProjectId) {
-    const href = `/moddulo/proyecto/${project.modduloProjectId}/exploracion${
-      analysisId ? `?pest_analysis_id=${analysisId}` : ""
-    }`;
-    return (
-      <button
-        type="button"
-        onClick={() => router.push(href)}
-        className="px-5 py-2.5 border border-bluegreen-eske text-bluegreen-eske
-          rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/10
-          transition-colors"
-      >
-        Regresar a Moddulo F2 con resultados
-      </button>
-    );
-  }
-
-  const params = new URLSearchParams({
-    from: "pestel",
-    pestelProjectId: projectId,
-    pestelProjectName: project.nombre,
-    pestelProjectType: project.tipo,
-  });
-
-  return (
-    <button
-      type="button"
-      onClick={() => router.push(`/moddulo/proyecto/nuevo?${params.toString()}`)}
-      className="px-5 py-2.5 bg-orange-eske text-white
-        rounded-lg text-sm font-semibold hover:bg-orange-eske-60
-        transition-colors shadow-sm"
-    >
-      Iniciar proyecto en Moddulo
-    </button>
   );
 }
 
@@ -450,6 +402,7 @@ export default function MonitoreoPage() {
             project={project}
             projectId={projectId}
             analysisId={analysis?.id}
+            onLinked={loadAll}
           />
         </div>
       </div>

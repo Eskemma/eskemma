@@ -30,6 +30,7 @@ function NuevoProyectoContent() {
   const pestelProjectId = searchParams.get("pestelProjectId");
   const pestelProjectName = searchParams.get("pestelProjectName");
   const pestelProjectType = searchParams.get("pestelProjectType") as ProjectType | null;
+  const pestAnalysisId = searchParams.get("pestAnalysisId");
   const fromPESTEL = searchParams.get("from") === "pestel" && !!pestelProjectId;
 
   // Pre-fill if coming from PESTEL
@@ -64,6 +65,7 @@ function NuevoProyectoContent() {
           color,
           territorio: territory,
           pestelProjectId: fromPESTEL ? pestelProjectId : undefined,
+          pestAnalysisId: fromPESTEL && pestAnalysisId ? pestAnalysisId : undefined,
         }),
         credentials: "include",
       });
@@ -75,7 +77,11 @@ function NuevoProyectoContent() {
         return;
       }
 
-      router.push(`/moddulo/proyecto/${data.project.id}/proposito`);
+      if (fromPESTEL && pestAnalysisId) {
+        router.push(`/moddulo/proyecto/${data.project.id}/exploracion?pest_analysis_id=${pestAnalysisId}`);
+      } else {
+        router.push(`/moddulo/proyecto/${data.project.id}/proposito`);
+      }
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
@@ -324,10 +330,16 @@ function NuevoProyectoContent() {
             <h1 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-1">
               Confirma tu proyecto
             </h1>
-            <p className="text-black-eske-10 dark:text-[#C7D6E0] font-medium text-sm mb-6">
-              Al crear el proyecto, Moddulo te guiará a través de la Fase 1 — Propósito,
-              donde definirás las variables XPCTO del proyecto.
-            </p>
+            {fromPESTEL && pestAnalysisId ? (
+              <p className="text-black-eske-10 dark:text-[#C7D6E0] font-medium text-sm mb-6">
+                Al crear el proyecto irás directo a la Fase 2 — Exploración con el análisis PESTEL ya importado. Puedes completar la Fase 1 — Propósito después.
+              </p>
+            ) : (
+              <p className="text-black-eske-10 dark:text-[#C7D6E0] font-medium text-sm mb-6">
+                Al crear el proyecto, Moddulo te guiará a través de la Fase 1 — Propósito,
+                donde definirás las variables XPCTO del proyecto.
+              </p>
+            )}
 
             {/* Resumen */}
             <div className="bg-gray-eske-10 dark:bg-[#112230] rounded-lg p-4 mb-6 space-y-3">

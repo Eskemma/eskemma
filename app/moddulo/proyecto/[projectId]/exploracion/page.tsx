@@ -8,6 +8,7 @@ import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
 import MotoresSequentialView from "./components/MotoresSequentialView";
+import OrphanRecoveryView from "./components/OrphanRecoveryView";
 import type {
   XPCTO,
   ProjectType,
@@ -231,6 +232,11 @@ export default function ExploracionPage() {
   const [rdaActivo, setRdaActivo] = useState(false);
   const [rdaItems, setRdaItems] = useState<string[]>([]);
 
+  // Orphan recovery: Moddulo project was hard-deleted
+  const [projectNotFound, setProjectNotFound] = useState(false);
+  // F1 banner: phase proposito status for F2 landing warning
+  const [phaseStatusF1, setPhaseStatusF1] = useState<string | null>(null);
+
   // A1 — Landing page: metadatos del proyecto
   const [showLanding, setShowLanding] = useState(true);
   const [projectName, setProjectName] = useState<string>("");
@@ -243,6 +249,9 @@ export default function ExploracionPage() {
   const [pestProjectId, setPestProjectId] = useState<string | null>(null);
   // ID del análisis PESTEL vinculado (para resolver pestProjectId cuando falta)
   const [pestAnalysisId, setPestAnalysisId] = useState<string | null>(null);
+  // currentStage del proyecto PESTEL — always fetched fresh, never cached
+  const [pestCurrentStage, setPestCurrentStage] = useState<number | null>(null);
+  const [pestStageLoading, setPestStageLoading] = useState(false);
 
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
@@ -279,7 +288,11 @@ export default function ExploracionPage() {
     fetch(`/api/moddulo/projects/${projectId}`, { credentials: "include" })
       .then(async (r) => {
         if (!r.ok) {
-          console.error(`[exploracion] API error ${r.status}:`, await r.text());
+          if (r.status === 404) {
+            setProjectNotFound(true);
+          } else {
+            console.error(`[exploracion] API error ${r.status}:`, await r.text());
+          }
           return null;
         }
         return r.json();
@@ -354,9 +367,30 @@ export default function ExploracionPage() {
         if (savedPestProjectId) {
           setPestProjectId(savedPestProjectId as string);
           setPestlVia("pestel");
+          // Happy path: fetch fresh currentStage — never use a cached value
+          setPestStageLoading(true);
+          fetch(`/api/moddulo/f2/find-linked-pestel?pestel_project_id=${savedPestProjectId}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data: { found: boolean; currentStage?: number } | null) => {
+              if (data?.found) setPestCurrentStage(data.currentStage ?? 3);
+            })
+            .catch(() => { /* non-fatal — button falls back to /datos */ })
+            .finally(() => setPestStageLoading(false));
         } else if (savedPestAnalysisId || savedMapa) {
           // Proyecto vinculado antes de que se guardara pestProjectId
           setPestlVia("pestel");
+        } else {
+          // Fallback: check Centinela side in case write-back failed
+          fetch(`/api/moddulo/f2/find-linked-pestel?moddulo_project_id=${projectId}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data: { found: boolean; pestProjectId?: string; currentStage?: number } | null) => {
+              if (data?.found && data.pestProjectId) {
+                setPestProjectId(data.pestProjectId);
+                setPestlVia("pestel");
+                setPestCurrentStage(data.currentStage ?? 3);
+              }
+            })
+            .catch(() => { /* non-fatal */ });
         }
 
         // A1 — Ocultar landing si ya inició la fase
@@ -370,6 +404,10 @@ export default function ExploracionPage() {
           setRdaActivo(true);
           setRdaItems(rda.items ?? []);
         }
+
+        // Track F1 status for the F2 landing banner
+        const f1Status = p.phases?.proposito?.status as string | undefined;
+        if (f1Status) setPhaseStatusF1(f1Status);
       })
       .catch((err) => console.error("[exploracion] fetch error:", err))
       .finally(() => setIsLoaded(true));
@@ -400,22 +438,35 @@ export default function ExploracionPage() {
       .catch(() => {});
   }, [isLoaded, projectId, mapaPESTEL]);
 
-  // C7b — Resolver pestProjectId cuando existe pestAnalysisId pero no pestProjectId
+  // C7b — Resolver pestProjectId cuando existe pestAnalysisId pero no pestProjectId.
+  // Si M1 ya existe, usa analysis-meta (solo lectura) para evitar sobreescribir mapaPESTEL.
+  // Si M1 no existe, la importación anterior no se completó — relanzar import completo.
   useEffect(() => {
     if (!isLoaded || !projectId || pestProjectId || !pestAnalysisId) return;
-    fetch("/api/moddulo/f2/import-pestel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ projectId, pestAnalysisId }),
-    })
-      .then(async (r) => {
-        if (!r.ok) return;
-        const data = await r.json();
-        if (data.pestProjectId) setPestProjectId(data.pestProjectId as string);
+
+    if (mapaPESTEL) {
+      fetch(`/api/centinela/pestel/analysis-meta?analysis_id=${pestAnalysisId}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: { pestelProjectId?: string } | null) => {
+          if (data?.pestelProjectId) setPestProjectId(data.pestelProjectId);
+        })
+        .catch((err) => console.error("[C7b] analysis-meta falló para pestAnalysisId:", pestAnalysisId, err));
+    } else {
+      fetch("/api/moddulo/f2/import-pestel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId, pestAnalysisId }),
       })
-      .catch(() => {});
-  }, [isLoaded, projectId, pestAnalysisId, pestProjectId]);
+        .then(async (r) => {
+          if (!r.ok) return;
+          const data = await r.json();
+          if (data.pestProjectId) setPestProjectId(data.pestProjectId as string);
+          if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
+        })
+        .catch((err) => console.error("[C7b] import-pestel falló para pestAnalysisId:", pestAnalysisId, err));
+    }
+  }, [isLoaded, projectId, pestAnalysisId, pestProjectId, mapaPESTEL]);
 
   // Cargar datos Sefix
   useEffect(() => {
@@ -934,6 +985,20 @@ export default function ExploracionPage() {
   // RENDER
   // ==========================================
 
+  // Moddulo project was hard-deleted — show recovery UI
+  if (projectNotFound) {
+    const pestAnalysisIdFromUrl =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("pest_analysis_id")
+        : null;
+    return (
+      <OrphanRecoveryView
+        pestAnalysisId={pestAnalysisIdFromUrl}
+        deadProjectId={projectId}
+      />
+    );
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
@@ -1028,6 +1093,27 @@ export default function ExploracionPage() {
             className="ml-auto text-bluegreen-eske underline text-xs shrink-0 hover:text-bluegreen-eske-60"
           >
             Ver RDA de F1
+          </Link>
+        </div>
+      )}
+
+      {/* Banner F1 incompleto — visible cuando PESTEL está importado pero F1 aún no está completado */}
+      {mapaPESTEL && phaseStatusF1 !== "completed" && (
+        <div
+          role="alert"
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-yellow-eske/10 border-l-4 border-yellow-eske text-sm"
+        >
+          <svg className="w-4 h-4 shrink-0 text-yellow-eske-70 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <span className="text-black-eske dark:text-[#EAF2F8]">
+            <strong>Propósito (F1) incompleto.</strong> El análisis PESTEL está importado. Completa las variables XPCTO en F1 para desbloquear los Motores DVS.
+          </span>
+          <Link
+            href={`/moddulo/proyecto/${projectId}/proposito`}
+            className="ml-auto text-bluegreen-eske underline text-xs shrink-0 hover:text-bluegreen-eske-60"
+          >
+            Ir a Propósito →
           </Link>
         </div>
       )}
@@ -1314,11 +1400,19 @@ export default function ExploracionPage() {
                 <div className="shrink-0 flex justify-end">
                   <button
                     onClick={pestlVia === "pestel" && pestProjectId
-                      ? () => router.push(`/centinela/pestel/${pestProjectId}/analisis`)
+                      ? () => {
+                          const dest = pestCurrentStage !== null && pestCurrentStage >= 5
+                            ? `/centinela/pestel/${pestProjectId}/analisis`
+                            : `/centinela/pestel/${pestProjectId}/datos`;
+                          router.push(dest);
+                        }
                       : handleAbrirPESTEL}
-                    className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                    disabled={!!(pestlVia === "pestel" && pestProjectId && pestStageLoading)}
+                    className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {pestlVia === "pestel" && pestProjectId ? "Regresar a PESTEL →" : "Abrir PESTEL"}
+                    {pestlVia === "pestel" && pestProjectId
+                      ? pestStageLoading ? "Cargando…" : "Regresar a PESTEL →"
+                      : "Abrir PESTEL"}
                   </button>
                 </div>
               )}

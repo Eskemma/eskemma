@@ -298,6 +298,7 @@ export interface CreateProjectInput {
   territorio?: Territorio;
   xpcto?: Partial<XPCTO>;
   pestelProjectId?: string;
+  pestAnalysisId?: string;
 }
 
 export type UpdateProjectInput = Partial<
