@@ -36,6 +36,14 @@ import {
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/pestel.types";
 import { fetchWithCache, CACHE_TTL } from "@/lib/centinela/pestel/cache/indicatorCache";
+import { isMexico } from "@/lib/centinela/pestel/utils/country";
+import {
+  fetchWebEconomicContext,
+  fetchWebLegalContext,
+} from "@/lib/search/webContextFetcher";
+import type { WebContextResult } from "@/lib/search/SearchProvider";
+
+export const maxDuration = 300;
 
 function getNewsTerritory(territorio: Territorio | undefined): string {
   if (!territorio) return "";
@@ -95,6 +103,8 @@ export async function POST(request: NextRequest) {
   const territorioNombre = project.territorio?.nombre ?? "";
   const estadoNombre = project.territorio?.estado ?? null;
   const nivelTerritorial = project.territorio?.nivel ?? "estatal";
+  const paisProyecto = (project.territorio as Territorio | undefined)?.pais ?? null;
+  const esMexico = isMexico(paisProyecto);
 
   // Resolve district cabecera once — shared by Google News (territory focus)
   // and Sefix (district-scoped electoral data). Avoids two calls to getEleccionesGeo.
@@ -131,23 +141,26 @@ export async function POST(request: NextRequest) {
         "google_news",
         `google_news_${normTerr}_${today}`,
         CACHE_TTL.TTL_24H,
-        () => fetchGoogleNewsRSS(newsTerritorioNombre, newsTopics)
+        () => fetchGoogleNewsRSS(newsTerritorioNombre, newsTopics, paisProyecto)
       ),
-      fetchWithCache(
-        "dof",
-        `dof_${today}`,
-        CACHE_TTL.TTL_24H,
-        () => fetchDOFRSS()
-      ),
-      fetchInegiIndicators(INEGI_DEFAULT_SERIES), // BIE omitido — IDs sin verificar
-      fetchWithCache(
-        "banxico",
-        `banxico_${month}`,
-        CACHE_TTL.TTL_24H,
-        () => fetchBanxicoSeries(BANXICO_DEFAULT_SERIES)
-      ),
-      buildSefixContext({ tipoProyecto, estadoNombre, nivelTerritorial, resolvedCabecera }),
-      cveEntidad
+      esMexico
+        ? fetchWithCache("dof", `dof_${today}`, CACHE_TTL.TTL_24H, () => fetchDOFRSS())
+        : Promise.resolve([] as NewsItem[]),
+      esMexico
+        ? fetchInegiIndicators(INEGI_DEFAULT_SERIES)
+        : Promise.resolve([] as InegiDataPoint[]),
+      esMexico
+        ? fetchWithCache(
+            "banxico",
+            `banxico_${month}`,
+            CACHE_TTL.TTL_24H,
+            () => fetchBanxicoSeries(BANXICO_DEFAULT_SERIES)
+          )
+        : Promise.resolve([] as BanxicoDataPoint[]),
+      esMexico
+        ? buildSefixContext({ tipoProyecto, estadoNombre, nivelTerritorial, resolvedCabecera })
+        : Promise.resolve(null),
+      esMexico && cveEntidad
         ? fetchWithCache(
             "inegi_bise",
             `inegi_bise_${cveEntidad}_${month}`,
@@ -179,11 +192,34 @@ export async function POST(request: NextRequest) {
     bise: bise.length > 0,
   };
 
+  // ── Web context for non-Mexico projects ──────────────────────
+  let webContext: { economic?: WebContextResult; legal?: WebContextResult } | undefined;
+  if (!esMexico && project.territorio) {
+    const territorio = project.territorio as import("@/types/pestel.types").Territorio;
+    const [webEconomicResult, webLegalResult] = await Promise.allSettled([
+      fetchWebEconomicContext(territorio),
+      fetchWebLegalContext(territorio),
+    ]);
+    if (webEconomicResult.status === "rejected") {
+      console.error("[generate-m1-express] webEconomicContext error:", webEconomicResult.reason);
+    }
+    if (webLegalResult.status === "rejected") {
+      console.error("[generate-m1-express] webLegalContext error:", webLegalResult.reason);
+    }
+    webContext = {
+      economic: webEconomicResult.status === "fulfilled" ? webEconomicResult.value : undefined,
+      legal: webLegalResult.status === "fulfilled" ? webLegalResult.value : undefined,
+    };
+  }
+
   console.log(
-    `[generate-m1-express] Sources: news=${news.length}, dof=${dof.length}, ` +
+    `[generate-m1-express] pais=${paisProyecto ?? "México (legacy)"} esMexico=${esMexico} ` +
+      `Sources: news=${news.length}, dof=${dof.length}, ` +
       `inegi=${inegi.length}, banxico=${banxico.length}, ` +
       `sefix=${sefix ? sefix.resultadosList.length + " cargos" : "no disponible"}, ` +
-      `bise=${bise.length}`
+      `bise=${bise.length}, ` +
+      `webEconomic=${webContext?.economic?.disponible ?? false}, ` +
+      `webLegal=${webContext?.legal?.disponible ?? false}`
   );
 
   // ── Build prompt and call Claude ──────────────────────────────
@@ -191,7 +227,7 @@ export async function POST(request: NextRequest) {
     tipoProyecto,
     xpcto as Record<string, unknown>,
     archivos.length > 0 ? archivos : undefined,
-    { news, dof, inegi, banxico, sefix, bise }
+    { news, dof, inegi, banxico, sefix, bise, webContext }
   );
 
   const response = await anthropic.messages.create({

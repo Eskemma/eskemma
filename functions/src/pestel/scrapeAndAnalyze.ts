@@ -19,6 +19,7 @@ import {
 } from "./scrapers/banxico";
 import {generateAnalysisV2, generateFeedFromRawData} from "./generateFeed";
 import {fetchWithCache, CACHE_TTL} from "./cache/indicatorCache";
+import {isMexico} from "../utils/country";
 
 export const scrapeAndAnalyze = onRequest(
   {
@@ -68,6 +69,7 @@ export const scrapeAndAnalyze = onRequest(
     // ----- Resolve territory and data for scraping -----
     let territorioNombre = "México";
     let estadoRaw: string | null = null;
+    let paisRaw: string | null = null;
     let projectData: Record<string, unknown> | null = null;
 
     if (isV2) {
@@ -83,9 +85,10 @@ export const scrapeAndAnalyze = onRequest(
       projectData = projectSnap.data() as Record<string, unknown>;
       const territorio =
         projectData.territorio as
-          {nombre?: string; estado?: string} | undefined;
+          {nombre?: string; estado?: string; pais?: string} | undefined;
       territorioNombre = territorio?.nombre ?? "México";
       estadoRaw = territorio?.estado ?? null;
+      paisRaw = territorio?.pais ?? null;
     } else {
       const configSnap = await db
         .collection("pestel_configs")
@@ -179,31 +182,43 @@ export const scrapeAndAnalyze = onRequest(
       const month = today.slice(0, 7); // YYYY-MM
       const normTerr = territorioNombre.toLowerCase().replace(/\W+/g, "_");
 
+      const esMexico = isMexico(paisRaw);
+      console.log(
+        `[scrapeAndAnalyze] pais=${paisRaw ?? "México (legacy)"} ` +
+        `esMexico=${esMexico}`
+      );
+
       const [newsResult, dofResult, inegiResult, banxicoResult, biseResult] =
         await Promise.allSettled([
           fetchWithCache(
             "google_news",
             `google_news_${normTerr}_${today}`,
             CACHE_TTL.TTL_24H,
-            () => fetchGoogleNewsRSS(territorioNombre, newsTopics)
+            () => fetchGoogleNewsRSS(territorioNombre, newsTopics, paisRaw)
           ),
-          fetchWithCache(
-            "dof",
-            `dof_${today}`,
-            CACHE_TTL.TTL_24H,
-            () => fetchDOFRSS()
-          ),
-          // BIE omitido — IDs sin verificar, retorna []
-          fetchInegiIndicators(INEGI_DEFAULT_SERIES),
-          fetchWithCache(
-            "banxico",
-            `banxico_${month}`,
-            CACHE_TTL.TTL_24H,
-            () => Promise.all(
-              BANXICO_DEFAULT_SERIES.map((s) => fetchBanxicoSeries(s))
-            )
-          ),
-          cveEntidad ?
+          esMexico ?
+            fetchWithCache(
+              "dof",
+              `dof_${today}`,
+              CACHE_TTL.TTL_24H,
+              () => fetchDOFRSS()
+            ) :
+            Promise.resolve([]),
+          // BIE omitido — IDs sin verificar
+          esMexico ?
+            fetchInegiIndicators(INEGI_DEFAULT_SERIES) :
+            Promise.resolve([]),
+          esMexico ?
+            fetchWithCache(
+              "banxico",
+              `banxico_${month}`,
+              CACHE_TTL.TTL_24H,
+              () => Promise.all(
+                BANXICO_DEFAULT_SERIES.map((s) => fetchBanxicoSeries(s))
+              )
+            ) :
+            Promise.resolve([]),
+          esMexico && cveEntidad ?
             fetchWithCache(
               "inegi_bise",
               `inegi_bise_${cveEntidad}_${month}`,

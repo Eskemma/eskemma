@@ -161,7 +161,7 @@ function ProjectCard({
   const [metaDraft, setMetaDraft] = useState({ name: project.name, description: project.description ?? "", color: project.color ?? "#026988" });
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
-  const borderColor = project.color ?? "#026988";
+  const borderColor = project.status === "archived" ? "#9ca3af" : (project.color ?? "#026988");
 
   function openEditMeta() {
     setKebabOpen(false);
@@ -227,9 +227,11 @@ function ProjectCard({
     }
   }
 
-  const menuItems: { label: string; onClick: () => void; danger?: boolean }[] = [
-    { label: "Editar", onClick: openEditMeta },
-  ];
+  const isProjectArchived = project.status === "archived";
+  const menuItems: { label: string; onClick: () => void; danger?: boolean }[] = [];
+  if (!isProjectArchived) {
+    menuItems.push({ label: "Editar", onClick: openEditMeta });
+  }
   if (project.status === "active") {
     menuItems.push({ label: "Pausar", onClick: () => handleStatusPatch("paused") });
     menuItems.push({ label: "Archivar", onClick: () => handleStatusPatch("archived") });
@@ -241,8 +243,8 @@ function ProjectCard({
   if (project.status === "completed") {
     menuItems.push({ label: "Archivar", onClick: () => handleStatusPatch("archived") });
   }
-  if (project.status === "archived") {
-    menuItems.push({ label: "Restaurar", onClick: () => handleStatusPatch("active") });
+  if (isProjectArchived) {
+    menuItems.push({ label: "Activar", onClick: () => handleStatusPatch("active") });
   }
   menuItems.push({
     label: "Eliminar",

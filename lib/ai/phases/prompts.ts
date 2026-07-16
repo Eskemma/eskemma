@@ -1,5 +1,6 @@
 // lib/ai/phases/prompts.ts
 import type { PhaseId } from "@/types/moddulo.types";
+import type { WebContextResult } from "@/lib/search/SearchProvider";
 
 const MODDULO_BASE_IDENTITY = `Eres Moddulo, el Colaborador Estratégico y Copiloto Táctico de la metodología Eskemma.
 Tu función es acompañar al consultor político en la construcción de proyectos estratégicos bajo el modelo XPCTO (Hito, Sujeto, Capacidades, Tiempo, Justificación).
@@ -441,6 +442,10 @@ interface ExpressContext {
   banxico: ExpressBanxicoPoint[];
   sefix: { resultadosList: ExpressSefixResultado[]; padron: unknown } | null;
   bise?: ExpressInegiPoint[];
+  webContext?: {
+    economic?: WebContextResult;
+    legal?: WebContextResult;
+  };
 }
 
 const INEGI_LABEL: Record<string, string> = {
@@ -482,7 +487,7 @@ function buildSourcesSection(ctx: ExpressContext): string {
     lines.push("\n[NOTICIAS — Google News]: no disponible en esta ejecución");
   }
 
-  // DOF
+  // DOF / marco legal
   const dof = ctx.dof.slice(0, 15);
   if (dof.length > 0) {
     lines.push("\n[DIARIO OFICIAL DE LA FEDERACIÓN — últimos 7 días]");
@@ -490,19 +495,31 @@ function buildSourcesSection(ctx: ExpressContext): string {
       const date = d.pubDate ? d.pubDate.slice(0, 10) : "";
       lines.push(`- "${d.title}" (${date})`);
     }
+  } else if (ctx.webContext?.legal?.disponible && ctx.webContext.legal.indicadores.length > 0) {
+    lines.push("\n[MARCO LEGAL — búsqueda web (fuente: Brave Search)]");
+    for (const ind of ctx.webContext.legal.indicadores) {
+      const fecha = ind.fecha ? ` (${ind.fecha})` : "";
+      lines.push(`- ${ind.nombre}: ${ind.valor}${fecha} — Fuente: ${ind.fuente} ${ind.url}`);
+    }
   } else {
-    lines.push("\n[DIARIO OFICIAL DE LA FEDERACIÓN]: no disponible en esta ejecución");
+    lines.push("\n[MARCO LEGAL]: no disponible en esta ejecución");
   }
 
-  // INEGI
+  // INEGI / indicadores económicos
   if (ctx.inegi.length > 0) {
     lines.push("\n[INEGI — Indicadores económicos]");
     for (const p of ctx.inegi) {
       const label = INEGI_LABEL[p.serieId] ?? `Serie ${p.serieId}`;
       lines.push(`- ${label}: ${p.value} (${p.date})`);
     }
+  } else if (ctx.webContext?.economic?.disponible && ctx.webContext.economic.indicadores.length > 0) {
+    lines.push("\n[INDICADORES ECONÓMICOS — búsqueda web (fuente: Brave Search)]");
+    for (const ind of ctx.webContext.economic.indicadores) {
+      const fecha = ind.fecha ? ` (${ind.fecha})` : "";
+      lines.push(`- ${ind.nombre}: ${ind.valor}${fecha} — Fuente: ${ind.fuente} ${ind.url}`);
+    }
   } else {
-    lines.push("\n[INEGI]: no disponible en esta ejecución");
+    lines.push("\n[INDICADORES ECONÓMICOS]: no disponible en esta ejecución");
   }
 
   // Banxico
@@ -622,6 +639,11 @@ Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
 - confidence: ${confidenceValue}.
 - Genera 2–4 señales por categoría (favorables/adversas/inciertas) específicas a este proyecto.
   OBLIGATORIO: cada dimensión debe tener al menos 1 señal (en cualquier categoría) O explicar en narrativa por qué no hay datos.
+- REGLA DE NARRATIVA: la narrativa puede y debe describir qué información contienen las fuentes consultadas
+  (ej: "El marco legal disponible incluye X según Brave Search"). La narrativa NO DEBE declarar ausencia
+  de temas específicos que las búsquedas no cubrieron (ej: inhabilitaciones de un candidato, investigaciones
+  en curso sobre personas, compliance sectorial). Si un tema es relevante pero no fue buscado, omítelo —
+  no lo declares como "no encontrado". Los vacíos de investigación específica son tarea de F3-Investigación.
 - Cada señal debe tener estos campos exactos:
   { "descripcion": "descripción específica al hito y sujeto del proyecto", "fuente": "Fuente: nombre, fecha", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }
 

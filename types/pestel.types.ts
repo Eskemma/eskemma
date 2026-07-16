@@ -58,6 +58,8 @@ export type RiskLevel = "CRÍTICO" | "MODERADO" | "BAJO";
 
 export type AnalysisStatus = "PENDING_REVIEW" | "REVIEWED" | "APPROVED";
 
+export type PESTELProjectStatus = "active" | "paused" | "archived";
+
 // ==========================================
 // CATÁLOGO DE DIMENSIONES (C2)
 // ==========================================
@@ -108,7 +110,8 @@ export interface PESTELProject {
   tipo: TipoProyecto;
   territorio: Territorio;
   horizonte: number;            // months
-  isActive: boolean;
+  status: PESTELProjectStatus;
+  isActive: boolean;            // infra field — kept in sync with status by PATCH
   autoMonitorEnabled: boolean;
   alertas: AlertasConfig;
   currentStage: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;

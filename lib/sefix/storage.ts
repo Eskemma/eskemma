@@ -2787,6 +2787,11 @@ export async function getResultadosLocalesFiltered(params: {
     tipoEleccion, principio, cabecera, municipio, secciones, partidos,
   } = params;
 
+  // Normalize municipio for case/accent-insensitive comparison (CSV stores uppercase without accents)
+  const municipioNorm = municipio
+    ? stripAccents(municipio.trim().toUpperCase())
+    : undefined;
+
   const locKeys = getLocKeys(estadoNombre);
   if (!locKeys.length) return null;
 
@@ -2831,7 +2836,9 @@ export async function getResultadosLocalesFiltered(params: {
     if (principio && rowPrincipio !== principio) return;
 
     const rowCabecera = row.cabecera?.trim();
-    const rowMunicipio = row.municipio?.trim();
+    const rowMunicipio = row.municipio
+      ? stripAccents(row.municipio.trim().toUpperCase())
+      : undefined;
 
     if (cabecera) {
       const reqCode = cabecera.match(/^(\d+)/)?.[1];
@@ -2850,14 +2857,14 @@ export async function getResultadosLocalesFiltered(params: {
         // Continue to accumulate this redistributed section.
       } else {
         votosDist += tvSafe; lneDist += lneSafe;
-        if (municipio) { if (rowMunicipio === municipio) districtMatchFound = true; }
+        if (municipioNorm) { if (rowMunicipio === municipioNorm) districtMatchFound = true; }
         else if (secFilter) { if (secFilter.has(rowSeccion)) districtMatchFound = true; }
         else { districtMatchFound = true; }
       }
     }
 
-    if (municipio) {
-      if (rowMunicipio !== municipio) return;
+    if (municipioNorm) {
+      if (rowMunicipio !== municipioNorm) return;
       votosMun += tvSafe; lneMun += lneSafe;
     }
 

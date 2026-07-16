@@ -24,6 +24,8 @@ import type {
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { isMexico } from "@/lib/centinela/pestel/utils/country";
+import type { WebContextResult } from "@/lib/search/SearchProvider";
 
 // ==========================================
 // TIPOS SEFIX
@@ -208,6 +210,8 @@ export default function ExploracionPage() {
   const [showConfirmReanalisis, setShowConfirmReanalisis] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
   const [sefixData, setSefixData] = useState<SefixData | null>(null);
+  const [webElectoralData, setWebElectoralData] = useState<WebContextResult | null>(null);
+  const [webElectoralLoading, setWebElectoralLoading] = useState(false);
 
   // DVS y MapaPESTEL (C2, C3, C4)
   const [dvs, setDvs] = useState<DVSF2 | null>(null);
@@ -242,6 +246,7 @@ export default function ExploracionPage() {
   const [projectName, setProjectName] = useState<string>("");
   const [projectColor, setProjectColor] = useState<string>("#026988");
   const [projectTerritory, setProjectTerritory] = useState<Territorio | null>(null);
+  const esMexico = isMexico(projectTerritory?.pais);
 
   // A7 — rastrear si el usuario eligió la vía PESTEL desde el chat
   const [pestlVia, setPestlVia] = useState<"pestel" | null>(null);
@@ -468,9 +473,10 @@ export default function ExploracionPage() {
     }
   }, [isLoaded, projectId, pestAnalysisId, pestProjectId, mapaPESTEL]);
 
-  // Cargar datos Sefix
+  // Cargar datos Sefix (solo México)
   useEffect(() => {
     if (!isLoaded || !["electoral", "gubernamental", "legislativo"].includes(projectType)) return;
+    if (!esMexico) return;
     const estadoSefix = projectTerritory?.estado ?? (xpcto ? detectEstadoFromXpcto(xpcto) : null);
     if (!estadoSefix) return;
 
@@ -527,7 +533,25 @@ export default function ExploracionPage() {
       } catch { /* no-op */ }
     };
     fetchSefix();
-  }, [isLoaded, xpcto, projectType, projectTerritory]);
+  }, [isLoaded, xpcto, projectType, projectTerritory, esMexico]);
+
+  // Cargar contexto electoral web (proyectos no-México)
+  useEffect(() => {
+    if (esMexico) return;
+    if (!isLoaded || !["electoral", "gubernamental", "legislativo"].includes(projectType)) return;
+    if (!projectTerritory) return;
+    setWebElectoralLoading(true);
+    fetch("/api/moddulo/f2/web-context", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "electoral", territorio: projectTerritory }),
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<WebContextResult>) : null))
+      .then((data) => setWebElectoralData(data))
+      .catch(() => setWebElectoralData(null))
+      .finally(() => setWebElectoralLoading(false));
+  }, [isLoaded, esMexico, projectType, projectTerritory]);
 
   // Auto-guardar (solo en modo activo, después de cargar)
   const autoSave = useCallback(async (formData: ExplorationForm) => {
@@ -1434,6 +1458,9 @@ export default function ExploracionPage() {
             isAnalyzing={isExpressAnalyzing}
             pestProjectId={pestProjectId}
             onNuevoAnalisis={pestProjectId === null ? () => setShowConfirmReanalisis(true) : undefined}
+            esMexico={esMexico}
+            webElectoralData={webElectoralData}
+            webElectoralLoading={webElectoralLoading}
           />
         </div>
         </>)}
@@ -1499,6 +1526,7 @@ function SkeletonDimension() {
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
   isAnalyzing = false, onNuevoAnalisis, pestProjectId,
+  esMexico, webElectoralData, webElectoralLoading,
 }: {
   form: ExplorationForm;
   onChange: (f: ExplorationForm) => void;
@@ -1511,6 +1539,9 @@ function ExplorationFormPanel({
   isAnalyzing?: boolean;
   onNuevoAnalisis?: () => void;
   pestProjectId?: string | null;
+  esMexico: boolean;
+  webElectoralData: WebContextResult | null;
+  webElectoralLoading: boolean;
 }) {
   const fieldClass =
     "w-full px-3 py-2 text-sm font-normal rounded-lg border border-gray-eske-20 dark:border-white/10 " +
@@ -1578,17 +1609,20 @@ function ExplorationFormPanel({
           mapaPESTEL?.["P"] ? (
             <div className="space-y-4">
               <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
-              {sefixData && (projectType === "electoral" || projectType === "gubernamental") && (
+              {(projectType === "electoral" || projectType === "gubernamental") && (
                 <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
                   <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
                     Contexto Electoral
                   </p>
-                  <SefixWidget data={sefixData} projectType={projectType} />
+                  {esMexico
+                    ? sefixData && <SefixWidget data={sefixData} projectType={projectType} />
+                    : <WebElectoralWidget data={webElectoralData} loading={webElectoralLoading} />
+                  }
                 </div>
               )}
             </div>
           ) : (
-            <PoliticoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} projectType={projectType} sefixData={sefixData} />
+            <PoliticoSection form={form} onChange={onChange} readOnly={readOnly} fieldClass={fieldClass} projectType={projectType} sefixData={sefixData} esMexico={esMexico} webElectoralData={webElectoralData} webElectoralLoading={webElectoralLoading} />
           )
         )}
         {activeSection === "economico" && (
@@ -1802,10 +1836,13 @@ function SignalGroup({
 // SECCIÓN POLÍTICO
 // ==========================================
 
-function PoliticoSection({ form, onChange, readOnly, fieldClass, projectType, sefixData }: {
+function PoliticoSection({ form, onChange, readOnly, fieldClass, projectType, sefixData, esMexico, webElectoralData, webElectoralLoading }: {
   form: ExplorationForm; onChange: (f: ExplorationForm) => void;
   readOnly: boolean; fieldClass: string; projectType: ProjectType;
   sefixData: SefixData | null;
+  esMexico: boolean;
+  webElectoralData: WebContextResult | null;
+  webElectoralLoading: boolean;
 }) {
   const hint = projectType === "legislativo"
     ? "Bloques parlamentarios, presidencias de comisión, alianzas y oposición"
@@ -1818,7 +1855,10 @@ function PoliticoSection({ form, onChange, readOnly, fieldClass, projectType, se
 
   return (
     <div className="space-y-3">
-      {sefixData && <SefixWidget data={sefixData} projectType={projectType} />}
+      {esMexico
+        ? sefixData && <SefixWidget data={sefixData} projectType={projectType} />
+        : <WebElectoralWidget data={webElectoralData} loading={webElectoralLoading} />
+      }
       <SectionField label="Contexto político general" hint={hint}>
         <AutoResizeTextarea value={form.pestl.politico.contexto}
           onChange={(v) => upd({ contexto: v })} disabled={readOnly}
@@ -2281,6 +2321,91 @@ function buildPadronLabel(territory: import("@/types/pestel.types").Territorio |
   }
 
   return haystack.toUpperCase() || fallback.toUpperCase();
+}
+
+// ==========================================
+// WIDGET CONTEXTO ELECTORAL WEB (no-México)
+// ==========================================
+
+function WebElectoralWidget({
+  data,
+  loading,
+}: {
+  data: WebContextResult | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-2 text-xs text-gray-eske-40 dark:text-[#6D8294]">
+        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        </svg>
+        Buscando contexto electoral…
+      </div>
+    );
+  }
+
+  if (!data || !data.disponible || data.indicadores.length === 0) {
+    return (
+      <p className="text-xs italic text-gray-eske-40 dark:text-[#6D8294]">
+        No se encontró información electoral reciente para este territorio.
+      </p>
+    );
+  }
+
+  // Derive most recent date from indicators for badge
+  const fechas = data.indicadores
+    .map((i) => i.fecha)
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  const fechaBadge = fechas[0] ?? null;
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-lg border border-blue-eske/20 bg-blue-eske/5 p-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <svg
+            className="h-3.5 w-3.5 text-blue-eske-60 dark:text-blue-eske-40 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+          </svg>
+          <span className="text-xs text-blue-eske-60 dark:text-blue-eske-40">
+            Búsqueda web{fechaBadge ? ` · ${fechaBadge}` : ""}
+          </span>
+        </div>
+        <ul className="space-y-1.5">
+          {data.indicadores.map((ind, i) => (
+            <li key={i} className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+              <span className="font-medium">{ind.nombre}:</span>{" "}
+              {ind.valor}
+              {ind.fecha ? (
+                <span className="text-blue-eske-60 dark:text-blue-eske-40"> ({ind.fecha})</span>
+              ) : null}
+              {ind.url ? (
+                <a
+                  href={ind.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 text-blue-eske-60 dark:text-blue-eske-40 underline"
+                  aria-label={`Fuente: ${ind.fuente}`}
+                >
+                  ↗
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 function SefixWidget({ data, projectType }: { data: SefixData; projectType?: ProjectType }) {

@@ -17,12 +17,17 @@ export async function GET(request: NextRequest) {
   const snap = await adminDb
     .collection("pestel_projects")
     .where("userId", "==", session.uid)
-    .where("isActive", "==", true)
     .get();
 
   type ProjectDoc = PESTELProject & { id: string };
   const projects: ProjectDoc[] = snap.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() } as ProjectDoc))
+    .map((doc) => {
+      const raw = doc.data();
+      // Lazy migration: derive status from isActive for pre-status documents
+      const status: PESTELProject["status"] =
+        raw.status ?? (raw.isActive === false ? "archived" : "active");
+      return { id: doc.id, ...raw, status } as ProjectDoc;
+    })
     .sort((a, b) => {
       const aTime = (a.createdAt as { _seconds?: number })?._seconds ?? 0;
       const bTime = (b.createdAt as { _seconds?: number })?._seconds ?? 0;
@@ -110,6 +115,7 @@ export async function POST(request: NextRequest) {
     tipo,
     territorio,
     horizonte,
+    status: "active",
     isActive: true,
     autoMonitorEnabled: false,
     alertas: alertas ?? {

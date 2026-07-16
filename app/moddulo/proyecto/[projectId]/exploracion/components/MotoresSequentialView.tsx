@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type {
   DVSF2,
   ContrasteXPCTO,
@@ -38,11 +39,31 @@ export interface MotoresSequentialViewProps {
 
 // ── Motor metadata ─────────────────────────────────────────────────────────────
 
-const MOTORS: { id: MotorId; label: string; description: string }[] = [
-  { id: "M2", label: "Contraste XPCTO–Entorno",   description: "Veredicto por cada variable del XPCTO frente al análisis PESTEL." },
-  { id: "M3", label: "Semáforo de Veto",           description: "Actores con capacidad de bloqueo y nivel de riesgo." },
-  { id: "M4", label: "Mapa de Incertidumbres",     description: "Incertidumbres priorizadas por urgencia y destino de resolución." },
-  { id: "M5", label: "Hipótesis + PIP",            description: "Hipótesis Estratégica Inicial y Programa de Investigación Profunda." },
+const MOTORS: { id: MotorId; label: string; description: string; tooltip?: string }[] = [
+  {
+    id: "M2",
+    label: "Contraste XPCTO–Entorno",
+    description: "Veredicto por cada variable del XPCTO frente al análisis PESTEL.",
+    tooltip: "Este motor compara cada variable XPCTO contra el entorno PESTEL detectado, para verificar si el proyecto es coherente con el contexto real. Revisa cada elemento para marcarlo como 'Coherente', 'Requiere ajuste' o 'Requiere investigación' y decide si tu estrategia necesita adaptarse antes de aprobar.",
+  },
+  {
+    id: "M3",
+    label: "Semáforo de Veto",
+    description: "Actores con capacidad de bloqueo y nivel de riesgo.",
+    tooltip: "Este motor identifica actores con capacidad real de bloquear tu objetivo y clasifica el riesgo que representan. Revisa cada actor, ajusta su nivel de riesgo si no coincide con tu conocimiento del terreno, y aprueba cuando el semáforo refleje fielmente el panorama de oposición y bloqueo que enfrentas.",
+  },
+  {
+    id: "M4",
+    label: "Mapa de Incertidumbres",
+    description: "Incertidumbres priorizadas por urgencia y destino de resolución.",
+    tooltip: "Este motor señala vacíos de información (preguntas sin resolver que podrían cambiar tu estrategia si se contestan). No son afirmaciones, son brechas. Revísalas y aprueba cuando confirmes que reflejan las dudas reales que aún tienes sobre el proyecto.",
+  },
+  {
+    id: "M5",
+    label: "Hipótesis + PIP",
+    description: "Hipótesis Estratégica Inicial y Programa de Investigación Profunda.",
+    tooltip: "Este motor propone una Hipótesis Estratégica Inicial (la apuesta central de tu proyecto) y un Programa de Investigación Profunda (las preguntas que Fase 3 deberá resolver). Revisa la tensión central, el contexto y las condiciones favorables/adversas; ajusta o agrega preguntas de investigación antes de aprobar y cerrar la Fase 2.",
+  },
 ];
 
 const ORDER: MotorId[] = ["M2", "M3", "M4", "M5"];
@@ -821,9 +842,14 @@ export default function MotoresSequentialView({
                 }`} aria-hidden />
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-eske-50 dark:text-[#6D8294]">{motor.id}</p>
-                  <p className={`text-sm font-semibold leading-snug ${isLocked ? "text-gray-eske-40 dark:text-[#6D8294]" : "text-black-eske dark:text-white"}`}>
+                  <div className={`text-sm font-semibold leading-snug flex items-center gap-1.5 ${isLocked ? "text-gray-eske-40 dark:text-[#6D8294]" : "text-black-eske dark:text-white"}`}>
                     {motor.label}
-                  </p>
+                    {motor.tooltip && (
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <InfoTooltip content={motor.tooltip} />
+                      </span>
+                    )}
+                  </div>
                   {/* Summary — shown when collapsed and approved/active */}
                   {!isExpanded && !isLocked && (
                     <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5 truncate max-w-sm">

@@ -258,6 +258,15 @@ hasta que haya imagen OG corporativa diseñada.
 Las functions tienen su propio `package.json` y `tsconfig.json` en
 `functions/`. **No pueden importar desde `lib/` del proyecto raíz.**
 
+### Lógica duplicada: puntos de sincronización manual obligatorios
+
+Cuando se modifique cualquiera de estos archivos, actualizar AMBAS copias simultáneamente:
+
+| Lógica | Next.js | Cloud Function |
+|--------|---------|---------------|
+| Google News RSS scraper + tabla de locales por país | `lib/centinela/pestel/scraper/googleNewsRSS.ts` | `functions/src/pestel/scrapers/googleNewsRSS.ts` |
+| Gate de país `isMexico()` | `lib/centinela/pestel/utils/country.ts` | `functions/src/utils/country.ts` |
+
 ### ESLint Google style guide (obligatorio para deploy)
 
 - Comillas **dobles** `"` (no simples)
