@@ -1,7 +1,8 @@
 // lib/moddulo/dvs-criteria.ts
 // Los 10 criterios de suficiencia del DVS F2, en el orden canónico de la metodología.
 
-import type { DVSF2, MapaPESTEL } from "@/types/moddulo.types";
+import type { DVSF2, MapaPESTEL, ProjectType } from "@/types/moddulo.types";
+import { DIMENSION_PRIORITY_BY_TYPE, type DimensionCode } from "@/lib/moddulo/dimensionPriority";
 
 export interface CriterioDVS {
   id: string;
@@ -10,7 +11,11 @@ export interface CriterioDVS {
   severidad: "bloqueante" | "advertencia";
 }
 
-export function evaluarCriteriosDVS(dvs: DVSF2, mapaPESTEL?: MapaPESTEL): CriterioDVS[] {
+export function evaluarCriteriosDVS(
+  dvs: DVSF2,
+  mapaPESTEL?: MapaPESTEL,
+  tipo?: ProjectType
+): CriterioDVS[] {
   const DIMS = ["P", "E", "S", "T", "Ec", "L"];
 
   // Criterion 1: cobertura del mapaPESTEL — si está disponible, verificar señales tripartitas
@@ -98,12 +103,30 @@ export function evaluarCriteriosDVS(dvs: DVSF2, mapaPESTEL?: MapaPESTEL): Criter
       id: "pesos-tipo-proyecto",
       descripcion:
         "Pesos por tipo de proyecto — ¿Las dimensiones prioritarias corresponden al tipo heredado del EPP?",
-      // Proxy: al menos 3 dimensiones con clasificación definida (OPORTUNIDAD o AMENAZA)
-      satisfecho: mapaPESTEL
-        ? Object.values(mapaPESTEL).filter(
-            (d) => d?.clasificacion === "OPORTUNIDAD" || d?.clasificacion === "AMENAZA"
-          ).length >= 3
-        : dvs.contrasteXPCTO.filter((c) => c.veredicto !== "coherente").length >= 2,
+      // Compara contra el set EFECTIVO de prioritarias: la tabla estática
+      // (DIMENSION_PRIORITY_BY_TYPE) más cualquier dimensión "de seguimiento"
+      // que el M1 haya marcado escaladaPorRelevanciaLocal: true — una
+      // dimensión legítimamente escalada no debe penalizarse como
+      // "mal cubierta" solo por ser de seguimiento en la tabla original.
+      satisfecho:
+        mapaPESTEL && tipo
+          ? (() => {
+              const config = DIMENSION_PRIORITY_BY_TYPE[tipo];
+              const prioritariasEfectivas = new Set<DimensionCode>(config.prioritarias);
+              for (const dim of config.seguimiento) {
+                const d = mapaPESTEL[dim as keyof MapaPESTEL] as
+                  | { escaladaPorRelevanciaLocal?: boolean }
+                  | undefined;
+                if (d?.escaladaPorRelevanciaLocal) prioritariasEfectivas.add(dim);
+              }
+              return Array.from(prioritariasEfectivas).every((dim) => {
+                const d = mapaPESTEL[dim as keyof MapaPESTEL] as
+                  | { clasificacion?: string }
+                  | undefined;
+                return d?.clasificacion === "OPORTUNIDAD" || d?.clasificacion === "AMENAZA";
+              });
+            })()
+          : dvs.contrasteXPCTO.filter((c) => c.veredicto !== "coherente").length >= 2,
       severidad: "advertencia",
     },
     {

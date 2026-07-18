@@ -266,6 +266,33 @@ Cuando se modifique cualquiera de estos archivos, actualizar AMBAS copias simult
 |--------|---------|---------------|
 | Google News RSS scraper + tabla de locales por país | `lib/centinela/pestel/scraper/googleNewsRSS.ts` | `functions/src/pestel/scrapers/googleNewsRSS.ts` |
 | Gate de país `isMexico()` | `lib/centinela/pestel/utils/country.ts` | `functions/src/utils/country.ts` |
+| Pesos del escaneo PESTEL por tipo de proyecto (dimensiones prioritarias/seguimiento) | `lib/moddulo/dimensionPriority.ts` | `functions/src/pestel/dimensionPriority.ts` |
+
+**Checklist obligatorio al sincronizar instrucciones de PROMPT (no solo tablas/funciones)
+entre el path express (una sola llamada a Claude cubre las 6 dimensiones) y el path
+Centinela (una llamada por dimensión, vía `buildDimensionPrompt`):**
+
+No basta con igualar el texto por rama/dimensión. Antes de dar por cerrada la
+sincronización, verificar explícitamente si la instrucción que se está portando
+dependía, en el path de una-sola-llamada, de un bloque **global/implícito** que
+aplica a las 6 dimensiones a la vez (ej. una sección única de "reglas de campo"
+al final del prompt) — ese bloque **no tiene equivalente natural** en el path
+por-dimensión de Centinela, donde cada llamada solo conoce su propia dimensión.
+Si la instrucción incluye un caso negativo o una excepción ("no aplica cuando...",
+"deja este campo en false salvo que...", "omite esto para el resto de los casos"),
+esa regla debe reescribirse explícitamente **dentro de cada rama relevante** del
+prompt por-dimensión, no asumirse heredada de un bloque global que allí no existe.
+
+Precedente: el campo auditable `escaladaPorRelevanciaLocal` (M1, pesos por tipo
+de proyecto) se implementó primero en express con la regla negativa en un bloque
+global de reglas de campo aplicable a las 6 dimensiones; al portar el mismo
+criterio a `claudePESTL.ts` (Centinela, prompt por dimensión) esa regla negativa
+no tenía dónde vivir y se perdió — resultado: una dimensión ya prioritaria podía
+marcarse incorrectamente como "escalada por relevancia local", detectado recién
+en verificación en vivo (26-07-19). Mismo tipo de punto ciego que el header
+combinado INEGI/Banxico y el sesgo hacia datos numéricos del contexto Legal de
+Colombia: una suposición válida en la forma de datos/granularidad de un path deja
+de sostenerse al portarla al otro sin re-derivarla explícitamente.
 
 ### ESLint Google style guide (obligatorio para deploy)
 

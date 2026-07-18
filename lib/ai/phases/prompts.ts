@@ -1,6 +1,7 @@
 // lib/ai/phases/prompts.ts
-import type { PhaseId } from "@/types/moddulo.types";
+import type { PhaseId, ProjectType } from "@/types/moddulo.types";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
+import { DIMENSION_PRIORITY_BY_TYPE, type DimensionCode } from "@/lib/moddulo/dimensionPriority";
 
 const MODDULO_BASE_IDENTITY = `Eres Moddulo, el Colaborador Estratégico y Copiloto Táctico de la metodología Eskemma.
 Tu función es acompañar al consultor político en la construcción de proyectos estratégicos bajo el modelo XPCTO (Hito, Sujeto, Capacidades, Tiempo, Justificación).
@@ -574,6 +575,36 @@ function buildSourcesSection(ctx: ExpressContext): string {
   return lines.join("\n");
 }
 
+const DIMENSION_LABEL_ES: Record<DimensionCode, string> = {
+  P: "Político", E: "Económico", S: "Social", T: "Tecnológico", Ec: "Ecológico", L: "Legal",
+};
+
+const DIMENSION_ORDER_PESTEL: DimensionCode[] = ["P", "E", "S", "T", "Ec", "L"];
+
+// Instrucción de profundidad diferenciada por dimensión, según FAT 2.0 Fase 2
+// M1 ("Pesos del escaneo por tipo de proyecto"). Mismo texto/criterio que
+// functions/src/pestel/classifier/claudePESTL.ts — ver lib/moddulo/dimensionPriority.ts
+// para la tabla y la nota de sincronización obligatoria.
+function buildDimensionDepthInstructions(projectType: string): string {
+  const config = DIMENSION_PRIORITY_BY_TYPE[projectType as ProjectType] ?? DIMENSION_PRIORITY_BY_TYPE.ciudadano;
+  return DIMENSION_ORDER_PESTEL.map((code) => {
+    const label = DIMENSION_LABEL_ES[code];
+    if (config.prioritarias.includes(code)) {
+      return `- ${code} (${label}) — PRIORITARIA para este tipo de proyecto: 3–4 señales por categoría, narrativa de 3–4 oraciones, mayor profundidad analítica.`;
+    }
+    return `- ${code} (${label}) — DE SEGUIMIENTO: 1–2 señales por categoría, narrativa breve de 1–2 oraciones — SALVO que el contexto local específico (agenda vigente, coyuntura relevante) la vuelva claramente relevante para este proyecto en particular, en cuyo caso trátala con la misma profundidad que una prioritaria y marca "escaladaPorRelevanciaLocal": true en su objeto (omite el campo o usa false en cualquier otro caso).`;
+  }).join("\n");
+}
+
+// Instrucción de dimensiones prioritarias para M2 (Contraste XPCTO–Entorno) —
+// misma tabla que M1, usada aquí solo para ponderar énfasis en la argumentación,
+// no para filtrar dimensiones (M2 siempre escanea las 6).
+function buildM2PriorityInstruction(projectType: string): string {
+  const config = DIMENSION_PRIORITY_BY_TYPE[projectType as ProjectType] ?? DIMENSION_PRIORITY_BY_TYPE.ciudadano;
+  const labels = config.prioritarias.map((code) => `${code} (${DIMENSION_LABEL_ES[code]})`).join(", ");
+  return `Para este tipo de proyecto (${projectType}), las dimensiones PEST-L prioritarias son: ${labels}.`;
+}
+
 export function getMapaPESTELExpressPrompt(
   projectType: string,
   xpcto: Record<string, unknown>,
@@ -628,16 +659,20 @@ C — Capacidad logística: ${cap.logistico ?? ""}
 T — Fecha límite: ${t.fechaLimite ?? ""} (${t.duracionMeses ?? "?"} meses)
 O — Justificación: ${x.justificacion ?? ""}
 ${antiFabricacionRule}
+== PROFUNDIDAD POR DIMENSIÓN (pesos del escaneo PESTEL por tipo de proyecto) ==
+Las 6 dimensiones SIEMPRE se generan — la diferencia es de profundidad, no de inclusión:
+${buildDimensionDepthInstructions(projectType)}
+
 == INSTRUCCIONES ==
 Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
 - clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
-- narrativa: 2–3 oraciones de síntesis vinculadas al hito, sujeto y fuentes disponibles.
+- narrativa: la extensión indicada arriba según si la dimensión es prioritaria o de seguimiento, de síntesis vinculada al hito, sujeto y fuentes disponibles.
   Cuando afirmes un hecho específico proveniente de una fuente consultada, cita entre paréntesis
   al final de la afirmación: (Nombre fuente, mes año) — ej. (Google News, julio 2026) o
   (INEGI/BISE, Censo 2020). Solo para datos y hechos externos; el análisis estratégico no
   necesita cita. Máx. 2–3 citas por narrativa.
 - confidence: ${confidenceValue}.
-- Genera 2–4 señales por categoría (favorables/adversas/inciertas) específicas a este proyecto.
+- Genera la cantidad de señales por categoría (favorables/adversas/inciertas) indicada arriba según la profundidad de la dimensión.
   OBLIGATORIO: cada dimensión debe tener al menos 1 señal (en cualquier categoría) O explicar en narrativa por qué no hay datos.
 - REGLA DE NARRATIVA: la narrativa puede y debe describir qué información contienen las fuentes consultadas
   (ej: "El marco legal disponible incluye X según Brave Search"). La narrativa NO DEBE declarar ausencia
@@ -646,6 +681,10 @@ Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
   no lo declares como "no encontrado". Los vacíos de investigación específica son tarea de F3-Investigación.
 - Cada señal debe tener estos campos exactos:
   { "descripcion": "descripción específica al hito y sujeto del proyecto", "fuente": "Fuente: nombre, fecha", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }
+- Si una dimensión es "DE SEGUIMIENTO" según la sección == PROFUNDIDAD POR DIMENSIÓN == y decidiste tratarla
+  con la misma profundidad que una prioritaria por relevancia local, agrega "escaladaPorRelevanciaLocal": true
+  en el objeto de esa dimensión. Omite el campo (o usa false) en cualquier otro caso — incluidas las dimensiones
+  ya prioritarias, donde el campo no aplica.
 
 Responde con este JSON exacto (las 6 claves en el nivel raíz):
 {
@@ -666,6 +705,7 @@ Responde con este JSON exacto (las 6 claves en el nivel raíz):
     "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
     "senalesInciertas": [] },
   "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": ${confidenceValue},
+    "escaladaPorRelevanciaLocal": false,
     "senalesFavorables": [],
     "senalesAdversas": [],
     "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] },
@@ -789,9 +829,14 @@ ${xpctoToText(xpcto)}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
+== DIMENSIONES PRIORITARIAS PARA ESTE TIPO DE PROYECTO ==
+${buildM2PriorityInstruction(projectType)}
+
 == INSTRUCCIONES ==
 Para cada una de las 5 variables XPCTO (X, P, C, T, O):
-1. Escanea TODAS las dimensiones PEST-L buscando señales relevantes para esa variable.
+1. Escanea TODAS las dimensiones PEST-L buscando señales relevantes para esa variable — pero da mayor
+   peso y detalle en la argumentación a las señales provenientes de las dimensiones prioritarias listadas
+   arriba, cuando estén disponibles.
 2. Veredicto:
    - "coherente": el entorno apoya o no obstaculiza esta variable
    - "requiere_ajuste": fricción moderada que el proyecto puede gestionar

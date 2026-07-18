@@ -6,6 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type {RawArticle} from "../scrapers/googleNewsRSS";
+import {isDimensionPrioritaria} from "../dimensionPriority";
 
 const CLAUDE_MODEL = "claude-sonnet-4-6";
 const BATCH_SIZE = 10;
@@ -76,6 +77,11 @@ export interface DimensionAnalysisResult {
   senalesInciertas?: Senal[];
   // Set when all parse attempts failed with rawData present (not "no data")
   processingError?: true;
+  // true only when this dimension is "de seguimiento" per
+  // ../dimensionPriority.ts for the project's tipo, but Claude judged it
+  // locally relevant enough to treat with full ("prioritaria") depth —
+  // auditable signal so the escalation isn't just inferred from narrative.
+  escaladaPorRelevanciaLocal?: boolean;
 }
 
 export interface ImpactChainResult {
@@ -96,6 +102,8 @@ interface DimensionRawOutput {
   señalesFavorables?: Senal[];
   señalesAdversas?: Senal[];
   señalesInciertas?: Senal[];
+  // See DimensionAnalysisResult.escaladaPorRelevanciaLocal.
+  escalada_por_relevancia_local?: boolean;
 }
 
 // ============================================================
@@ -261,6 +269,26 @@ L y E respectivamente).
   const legalBlock = useLegalCtx ? `\n${MEXICAN_LEGAL_CONTEXT}\n` : "";
   const ecoBlock = ecologicoCtx ? `\n${ecologicoCtx}\n` : "";
 
+  // Pesos del escaneo PESTEL por tipo de proyecto (FAT 2.0, Fase 2 · M1).
+  // Mismo texto/criterio que lib/ai/phases/prompts.ts
+  // (getMapaPESTELExpressPrompt) — ver ../dimensionPriority.ts para la
+  // tabla y la nota de sincronización.
+  const isPrioritaria = isDimensionPrioritaria(tipo, code);
+  const depthBlock = isPrioritaria ?
+    "PROFUNDIDAD PARA ESTA DIMENSIÓN: PRIORITARIA para este tipo de " +
+    "proyecto — 3-4 señales por categoría, narrativa de 3-4 párrafos, " +
+    "mayor profundidad analítica. El campo " +
+    "\"escalada_por_relevancia_local\" NO APLICA a esta dimensión — " +
+    "déjalo en false (es exclusivo de dimensiones DE SEGUIMIENTO)." :
+    "PROFUNDIDAD PARA ESTA DIMENSIÓN: DE SEGUIMIENTO para este tipo de " +
+    "proyecto — 1-2 señales por categoría, narrativa breve de 1-2 " +
+    "párrafos — SALVO que el contexto local específico (agenda vigente, " +
+    "coyuntura relevante) la vuelva claramente relevante para este " +
+    "proyecto en particular, en cuyo caso trátala con la misma " +
+    "profundidad que una prioritaria y marca " +
+    "\"escalada_por_relevancia_local\": true en el JSON de respuesta " +
+    "(omite el campo o usa false en cualquier otro caso).";
+
   return `Eres un consultor experto en comunicación política en \
 Latinoamérica. Analiza la dimensión ${dimName} del análisis PEST-L.
 
@@ -268,6 +296,8 @@ CONTEXTO DEL PROYECTO:
 - Tipo de proyecto: ${tipoDesc}
 - Territorio: ${territorio}
 - Horizonte temporal: ${horizonte} meses
+
+${depthBlock}
 ${legalBlock}${ecoBlock}
 VARIABLES MONITOREADAS:
 ${varsText}
@@ -305,9 +335,10 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "tendencia": "ASCENDENTE" | "DESCENDENTE" | "ESTABLE",
   "intensidad": "ALTA" | "MEDIA" | "BAJA",
   "señal_principal": "máx. 150 chars describiendo el hallazgo clave",
-  "narrativa": "2-3 párrafos con el análisis detallado",
+  "narrativa": "extensión indicada arriba según profundidad de la dimensión",
   "clasificación": "OPORTUNIDAD" | "AMENAZA" | "NEUTRAL",
   "confianza": número entre 0 y 100,
+  "escalada_por_relevancia_local": true | false,
   "señalesFavorables": [
     {
       "descripcion": "...",
@@ -321,8 +352,9 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "señalesInciertas": [...]
 }
 
-Incluye entre 1 y 3 señales por categoría según los datos \
-disponibles. Si no hay señales de una categoría, usa array vacío [].
+Incluye la cantidad de señales por categoría indicada arriba en \
+PROFUNDIDAD PARA ESTA DIMENSIÓN, según los datos disponibles. Si no hay \
+señales de una categoría, usa array vacío [].
 La confianza debe reflejar la calidad y cantidad de datos disponibles.
 Sin datos suficientes asigna confianza menor a 50.`;
 }
@@ -457,6 +489,8 @@ export async function analyzeDimension(params: {
     senalesFavorables: raw.señalesFavorables ?? [],
     senalesAdversas: raw.señalesAdversas ?? [],
     senalesInciertas: raw.señalesInciertas ?? [],
+    ...(raw.escalada_por_relevancia_local ?
+      {escaladaPorRelevanciaLocal: true as const} : {}),
     ...(!parsedSuccessfully && !!params.rawData?.trim() ?
       {processingError: true as const} : {}),
   };

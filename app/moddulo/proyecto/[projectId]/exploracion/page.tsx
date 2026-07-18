@@ -974,7 +974,7 @@ export default function ExploracionPage() {
 
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
-    if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs));
+    if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs, mapaPESTEL ?? undefined, projectType));
     setShowReview(true);
   };
 

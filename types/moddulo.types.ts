@@ -378,6 +378,11 @@ export interface F2DimensionPESTEL {
   senalesInciertas: F2Senal[];
   narrativa?: string;
   confidence?: number;
+  // true solo si esta dimensión es "de seguimiento" según
+  // lib/moddulo/dimensionPriority.ts pero el modelo decidió tratarla como
+  // prioritaria por relevancia del contexto local — señal auditable para no
+  // depender de inferir el criterio leyendo la narrativa.
+  escaladaPorRelevanciaLocal?: boolean;
 }
 
 export type MapaPESTEL = Partial<Record<string, F2DimensionPESTEL>>;
