@@ -166,11 +166,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     console.error("[link-moddulo] error buscando análisis para projectId:", projectId, err);
   }
 
-  // If Moddulo already has mapaPESTEL, check if it's from the same analysis (C7b guard)
+  // If Moddulo already has mapaPESTEL FROM A TRACKED CENTINELA ANALYSIS, check
+  // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
+  // from the express flow — that's the express→Centinela upgrade path this
+  // endpoint must allow, not a conflict to protect against.
   const existingAnalysisId = explorarPhase?.pestAnalysisId;
   const existingMapa = explorarPhase?.mapaPESTEL as MapaPESTEL | undefined;
 
-  if (existingMapa) {
+  if (existingMapa && existingAnalysisId) {
     if (existingAnalysisId === latestAnalysisId) {
       // Same analysis already imported — idempotent, just ensure PESTEL write-back
       await adminDb.collection("pestel_projects").doc(projectId).update({
@@ -200,6 +203,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
     updatePayload["phases.exploracion.pestAnalysisId"] = latestAnalysisId;
     updatePayload["phases.exploracion.mapaPESTEL"] = mapaPESTEL;
+    updatePayload["phases.exploracion.xpctoSnapshotAtGeneration"] = JSON.stringify(modduloProject.xpcto ?? {});
+    // M1 puede estar reemplazando uno de origen express (upgrade) — M2-M5
+    // aprobados contra el M1 anterior quedarían obsoletos, se fuerza
+    // re-aprobación. draftDVS NO se borra: si la regeneración automática
+    // falla, el usuario conserva su último estado válido en vez de pantalla
+    // en blanco.
+    updatePayload["phases.exploracion.motorAprobaciones"] = {};
   }
 
   await adminDb.collection("moddulo_projects").doc(modduloProjectId).update(updatePayload);

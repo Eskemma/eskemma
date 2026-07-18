@@ -9,6 +9,10 @@ import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionRevie
 import DVSView from "./components/DVSView";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import OrphanRecoveryView from "./components/OrphanRecoveryView";
+import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import ConfirmReplacePestelModal from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
+import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
+import { formatF2Report, formatPestelAnalysis } from "@/lib/moddulo/reportFormatters";
 import type {
   XPCTO,
   ProjectType,
@@ -173,11 +177,14 @@ function diffXpcto(old: Partial<XPCTO>, next: Partial<XPCTO>): XpctoDiff[] {
   return diffs;
 }
 
+// M1 (escaneo PESTEL) se lee "desde la posición del proyecto: ¿qué significa
+// esta variable para este sujeto, con este hito, en esta escala?" (FAT 2.0,
+// Fase 2 · M1). Sujeto e Hito enmarcan el escaneo — Capacidades, Tiempo y
+// Justificación solo alimentan M2 (contraste XPCTO-Entorno), que opera sobre
+// el M1 ya generado sin necesidad de rescanearlo.
 const FULL_REGEN_FIELDS = new Set([
   "Sujeto",
-  "Capacidad financiero",
-  "Capacidad humano",
-  "Capacidad logistico",
+  "Hito",
 ]);
 
 function getRegenerationType(diffs: XpctoDiff[]): "full" | "partial" {
@@ -221,6 +228,14 @@ export default function ExploracionPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [expressError, setExpressError] = useState<string | null>(null);
   const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
+  // Mirror de mapaPESTEL en ref — permite leer el valor vigente dentro de
+  // generarDraftDVS sin agregarlo a sus deps (se mantiene estable).
+  const mapaPESTELRef = useRef<MapaPESTEL | null>(null);
+  useEffect(() => { mapaPESTELRef.current = mapaPESTEL; }, [mapaPESTEL]);
+  // Serializado del mapaPESTEL que corresponde al draftDVS actualmente
+  // válido — el auto-generate effect solo regenera si el contenido de
+  // mapaPESTEL difiere de este marcador, no solo su referencia de objeto.
+  const lastGeneratedMapaRef = useRef<string | null>(null);
   const [showReporte, setShowReporte] = useState(false);
   // Nuevo flujo de motores secuenciales (Iter 2+)
   const [draftDVS, setDraftDVS] = useState<DVSF2 | null>(null);
@@ -229,6 +244,10 @@ export default function ExploracionPage() {
   }>({});
   const [isGeneratingMotors, setIsGeneratingMotors] = useState(false);
   const [motorGenerationError, setMotorGenerationError] = useState<string | null>(null);
+  // Distingue si la generación de M2-M5 en curso acompaña un M1 nuevo/reemplazado
+  // ("full") o es solo una actualización de contraste sobre el mismo M1 ("partial")
+  // — determina el texto del botón de reintento si falla.
+  const [regenKind, setRegenKind] = useState<"full" | "partial">("full");
   const [dvsChecklist, setDvsChecklist] = useState<CriterioDVS[]>([]);
   const [xpctoStaleChanges, setXpctoStaleChanges] = useState<XpctoDiff[]>([]);
 
@@ -257,6 +276,14 @@ export default function ExploracionPage() {
   // currentStage del proyecto PESTEL — always fetched fresh, never cached
   const [pestCurrentStage, setPestCurrentStage] = useState<number | null>(null);
   const [pestStageLoading, setPestStageLoading] = useState(false);
+  // Guarda el pestAnalysisId previo a desvincular — habilita el botón
+  // "Vincular de nuevo" (deshacer) sin tener que pasar por el picker.
+  const [lastUnlinkedPestAnalysisId, setLastUnlinkedPestAnalysisId] = useState<string | null>(null);
+  // Conflicto detectado por import-pestel (409): mapaPESTEL existente viene
+  // de una fuente distinta. Se resuelve con confirmación explícita del
+  // usuario antes de reintentar con confirmReplace: true.
+  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync" } | null>(null);
+  const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
 
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
@@ -345,7 +372,12 @@ export default function ExploracionPage() {
         const savedDraftDVS = p.phases?.exploracion?.draftDVS as Record<string, unknown> | undefined;
         const draftHei = savedDraftDVS?.hei as Record<string, unknown> | undefined;
         const draftM5Valid = !!(draftHei?.tensionCentral || draftHei?.contexto || (Array.isArray(savedDraftDVS?.pip) && (savedDraftDVS.pip as unknown[]).length > 0));
-        if (savedDraftDVS && draftM5Valid) setDraftDVS(savedDraftDVS as unknown as DVSF2);
+        if (savedDraftDVS && draftM5Valid) {
+          setDraftDVS(savedDraftDVS as unknown as DVSF2);
+          // Este draft ya corresponde a savedMapa — marca el baseline para
+          // que el auto-generate effect no dispare una regeneración de sobra.
+          if (savedMapa) lastGeneratedMapaRef.current = JSON.stringify(savedMapa);
+        }
         const savedMotorAprobaciones = p.phases?.exploracion?.motorAprobaciones;
         if (savedMotorAprobaciones) setMotorAprobaciones(
           savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
@@ -353,9 +385,11 @@ export default function ExploracionPage() {
 
         if (savedMapa) setMapaPESTEL(savedMapa as MapaPESTEL);
 
-        // Detect F1→F2 staleness: compare XPCTO used at generation vs. current
+        // Detect F1→F2 staleness: compare XPCTO used at generation vs. current.
+        // Applies regardless of M1 origin (express or Centinela PESTEL) — both
+        // paths capture xpctoSnapshotAtGeneration since the snapshot/redirect fix.
         const savedSnapshot = p.phases?.exploracion?.xpctoSnapshotAtGeneration as string | undefined;
-        if (savedSnapshot && savedMapa && !p.phases?.exploracion?.pestAnalysisId) {
+        if (savedSnapshot && savedMapa) {
           const currentXpcto = JSON.stringify(p.xpcto ?? {});
           if (savedSnapshot !== currentXpcto) {
             setXpctoStaleChanges(diffXpcto(
@@ -368,6 +402,8 @@ export default function ExploracionPage() {
         // Cargar referencia al proyecto PESTEL vinculado
         const savedPestProjectId = p.phases?.exploracion?.pestProjectId;
         const savedPestAnalysisId = p.phases?.exploracion?.pestAnalysisId;
+        const savedLastUnlinked = p.phases?.exploracion?.lastUnlinkedPestAnalysisId;
+        if (savedLastUnlinked) setLastUnlinkedPestAnalysisId(savedLastUnlinked as string);
         if (savedPestAnalysisId) setPestAnalysisId(savedPestAnalysisId as string);
         if (savedPestProjectId) {
           setPestProjectId(savedPestProjectId as string);
@@ -418,30 +454,80 @@ export default function ExploracionPage() {
       .finally(() => setIsLoaded(true));
   }, [projectId]);
 
-  // C7 — Auto-import PESTEL al regresar con pest_analysis_id en URL
-  useEffect(() => {
-    if (!isLoaded || !projectId) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const pestId = urlParams.get("pest_analysis_id");
-    if (!pestId || mapaPESTEL) return; // skip if already imported
+  // Helper compartido: importa/re-sincroniza un análisis de Centinela PESTEL.
+  // Usado por el efecto C7 (automático, al regresar con ?pest_analysis_id=),
+  // "Vincular de nuevo ↺" (handleRelinkPestel), y la confirmación de
+  // reemplazo (handleConfirmReplace) — un solo lugar para el manejo de
+  // éxito/conflicto en vez de triplicar la lógica.
+  //
+  // Devuelve { ok: true } en éxito (incluye el idempotente), o
+  // { ok: false, conflict: boolean } — conflict: true significa que el
+  // backend rechazó con 409 porque mapaPESTEL viene de otra fuente; el
+  // llamador decide si ofrece confirmación (confirmReplace: true) o no.
+  const importPestel = useCallback(
+    async (pestAnalysisId: string, confirmReplace = false): Promise<{ ok: boolean; conflict: boolean }> => {
+      try {
+        const r = await fetch("/api/moddulo/f2/import-pestel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId, pestAnalysisId, confirmReplace }),
+        });
+        if (r.status === 409) return { ok: false, conflict: true };
+        if (!r.ok) return { ok: false, conflict: false };
 
-    fetch("/api/moddulo/f2/import-pestel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ projectId, pestAnalysisId: pestId }),
-    })
-      .then(async (r) => {
-        if (!r.ok) return;
         const data = await r.json();
         if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
         if (data.pestProjectId) {
           setPestProjectId(data.pestProjectId as string);
           setPestlVia("pestel");
         }
-      })
-      .catch(() => {});
-  }, [isLoaded, projectId, mapaPESTEL]);
+        setPestAnalysisId(pestAnalysisId);
+        // M1 pudo haberse refrescado (análisis renovado, restaurado, o
+        // reemplazando un express) — M2-M5 aprobados contra el M1 anterior
+        // quedarían obsoletos, se fuerza re-aprobación. draftDVS NO se limpia
+        // aquí: el auto-generate effect dispara la regeneración y solo lo
+        // sobreescribe si tiene éxito.
+        setRegenKind("full");
+        setMotorAprobaciones({});
+        setXpctoStaleChanges([]);
+        setLastUnlinkedPestAnalysisId(null);
+
+        // Limpia el query param — evita que el efecto C7 vuelva a disparar
+        // este mismo import (aunque sea idempotente) en visitas futuras.
+        if (window.location.search.includes("pest_analysis_id")) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("pest_analysis_id");
+          router.replace(url.pathname + url.search, { scroll: false });
+        }
+        return { ok: true, conflict: false };
+      } catch {
+        return { ok: false, conflict: false };
+      }
+    },
+    [projectId, router]
+  );
+
+  // C7 — Auto-import PESTEL al regresar con pest_analysis_id en URL.
+  // Se re-dispara cuando el pestId de la URL difiere del ya importado —
+  // cubre el caso de regreso tras regenerar el análisis en Centinela
+  // (mismo proyecto PESTEL vinculado, análisis renovado). Si el backend
+  // responde 409 (mapaPESTEL de otra fuente — p.ej. reemplazando un express
+  // tras "Analizar con PESTEL"), pide confirmación explícita en vez de
+  // sobrescribir o ignorar en silencio.
+  useEffect(() => {
+    if (!isLoaded || !projectId) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const pestId = urlParams.get("pest_analysis_id");
+    if (!pestId) return;
+    if (mapaPESTEL && pestId === pestAnalysisId) return; // ya sincronizado
+
+    importPestel(pestId).then((result) => {
+      if (!result.ok && result.conflict) {
+        setPendingReplaceConfirm({ pestAnalysisId: pestId, source: "sync" });
+      }
+    });
+  }, [isLoaded, projectId, mapaPESTEL, pestAnalysisId, importPestel]);
 
   // C7b — Resolver pestProjectId cuando existe pestAnalysisId pero no pestProjectId.
   // Si M1 ya existe, usa analysis-meta (solo lectura) para evitar sobreescribir mapaPESTEL.
@@ -588,24 +674,24 @@ export default function ExploracionPage() {
     return () => clearInterval(id);
   }, [isExpressAnalyzing, expressStartTime]);
 
-  // Tracks whether the initial Firestore load has completed. Prevents auto-generate
-  // from firing on page mount when mapaPESTEL was already saved (not newly set).
-  const isInitialLoad = useRef(true);
-
-  // Auto-generate draftDVS when mapaPESTEL is newly set during the session.
-  // isInitialLoad guard prevents firing on page mount when mapaPESTEL was
-  // already in Firestore — only fires when mapaPESTEL changes after load.
+  // Auto-generate draftDVS cuando mapaPESTEL cambia de CONTENIDO (no de
+  // referencia) durante la sesión — cubre primer análisis, re-sync tras
+  // regenerar en Centinela, restauración de vínculo, o upgrade
+  // express→Centinela. No exige draftDVS === null: si ya había un draft
+  // previo (de un M1 anterior), se deja intacto mientras se regenera —
+  // generarDraftDVS solo lo sobreescribe si la llamada tiene éxito, así que
+  // un fallo no deja al usuario sin nada que ver.
+  //
+  // La comparación es por contenido serializado (lastGeneratedMapaRef), no
+  // por igualdad de referencia: un re-import idempotente (mismo análisis, ya
+  // sincronizado) deserializa un objeto NUEVO con el mismo contenido, y
+  // comparar por referencia disparaba una regeneración real de sobra en cada
+  // visita — ver bug reportado 2026-07-17.
   useEffect(() => {
-    if (isInitialLoad.current) {
-      // First fire: mark initial load done (only after isLoaded is true)
-      if (isLoaded) {
-        isInitialLoad.current = false;
-      }
-      return;
-    }
-    if (mapaPESTEL !== null && draftDVS === null && isLoaded) {
-      generarDraftDVS();
-    }
+    if (mapaPESTEL === null || !isLoaded) return;
+    const serialized = JSON.stringify(mapaPESTEL);
+    if (serialized === lastGeneratedMapaRef.current) return;
+    generarDraftDVS();
   // generarDraftDVS es estable (useCallback con dep projectId que no cambia en runtime)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapaPESTEL, isLoaded]);
@@ -738,7 +824,12 @@ export default function ExploracionPage() {
         return;
       }
       const data = await r.json();
-      if (data.dvs) setDraftDVS(data.dvs as DVSF2);
+      if (data.dvs) {
+        setDraftDVS(data.dvs as DVSF2);
+        // Marca el mapaPESTEL vigente como el que generó este draft — el
+        // auto-generate effect no vuelve a disparar hasta que cambie de verdad.
+        lastGeneratedMapaRef.current = JSON.stringify(mapaPESTELRef.current);
+      }
     } catch {
       setMotorGenerationError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
@@ -781,6 +872,73 @@ export default function ExploracionPage() {
 
   // Keep the ref in sync so handleDataExtracted can call it without stale closure
   useEffect(() => { handleGenerarDVSRef.current = handleGenerarDVS; }, [handleGenerarDVS]);
+
+  const [isUnlinkingPestel, setIsUnlinkingPestel] = useState(false);
+  const [showConfirmUnlink, setShowConfirmUnlink] = useState(false);
+  const [isRelinkingPestel, setIsRelinkingPestel] = useState(false);
+  const [showLinkExistingPicker, setShowLinkExistingPicker] = useState(false);
+
+  // Desvincula el proyecto de su análisis de Centinela PESTEL: limpia
+  // pestAnalysisId/pestProjectId/mapaPESTEL en el servidor (que además
+  // conserva el pestAnalysisId anterior para poder deshacer) y resetea el
+  // estado local para que el usuario pueda regenerar vía express de inmediato.
+  const handleUnlinkPestel = useCallback(async () => {
+    setShowConfirmUnlink(false);
+    setIsUnlinkingPestel(true);
+    try {
+      const r = await fetch("/api/moddulo/f2/unlink-pestel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId }),
+      });
+      if (r.ok) {
+        setLastUnlinkedPestAnalysisId(pestAnalysisId);
+        setPestlVia(null);
+        setPestProjectId(null);
+        setPestAnalysisId(null);
+        setMapaPESTEL(null);
+        setXpctoStaleChanges([]);
+        setMotorAprobaciones({});
+        // draftDVS NO se limpia: si el usuario restaura el vínculo o
+        // regenera vía express, sigue teniendo su último estado válido
+        // visible mientras la regeneración corre.
+      }
+    } finally {
+      setIsUnlinkingPestel(false);
+    }
+  }, [projectId, pestAnalysisId]);
+
+  // Deshace una desvinculación: re-vincula con el MISMO análisis de
+  // Centinela del que se desvinculó (no uno nuevo). Si el usuario generó un
+  // análisis express nuevo mientras tanto, mapaPESTEL viene de esa otra
+  // fuente — import-pestel responde 409 y se pide confirmación explícita en
+  // vez de bloquear o sobrescribir en silencio.
+  const handleRelinkPestel = useCallback(async () => {
+    if (!lastUnlinkedPestAnalysisId) return;
+    setIsRelinkingPestel(true);
+    try {
+      const result = await importPestel(lastUnlinkedPestAnalysisId);
+      if (!result.ok && result.conflict) {
+        setPendingReplaceConfirm({ pestAnalysisId: lastUnlinkedPestAnalysisId, source: "relink" });
+      }
+    } finally {
+      setIsRelinkingPestel(false);
+    }
+  }, [lastUnlinkedPestAnalysisId, importPestel]);
+
+  // Confirma el reemplazo tras un 409 de import-pestel (mapaPESTEL de otra
+  // fuente) — reintenta con confirmReplace: true.
+  const handleConfirmReplace = useCallback(async () => {
+    if (!pendingReplaceConfirm) return;
+    setIsConfirmingReplace(true);
+    try {
+      await importPestel(pendingReplaceConfirm.pestAnalysisId, true);
+    } finally {
+      setIsConfirmingReplace(false);
+      setPendingReplaceConfirm(null);
+    }
+  }, [pendingReplaceConfirm, importPestel]);
 
   const [isRegeneratingReport, setIsRegeneratingReport] = useState(false);
   const [reportRegenError, setReportRegenError] = useState<string | null>(null);
@@ -1048,7 +1206,14 @@ export default function ExploracionPage() {
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
               ) : null}
             </span>
-            <DownloadButton form={form} reportText={reportText} chatMessages={chatMessages} />
+            <PhaseDownloadMenu
+              phaseId="exploracion"
+              projectName={projectName}
+              content={{
+                reporte: (dvs ?? draftDVS) ? formatF2Report(dvs ?? draftDVS!) : null,
+                pestel: mapaPESTEL ? formatPestelAnalysis(mapaPESTEL) : null,
+              }}
+            />
           </div>
         </div>
 
@@ -1284,16 +1449,35 @@ export default function ExploracionPage() {
                   </p>
                 </div>
                 {pestlVia === "pestel" && pestProjectId && (
-                  <button
-                    onClick={() => router.push(`/centinela/pestel/${pestProjectId}/analisis`)}
-                    className="shrink-0 px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
-                  >
-                    Regresar a PESTEL →
-                  </button>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      onClick={() => router.push(`/centinela/pestel/${pestProjectId}/analisis`)}
+                      className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                    >
+                      Regresar a PESTEL →
+                    </button>
+                    <span className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => setShowConfirmUnlink(true)}
+                        disabled={isUnlinkingPestel}
+                        className="px-3 py-1.5 text-black-eske/50 dark:text-[#9AAEBE] text-xs font-medium hover:underline disabled:opacity-50"
+                      >
+                        {isUnlinkingPestel ? "Desvinculando…" : "Desvincular"}
+                      </button>
+                      <InfoTooltip
+                        content="Rompe el vínculo de este proyecto con el análisis de Centinela PESTEL. El escaneo PESTEL actual (M1) y las secciones M2-M5 ya aprobadas se borran. Podrás regenerar vía el flujo express de Moddulo, o restaurar este mismo vínculo después."
+                        placement="left"
+                      />
+                    </span>
+                  </div>
                 )}
               </div>
               {xpctoStaleChanges.length > 0 && (() => {
                 const regenType = getRegenerationType(xpctoStaleChanges);
+                // El M1 vía Centinela no se puede regenerar in-app: pertenece a un
+                // análisis independiente. Redirigir a Centinela en vez de llamar a
+                // generate-m1-express, que sobrescribiría el mapaPESTEL vinculado.
+                const viaCentinela = regenType === "full" && pestlVia === "pestel" && !!pestProjectId;
                 return (
                   <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
                     <div className="flex items-start justify-between gap-3">
@@ -1317,26 +1501,40 @@ export default function ExploracionPage() {
                           )}
                         </ul>
                         <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
-                          {regenType === "full"
+                          {viaCentinela
+                            ? "Este M1 proviene de Centinela PESTEL. Actualiza el análisis ahí y vuelve a importarlo."
+                            : regenType === "full"
                             ? "Se regenerará el escaneo PESTEL completo (M1) y el contraste XPCTO-Entorno."
                             : "El escaneo de fuentes no se repite — solo se actualiza el contraste XPCTO-Entorno."}
                         </p>
                       </div>
                       <button
                         onClick={() => {
+                          if (viaCentinela) {
+                            // Etapa 2 (Datos), donde vive "Ejecutar Análisis IA".
+                            // Centinela avanza solo a Etapa 3 al terminar.
+                            router.push(`/centinela/pestel/${pestProjectId}/datos`);
+                            return;
+                          }
                           setXpctoStaleChanges([]);
                           setMotorAprobaciones({});
-                          setDraftDVS(null);
+                          // draftDVS NO se limpia aquí — se conserva mientras
+                          // corre la regeneración; solo se sobreescribe si
+                          // generarDraftDVS/generate-m1-express tienen éxito.
                           if (regenType === "full") {
+                            setRegenKind("full");
                             setMapaPESTEL(null);
                             handleGenerarDVSRef.current();
                           } else {
+                            setRegenKind("partial");
                             generarDraftDVS();
                           }
                         }}
                         className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
                       >
-                        {regenType === "full" ? "Regenerar análisis completo ↺" : "Actualizar contraste XPCTO ↺"}
+                        {viaCentinela
+                          ? "Ir a Centinela PESTEL →"
+                          : regenType === "full" ? "Regenerar análisis completo ↺" : "Actualizar contraste XPCTO ↺"}
                       </button>
                     </div>
                   </div>
@@ -1370,6 +1568,7 @@ export default function ExploracionPage() {
                     isGenerating={isGeneratingMotors}
                     generationError={motorGenerationError}
                     onRetry={generarDraftDVS}
+                    retryLabel={regenKind === "partial" ? "Reintentar actualización" : "Reintentar análisis"}
                     onApprove={handleApproveMotor}
                     onDraftChange={setDraftDVS}
                     onSaveEdit={handleSaveMotorEdit}
@@ -1458,6 +1657,11 @@ export default function ExploracionPage() {
             isAnalyzing={isExpressAnalyzing}
             pestProjectId={pestProjectId}
             onNuevoAnalisis={pestProjectId === null ? () => setShowConfirmReanalisis(true) : undefined}
+            lastUnlinkedPestAnalysisId={lastUnlinkedPestAnalysisId}
+            onRelinkPestel={handleRelinkPestel}
+            isRelinkingPestel={isRelinkingPestel}
+            onLinkExisting={() => setShowLinkExistingPicker(true)}
+            onAnalizarConPESTEL={handleAbrirPESTEL}
             esMexico={esMexico}
             webElectoralData={webElectoralData}
             webElectoralLoading={webElectoralLoading}
@@ -1472,12 +1676,42 @@ export default function ExploracionPage() {
           onCancel={() => setShowConfirmReanalisis(false)}
           onConfirm={() => {
             setShowConfirmReanalisis(false);
+            setRegenKind("full");
             setMapaPESTEL(null);
             setExpressError(null);
             setMotorAprobaciones({});
-            setDraftDVS(null);
+            // draftDVS NO se limpia — se conserva mientras corre la
+            // regeneración; solo se sobreescribe si express tiene éxito.
             handleGenerarDVSRef.current();
           }}
+        />
+      )}
+
+      {/* Modal confirmación desvincular de Centinela PESTEL */}
+      {showConfirmUnlink && (
+        <ConfirmUnlinkPestelModal
+          onCancel={() => setShowConfirmUnlink(false)}
+          onConfirm={handleUnlinkPestel}
+        />
+      )}
+
+      {/* Modal confirmación reemplazo — mapaPESTEL existente viene de otra fuente */}
+      {pendingReplaceConfirm && (
+        <ConfirmReplacePestelModal
+          source={pendingReplaceConfirm.source}
+          isConfirming={isConfirmingReplace}
+          onCancel={() => setPendingReplaceConfirm(null)}
+          onConfirm={handleConfirmReplace}
+        />
+      )}
+
+      {/* Picker: vincular a un análisis PESTEL existente (upgrade express→Centinela) */}
+      {showLinkExistingPicker && (
+        <LinkExistingPestelModal
+          projectId={projectId}
+          projectType={projectType}
+          projectTerritory={projectTerritory}
+          onClose={() => setShowLinkExistingPicker(false)}
         />
       )}
 
@@ -1526,6 +1760,7 @@ function SkeletonDimension() {
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
   isAnalyzing = false, onNuevoAnalisis, pestProjectId,
+  lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL,
   esMexico, webElectoralData, webElectoralLoading,
 }: {
   form: ExplorationForm;
@@ -1539,6 +1774,11 @@ function ExplorationFormPanel({
   isAnalyzing?: boolean;
   onNuevoAnalisis?: () => void;
   pestProjectId?: string | null;
+  lastUnlinkedPestAnalysisId?: string | null;
+  onRelinkPestel?: () => void;
+  isRelinkingPestel?: boolean;
+  onLinkExisting?: () => void;
+  onAnalizarConPESTEL?: () => void;
   esMexico: boolean;
   webElectoralData: WebContextResult | null;
   webElectoralLoading: boolean;
@@ -1550,6 +1790,21 @@ function ExplorationFormPanel({
     "disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] disabled:text-black-eske-10 dark:disabled:text-[#9AAEBE] " +
     "placeholder:text-gray-eske-40 dark:placeholder:text-[#6D8294] resize-none";
 
+  // Menú kebab — consolida "Analizar con PESTEL" / "Nuevo análisis" /
+  // "Vincular con análisis independiente" (mismo patrón que app/moddulo/page.tsx).
+  const [kebabOpen, setKebabOpen] = useState(false);
+  const kebabRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!kebabOpen) return;
+    function onOutsideClick(e: MouseEvent) {
+      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+        setKebabOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onOutsideClick);
+    return () => document.removeEventListener("mousedown", onOutsideClick);
+  }, [kebabOpen]);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -1559,19 +1814,79 @@ function ExplorationFormPanel({
           <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Solo lectura</span>
         ) : pestProjectId ? (
           <Link
-            href={`/centinela/pestel/${pestProjectId}`}
+            href={`/centinela/pestel/${pestProjectId}/analisis`}
             className="text-xs text-bluegreen-eske hover:underline font-medium"
           >
             Ver en Centinela →
           </Link>
+        ) : lastUnlinkedPestAnalysisId && onRelinkPestel ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRelinkPestel}
+              disabled={isRelinkingPestel}
+              className="text-xs text-bluegreen-eske hover:underline font-medium disabled:opacity-50"
+            >
+              {isRelinkingPestel ? "Vinculando…" : "Vincular de nuevo ↺"}
+            </button>
+            {onNuevoAnalisis && (
+              <button
+                type="button"
+                onClick={onNuevoAnalisis}
+                className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] hover:underline"
+              >
+                Nuevo análisis
+              </button>
+            )}
+          </div>
         ) : onNuevoAnalisis ? (
-          <button
-            type="button"
-            onClick={onNuevoAnalisis}
-            className="text-xs text-bluegreen-eske hover:underline font-medium"
-          >
-            Nuevo análisis ↺
-          </button>
+          <div className="relative shrink-0" ref={kebabRef}>
+            <button
+              type="button"
+              aria-label="Opciones de análisis PESTEL"
+              onClick={() => setKebabOpen((o) => !o)}
+              className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40
+                hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <circle cx="8" cy="3" r="1.5" />
+                <circle cx="8" cy="8" r="1.5" />
+                <circle cx="8" cy="13" r="1.5" />
+              </svg>
+            </button>
+            {kebabOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-1.5rem)] bg-white-eske dark:bg-[#1E3A52]
+                  rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20"
+              >
+                {onAnalizarConPESTEL && (
+                  <button
+                    type="button"
+                    onClick={() => { setKebabOpen(false); onAnalizarConPESTEL(); }}
+                    className="w-full text-left px-3 py-2 text-sm font-medium text-bluegreen-eske hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Analizar con PESTEL
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setKebabOpen(false); onNuevoAnalisis(); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                >
+                  Nuevo análisis ↺
+                </button>
+                {onLinkExisting && (
+                  <button
+                    type="button"
+                    onClick={() => { setKebabOpen(false); onLinkExisting(); }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Vincular con análisis independiente
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Auto-rellena via chat</span>
         )}
@@ -1743,9 +2058,9 @@ function InlineMarkdown({ text }: { text: string }) {
 
 function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
   const CLASIF_COLORS: Record<string, string> = {
-    OPORTUNIDAD: "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20",
+    OPORTUNIDAD: "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-[#7BC47C]",
     NEUTRAL: "bg-[#FFF2CC] text-[#816000] dark:bg-yellow-eske/20 dark:text-yellow-eske",
-    AMENAZA: "bg-red-eske-20 text-red-eske-80 dark:bg-red-eske/20",
+    AMENAZA: "bg-red-eske-20 text-red-eske-80 dark:bg-orange-eske/20 dark:text-orange-eske",
   };
 
   return (
@@ -1778,8 +2093,8 @@ function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
       <SignalGroup
         title="Señales adversas"
         signals={dim.senalesAdversas}
-        colorClass="text-red-eske-70 dark:text-[#E07070]"
-        summaryClass="border border-red-eske-20 dark:border-red-eske/20"
+        colorClass="text-red-eske-70 dark:text-orange-eske"
+        summaryClass="border border-red-eske-20 dark:border-orange-eske/30"
       />
       <SignalGroup
         title="Señales inciertas"
@@ -1993,6 +2308,284 @@ function ConfirmReanalisisModal({ onCancel, onConfirm }: {
   );
 }
 
+function ConfirmUnlinkPestelModal({ onCancel, onConfirm }: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
+      <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="font-bold text-black-eske dark:text-[#EAF2F8]">¿Desvincular del análisis de Centinela PESTEL?</h2>
+            <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-1">
+              Se borrará el escaneo PESTEL actual (M1) y las secciones M2-M5 ya aprobadas. El análisis
+              de Centinela seguirá intacto — podrás regenerar vía el flujo express de Moddulo, o
+              restaurar este mismo vínculo después.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors"
+          >
+            Desvincular
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// PICKER: VINCULAR A ANÁLISIS PESTEL EXISTENTE (upgrade express→Centinela)
+// ==========================================
+// Dirección inversa del picker de ModduloButton.tsx (PESTEL→Moddulo): aquí el
+// usuario navega desde un proyecto Moddulo de origen express y elige un
+// proyecto PESTEL de Centinela ya existente para vincularlo. Reutiliza el
+// mismo endpoint link-moddulo/route.ts sin cambios — es agnóstico a qué lado
+// lo invoca — y la misma lógica de compatibilidad tipo/territorio.
+
+type TerritoryMatchKind = "exact" | "approximate" | "mismatch";
+
+function checkTerritoryMatchInverse(
+  m: Territorio | null,
+  p: Territorio | undefined
+): TerritoryMatchKind {
+  if (!m || !p) return "approximate";
+  if (m.nivel !== p.nivel) return "mismatch";
+  if (m.pais && p.pais && m.pais !== p.pais) return "mismatch";
+  if (m.estado && p.estado && m.estado !== p.estado) return "mismatch";
+
+  const isDistrito = ["distrito_federal", "distrito_local", "distrito"].includes(m.nivel);
+  if (isDistrito) {
+    if (m.cve_distrito && p.cve_distrito) {
+      return m.cve_distrito === p.cve_distrito ? "exact" : "mismatch";
+    }
+    if (m.municipio && p.municipio && m.municipio !== p.municipio) return "mismatch";
+    return "approximate";
+  }
+  if (m.nivel === "municipal") {
+    if (m.municipio && p.municipio && m.municipio !== p.municipio) return "mismatch";
+    return "approximate";
+  }
+  return "exact";
+}
+
+type PestelPickerProject = {
+  id: string;
+  nombre: string;
+  tipo: ProjectType;
+  territorio?: Territorio;
+  status?: string;
+};
+
+function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onClose }: {
+  projectId: string;
+  projectType: ProjectType;
+  projectTerritory: Territorio | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [projects, setProjects] = useState<(PestelPickerProject & { tipoOk: boolean; territoryMatch: TerritoryMatchKind })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<(PestelPickerProject & { territoryMatch: TerritoryMatchKind }) | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/centinela/pestel/project", { credentials: "include" });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as { projects: PestelPickerProject[] };
+        const enriched = (data.projects ?? [])
+          .filter((p) => p.status !== "archived")
+          .map((p) => ({
+            ...p,
+            tipoOk: p.tipo === projectType,
+            territoryMatch: checkTerritoryMatchInverse(projectTerritory, p.territorio),
+          }));
+        enriched.sort((a, b) => {
+          const scoreA = !a.tipoOk ? 3 : a.territoryMatch === "exact" ? 0 : a.territoryMatch === "approximate" ? 1 : 2;
+          const scoreB = !b.tipoOk ? 3 : b.territoryMatch === "exact" ? 0 : b.territoryMatch === "approximate" ? 1 : 2;
+          return scoreA - scoreB;
+        });
+        setProjects(enriched);
+      } catch {
+        setFetchError("No se pudieron cargar los proyectos PESTEL.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [projectType, projectTerritory]);
+
+  async function doLink(target: PestelPickerProject, force: boolean) {
+    setLinking(true);
+    setLinkError(null);
+    try {
+      const res = await fetch(`/api/centinela/pestel/project/${target.id}/link-moddulo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ modduloProjectId: projectId, forceLink: force }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { pestAnalysisId?: string };
+        onClose();
+        router.push(
+          `/moddulo/proyecto/${projectId}/exploracion${data.pestAnalysisId ? `?pest_analysis_id=${data.pestAnalysisId}` : ""}`
+        );
+        router.refresh();
+        return;
+      }
+      const err = (await res.json()) as { message?: string };
+      setLinkError(err.message ?? "No se pudo vincular. Intenta de nuevo.");
+    } catch {
+      setLinkError("Error de conexión. Intenta de nuevo.");
+    } finally {
+      setLinking(false);
+      setConfirmTarget(null);
+    }
+  }
+
+  function handleSelect(target: PestelPickerProject & { tipoOk: boolean; territoryMatch: TerritoryMatchKind }) {
+    if (!target.tipoOk) return;
+    setLinkError(null);
+    if (target.territoryMatch === "exact") {
+      doLink(target, false);
+    } else {
+      setConfirmTarget(target);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between p-5 border-b border-gray-eske-20 dark:border-white/10 shrink-0">
+          <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] text-base">
+            Vincular con análisis independiente
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        {confirmTarget && (
+          <div className="p-5 flex flex-col gap-4">
+            <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-yellow-eske-80 dark:text-yellow-eske/90">
+              <svg className="shrink-0 mt-0.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <span>
+                {confirmTarget.territoryMatch === "approximate"
+                  ? `Los territorios parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
+                  : `El análisis es de "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}", pero este proyecto cubre "${projectTerritory?.nombre ?? "territorio no especificado"}".`}
+              </span>
+            </div>
+            {linkError && <p className="text-sm text-red-eske">{linkError}</p>}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setConfirmTarget(null); setLinkError(null); }}
+                disabled={linking}
+                className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => doLink(confirmTarget, true)}
+                disabled={linking}
+                className="px-4 py-2 text-sm font-medium bg-orange-eske text-white rounded-lg hover:bg-orange-eske-60 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {linking && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                Vincular de todas formas
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!confirmTarget && (
+          <div className="overflow-y-auto flex-1 p-2">
+            {loading && (
+              <div className="flex justify-center py-8">
+                <div className="w-6 h-6 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {fetchError && <p className="text-sm text-red-eske text-center py-8">{fetchError}</p>}
+            {!loading && !fetchError && projects.length === 0 && (
+              <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] text-center py-8">
+                No tienes proyectos PESTEL en Centinela todavía.
+              </p>
+            )}
+            {linkError && (
+              <div className="mx-2 mb-2 p-3 rounded-lg bg-red-eske/10 border border-red-eske/20 text-sm text-red-eske">
+                {linkError}
+              </div>
+            )}
+            {projects.map((p) => {
+              const disabled = !p.tipoOk || linking;
+              const showWarning = p.tipoOk && p.territoryMatch !== "exact";
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelect(p)}
+                  disabled={disabled}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-start gap-3 ${
+                    disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-eske-10 dark:hover:bg-white/5 cursor-pointer"
+                  }`}
+                  title={!p.tipoOk ? `Tipo incompatible: el análisis es "${p.tipo}" y este proyecto es "${projectType}"` : undefined}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <span className="font-medium text-sm text-gray-eske-80 dark:text-[#C7D6E0] truncate">{p.nombre}</span>
+                      {showWarning && <span className="shrink-0 text-yellow-eske text-xs" aria-label="Diferencia de territorio">⚠</span>}
+                    </div>
+                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5 truncate">
+                      {p.tipo}{p.territorio?.nombre ? ` · ${p.territorio.nombre}` : ""}
+                    </p>
+                    {!p.tipoOk && <p className="text-xs text-gray-eske-40 mt-0.5">Tipo incompatible con este proyecto</p>}
+                  </div>
+                  {p.tipoOk && !linking && (
+                    <svg className="shrink-0 mt-0.5 w-4 h-4 text-gray-eske-30 dark:text-[#9AAEBE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BackPropagationModal({ affectedPhases, onDismiss }: {
   affectedPhases: PhaseId[]; onDismiss: () => void;
 }) {
@@ -2033,101 +2626,6 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
           Entendido — revisar las fases afectadas
         </button>
       </div>
-    </div>
-  );
-}
-
-// ==========================================
-// BOTÓN DE DESCARGA
-// ==========================================
-
-function DownloadButton({ form, reportText, chatMessages }: {
-  form: ExplorationForm; reportText: string | null; chatMessages: ChatMessage[];
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const dl = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-    setOpen(false);
-  };
-
-  const pestlText = [
-    "ANÁLISIS PESTEL — FASE 2: EXPLORACIÓN",
-    "======================================", "",
-    "[ P ] POLÍTICO",
-    `Contexto: ${form.pestl.politico.contexto || "(sin datos)"}`,
-    `Actores clave: ${form.pestl.politico.actoresClave || "(sin datos)"}`,
-    `Actores de veto: ${form.pestl.politico.actoresVeto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.politico.senalesCriticas || "(sin datos)"}`, "",
-    "[ E ] ECONÓMICO", `Contexto: ${form.pestl.economico.contexto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.economico.senalesCriticas || "(sin datos)"}`, "",
-    "[ S ] SOCIAL", `Contexto: ${form.pestl.social.contexto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.social.senalesCriticas || "(sin datos)"}`, "",
-    "[ T ] TECNOLÓGICO", `Contexto: ${form.pestl.tecnologico.contexto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.tecnologico.senalesCriticas || "(sin datos)"}`, "",
-    "[ Ec ] ECOLÓGICO", `Contexto: ${form.pestl.ecologico.contexto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.ecologico.senalesCriticas || "(sin datos)"}`, "",
-    "[ L ] LEGAL", `Contexto: ${form.pestl.legal.contexto || "(sin datos)"}`,
-    `Señales críticas: ${form.pestl.legal.senalesCriticas || "(sin datos)"}`, "",
-    "SEMÁFORO DE VETO",
-    ...(form.semaforo.actores.length
-      ? form.semaforo.actores.map((a) => `  • ${a.nombre} [${a.nivel.toUpperCase()}]: ${a.descripcion}`)
-      : ["  (Sin actores registrados)"]),
-    `Síntesis: ${form.semaforo.resumen || "(sin datos)"}`, "",
-    "HIPÓTESIS ESTRATÉGICA INICIAL",
-    `Enunciado: ${form.hipotesis.enunciado || "(sin datos)"}`,
-    `Premisas: ${form.hipotesis.premisas || "(sin datos)"}`,
-    `Implicaciones: ${form.hipotesis.implicaciones || "(sin datos)"}`,
-  ].join("\n");
-
-  const options = [
-    { label: "Reporte exploratorio (.md)", available: !!reportText, action: () => reportText && dl(reportText, "F2-Exploracion-Resultado.md") },
-    { label: "Historial del chat (.txt)", available: chatMessages.length > 0, action: () => {
-      dl(chatMessages.map((m) => `[${m.role === "assistant" ? "Moddulo" : "Consultor"}]\n${m.content}`).join("\n\n---\n\n"), "F2-Exploracion-Chat.txt");
-    }},
-    { label: "Análisis PESTEL (.txt)", available: !!(form.pestl.politico.contexto || form.hipotesis.enunciado), action: () => dl(pestlText, "F2-Exploracion-PESTL.txt") },
-  ];
-
-  return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((v) => !v)} title="Descargar archivos de esta fase"
-        className="p-1.5 rounded-lg border border-gray-eske-20 dark:border-white/10 text-black-eske-10 dark:text-[#C7D6E0] hover:border-bluegreen-eske hover:text-bluegreen-eske dark:hover:border-bluegreen-eske-40 dark:hover:text-[#6BA4C6] transition-colors">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-60 bg-white-eske dark:bg-[#18324A] border border-gray-eske-20 dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230]">
-            <p className="text-xs font-bold text-black-eske dark:text-[#9AAEBE] uppercase tracking-widest">Descargar</p>
-          </div>
-          {options.map(({ label, available, action }) => (
-            <button key={label} onClick={() => available && action()} disabled={!available}
-              className={`w-full text-left px-3 py-2.5 text-xs font-medium flex items-center gap-2 transition-colors ${
-                available ? "text-black-eske dark:text-[#C7D6E0] hover:bg-bluegreen-eske/5 dark:hover:bg-white/5 hover:text-bluegreen-eske dark:hover:text-[#6BA4C6]" : "text-gray-eske-40 dark:text-[#6D8294] cursor-not-allowed"
-              }`}>
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {label}
-              {!available && <span className="ml-auto text-gray-eske-40 dark:text-[#6D8294]">(sin datos)</span>}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -2367,7 +2865,7 @@ function WebElectoralWidget({
       <div className="rounded-lg border border-blue-eske/20 bg-blue-eske/5 p-3">
         <div className="flex items-center gap-1.5 mb-2">
           <svg
-            className="h-3.5 w-3.5 text-blue-eske-60 dark:text-blue-eske-40 flex-shrink-0"
+            className="h-3.5 w-3.5 text-blue-eske-60 dark:text-blue-eske-20 flex-shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -2377,7 +2875,7 @@ function WebElectoralWidget({
             <circle cx="12" cy="12" r="10" />
             <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
           </svg>
-          <span className="text-xs text-blue-eske-60 dark:text-blue-eske-40">
+          <span className="text-xs text-blue-eske-60 dark:text-blue-eske-20">
             Búsqueda web{fechaBadge ? ` · ${fechaBadge}` : ""}
           </span>
         </div>
@@ -2387,14 +2885,14 @@ function WebElectoralWidget({
               <span className="font-medium">{ind.nombre}:</span>{" "}
               {ind.valor}
               {ind.fecha ? (
-                <span className="text-blue-eske-60 dark:text-blue-eske-40"> ({ind.fecha})</span>
+                <span className="text-blue-eske-60 dark:text-blue-eske-20"> ({ind.fecha})</span>
               ) : null}
               {ind.url ? (
                 <a
                   href={ind.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 text-blue-eske-60 dark:text-blue-eske-40 underline"
+                  className="ml-1 text-blue-eske-60 dark:text-blue-eske-20 underline"
                   aria-label={`Fuente: ${ind.fuente}`}
                 >
                   ↗

@@ -552,6 +552,14 @@ firebase functions:log
 
 ---
 
+## Deuda Técnica Conocida
+
+| Ítem | Detalle | Detectado |
+|------|---------|-----------|
+| Drift `capacidades` XPCTO (3 vs. 4 subcampos) | El FAT 2.0 (Fase 1, variable C) define 4 dimensiones: Financiero, Humano, Organizacional, Material. `types/moddulo.types.ts` (`XPCTO.capacidades`) solo tiene 3 campos: `financiero`, `humano` (comentario: "Equipo y estructura organizacional" — fusiona Humano+Organizacional), `logistico` (comentario: "Infraestructura y medios operativos" ≈ Material). No bloquea funcionalidad actual; evaluar si separar en 4 campos al tocar el wizard de F1 o el tipo `XPCTO`. | 26-07-16, auditoría snapshot XPCTO/Centinela |
+
+---
+
 ## Historial de Sprints
 
 | Fecha | Sprint | Resultado |

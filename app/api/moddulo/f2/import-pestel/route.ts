@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string; pestAnalysisId?: string };
+  let body: { projectId?: string; pestAnalysisId?: string; confirmReplace?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { projectId, pestAnalysisId } = body;
+  const { projectId, pestAnalysisId, confirmReplace } = body;
   if (!projectId || !pestAnalysisId) {
     return NextResponse.json(
       { error: "projectId y pestAnalysisId son requeridos" },
@@ -60,20 +60,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sin permisos para este análisis PESTEL" }, { status: 403 });
   }
 
-  // Guard: if mapaPESTEL already exists, do not overwrite.
+  // Guard: protect against overwriting mapaPESTEL from a genuinely different
+  // source (express, or a different Centinela PESTEL project). Compares
+  // pestProjectId — not pestAnalysisId — because Centinela can renew the
+  // analysis (new pestAnalysisId) for the SAME linked project; that case must
+  // re-sync, not be blocked as a conflict.
+  //
+  // confirmReplace lets an explicit user action (relink or "Analizar con
+  // PESTEL" upgrade) bypass this — it's the same forceLink pattern used in
+  // link-moddulo/route.ts for territory mismatches. Without it, a different
+  // source always 409s: this guard exists specifically to stop SILENT
+  // overwrites, not deliberate ones the user confirmed.
   const existingAnalysisId = project.phases?.exploracion?.pestAnalysisId as string | undefined;
+  const existingPestProjectId = project.phases?.exploracion?.pestProjectId as string | undefined;
   const existingMapa = project.phases?.exploracion?.mapaPESTEL as MapaPESTEL | undefined;
+  const incomingPestProjectId = analysis.projectId as string;
 
   if (existingMapa) {
-    if (existingAnalysisId === pestAnalysisId) {
+    const sameLinkedProject = existingPestProjectId && existingPestProjectId === incomingPestProjectId;
+
+    if (!sameLinkedProject) {
+      if (!confirmReplace) {
+        return NextResponse.json(
+          { error: "conflict", message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte." },
+          { status: 409 }
+        );
+      }
+      // Usuario confirmó el reemplazo explícitamente — continúa abajo y sobrescribe.
+    } else if (existingAnalysisId === pestAnalysisId) {
       // Same analysis already imported — return existing data idempotently.
-      const existingPestProjectId = project.phases?.exploracion?.pestProjectId as string | undefined;
       return NextResponse.json({ pestProjectId: existingPestProjectId, mapaPESTEL: existingMapa }, { status: 200 });
     }
-    return NextResponse.json(
-      { error: "conflict", message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte." },
-      { status: 409 }
-    );
+    // Same linked PESTEL project (renewed analysis), o confirmReplace — fall through to re-sync/overwrite.
   }
 
   const mapaPESTEL: MapaPESTEL = transformToMapaPESTEL(
@@ -82,11 +100,22 @@ export async function POST(request: NextRequest) {
 
   const pestProjectId = analysis.projectId as string;
 
-  // Save to Moddulo project
+  // Save to Moddulo project. On re-sync (M1 refreshed from a renewed
+  // Centinela analysis), M2-M5 fueron aprobados contra el M1 anterior —
+  // se limpia motorAprobaciones para forzar re-aprobación, pero NO se borra
+  // draftDVS: el cliente regenera automáticamente al detectar el cambio de
+  // mapaPESTEL, y si esa regeneración falla, el usuario debe seguir viendo
+  // el último draftDVS válido en vez de una pantalla en blanco sin salida.
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.pestAnalysisId": pestAnalysisId,
     "phases.exploracion.pestProjectId": pestProjectId,
     "phases.exploracion.mapaPESTEL": mapaPESTEL,
+    "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+    "phases.exploracion.motorAprobaciones": {},
+    // Ya no hace falta el puntero de "deshacer desvinculación" — este
+    // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
+    "phases.exploracion.lastUnlinkedPestAnalysisId": FieldValue.delete(),
+    "phases.exploracion.lastUnlinkedPestProjectId": FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   });
 

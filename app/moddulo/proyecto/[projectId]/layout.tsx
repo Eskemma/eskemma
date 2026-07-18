@@ -2,13 +2,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import PhaseNav from "@/app/moddulo/components/PhaseNav";
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const projectId = params?.projectId as string;
+  const pathname = usePathname();
+  // Mismo patrón que PhaseNav.tsx para derivar la fase activa — las rutas son
+  // carpetas estáticas por fase, no [phaseId] dinámico.
+  const isEvaluacionActive = pathname.includes("/evaluacion");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
@@ -65,14 +69,18 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              className="p-2 rounded-lg hover:bg-white-eske/10 transition-colors text-white-eske/80 hover:text-white-eske"
-              title="Exportar proyecto"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            </button>
+            {/* Descarga consolidada de todos los informes del proyecto —
+                oculta por completo (no solo deshabilitada) antes de F9. */}
+            {isEvaluacionActive && (
+              <button
+                className="p-2 rounded-lg hover:bg-white-eske/10 transition-colors text-white-eske/80 hover:text-white-eske"
+                title="Exportar proyecto"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </header>

@@ -6,6 +6,7 @@ import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
+import { logAnthropicError } from "@/lib/ai/creditError";
 import type { PhaseId, XPCTO, Dictamen } from "@/types/moddulo.types";
 
 interface GenerateReportBody {
@@ -106,7 +107,7 @@ export async function POST(
 
     return NextResponse.json({ reportText: rawText });
   } catch (error) {
-    console.error("[generate-report] Error:", error);
+    logAnthropicError("generate-report", error);
     return NextResponse.json({ error: "Error al generar el reporte" }, { status: 500 });
   }
 }

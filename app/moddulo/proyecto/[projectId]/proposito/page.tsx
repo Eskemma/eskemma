@@ -9,6 +9,8 @@ import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
 import { detectRisks } from "@/lib/moddulo/risks";
 import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen, Territorio } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
+import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
+import { formatChatHistory, formatXpctoForm } from "@/lib/moddulo/reportFormatters";
 
 // ==========================================
 // TIPOS LOCALES
@@ -473,7 +475,15 @@ export default function PropositoPage() {
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
               ) : null}
             </span>
-            <DownloadButton form={form} reportText={reportText} chatMessages={chatMessages} />
+            <PhaseDownloadMenu
+              phaseId="proposito"
+              projectName={projectName}
+              content={{
+                reporte: reportText ?? null,
+                chat: chatMessages.length > 0 ? formatChatHistory(chatMessages, "Fase 1 — Propósito") : null,
+                xpcto: (form.hito || form.sujeto) ? formatXpctoForm(form) : null,
+              }}
+            />
           </div>
         </div>
 
@@ -1142,119 +1152,3 @@ function F1LandingView({
   );
 }
 
-// ==========================================
-// DESCARGA DE ARCHIVOS — FASE 1
-// ==========================================
-
-type DownloadOption = "resumen" | "chat" | "formulario";
-
-function DownloadButton({
-  form,
-  reportText,
-  chatMessages,
-}: {
-  form: XPCTOForm;
-  reportText: string | null;
-  chatMessages: ChatMessage[];
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Cerrar al click fuera
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const download = (content: string, filename: string, mime = "text/plain") => {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    setOpen(false);
-  };
-
-  const handleDownload = (option: DownloadOption) => {
-    if (option === "resumen" && reportText) {
-      download(reportText, "F1-Proposito-Resumen.md");
-    } else if (option === "chat") {
-      const text = chatMessages
-        .map((m) => `[${m.role === "assistant" ? "Moddulo" : "Consultor"}]\n${m.content}`)
-        .join("\n\n---\n\n");
-      download(text || "(Sin mensajes)", "F1-Proposito-Chat.txt");
-    } else if (option === "formulario") {
-      const lines = [
-        "FORMULARIO XPCTO — FASE 1: PROPÓSITO",
-        "=====================================",
-        "",
-        `HITO (X):\n${form.hito || "(Sin datos)"}`,
-        "",
-        `SUJETO (P):\n${form.sujeto || "(Sin datos)"}`,
-        "",
-        "CAPACIDADES (C):",
-        `  Financiero: ${form.capacidades.financiero || "(Sin datos)"}`,
-        `  Humano: ${form.capacidades.humano || "(Sin datos)"}`,
-        `  Logístico: ${form.capacidades.logistico || "(Sin datos)"}`,
-        "",
-        "TIEMPO (T):",
-        `  Fecha límite: ${form.tiempo.fechaLimite || "(Sin datos)"}`,
-        `  Duración: ${form.tiempo.duracionMeses} meses`,
-        "",
-        `JUSTIFICACIÓN (O):\n${form.justificacion || "(Sin datos)"}`,
-      ];
-      download(lines.join("\n"), "F1-Proposito-Formulario.txt");
-    }
-  };
-
-  const options: { id: DownloadOption; label: string; available: boolean }[] = [
-    { id: "resumen", label: "Resumen diagnóstico (.md)", available: !!reportText },
-    { id: "chat", label: "Historial del chat (.txt)", available: chatMessages.length > 0 },
-    { id: "formulario", label: "Formulario XPCTO (.txt)", available: !!(form.hito || form.sujeto) },
-  ];
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="Descargar archivos de esta fase"
-        className="p-1.5 rounded-lg border border-gray-eske-20 dark:border-white/10 text-black-eske-10 dark:text-[#C7D6E0] hover:border-bluegreen-eske hover:text-bluegreen-eske dark:hover:border-bluegreen-eske-40 dark:hover:text-[#6BA4C6] transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-56 bg-white-eske dark:bg-[#18324A] border border-gray-eske-20 dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230]">
-            <p className="text-xs font-bold text-black-eske dark:text-[#9AAEBE] uppercase tracking-widest">Descargar</p>
-          </div>
-          {options.map(({ id, label, available }) => (
-            <button
-              key={id}
-              onClick={() => available && handleDownload(id)}
-              disabled={!available}
-              className={`w-full text-left px-3 py-2.5 text-xs font-medium flex items-center gap-2 transition-colors ${
-                available
-                  ? "text-black-eske dark:text-[#C7D6E0] hover:bg-bluegreen-eske/5 dark:hover:bg-white/5 hover:text-bluegreen-eske dark:hover:text-[#6BA4C6]"
-                  : "text-gray-eske-40 dark:text-[#6D8294] cursor-not-allowed"
-              }`}
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {label}
-              {!available && <span className="ml-auto text-gray-eske-40 dark:text-[#6D8294]">(sin datos)</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

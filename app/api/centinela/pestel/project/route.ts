@@ -46,10 +46,11 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as Partial<PESTELProject> & {
     modduloProjectId?: string;
     modduloOrigenEscenario?: "A" | "B";
+    confirmReplace?: boolean;
   };
   const {
     nombre, tipo, territorio, horizonte, alertas,
-    color, modduloProjectId, modduloOrigenEscenario,
+    color, modduloProjectId, modduloOrigenEscenario, confirmReplace,
   } = body;
 
   if (!nombre || !tipo || !territorio || !horizonte) {
@@ -106,6 +107,45 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Guard: this creation's write-back is about to point the Moddulo project
+  // at a brand-new (empty) pestel_project. If that Moddulo project already
+  // has a PESTEL vínculo vigente (Centinela link or express mapaPESTEL),
+  // silently reassigning pestProjectId here would leave pestAnalysisId
+  // pointing at a source that no longer matches the pointer — same class of
+  // silent-overwrite bug already fixed in import-pestel (confirmReplace) and
+  // guarded in link-moddulo. Requires explicit confirmation, same pattern.
+  let oldPestProjectIdToUnlink: string | undefined;
+  if (modduloProjectId && !confirmReplace) {
+    const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
+    const explorarPhase = modduloSnap.data()?.phases?.exploracion;
+    const existingPestProjectId = explorarPhase?.pestProjectId as string | undefined;
+    const existingMapa = explorarPhase?.mapaPESTEL;
+
+    if (existingPestProjectId) {
+      return NextResponse.json(
+        {
+          error: "conflict",
+          currentSource: "centinela",
+          message: "Este proyecto de Moddulo ya está vinculado a otro análisis de Centinela PESTEL.",
+        },
+        { status: 409 }
+      );
+    }
+    if (existingMapa) {
+      return NextResponse.json(
+        {
+          error: "conflict",
+          currentSource: "express",
+          message: "Este proyecto de Moddulo ya tiene un análisis PESTEL express generado.",
+        },
+        { status: 409 }
+      );
+    }
+  } else if (modduloProjectId && confirmReplace) {
+    const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
+    oldPestProjectIdToUnlink = modduloSnap.data()?.phases?.exploracion?.pestProjectId as string | undefined;
+  }
+
   const projectRef = adminDb.collection("pestel_projects").doc();
   const now = FieldValue.serverTimestamp();
 
@@ -136,6 +176,10 @@ export async function POST(request: NextRequest) {
 
   // Write-back: let Moddulo know about the linked PESTEL project immediately,
   // without waiting for the round-trip import (pest_analysis_id in URL).
+  // Only pestProjectId is touched here — pestAnalysisId/mapaPESTEL stay as
+  // they are (old express or old Centinela content) until the real
+  // import-pestel round-trip replaces them, same "don't destroy until the
+  // replacement is confirmed working" principle used elsewhere in F2.
   if (modduloProjectId) {
     try {
       await adminDb
@@ -147,6 +191,25 @@ export async function POST(request: NextRequest) {
         });
     } catch {
       // Non-fatal: the fallback query in F2 covers this case.
+    }
+
+    // Reemplazo confirmado de un vínculo Centinela anterior: limpiar su
+    // referencia inversa para no dejarla colgando (mismo patrón de simetría
+    // que unlink-pestel/route.ts).
+    if (oldPestProjectIdToUnlink) {
+      try {
+        const oldPestelSnap = await adminDb.collection("pestel_projects").doc(oldPestProjectIdToUnlink).get();
+        if (oldPestelSnap.exists && oldPestelSnap.data()?.modduloProjectId === modduloProjectId) {
+          await adminDb.collection("pestel_projects").doc(oldPestProjectIdToUnlink).update({
+            modduloProjectId: FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        console.error(
+          "[pestel/project POST] no se pudo limpiar la referencia inversa de", oldPestProjectIdToUnlink, err
+        );
+      }
     }
   }
 

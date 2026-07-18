@@ -30,6 +30,8 @@ export interface MotoresSequentialViewProps {
   isGenerating: boolean;
   generationError?: string | null;
   onRetry?: () => void;
+  /** Texto del botón de reintento — distingue regeneración completa de actualización parcial */
+  retryLabel?: string;
   onApprove: (motor: MotorId) => void;
   onDraftChange: (updated: DVSF2) => void;
   onSaveEdit?: (motor: MotorId) => void;
@@ -235,10 +237,10 @@ const VEREDICTO_DESC: Record<ContrasteXPCTO["veredicto"], string> = {
 };
 
 const VEREDICTO_BADGE = {
-  coherente:              "bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40",
+  coherente:              "bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-[#7BC47C] dark:text-[#7BC47C]",
   // text-black-eske (no amarillo): amarillo sobre fondo transparente no alcanza 4.5:1 (WCAG AA).
   requiere_ajuste:        "bg-transparent border border-yellow-eske-60 text-black-eske dark:border-yellow-eske-40 dark:text-yellow-eske-70",
-  requiere_investigacion: "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-red-eske-40 dark:text-red-eske-40",
+  requiere_investigacion: "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-orange-eske dark:text-orange-eske",
 } as const;
 
 function M2Panel({ items, editable, onChange }: {
@@ -276,7 +278,7 @@ function M2Panel({ items, editable, onChange }: {
             )}
           </div>
           {/* Description spans full card width — two lines split at period */}
-          <DescTwoLines text={VEREDICTO_DESC[item.veredicto]} className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-40 text-right" />
+          <DescTwoLines text={VEREDICTO_DESC[item.veredicto]} className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-20 text-right" />
           {editable ? (
             <InlineEdit
               value={item.argumentacion}
@@ -355,7 +357,7 @@ function M3Panel({ actores, editable, onChange }: {
                 </div>
               </div>
               {/* Description at full card width — two lines split at period */}
-              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 text-right" />
+              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 text-right" />
             </>
           ) : (
             <>
@@ -440,7 +442,7 @@ const DESTINO_DESC: Record<IncertidumbreF2["destino"], string> = {
 };
 
 const NIVEL_BADGE = {
-  alta:  "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-red-eske-40 dark:text-red-eske-40",
+  alta:  "bg-transparent border border-red-eske-60 text-red-eske-80 dark:border-orange-eske dark:text-orange-eske",
   // text-black-eske (no amarillo): amarillo sobre fondo transparente no alcanza 4.5:1 (WCAG AA).
   media: "bg-transparent border border-yellow-eske-60 text-black-eske dark:border-yellow-eske-40 dark:text-yellow-eske-70",
   baja:  "bg-transparent border border-green-eske-60 text-green-eske-80 dark:border-green-eske-40 dark:text-green-eske-40",
@@ -478,17 +480,17 @@ function M4Panel({ items, editable, onChange }: {
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Urgencia</p>
                   <SelectField value={item.urgencia}   onChange={(v) => update(i, { urgencia: v })}   options={URGENCIA_OPTS} />
-                  <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
+                  <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Resolución</p>
                   <SelectField value={item.resolucion} onChange={(v) => update(i, { resolucion: v })} options={RESOLUCION_OPTS} />
-                  <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
+                  <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Destino</p>
                   <SelectField value={item.destino}    onChange={(v) => update(i, { destino: v })}    options={DESTINO_OPTS} />
-                  <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-40 mt-1" />
+                  <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
                 </div>
               </div>
             </>
@@ -498,7 +500,7 @@ function M4Panel({ items, editable, onChange }: {
               <div className="flex flex-wrap gap-1.5">
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${NIVEL_BADGE[item.urgencia]}`}>Urgencia {item.urgencia}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${NIVEL_BADGE[item.resolucion]}`}>Resolución {item.resolucion}</span>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.destino === "F3" ? "bg-bluegreen-eske-10 text-bluegreen-eske-80 dark:bg-bluegreen-eske/20 dark:text-[#6BA4C6]" : "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10 dark:text-[#9AAEBE]"}`}>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.destino === "F3" ? "bg-green-eske-10 text-green-eske-80 dark:bg-green-eske/20 dark:text-[#7BC47C]" : "bg-gray-eske-20 text-gray-eske-70 dark:bg-white/10 dark:text-[#9AAEBE]"}`}>
                   → {item.destino === "F3" ? "F3 — Investigación" : "SIP (largo plazo)"}
                 </span>
               </div>
@@ -582,7 +584,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                 <ul className="space-y-1 mb-1">
                   {hei.condicionesAdversas.map((c, i) => (
                     <li key={i} className="flex items-center gap-1.5">
-                      <span className="text-red-eske-70 shrink-0 select-none">•</span>
+                      <span className="text-red-eske-70 dark:text-orange-eske shrink-0 select-none">•</span>
                       <input
                         value={c}
                         onChange={(e) => { const a = [...hei.condicionesAdversas]; a[i] = e.target.value; onHEIChange({ ...hei, condicionesAdversas: a }); }}
@@ -611,7 +613,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                 <ul className="space-y-1 list-disc list-inside">{hei.condicionesFavorables.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
               <div>
-                <p className="font-semibold text-red-eske-70 dark:text-[#E07070] mb-1">Condiciones adversas</p>
+                <p className="font-semibold text-red-eske-70 dark:text-orange-eske mb-1">Condiciones adversas</p>
                 <ul className="space-y-1 list-disc list-inside">{hei.condicionesAdversas.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
             </div>
@@ -662,8 +664,8 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Método: {item.metodo}</p>
-                    <p className="text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6]">Vínculo: {item.vinculoHito}</p>
+                    <p className="text-xs text-black-eske-80 dark:text-white">Método: {item.metodo}</p>
+                    <p className="text-xs text-bluegreen-eske-70 dark:text-white">Vínculo: {item.vinculoHito}</p>
                     {item.orden !== undefined && item.orden !== item.numero && (
                       <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
                         Prioridad de ejecución: {item.orden}
@@ -732,6 +734,7 @@ export default function MotoresSequentialView({
   isGenerating,
   generationError,
   onRetry,
+  retryLabel = "Reintentar análisis",
   onApprove,
   onDraftChange,
   onSaveEdit,
@@ -769,9 +772,10 @@ export default function MotoresSequentialView({
     setExpanded((prev) => ({ ...prev, [motor]: !prev[motor] }));
   };
 
-  if (isGenerating) return <GeneratingSkeleton />;
-
+  // Sin draft previo (primer análisis): pantalla completa de carga/error —
+  // no hay nada que mostrar mientras tanto.
   if (!draftDVS) {
+    if (isGenerating) return <GeneratingSkeleton />;
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
         {generationError ? (
@@ -787,7 +791,7 @@ export default function MotoresSequentialView({
             </div>
             {onRetry && (
               <button type="button" onClick={onRetry} className="px-4 py-2 bg-bluegreen-eske text-white rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors">
-                Reintentar análisis
+                {retryLabel}
               </button>
             )}
           </>
@@ -796,8 +800,29 @@ export default function MotoresSequentialView({
     );
   }
 
+  // Hay un draft previo (de un M1 anterior o de un intento previo): se
+  // mantiene visible y usable mientras se regenera o si la regeneración
+  // falla — nunca se blanquea la pantalla teniendo contenido válido que mostrar.
   return (
     <div className="space-y-2 pb-4">
+      {isGenerating && (
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6]">
+          <span className="w-3.5 h-3.5 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin shrink-0" />
+          Actualizando análisis… lo que ves abajo es la última versión válida.
+        </div>
+      )}
+      {!isGenerating && generationError && (
+        <div className="flex items-start justify-between gap-3 px-4 py-2.5 rounded-xl border border-red-eske-30 dark:border-red-eske/30 bg-red-eske-10 dark:bg-red-eske/10 text-xs text-red-eske-70 dark:text-red-eske-40">
+          <span className="min-w-0">
+            No se pudo actualizar: {generationError} Lo que ves abajo es la última versión válida.
+          </span>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="shrink-0 font-semibold hover:underline whitespace-nowrap">
+              {retryLabel}
+            </button>
+          )}
+        </div>
+      )}
       {MOTORS.map((motor) => {
         const state      = getMotorState(motor.id, motorAprobaciones);
         const isActive   = !editMode && state === "active";

@@ -9,6 +9,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
+import { logAnthropicError } from "@/lib/ai/creditError";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   serializeMapaPESTEL,
@@ -171,7 +172,7 @@ async function runMultiMotorPath(
     m3Raw = extractText(resM3);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[generate-dvs] M2/M3 error:", msg, err);
+    logAnthropicError("generate-dvs M2/M3", err);
     return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3" }, { status: 500 });
   }
 
@@ -203,6 +204,7 @@ async function runMultiMotorPath(
     m4Raw = extractText(resM4);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    logAnthropicError("generate-dvs M4", err);
     return NextResponse.json({ error: `Error en M4: ${msg}`, motor: "M4" }, { status: 500 });
   }
 
@@ -239,7 +241,7 @@ async function runMultiMotorPath(
       console.log(`[generate-dvs] M5 attempt ${attempt} raw (200 chars):`, m5Raw.slice(0, 200));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generate-dvs] M5 attempt ${attempt} Claude error:`, msg);
+      logAnthropicError(`generate-dvs M5 attempt ${attempt}`, err);
       if (attempt === 2) {
         return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5" }, { status: 500 });
       }

@@ -11,6 +11,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import Anthropic from "@anthropic-ai/sdk";
+import { logAnthropicError } from "@/lib/ai/creditError";
 import type { DimensionCode, ReliabilityLevel } from "@/types/pestel.types";
 import { DIMENSION_ORDER } from "@/types/pestel.types";
 
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     extraction = await extractText(buffer, mimeType);
   } catch (err) {
-    console.error("[upload-source] extraction error:", err);
+    logAnthropicError("upload-source extraction", err);
     return NextResponse.json(
       { error: "No se pudo extraer texto del archivo." },
       { status: 422 }

@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import WizardStep1Tipo from "@/app/components/centinela/pestel/wizard/WizardStep1Tipo";
 import WizardStep2Territorio from "@/app/components/centinela/pestel/wizard/WizardStep2Territorio";
 import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/WizardStep3Variables";
+import ConfirmReplacePestelModal, {
+  type ConfirmReplacePestelSource,
+} from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
 import type {
   TipoProyecto,
   Territorio,
@@ -65,6 +68,12 @@ export default function NuevoProyectoPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Conflicto detectado por el guard de creación (409: el proyecto Moddulo
+  // destino ya tiene un vínculo PESTEL vigente — express o Centinela).
+  const [pendingReplace, setPendingReplace] = useState<{ source: ConfirmReplacePestelSource } | null>(null);
+  const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
+  // Se guardan para poder reintentar todo el flujo (crear + variables) tras confirmar.
+  const [pendingDimensions, setPendingDimensions] = useState<PestlDimensionConfig[] | null>(null);
 
   function goNext() {
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -74,7 +83,7 @@ export default function NuevoProyectoPage() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  async function handleFinish(finalDimensions: PestlDimensionConfig[]) {
+  async function handleFinish(finalDimensions: PestlDimensionConfig[], confirmReplace = false) {
     if (!data.tipo || !data.territorio) return;
     setSaving(true);
     setError(null);
@@ -94,8 +103,17 @@ export default function NuevoProyectoPage() {
             modduloProjectId: data.modduloProjectId,
             modduloOrigenEscenario: data.modduloOrigenEscenario,
           } : {}),
+          ...(confirmReplace ? { confirmReplace: true } : {}),
         }),
       });
+
+      if (projectRes.status === 409) {
+        const err = (await projectRes.json()) as { currentSource?: "centinela" | "express" };
+        setPendingDimensions(finalDimensions);
+        setPendingReplace({ source: err.currentSource === "centinela" ? "recreate" : "sync" });
+        setSaving(false);
+        return;
+      }
 
       if (!projectRes.ok) {
         const err = (await projectRes.json()) as { error?: string };
@@ -123,6 +141,17 @@ export default function NuevoProyectoPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
       setSaving(false);
+    }
+  }
+
+  async function handleConfirmReplace() {
+    if (!pendingDimensions) return;
+    setIsConfirmingReplace(true);
+    try {
+      await handleFinish(pendingDimensions, true);
+    } finally {
+      setIsConfirmingReplace(false);
+      setPendingReplace(null);
     }
   }
 
@@ -219,6 +248,15 @@ export default function NuevoProyectoPage() {
           </p>
         )}
       </div>
+
+      {pendingReplace && (
+        <ConfirmReplacePestelModal
+          source={pendingReplace.source}
+          isConfirming={isConfirmingReplace}
+          onCancel={() => setPendingReplace(null)}
+          onConfirm={handleConfirmReplace}
+        />
+      )}
     </div>
   );
 }

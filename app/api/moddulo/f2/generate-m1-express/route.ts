@@ -84,6 +84,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
 
+  // Guard: si el M1 proviene de un análisis de Centinela PESTEL vinculado,
+  // el flujo express no debe sobrescribirlo — rompería el vínculo sin avisar
+  // (mapaPESTEL quedaría huérfano mientras pestAnalysisId/pestProjectId
+  // siguen apuntando al análisis original). El usuario debe desvincular
+  // explícitamente antes de poder regenerar vía express.
+  if (project.phases?.exploracion?.pestAnalysisId) {
+    return NextResponse.json(
+      {
+        error: "pestel_linked",
+        message: "Este proyecto tiene un análisis PESTEL importado de Centinela. Desvincúlalo antes de regenerar vía el flujo express.",
+      },
+      { status: 409 }
+    );
+  }
+
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
   // Include any documents the consultant shared in F2 chat as enrichment context
