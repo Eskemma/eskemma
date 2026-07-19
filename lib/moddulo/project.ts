@@ -212,9 +212,20 @@ export async function updatePhaseData(
     throw new Error("Sin permisos para editar fases.");
   }
 
+  // Nunca degradar una fase ya "completed" de vuelta a "in-progress" solo
+  // porque este guardado de datos no especificó status explícitamente.
+  // Bug real detectado (26-07-19): handleClosePhase en F2 llama a
+  // complete-phase (marca "completed"), y justo después dispara —sin
+  // esperar— un PATCH fire-and-forget de propagación (PIP/incertidumbres
+  // hacia F3) que cae aquí sin `status`, sobreescribiendo "completed" de
+  // vuelta a "in-progress" segundos después. Esta protección cubre ese
+  // call site y CUALQUIER fase futura (F3+) que agregue su propio PATCH
+  // de propagación fire-and-forget tras su complete-phase — mismo patrón
+  // que F2 ya usa hoy — sin que vuelva a reintroducir este bug.
+  const currentStatus = project.phases?.[phaseId]?.status;
   const updates: Record<string, unknown> = {
     [`phases.${phaseId}.data`]: data,
-    [`phases.${phaseId}.status`]: status ?? "in-progress",
+    [`phases.${phaseId}.status`]: status ?? (currentStatus === "completed" ? "completed" : "in-progress"),
     updatedAt: FieldValue.serverTimestamp(),
   };
 

@@ -6,6 +6,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import type { PhaseId } from "@/types/moddulo.types";
+import { planRDAUpdate } from "@/lib/moddulo/rda";
 
 interface CompletePhaseBody {
   phaseId: PhaseId;
@@ -53,6 +54,20 @@ export async function POST(
     if (phaseId === "proposito") {
       updates.fasesCompletadas = FieldValue.arrayUnion(1);
       updates.faseActual = 2;
+    }
+
+    // RDA — generación de ítems nuevos + reconciliación automática,
+    // barriendo todas las fases con evaluador disponible (no solo la que
+    // se está cerrando). Evaluado server-side contra los datos que
+    // getProject ya trajo — no se confía en nada calculado por el cliente.
+    const { nuevos, resueltos } = planRDAUpdate(project);
+    for (const item of nuevos) {
+      updates[`rda.${item.id}`] = { ...item, fechaCreacion: FieldValue.serverTimestamp() };
+    }
+    for (const id of resueltos) {
+      updates[`rda.${id}.estado`] = "resuelto";
+      updates[`rda.${id}.fechaResolucion`] = FieldValue.serverTimestamp();
+      updates[`rda.${id}.resueltoPor`] = "sistema";
     }
 
     await adminDb.collection("moddulo_projects").doc(projectId).update(updates);

@@ -197,6 +197,28 @@ export interface CriterioSuficiencia {
 }
 
 // ==========================================
+// RDA — REGISTRO DE DEFICIENCIAS ACTIVAS (acumulativo, F1→F2→...)
+// ==========================================
+
+export type EstadoRDAItem = "activo" | "resuelto" | "aceptado";
+
+export interface RDAItem {
+  id: string; // determinístico: `${faseOrigen}:${criterioId}`
+  faseOrigen: PhaseId;
+  origenMecanismo: "criterio_suficiencia" | "vacio_residual";
+  criterioId?: string;
+  nombre: string;
+  descripcion: string;
+  nivelImpacto: "prioritario" | "advertencia";
+  recomendacion: string;
+  estado: EstadoRDAItem;
+  vinculadoA?: { tipo: string; valor: string }[];
+  fechaCreacion: Timestamp;
+  fechaResolucion?: Timestamp;
+  resueltoPor?: "usuario" | "sistema";
+}
+
+// ==========================================
 // ESTADO DE FASE
 // ==========================================
 
@@ -210,11 +232,6 @@ export interface PhaseState {
   reportText?: string;
   // Dictamen de Coherencia XPCTO (solo F1)
   dictamen?: Dictamen;
-  // Registro de Deficiencias Activas (F1) — heredado en F2 como alerta
-  rda?: {
-    activo: boolean;
-    items?: string[];
-  };
   // DVS de Exploración (F2) — generado por generate-dvs
   dvs?: DVSF2;
   // DVS pre-generado pendiente de aprobación por motor (F2 nuevo flujo)
@@ -243,22 +260,6 @@ export interface PhaseState {
 }
 
 // ==========================================
-// ALERTA DE PROPAGACIÓN
-// ==========================================
-
-export interface PropagationAlert {
-  sourcePhase: PhaseId;
-  affectedPhases: PhaseId[];
-  suggestions: {
-    phaseId: PhaseId;
-    suggestion: string;
-  }[];
-  createdAt: string;
-  resolvedAt?: string;
-  resolvedBy?: string;
-}
-
-// ==========================================
 // PROYECTO PRINCIPAL
 // ==========================================
 
@@ -275,6 +276,10 @@ export interface ModduloProject {
   xpcto: XPCTO;
   currentPhase: PhaseId;
   phases: Record<PhaseId, PhaseState>;
+  // Registro de Deficiencias Activas — acumulativo a través de todas las
+  // fases, indexado por RDAItem.id. Mapa (no array) para permitir
+  // actualizaciones atómicas de un solo ítem, mismo patrón que mapaPESTEL.
+  rda?: Record<string, RDAItem>;
   collaborators: Collaborator[];
   status: ProjectStatus;
   settings: {

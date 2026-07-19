@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { PhaseId, Dictamen, XPCTO } from "@/types/moddulo.types";
 import { PHASE_NAMES } from "@/types/moddulo.types";
-import { evaluarCriterios, getCriterioDeficiencia } from "@/lib/moddulo/criterios";
+import { evaluarCriterios } from "@/lib/moddulo/criterios";
 
 interface PhaseReportViewProps {
   phaseId: PhaseId;
@@ -181,57 +181,6 @@ function CriteriosSection({
 }
 
 // ==========================================
-// SECCIÓN C — REGISTRO DE DEFICIENCIAS ACTIVAS (RDA)
-// ==========================================
-
-function RDASection({
-  xpcto,
-  dictamen,
-  isCompleted,
-}: {
-  xpcto: Partial<XPCTO> | null | undefined;
-  dictamen: Dictamen | null | undefined;
-  isCompleted: boolean;
-}) {
-  const criterios = evaluarCriterios(xpcto, dictamen, isCompleted);
-  const pendientes = criterios.filter((c) => c.estado === "pendiente");
-
-  if (!pendientes.length) return null;
-
-  return (
-    <div className="mt-6 pt-5 border-t border-gray-eske-20 dark:border-white/10">
-      <h2 className="text-sm font-bold text-black-eske dark:text-[#EAF2F8] mb-4 flex items-center gap-2">
-        <span className="w-5 h-5 rounded-full bg-red-eske/20 text-red-eske text-xs flex items-center justify-center font-bold shrink-0">C</span>
-        Registro de Deficiencias Activas (RDA)
-      </h2>
-      <div className="space-y-3">
-        {pendientes.map((c) => {
-          const def = getCriterioDeficiencia(c.id);
-          return (
-            <div
-              key={c.id}
-              className={`rounded-lg border p-4 ${
-                c.nivel === "Prioritario"
-                  ? "border-red-eske/30 bg-red-eske/5"
-                  : "border-purple-200 bg-purple-50 dark:border-yellow-eske/30 dark:bg-yellow-eske/5"
-              }`}
-            >
-              <p className={`text-xs font-bold mb-1 ${c.nivel === "Prioritario" ? "text-red-eske" : "text-purple-700 dark:text-yellow-eske"}`}>
-                Criterio {c.id} — {c.nombre}
-              </p>
-              <p className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] mb-2">{def.descripcion}</p>
-              <p className="text-xs text-bluegreen-eske dark:text-[#6BA4C6] font-medium">
-                ↳ {def.rutaResolucion}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
 
@@ -387,7 +336,6 @@ export default function PhaseReportView({
           <>
             <DictamenSection dictamen={dictamen} />
             <CriteriosSection xpcto={xpcto} dictamen={dictamen} isCompleted={isCompleted} />
-            <RDASection xpcto={xpcto} dictamen={dictamen} isCompleted={isCompleted} />
           </>
         )}
       </div>

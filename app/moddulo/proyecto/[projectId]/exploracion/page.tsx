@@ -27,6 +27,7 @@ import type {
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
+import { detectForwardStaleness, type PropagationDiff } from "@/lib/moddulo/phasePropagation";
 import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
@@ -144,50 +145,18 @@ const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?
 // STALENESS DETECTION — F1 → F2
 // ==========================================
 
-interface XpctoDiff {
-  field: string;
-  from: string;
-  to: string;
-}
-
-function diffXpcto(old: Partial<XPCTO>, next: Partial<XPCTO>): XpctoDiff[] {
-  const diffs: XpctoDiff[] = [];
-  const labelMap: Record<string, string> = {
-    hito: "Hito",
-    sujeto: "Sujeto",
-    justificacion: "Justificación",
-  };
-
-  for (const key of ["hito", "sujeto", "justificacion"] as const) {
-    const a = (old[key] ?? "") as string;
-    const b = (next[key] ?? "") as string;
-    if (a !== b) diffs.push({ field: labelMap[key], from: a || "(vacío)", to: b || "(vacío)" });
-  }
-
-  for (const sub of ["financiero", "humano", "logistico"] as const) {
-    const a = old.capacidades?.[sub] ?? "";
-    const b = next.capacidades?.[sub] ?? "";
-    if (a !== b) diffs.push({ field: `Capacidad ${sub}`, from: a || "(vacío)", to: b || "(vacío)" });
-  }
-
-  const ta = old.tiempo?.fechaLimite ?? "";
-  const tb = next.tiempo?.fechaLimite ?? "";
-  if (ta !== tb) diffs.push({ field: "Fecha límite", from: ta || "(vacío)", to: tb || "(vacío)" });
-
-  return diffs;
-}
-
 // M1 (escaneo PESTEL) se lee "desde la posición del proyecto: ¿qué significa
 // esta variable para este sujeto, con este hito, en esta escala?" (FAT 2.0,
 // Fase 2 · M1). Sujeto e Hito enmarcan el escaneo — Capacidades, Tiempo y
 // Justificación solo alimentan M2 (contraste XPCTO-Entorno), que opera sobre
-// el M1 ya generado sin necesidad de rescanearlo.
+// el M1 ya generado sin necesidad de rescanearlo. Clasificación específica
+// de este par F1→F2 — no vive en el motor genérico (lib/moddulo/phasePropagation.ts).
 const FULL_REGEN_FIELDS = new Set([
   "Sujeto",
   "Hito",
 ]);
 
-function getRegenerationType(diffs: XpctoDiff[]): "full" | "partial" {
+function getRegenerationType(diffs: PropagationDiff[]): "full" | "partial" {
   return diffs.some((d) => FULL_REGEN_FIELDS.has(d.field)) ? "full" : "partial";
 }
 
@@ -249,11 +218,7 @@ export default function ExploracionPage() {
   // — determina el texto del botón de reintento si falla.
   const [regenKind, setRegenKind] = useState<"full" | "partial">("full");
   const [dvsChecklist, setDvsChecklist] = useState<CriterioDVS[]>([]);
-  const [xpctoStaleChanges, setXpctoStaleChanges] = useState<XpctoDiff[]>([]);
-
-  // RDA heredado de F1 (C8)
-  const [rdaActivo, setRdaActivo] = useState(false);
-  const [rdaItems, setRdaItems] = useState<string[]>([]);
+  const [xpctoStaleChanges, setXpctoStaleChanges] = useState<PropagationDiff[]>([]);
 
   // Orphan recovery: Moddulo project was hard-deleted
   const [projectNotFound, setProjectNotFound] = useState(false);
@@ -374,10 +339,14 @@ export default function ExploracionPage() {
         const draftM5Valid = !!(draftHei?.tensionCentral || draftHei?.contexto || (Array.isArray(savedDraftDVS?.pip) && (savedDraftDVS.pip as unknown[]).length > 0));
         if (savedDraftDVS && draftM5Valid) {
           setDraftDVS(savedDraftDVS as unknown as DVSF2);
-          // Este draft ya corresponde a savedMapa — marca el baseline para
-          // que el auto-generate effect no dispare una regeneración de sobra.
-          if (savedMapa) lastGeneratedMapaRef.current = JSON.stringify(savedMapa);
         }
+        // Baseline del auto-generate effect: marca que savedMapa ya generó
+        // un DVS — sin importar si el proyecto sigue en borrador (draftDVS)
+        // o ya finalizó (dvs, con draftDVS borrado por finalize-dvs). Antes
+        // esto solo se primaba dentro del `if` de arriba, así que cualquier
+        // proyecto F2 ya cerrado (sin draftDVS en Firestore) perdía el
+        // baseline y disparaba una regeneración completa en cada carga.
+        if (savedMapa) lastGeneratedMapaRef.current = JSON.stringify(savedMapa);
         const savedMotorAprobaciones = p.phases?.exploracion?.motorAprobaciones;
         if (savedMotorAprobaciones) setMotorAprobaciones(
           savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
@@ -388,16 +357,9 @@ export default function ExploracionPage() {
         // Detect F1→F2 staleness: compare XPCTO used at generation vs. current.
         // Applies regardless of M1 origin (express or Centinela PESTEL) — both
         // paths capture xpctoSnapshotAtGeneration since the snapshot/redirect fix.
-        const savedSnapshot = p.phases?.exploracion?.xpctoSnapshotAtGeneration as string | undefined;
-        if (savedSnapshot && savedMapa) {
-          const currentXpcto = JSON.stringify(p.xpcto ?? {});
-          if (savedSnapshot !== currentXpcto) {
-            setXpctoStaleChanges(diffXpcto(
-              JSON.parse(savedSnapshot) as Partial<XPCTO>,
-              (p.xpcto ?? {}) as Partial<XPCTO>
-            ));
-          }
-        }
+        // Vía el motor genérico de propagación (lib/moddulo/phasePropagation.ts).
+        const staleDiffs = detectForwardStaleness("exploracion", p);
+        if (staleDiffs && staleDiffs.length > 0) setXpctoStaleChanges(staleDiffs);
 
         // Cargar referencia al proyecto PESTEL vinculado
         const savedPestProjectId = p.phases?.exploracion?.pestProjectId;
@@ -437,13 +399,6 @@ export default function ExploracionPage() {
         // A1 — Ocultar landing si ya inició la fase
         if (p.phases?.exploracion?.started || phaseStatus === "completed") {
           setShowLanding(false);
-        }
-
-        // Cargar RDA de F1 (C8)
-        const rda = p.phases?.proposito?.rda;
-        if (rda?.activo) {
-          setRdaActivo(true);
-          setRdaItems(rda.items ?? []);
         }
 
         // Track F1 status for the F2 landing banner
@@ -1263,28 +1218,6 @@ export default function ExploracionPage() {
           );
         })()}
       </div>
-
-      {/* C8 — Alerta RDA heredada de F1 */}
-      {rdaActivo && (
-        <div
-          role="alert"
-          className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-purple-50 border-l-4 border-purple-400 text-sm dark:bg-yellow-eske/10 dark:border-yellow-eske"
-        >
-          <svg className="w-4 h-4 shrink-0 text-purple-600 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          </svg>
-          <span className="text-black-eske dark:text-white">
-            <strong>Deficiencias activas de F1</strong> —{" "}
-            {rdaItems.length > 0 ? `${rdaItems.length} pendientes` : "sin resolver"} en el Propósito.
-          </span>
-          <Link
-            href={`/moddulo/proyecto/${projectId}/proposito`}
-            className="ml-auto text-bluegreen-eske underline text-xs shrink-0 hover:text-bluegreen-eske-60"
-          >
-            Ver RDA de F1
-          </Link>
-        </div>
-      )}
 
       {/* Banner F1 incompleto — visible cuando PESTEL está importado pero F1 aún no está completado */}
       {mapaPESTEL && phaseStatusF1 !== "completed" && (
