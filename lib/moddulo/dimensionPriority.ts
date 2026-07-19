@@ -29,6 +29,14 @@ export const DIMENSION_PRIORITY_BY_TYPE: Record<ProjectType, DimensionPriorityCo
   ciudadano: { prioritarias: ["S", "P", "T"], seguimiento: ["Ec", "L", "E"] },
 };
 
-export function isDimensionPrioritaria(tipo: ProjectType, dim: DimensionCode): boolean {
-  return DIMENSION_PRIORITY_BY_TYPE[tipo].prioritarias.includes(dim);
+// Resuelve el config de prioridad para un tipo de proyecto, con fallback a
+// "ciudadano" para valores desconocidos/legacy — mismo comportamiento que
+// functions/src/pestel/dimensionPriority.ts.
+export function getDimensionPriorityConfig(tipo: string): DimensionPriorityConfig {
+  const key = tipo as ProjectType;
+  return DIMENSION_PRIORITY_BY_TYPE[key] ?? DIMENSION_PRIORITY_BY_TYPE.ciudadano;
+}
+
+export function isDimensionPrioritaria(tipo: string, dim: DimensionCode): boolean {
+  return getDimensionPriorityConfig(tipo).prioritarias.includes(dim);
 }

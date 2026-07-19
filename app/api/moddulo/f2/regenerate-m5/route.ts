@@ -11,6 +11,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import { serializeMapaPESTEL, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
+import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import type { XPCTO, HEIF2, PIPItem } from "@/types/moddulo.types";
 
 function extractText(response: Anthropic.Message): string {
@@ -129,10 +130,12 @@ export async function POST(request: NextRequest) {
       m3Actores,
       m4Incertidumbres
     );
+    const knowledgeContext = await buildPhaseContext({ phaseId: "exploracion", projectType: project.type });
+    const systemPrompt = knowledgeContext ? `${knowledgeContext}\n\n${system}` : system;
     const res = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 4000,
-      system,
+      system: systemPrompt,
       messages: [{ role: "user", content: user }],
     }) as Anthropic.Message;
     m5Raw = extractText(res);
