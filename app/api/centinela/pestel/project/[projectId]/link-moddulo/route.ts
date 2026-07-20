@@ -9,36 +9,9 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
+import { checkTerritoryMatch, esTipoCompatible } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
-
-type TerritoryMatch = "exact" | "approximate" | "mismatch";
-
-function checkTerritoryMatch(
-  p: Territorio,
-  m: Territorio | undefined
-): TerritoryMatch {
-  if (!m) return "approximate";
-  if (p.nivel !== m.nivel) return "mismatch";
-  if (p.pais && m.pais && p.pais !== m.pais) return "mismatch";
-  if (p.estado && m.estado && p.estado !== m.estado) return "mismatch";
-
-  const isDistrito = ["distrito_federal", "distrito_local", "distrito"].includes(p.nivel);
-  if (isDistrito) {
-    if (p.cve_distrito && m.cve_distrito) {
-      return p.cve_distrito === m.cve_distrito ? "exact" : "mismatch";
-    }
-    if (p.municipio && m.municipio && p.municipio !== m.municipio) return "mismatch";
-    return "approximate";
-  }
-
-  if (p.nivel === "municipal") {
-    if (p.municipio && m.municipio && p.municipio !== m.municipio) return "mismatch";
-    return "approximate";
-  }
-
-  return "exact";
-}
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -106,7 +79,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // Tipo compatibility: hard block, no forceLink flag
   const pestelTipo = pestelData.tipo as string;
   const modduloType = modduloProject.type;
-  if (pestelTipo !== modduloType) {
+  if (!esTipoCompatible(pestelTipo, modduloType)) {
     return NextResponse.json(
       {
         error: "tipo_mismatch",

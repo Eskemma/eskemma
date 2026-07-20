@@ -56,9 +56,20 @@ export interface CoberturaDeclarada {
 // VINCULACIÓN EXTERNA GENÉRICA (generalización del picker Moddulo↔Centinela)
 // ==========================================
 
+// Territorio y tipo responden la misma pregunta ("¿esto aplica a mi
+// proyecto?"), pero con distinto rigor: tipo es bloqueo duro sin bypass
+// (cumple), territorio es bloqueable-con-confirmación (las dos señales
+// viven en el mismo criterio, no en criterios separados).
+export interface CriterioPertinencia {
+  cumple: boolean; // false solo si el tipo no coincide — bloqueo duro, sin bypass
+  detalle: string;
+  territorioRequiereConfirmacion?: boolean; // true si territorio es mismatch/approximate
+  territorioDetalle?: string;
+}
+
 export interface EvaluacionCompatibilidad {
-  pertinencia: { cumple: boolean; detalle: string };
-  vigencia: { cumple: boolean; detalle: string };
+  pertinencia: CriterioPertinencia;
+  vigencia: { cumple: boolean; detalle: string }; // exclusivamente fecha vs. temporalidad del proyecto
   compatibilidadMetodologica: { cumple: boolean; detalle: string };
 }
 

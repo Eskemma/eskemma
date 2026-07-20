@@ -6,7 +6,15 @@
 // aquí cuando necesite mostrarlo, para que un cambio de nombre no obligue
 // a tocar el contrato.
 
-import type { TecnicaId, AppSourceKind, OrigenTrazabilidad, CoberturaDeclarada } from "./shared.types";
+import type {
+  TecnicaId,
+  AppSourceKind,
+  OrigenTrazabilidad,
+  CoberturaDeclarada,
+  Territorio,
+  EvaluacionCompatibilidad,
+} from "./shared.types";
+import type { ProjectType } from "./moddulo.types";
 
 export const NOMBRES_COMERCIALES: Record<TecnicaId, string> = {
   T06: "Sefix", T10: "Fontana", T29: "Acervo", T21: "Persona", T18: "Nexus",
@@ -79,5 +87,27 @@ export const FAMILIA_METODOLOGICA_POR_TECNICA: Record<TecnicaId, FamiliaMetodolo
   T29: "mixta", T30: "mixta", T31: "mixta", T32: "mixta",
   T33: "mixta", T34: "cuantitativa", T35: "mixta",
 };
+
+// ==========================================
+// CANAL 3 — VINCULACIÓN DE FUENTE EXTERNA
+// ==========================================
+
+export interface MetadatosFuenteExterna {
+  nombreHerramienta: string;
+  territorioDeclarado: Territorio;
+  fechaObtencion: string; // ISO
+  metodoDeclarado: MetodoUtilizado;
+  // Necesario para evaluar pertinencia (bloqueo duro) — no hay forma
+  // determinística de comparar "¿aplica a mi proyecto?" sin este dato.
+  tipoProyectoDeclarado: ProjectType;
+}
+
+export interface ResultadoFuenteExterna<TPayload = { archivoUrl: string; extractoTexto?: string }>
+  extends ResultadoF3<TPayload> {
+  origen: OrigenTrazabilidad & { sourceKind: "external"; componente: "external" };
+  metadatosFuente: MetadatosFuenteExterna;
+  // Evaluación que justificó el vínculo, conservada por trazabilidad.
+  compatibilidad: EvaluacionCompatibilidad;
+}
 
 export type { TecnicaId, AppSourceKind };
