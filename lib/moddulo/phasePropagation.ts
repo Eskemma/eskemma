@@ -70,7 +70,7 @@ export const PHASE_PROPAGATION_PAIRS: Partial<Record<PhaseId, PhasePropagationPa
     targetPhase: "exploracion",
     snapshotField: "xpctoSnapshotAtGeneration",
     getSourceData: (p) => p.xpcto ?? {},
-    hasTargetOutput: (p) => !!p.phases?.exploracion?.mapaPESTEL,
+    hasTargetOutput: (p) => !!p.phases?.exploracion?.linkedSource?.payload,
     diff: diffXpcto,
   },
 };

@@ -8,7 +8,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { MapaPESTEL } from "@/types/moddulo.types";
+import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 
 export async function POST(request: NextRequest) {
@@ -71,9 +71,10 @@ export async function POST(request: NextRequest) {
   // link-moddulo/route.ts for territory mismatches. Without it, a different
   // source always 409s: this guard exists specifically to stop SILENT
   // overwrites, not deliberate ones the user confirmed.
-  const existingAnalysisId = project.phases?.exploracion?.pestAnalysisId as string | undefined;
-  const existingPestProjectId = project.phases?.exploracion?.pestProjectId as string | undefined;
-  const existingMapa = project.phases?.exploracion?.mapaPESTEL as MapaPESTEL | undefined;
+  const existingLinkedSource = project.phases?.exploracion?.linkedSource as LinkedSourceRef<MapaPESTEL> | undefined;
+  const existingAnalysisId = existingLinkedSource?.sourceAnalysisId;
+  const existingPestProjectId = existingLinkedSource?.sourceId;
+  const existingMapa = existingLinkedSource?.payload;
   const incomingPestProjectId = analysis.projectId as string;
 
   if (existingMapa) {
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       // Usuario confirmó el reemplazo explícitamente — continúa abajo y sobrescribe.
     } else if (existingAnalysisId === pestAnalysisId) {
       // Same analysis already imported — return existing data idempotently.
-      return NextResponse.json({ pestProjectId: existingPestProjectId, mapaPESTEL: existingMapa }, { status: 200 });
+      return NextResponse.json({ linkedSource: existingLinkedSource }, { status: 200 });
     }
     // Same linked PESTEL project (renewed analysis), o confirmReplace — fall through to re-sync/overwrite.
   }
@@ -99,6 +100,13 @@ export async function POST(request: NextRequest) {
   );
 
   const pestProjectId = analysis.projectId as string;
+  const linkedSource: LinkedSourceRef<MapaPESTEL> = {
+    kind: "T22",
+    componente: "centinela",
+    sourceId: pestProjectId,
+    sourceAnalysisId: pestAnalysisId,
+    payload: mapaPESTEL,
+  };
 
   // Save to Moddulo project. On re-sync (M1 refreshed from a renewed
   // Centinela analysis), M2-M5 fueron aprobados contra el M1 anterior —
@@ -107,17 +115,14 @@ export async function POST(request: NextRequest) {
   // mapaPESTEL, y si esa regeneración falla, el usuario debe seguir viendo
   // el último draftDVS válido en vez de una pantalla en blanco sin salida.
   await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.pestAnalysisId": pestAnalysisId,
-    "phases.exploracion.pestProjectId": pestProjectId,
-    "phases.exploracion.mapaPESTEL": mapaPESTEL,
+    "phases.exploracion.linkedSource": linkedSource,
     "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
     "phases.exploracion.motorAprobaciones": {},
     // Ya no hace falta el puntero de "deshacer desvinculación" — este
     // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
-    "phases.exploracion.lastUnlinkedPestAnalysisId": FieldValue.delete(),
-    "phases.exploracion.lastUnlinkedPestProjectId": FieldValue.delete(),
+    "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  return NextResponse.json({ mapaPESTEL, pestProjectId }, { status: 200 });
+  return NextResponse.json({ linkedSource }, { status: 200 });
 }

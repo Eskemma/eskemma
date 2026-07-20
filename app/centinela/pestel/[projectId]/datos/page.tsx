@@ -70,7 +70,7 @@ export default function DatosPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFiles, setUploadedFiles] = useState<
-    { name: string; dimension: DimensionCode; method: "text" | "vision" }[]
+    { name: string; dimension: DimensionCode; method?: "text" | "vision" }[]
   >([]);
   // Import from Moddulo
   const [importingModdulo, setImportingModdulo] = useState(false);
@@ -107,11 +107,38 @@ export default function DatosPage() {
     }
   }, [projectId]);
 
+  // Rehidrata la lista de "archivos subidos" desde Firestore al montar —
+  // sin esto, uploadedFiles solo reflejaba lo subido en la sesión actual y
+  // parecía "perder" los documentos al reentrar a la página (los documentos
+  // en sí nunca se perdían, ver pestel_data_sources vía coverage/route.ts).
+  // DataSourceDoc no guarda el método (text/vision) usado en la carga
+  // original, así que los ítems rehidratados quedan sin ese dato.
+  const loadSources = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/centinela/pestel/project/${projectId}/data-sources`
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        sources: { source: string; dimensionCode: DimensionCode }[];
+      };
+      setUploadedFiles(
+        data.sources.map((s) => ({
+          name: s.source,
+          dimension: s.dimensionCode,
+          method: undefined,
+        }))
+      );
+    } catch {
+      // Non-blocking — la lista simplemente arranca vacía
+    }
+  }, [projectId]);
+
   useEffect(() => {
-    Promise.all([loadProject(), loadCoverage()]).finally(() =>
+    Promise.all([loadProject(), loadCoverage(), loadSources()]).finally(() =>
       setLoading(false)
     );
-  }, [loadProject, loadCoverage]);
+  }, [loadProject, loadCoverage, loadSources]);
 
   // Auto-importar adjuntos de Moddulo F2 si el proyecto tiene modduloProjectId
   // y aún no se han importado.
@@ -639,7 +666,7 @@ export default function DatosPage() {
               {uploadedFiles.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <p className="text-xs font-medium text-black-eske dark:text-[#C7D6E0]">
-                    Archivos subidos en esta sesión:
+                    Archivos subidos:
                   </p>
                   <ul className="flex flex-col gap-1">
                     {uploadedFiles.map((f, i) => (

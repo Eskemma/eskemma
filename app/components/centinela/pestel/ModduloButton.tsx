@@ -123,11 +123,11 @@ function PickerModal({
       );
 
       if (res.ok) {
-        const data = (await res.json()) as { pestAnalysisId?: string };
+        const data = (await res.json()) as { sourceAnalysisId?: string };
         onClose();
         onLinked();
         // Navigate to F2 of the newly linked project
-        const pestAnalysisId = data.pestAnalysisId ?? analysisId;
+        const pestAnalysisId = data.sourceAnalysisId ?? analysisId;
         router.push(
           `/moddulo/proyecto/${target.id}/exploracion${
             pestAnalysisId ? `?pest_analysis_id=${pestAnalysisId}` : ""

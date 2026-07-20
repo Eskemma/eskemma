@@ -10,7 +10,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import type { Territorio } from "@/types/pestel.types";
-import type { MapaPESTEL } from "@/types/moddulo.types";
+import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 
 type TerritoryMatch = "exact" | "approximate" | "mismatch";
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   // Conflict: Moddulo project's exploracion phase already has a different pestProjectId
   const explorarPhase = modduloProject.phases?.["exploracion"];
-  const existingPestProjectId = explorarPhase?.pestProjectId;
+  const existingPestProjectId = explorarPhase?.linkedSource?.sourceId;
   if (existingPestProjectId && existingPestProjectId !== projectId) {
     return NextResponse.json(
       {
@@ -170,8 +170,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
   // from the express flow — that's the express→Centinela upgrade path this
   // endpoint must allow, not a conflict to protect against.
-  const existingAnalysisId = explorarPhase?.pestAnalysisId;
-  const existingMapa = explorarPhase?.mapaPESTEL as MapaPESTEL | undefined;
+  const existingAnalysisId = explorarPhase?.linkedSource?.sourceAnalysisId;
+  const existingMapa = explorarPhase?.linkedSource?.payload as MapaPESTEL | undefined;
 
   if (existingMapa && existingAnalysisId) {
     if (existingAnalysisId === latestAnalysisId) {
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         modduloProjectId,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return NextResponse.json({ modduloProjectId, pestAnalysisId: latestAnalysisId }, { status: 200 });
+      return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 200 });
     }
     return NextResponse.json(
       {
@@ -192,8 +192,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   // Write MapaPESTEL to Moddulo project (if analysis available)
+  const linkedSource: LinkedSourceRef<MapaPESTEL> = {
+    kind: "T22",
+    componente: "centinela",
+    sourceId: projectId,
+  };
   const updatePayload: Record<string, unknown> = {
-    "phases.exploracion.pestProjectId": projectId,
     updatedAt: FieldValue.serverTimestamp(),
   };
 
@@ -201,8 +205,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const mapaPESTEL = transformToMapaPESTEL(
       (latestAnalysisData.dimensions ?? []) as RawDimension[]
     );
-    updatePayload["phases.exploracion.pestAnalysisId"] = latestAnalysisId;
-    updatePayload["phases.exploracion.mapaPESTEL"] = mapaPESTEL;
+    linkedSource.sourceAnalysisId = latestAnalysisId;
+    linkedSource.payload = mapaPESTEL;
     updatePayload["phases.exploracion.xpctoSnapshotAtGeneration"] = JSON.stringify(modduloProject.xpcto ?? {});
     // M1 puede estar reemplazando uno de origen express (upgrade) — M2-M5
     // aprobados contra el M1 anterior quedarían obsoletos, se fuerza
@@ -211,6 +215,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // en blanco.
     updatePayload["phases.exploracion.motorAprobaciones"] = {};
   }
+  updatePayload["phases.exploracion.linkedSource"] = linkedSource;
 
   await adminDb.collection("moddulo_projects").doc(modduloProjectId).update(updatePayload);
 
@@ -220,5 +225,5 @@ export async function POST(request: NextRequest, context: RouteContext) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  return NextResponse.json({ modduloProjectId, pestAnalysisId: latestAnalysisId }, { status: 201 });
+  return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 201 });
 }

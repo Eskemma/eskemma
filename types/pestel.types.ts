@@ -1,17 +1,12 @@
 // types/pestel.types.ts
 import type { Timestamp } from "firebase/firestore";
+import type { Territorio, NivelTerritorial } from "./shared.types";
+
+export type { Territorio, NivelTerritorial };
 
 // ==========================================
 // ENUMERACIONES FUNDAMENTALES
 // ==========================================
-
-export type NivelTerritorial =
-  | "nacional"           // Todo México
-  | "estatal"            // Un estado (ej. Jalisco)
-  | "municipal"          // Un municipio (ej. Zapopan)
-  | "distrito"           // legacy — alias de distrito_federal (proyectos en Firestore pre-renaming)
-  | "distrito_federal"   // Distrito electoral federal (Diputados Federales)
-  | "distrito_local";    // Distrito electoral local (Diputados Locales)
 
 /** @deprecated Use TipoProyecto instead */
 export type ModoAnalisis =
@@ -83,15 +78,9 @@ export const DIMENSION_ORDER: DimensionCode[] = ["P", "E", "S", "T", "Ec", "L"];
 // ==========================================
 // INTERFACES COMPARTIDAS
 // ==========================================
-
-export interface Territorio {
-  nivel: NivelTerritorial;
-  pais?: string;
-  estado?: string;
-  municipio?: string;
-  nombre: string;
-  cve_distrito?: string;
-}
+// Territorio y NivelTerritorial viven en ./shared.types — re-exportados
+// arriba para que los imports existentes desde "@/types/pestel.types"
+// sigan funcionando sin cambios.
 
 export interface AlertasConfig {
   vectorRiesgoUmbral: number;

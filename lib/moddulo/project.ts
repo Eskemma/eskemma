@@ -9,6 +9,7 @@ import type {
   PhaseState,
   PhaseStatus,
   XPCTO,
+  LinkedSourceRef,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
@@ -89,10 +90,15 @@ export async function createProject(
 
   if (input.pestelProjectId) {
     data.pestelProjectId = input.pestelProjectId;
+    const linkedSource: LinkedSourceRef = {
+      kind: "T22",
+      componente: "centinela",
+      sourceId: input.pestelProjectId,
+      ...(input.pestAnalysisId ? { sourceAnalysisId: input.pestAnalysisId } : {}),
+    };
     (data.phases as Record<string, unknown>).exploracion = {
       ...((data.phases as Record<string, Record<string, unknown>>).exploracion ?? emptyPhaseState()),
-      pestProjectId: input.pestelProjectId,
-      ...(input.pestAnalysisId ? { pestAnalysisId: input.pestAnalysisId } : {}),
+      linkedSource,
     };
   }
 
@@ -316,7 +322,11 @@ export async function deleteProject(projectId: string, userId: string): Promise<
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (collaborator?.role !== "owner") throw new Error("Solo el dueño puede eliminar el proyecto.");
 
-  const pestProjectId = project.phases?.["exploracion"]?.pestProjectId;
+  // Solo un vínculo real de Centinela (kind "T22") tiene una contraparte en
+  // pestel_projects que limpiar — el sourceId de un vínculo "express" es el
+  // propio ID del proyecto Moddulo, no un documento de Centinela.
+  const explorarLink = project.phases?.["exploracion"]?.linkedSource;
+  const pestProjectId = explorarLink?.kind === "T22" ? explorarLink.sourceId : undefined;
 
   await adminDb.collection(COLLECTION).doc(projectId).delete();
 

@@ -1,7 +1,21 @@
 // types/moddulo.types.ts
 import type { Timestamp } from "firebase/firestore";
-import type { Territorio, NivelTerritorial } from "./pestel.types";
+import type { Territorio, NivelTerritorial, AppSourceKind, OrigenTrazabilidad } from "./shared.types";
 export type { Territorio, NivelTerritorial };
+
+// Vínculo persistido de F2 (Exploración) a una fuente externa (Centinela
+// PESTEL, u otra app futura), o al M1 generado localmente vía flujo
+// express (kind: "express", sin fuente externa real — sourceId es el
+// propio ID del proyecto Moddulo). TPayload es unknown a este nivel porque
+// PhaseState es genérico para cualquier fase/fuente; el código PESTEL lo
+// castea a MapaPESTEL al leer.
+export interface LinkedSourceRef<TPayload = unknown> {
+  kind: AppSourceKind;
+  componente: OrigenTrazabilidad["componente"];
+  sourceId: string;
+  sourceAnalysisId?: string;
+  payload?: TPayload;
+}
 
 // ==========================================
 // ENUMERACIONES FUNDAMENTALES
@@ -243,12 +257,10 @@ export interface PhaseState {
     M4?: boolean;
     M5?: boolean;
   };
-  // ID del análisis PESTEL vinculado (F2)
-  pestAnalysisId?: string;
-  // ID del proyecto PESTEL vinculado (F2) — para navegar de vuelta a Centinela
-  pestProjectId?: string;
-  // MapaPESTEL transformado para F2 (señales tripartitas por dimensión)
-  mapaPESTEL?: MapaPESTEL;
+  // Vínculo a la fuente que generó el M1 de F2: Centinela PESTEL (kind
+  // "T22") o flujo express (kind "express"). payload es el MapaPESTEL
+  // transformado (señales tripartitas por dimensión).
+  linkedSource?: LinkedSourceRef<MapaPESTEL>;
   // Estado semántico de la fase (F2: "lista" cuando DVS generado)
   estado?: string;
   // Fecha de aprobación/cierre de la fase

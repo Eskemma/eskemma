@@ -35,9 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
 
-  const pestProjectId = project.phases?.exploracion?.pestProjectId as string | undefined;
-  const pestAnalysisId = project.phases?.exploracion?.pestAnalysisId as string | undefined;
-  if (!pestProjectId && !pestAnalysisId) {
+  const linkedSource = project.phases?.exploracion?.linkedSource;
+  const pestProjectId = linkedSource?.sourceId;
+  // kind !== "T22" cubre tanto "sin vínculo" como "vínculo express" — el
+  // express no tiene fuente de Centinela que desvincular (su sourceId es
+  // el propio ID del proyecto Moddulo, no un pestel_projects real).
+  if (!linkedSource || linkedSource.kind !== "T22") {
     return NextResponse.json(
       { error: "not_linked", message: "Este proyecto no está vinculado a ningún análisis de Centinela PESTEL." },
       { status: 400 }
@@ -45,15 +48,12 @@ export async function POST(request: NextRequest) {
   }
 
   await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.pestAnalysisId": FieldValue.delete(),
-    "phases.exploracion.pestProjectId": FieldValue.delete(),
-    "phases.exploracion.mapaPESTEL": FieldValue.delete(),
+    "phases.exploracion.linkedSource": FieldValue.delete(),
     "phases.exploracion.fuentesConsultadas": FieldValue.delete(),
     "phases.exploracion.xpctoSnapshotAtGeneration": FieldValue.delete(),
-    // Conserva el pestAnalysisId/pestProjectId anteriores para permitir
-    // deshacer ("Vincular de nuevo") sin pasar por el picker.
-    ...(pestAnalysisId && { "phases.exploracion.lastUnlinkedPestAnalysisId": pestAnalysisId }),
-    ...(pestProjectId && { "phases.exploracion.lastUnlinkedPestProjectId": pestProjectId }),
+    // Conserva el vínculo anterior completo para permitir deshacer
+    // ("Vincular de nuevo") sin pasar por el picker.
+    "phases.exploracion.lastUnlinkedLinkedSource": linkedSource,
     // M1 desaparece — M2-M5 aprobados contra él quedan obsoletos, se fuerza
     // re-aprobación. draftDVS NO se borra: si el usuario restaura el vínculo
     // o regenera vía express y la regeneración falla, sigue teniendo su

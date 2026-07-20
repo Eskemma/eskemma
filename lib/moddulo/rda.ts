@@ -40,7 +40,7 @@ function computeRDAItemsParaFase(
   if (phaseId === "exploracion") {
     const dvs = project.phases?.exploracion?.dvs;
     if (!dvs) return null;
-    const mapaPESTEL = project.phases?.exploracion?.mapaPESTEL;
+    const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload;
     const criterios = evaluarCriteriosDVS(dvs, mapaPESTEL, project.type);
     return criterios.filter((c) => !c.satisfecho).map(criterioDVSToRDAItem);
   }

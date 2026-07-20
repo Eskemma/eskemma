@@ -67,13 +67,15 @@ export async function POST(request: NextRequest) {
     }
 
     await adminDb.collection("moddulo_projects").doc(modduloProjectId).update({
-      "phases.exploracion.pestAnalysisId": analysisId,
-      "phases.exploracion.pestProjectId": analysis.projectId,
+      "phases.exploracion.linkedSource.kind": "T22",
+      "phases.exploracion.linkedSource.componente": "centinela",
+      "phases.exploracion.linkedSource.sourceId": analysis.projectId,
+      "phases.exploracion.linkedSource.sourceAnalysisId": analysisId,
     });
 
     const redirectUrl = `/moddulo/proyecto/${modduloProjectId}/exploracion?pest_analysis_id=${analysisId}`;
-    return NextResponse.json({ pestAnalysisId: analysisId, redirectUrl }, { status: 200 });
+    return NextResponse.json({ sourceAnalysisId: analysisId, redirectUrl }, { status: 200 });
   }
 
-  return NextResponse.json({ pestAnalysisId: analysisId }, { status: 200 });
+  return NextResponse.json({ sourceAnalysisId: analysisId }, { status: 200 });
 }

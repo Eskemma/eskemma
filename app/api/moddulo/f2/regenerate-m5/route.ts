@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   const draftDVS = project.phases?.exploracion?.draftDVS as Record<string, unknown> | undefined;
   if (!draftDVS) return NextResponse.json({ error: "No existe draftDVS para este proyecto" }, { status: 400 });
 
-  const mapaPESTEL = project.phases?.exploracion?.mapaPESTEL as Record<string, unknown> | undefined;
+  const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
   if (!mapaPESTEL || Object.keys(mapaPESTEL).length === 0) {
     return NextResponse.json({ error: "No hay mapaPESTEL para generar M5" }, { status: 400 });
   }

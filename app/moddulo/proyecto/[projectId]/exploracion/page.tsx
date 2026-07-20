@@ -318,7 +318,8 @@ export default function ExploracionPage() {
         if (savedReport) setReportText(savedReport);
 
         // Read mapaPESTEL first — needed to decide showReporte default
-        const savedMapa = p.phases?.exploracion?.mapaPESTEL;
+        const savedLinkedSource = p.phases?.exploracion?.linkedSource;
+        const savedMapa = savedLinkedSource?.payload;
 
         // Cargar DVS si existe
         const savedDvs = p.phases?.exploracion?.dvs;
@@ -361,10 +362,12 @@ export default function ExploracionPage() {
         const staleDiffs = detectForwardStaleness("exploracion", p);
         if (staleDiffs && staleDiffs.length > 0) setXpctoStaleChanges(staleDiffs);
 
-        // Cargar referencia al proyecto PESTEL vinculado
-        const savedPestProjectId = p.phases?.exploracion?.pestProjectId;
-        const savedPestAnalysisId = p.phases?.exploracion?.pestAnalysisId;
-        const savedLastUnlinked = p.phases?.exploracion?.lastUnlinkedPestAnalysisId;
+        // Cargar referencia al proyecto PESTEL vinculado — kind "T22" es el
+        // único que representa un vínculo real de Centinela (express también
+        // puebla linkedSource, pero su sourceId es el propio proyecto Moddulo).
+        const savedPestProjectId = savedLinkedSource?.kind === "T22" ? savedLinkedSource.sourceId : undefined;
+        const savedPestAnalysisId = savedLinkedSource?.sourceAnalysisId;
+        const savedLastUnlinked = p.phases?.exploracion?.lastUnlinkedLinkedSource?.sourceAnalysisId;
         if (savedLastUnlinked) setLastUnlinkedPestAnalysisId(savedLastUnlinked as string);
         if (savedPestAnalysisId) setPestAnalysisId(savedPestAnalysisId as string);
         if (savedPestProjectId) {
@@ -386,9 +389,9 @@ export default function ExploracionPage() {
           // Fallback: check Centinela side in case write-back failed
           fetch(`/api/moddulo/f2/find-linked-pestel?moddulo_project_id=${projectId}`)
             .then((r) => r.ok ? r.json() : null)
-            .then((data: { found: boolean; pestProjectId?: string; currentStage?: number } | null) => {
-              if (data?.found && data.pestProjectId) {
-                setPestProjectId(data.pestProjectId);
+            .then((data: { found: boolean; sourceId?: string; currentStage?: number } | null) => {
+              if (data?.found && data.sourceId) {
+                setPestProjectId(data.sourceId);
                 setPestlVia("pestel");
                 setPestCurrentStage(data.currentStage ?? 3);
               }
@@ -432,9 +435,10 @@ export default function ExploracionPage() {
         if (!r.ok) return { ok: false, conflict: false };
 
         const data = await r.json();
-        if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
-        if (data.pestProjectId) {
-          setPestProjectId(data.pestProjectId as string);
+        const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
+        if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
+        if (linkedSource?.sourceId) {
+          setPestProjectId(linkedSource.sourceId);
           setPestlVia("pestel");
         }
         setPestAnalysisId(pestAnalysisId);
@@ -507,8 +511,9 @@ export default function ExploracionPage() {
         .then(async (r) => {
           if (!r.ok) return;
           const data = await r.json();
-          if (data.pestProjectId) setPestProjectId(data.pestProjectId as string);
-          if (data.mapaPESTEL) setMapaPESTEL(data.mapaPESTEL as MapaPESTEL);
+          const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
+          if (linkedSource?.sourceId) setPestProjectId(linkedSource.sourceId);
+          if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
         })
         .catch((err) => console.error("[C7b] import-pestel falló para pestAnalysisId:", pestAnalysisId, err));
     }
@@ -2377,10 +2382,10 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
         body: JSON.stringify({ modduloProjectId: projectId, forceLink: force }),
       });
       if (res.ok) {
-        const data = (await res.json()) as { pestAnalysisId?: string };
+        const data = (await res.json()) as { sourceAnalysisId?: string };
         onClose();
         router.push(
-          `/moddulo/proyecto/${projectId}/exploracion${data.pestAnalysisId ? `?pest_analysis_id=${data.pestAnalysisId}` : ""}`
+          `/moddulo/proyecto/${projectId}/exploracion${data.sourceAnalysisId ? `?pest_analysis_id=${data.sourceAnalysisId}` : ""}`
         );
         router.refresh();
         return;

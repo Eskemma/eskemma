@@ -10,7 +10,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getMapaPESTELExpressPrompt } from "@/lib/ai/phases/prompts";
-import type { XPCTO, MapaPESTEL } from "@/types/moddulo.types";
+import type { XPCTO, MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import {
   fetchGoogleNewsRSS,
   getNewsTopicsForProject,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
   // (mapaPESTEL quedaría huérfano mientras pestAnalysisId/pestProjectId
   // siguen apuntando al análisis original). El usuario debe desvincular
   // explícitamente antes de poder regenerar vía express.
-  if (project.phases?.exploracion?.pestAnalysisId) {
+  if (project.phases?.exploracion?.linkedSource?.sourceAnalysisId) {
     return NextResponse.json(
       {
         error: "pestel_linked",
@@ -295,8 +295,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const linkedSource: LinkedSourceRef<MapaPESTEL> = {
+    kind: "express",
+    componente: "moddulo",
+    sourceId: projectId,
+    payload: mapaPESTEL,
+  };
+
   await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.mapaPESTEL": mapaPESTEL,
+    "phases.exploracion.linkedSource": linkedSource,
     "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
     "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
     updatedAt: FieldValue.serverTimestamp(),

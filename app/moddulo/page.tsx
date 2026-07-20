@@ -337,7 +337,7 @@ function ProjectCard({
         <DeleteModal
           projectName={project.name}
           isDeleting={isDeleting}
-          hasPestelLink={!!project.phases?.exploracion?.pestProjectId}
+          hasPestelLink={project.phases?.exploracion?.linkedSource?.kind === "T22"}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}
         />

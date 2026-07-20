@@ -87,7 +87,12 @@ export async function POST(request: NextRequest) {
             .collection("moddulo_projects")
             .doc(modduloProjectId)
             .update({
-              "phases.exploracion.pestProjectId": existing.id,
+              // kind/componente se reafirman aquí también — este write-back
+              // existe justo porque el intento anterior de escribirlos pudo
+              // haber fallado (ver comentario de "dedup" arriba).
+              "phases.exploracion.linkedSource.sourceId": existing.id,
+              "phases.exploracion.linkedSource.kind": "T22",
+              "phases.exploracion.linkedSource.componente": "centinela",
               updatedAt: FieldValue.serverTimestamp(),
             });
         } catch (wbErr) {
@@ -118,8 +123,8 @@ export async function POST(request: NextRequest) {
   if (modduloProjectId && !confirmReplace) {
     const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
     const explorarPhase = modduloSnap.data()?.phases?.exploracion;
-    const existingPestProjectId = explorarPhase?.pestProjectId as string | undefined;
-    const existingMapa = explorarPhase?.mapaPESTEL;
+    const existingPestProjectId = explorarPhase?.linkedSource?.sourceId as string | undefined;
+    const existingMapa = explorarPhase?.linkedSource?.payload;
 
     if (existingPestProjectId) {
       return NextResponse.json(
@@ -143,7 +148,7 @@ export async function POST(request: NextRequest) {
     }
   } else if (modduloProjectId && confirmReplace) {
     const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
-    oldPestProjectIdToUnlink = modduloSnap.data()?.phases?.exploracion?.pestProjectId as string | undefined;
+    oldPestProjectIdToUnlink = modduloSnap.data()?.phases?.exploracion?.linkedSource?.sourceId as string | undefined;
   }
 
   const projectRef = adminDb.collection("pestel_projects").doc();
@@ -176,17 +181,23 @@ export async function POST(request: NextRequest) {
 
   // Write-back: let Moddulo know about the linked PESTEL project immediately,
   // without waiting for the round-trip import (pest_analysis_id in URL).
-  // Only pestProjectId is touched here — pestAnalysisId/mapaPESTEL stay as
-  // they are (old express or old Centinela content) until the real
-  // import-pestel round-trip replaces them, same "don't destroy until the
-  // replacement is confirmed working" principle used elsewhere in F2.
+  // Solo sourceId/kind/componente se tocan aquí — sourceAnalysisId/payload
+  // quedan como están (viejo contenido express o de un Centinela anterior)
+  // hasta que el round-trip real de import-pestel los reemplace, mismo
+  // principio de "no destruir hasta que el reemplazo esté confirmado" usado
+  // en el resto de F2. kind/componente SÍ se fijan siempre a "T22"/"centinela"
+  // aquí — este write establece (o reemplaza, vía confirmReplace) un vínculo
+  // Centinela, así que no pueden quedar ausentes ni heredar un valor "express"
+  // de un linkedSource anterior.
   if (modduloProjectId) {
     try {
       await adminDb
         .collection("moddulo_projects")
         .doc(modduloProjectId)
         .update({
-          "phases.exploracion.pestProjectId": projectRef.id,
+          "phases.exploracion.linkedSource.sourceId": projectRef.id,
+          "phases.exploracion.linkedSource.kind": "T22",
+          "phases.exploracion.linkedSource.componente": "centinela",
           updatedAt: FieldValue.serverTimestamp(),
         });
     } catch {

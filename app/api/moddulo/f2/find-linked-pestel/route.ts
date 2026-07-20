@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({
       found: true,
-      pestProjectId: doc.id,
+      sourceId: doc.id,
       currentStage: doc.data()?.currentStage ?? 3,
     });
   }
@@ -53,13 +53,17 @@ export async function GET(request: NextRequest) {
       return bTime - aTime;
     })[0];
 
-    // Repair: write pestProjectId back to Moddulo if it was missing
+    // Repair: write sourceId (+ kind/componente, ausentes precisamente
+    // porque este es el caso de "el lado Moddulo nunca los tuvo") de vuelta
+    // a Moddulo si faltaban.
     try {
       await adminDb
         .collection("moddulo_projects")
         .doc(modduloProjectId)
         .update({
-          "phases.exploracion.pestProjectId": doc.id,
+          "phases.exploracion.linkedSource.sourceId": doc.id,
+          "phases.exploracion.linkedSource.kind": "T22",
+          "phases.exploracion.linkedSource.componente": "centinela",
           updatedAt: FieldValue.serverTimestamp(),
         });
     } catch {
@@ -68,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       found: true,
-      pestProjectId: doc.id,
+      sourceId: doc.id,
       currentStage: doc.data().currentStage ?? 3,
     });
   }

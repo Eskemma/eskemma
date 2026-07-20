@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
   // ── Try new path: mapaPESTEL en phases.exploracion ───────────────────────
-  const mapaPESTEL = project.phases?.exploracion?.mapaPESTEL as Record<string, unknown> | undefined;
+  const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
 
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
@@ -293,7 +293,7 @@ async function runLegacyPath(
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
   const exploData = (project.phases?.exploracion?.data ?? {}) as Record<string, unknown>;
-  const pestAnalysisId = project.phases?.exploracion?.pestAnalysisId as string | undefined;
+  const pestAnalysisId = project.phases?.exploracion?.linkedSource?.sourceAnalysisId;
 
   let pestelContext = "";
   if (pestAnalysisId) {
