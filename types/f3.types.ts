@@ -55,12 +55,6 @@ export const APP_TO_F3_CONTRACTS: Partial<Record<TecnicaId, AppContractConfig>> 
 
 export type FamiliaMetodologica = "cuantitativa" | "cualitativa" | "documental" | "mixta";
 
-// Canal 3 sigue usando MetodoUtilizado (tecnicaId del catálogo MMEE | otro) —
-// ahí sí aplica, es una herramienta del ecosistema usada de forma
-// independiente. Canal 2 (carga manual) usa tecnicaDescrita (texto libre) en
-// MetadatosCargaManual — no aplica el catálogo, es contenido fuera del ecosistema.
-export type MetodoUtilizado = { tecnicaId: TecnicaId } | { otro: string };
-
 export interface MetadatosCargaManual {
   fuente: string;
   fechaObtencion: string; // ISO — cuándo se obtuvo el dato originalmente, no cuándo se sube
@@ -88,11 +82,11 @@ export interface ResultadoCargaManual<TPayload = { archivoUrl: string; extractoT
 // metodoUtilizado sea { tecnicaId }: siempre resolver vía este catálogo.
 export const FAMILIA_METODOLOGICA_POR_TECNICA: Record<TecnicaId, FamiliaMetodologica> = {
   T01: "cuantitativa", T02: "cuantitativa", T03: "cuantitativa", T04: "cuantitativa",
-  T05: "cuantitativa", T06: "mixta", T07: "cuantitativa", T08: "mixta",
-  T09: "cuantitativa", T10: "mixta", T11: "cualitativa", T12: "cualitativa",
-  T13: "mixta", T14: "cualitativa", T15: "mixta", T16: "mixta",
-  T17: "mixta", T18: "mixta", T19: "mixta", T20: "mixta",
-  T21: "mixta", T22: "mixta", T23: "documental", T24: "mixta",
+  T05: "cuantitativa", T06: "documental", T07: "cuantitativa", T08: "mixta",
+  T09: "cuantitativa", T10: "documental", T11: "cualitativa", T12: "cualitativa",
+  T13: "cualitativa", T14: "cualitativa", T15: "cualitativa", T16: "mixta",
+  T17: "cualitativa", T18: "mixta", T19: "mixta", T20: "mixta",
+  T21: "mixta", T22: "documental", T23: "documental", T24: "mixta",
   T25: "mixta", T26: "documental", T27: "mixta", T28: "mixta",
   T29: "mixta", T30: "mixta", T31: "mixta", T32: "mixta",
   T33: "mixta", T34: "cuantitativa", T35: "mixta",
@@ -106,7 +100,13 @@ export interface MetadatosFuenteExterna {
   nombreHerramienta: string;
   territorioDeclarado: Territorio;
   fechaObtencion: string; // ISO
-  metodoDeclarado: MetodoUtilizado;
+  // Texto libre (ej. "Encuesta cara a cara, contratada con terceros") —
+  // mismo criterio que MetadatosCargaManual.tecnicaDescrita, sin
+  // autocompletado contra el catálogo MMEE.
+  metodoDeclarado: string;
+  // Sugerida por lib/moddulo/sugerirFamiliaMetodologica() a partir de
+  // metodoDeclarado, editable por el usuario — declarativa, no verificada.
+  familiaMetodologica: FamiliaMetodologica;
   // Necesario para evaluar pertinencia (bloqueo duro) — no hay forma
   // determinística de comparar "¿aplica a mi proyecto?" sin este dato.
   tipoProyectoDeclarado: ProjectType;

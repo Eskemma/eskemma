@@ -7,9 +7,11 @@ import { useRef, useState } from "react";
 import { uploadMedia } from "@/firebase/storageUtils";
 import type { TareaPIP, AsignacionCanal, PIPItem, ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FamiliaMetodologica } from "@/types/f3.types";
+import type { EvaluacionCompatibilidad } from "@/types/shared.types";
 import { sugerirFamiliaMetodologica } from "@/lib/moddulo/sugerirFamiliaMetodologica";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import PillButton from "@/app/moddulo/components/PillButton";
+import TerritorySelector from "@/app/components/shared/TerritorySelector";
 
 const ESTADO_LABELS: Record<AsignacionCanal["estado"], string> = {
   pendiente: "Pendiente",
@@ -343,21 +345,69 @@ function CargaManualForm({ projectId, moduloPIP, onDone, onCancel }: {
   );
 }
 
+// Canal 3 — mini-flujo de 2 pasos: paso 1 reutiliza TerritorySelector tal
+// cual fue diseñado (con su propia navegación Atrás/Continuar — no se
+// construye un selector nuevo), paso 2 trae el resto de los campos y el
+// flujo evaluar→confirmar advertencias→vincular contra /canal3/evaluar y
+// /canal3/vincular.
 function VincularFuenteForm({ projectId, moduloPIP, projectType, projectTerritory, onDone, onCancel }: {
   projectId: string; moduloPIP: string; projectType: ProjectType; projectTerritory: Territorio | null; onDone: () => void; onCancel: () => void;
 }) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [territorio, setTerritorio] = useState<Territorio | null>(projectTerritory);
+
   const [file, setFile] = useState<File | null>(null);
   const [nombreHerramienta, setNombreHerramienta] = useState("");
   const [fechaObtencion, setFechaObtencion] = useState("");
-  const [tecnicaId, setTecnicaId] = useState("");
-  const [otro, setOtro] = useState("");
+  const [tipoProyectoDeclarado, setTipoProyectoDeclarado] = useState<ProjectType>(projectType);
+  const [metodoDeclarado, setMetodoDeclarado] = useState("");
+  const [familiaMetodologica, setFamiliaMetodologica] = useState<FamiliaMetodologica>("mixta");
+  const [familiaTocadaManualmente, setFamiliaTocadaManualmente] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [evaluando, setEvaluando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<{ territorio?: boolean; vigencia?: boolean } | null>(null);
+  const [compatibilidad, setCompatibilidad] = useState<EvaluacionCompatibilidad | null>(null);
+  const [confirmarTerritorio, setConfirmarTerritorio] = useState(false);
+  const [confirmarVigencia, setConfirmarVigencia] = useState(false);
   const [archivoVinculado, setArchivoVinculado] = useState<string | null>(null);
 
-  async function handleSubmit(confirmarPeseATerritorio = false, confirmarPeseAVigencia = false) {
-    if (!file || !nombreHerramienta || !fechaObtencion) return;
+  function handleMetodoChange(value: string) {
+    setMetodoDeclarado(value);
+    if (!familiaTocadaManualmente) setFamiliaMetodologica(sugerirFamiliaMetodologica(value));
+  }
+
+  const metadatosFuente = territorio
+    ? { nombreHerramienta, territorioDeclarado: territorio, fechaObtencion, tipoProyectoDeclarado, metodoDeclarado, familiaMetodologica }
+    : null;
+
+  async function handleEvaluar() {
+    if (!metadatosFuente || !nombreHerramienta || !fechaObtencion || !metodoDeclarado) return;
+    setEvaluando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/moddulo/f3/canal3/evaluar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, metadatosFuente }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "No se pudo evaluar la compatibilidad");
+      setCompatibilidad(data.compatibilidad);
+      setConfirmarTerritorio(false);
+      setConfirmarVigencia(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setEvaluando(false);
+    }
+  }
+
+  const puedeVincular = !!compatibilidad
+    && compatibilidad.pertinencia.cumple
+    && (!compatibilidad.pertinencia.territorioRequiereConfirmacion || confirmarTerritorio)
+    && (compatibilidad.vigencia.cumple || confirmarVigencia);
+
+  async function handleVincular() {
+    if (!file || !metadatosFuente || !puedeVincular) return;
     setLoading(true);
     setError(null);
     try {
@@ -370,32 +420,16 @@ function VincularFuenteForm({ projectId, moduloPIP, projectType, projectTerritor
 
       await uploadMedia(file, storagePath);
 
-      const metodoDeclarado = tecnicaId ? { tecnicaId } : { otro };
       const res = await fetch("/api/moddulo/f3/canal3/vincular", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId, resultadoId, storagePath, nombre: file.name, tipo: file.type || "application/octet-stream",
-          metadatosFuente: {
-            nombreHerramienta, territorioDeclarado: projectTerritory ?? { nivel: "nacional", nombre: "México" },
-            fechaObtencion, metodoDeclarado, tipoProyectoDeclarado: projectType,
-          },
-          moduloPIP, cobertura: { completa: true }, confirmarPeseATerritorio, confirmarPeseAVigencia,
+          metadatosFuente, moduloPIP, cobertura: { completa: true },
+          confirmarPeseATerritorio: confirmarTerritorio, confirmarPeseAVigencia: confirmarVigencia,
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        if (data.error === "territorio_requiere_confirmacion") {
-          setPendingConfirm({ territorio: true });
-          setError(data.message);
-          return;
-        }
-        if (data.error === "vigencia_rechazada") {
-          setPendingConfirm({ vigencia: true });
-          setError(data.message);
-          return;
-        }
-        throw new Error(data.message ?? "No se pudo vincular la fuente");
-      }
+      if (!res.ok) throw new Error(data.message ?? "No se pudo vincular la fuente");
       setArchivoVinculado(file.name);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -415,6 +449,18 @@ function VincularFuenteForm({ projectId, moduloPIP, projectType, projectTerritor
     );
   }
 
+  if (step === 1) {
+    return (
+      <TerritorySelector
+        territorio={territorio}
+        onChange={setTerritorio}
+        onNext={() => setStep(2)}
+        onBack={onCancel}
+        label="¿Qué territorio declara cubrir esta fuente/herramienta?"
+      />
+    );
+  }
+
   return (
     <div className="space-y-2">
       <div>
@@ -429,31 +475,91 @@ function VincularFuenteForm({ projectId, moduloPIP, projectType, projectTerritor
         <FieldLabel>Fecha de obtención</FieldLabel>
         <input type="date" onChange={(e) => setFechaObtencion(e.target.value ? new Date(e.target.value).toISOString() : "")} className={inputClass} />
       </div>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <FieldLabel>Técnica (T01-T35, opcional)</FieldLabel>
-          <input value={tecnicaId} onChange={(e) => setTecnicaId(e.target.value)} className={inputClass} />
-        </div>
-        {!tecnicaId && (
-          <div className="flex-1">
-            <FieldLabel>Otro método</FieldLabel>
-            <input value={otro} onChange={(e) => setOtro(e.target.value)} className={inputClass} />
-          </div>
-        )}
+      <div>
+        <FieldLabel>Tipo de proyecto declarado</FieldLabel>
+        <select value={tipoProyectoDeclarado} onChange={(e) => setTipoProyectoDeclarado(e.target.value as ProjectType)} className={inputClass}>
+          <option value="electoral">Electoral</option>
+          <option value="gubernamental">Gubernamental</option>
+          <option value="legislativo">Legislativo</option>
+          <option value="ciudadano">Ciudadano</option>
+        </select>
       </div>
+      <div>
+        <FieldLabel>Método declarado</FieldLabel>
+        <input
+          placeholder="Ej. Encuesta cara a cara, contratada con terceros"
+          value={metodoDeclarado}
+          onChange={(e) => handleMetodoChange(e.target.value)}
+          className={inputClass}
+        />
+      </div>
+      <div>
+        <FieldLabel>Familia metodológica (sugerida, editable)</FieldLabel>
+        <select
+          value={familiaMetodologica}
+          onChange={(e) => { setFamiliaMetodologica(e.target.value as FamiliaMetodologica); setFamiliaTocadaManualmente(true); }}
+          className={inputClass}
+        >
+          <option value="cuantitativa">Cuantitativa</option>
+          <option value="cualitativa">Cualitativa</option>
+          <option value="documental">Documental</option>
+          <option value="mixta">Mixta</option>
+        </select>
+      </div>
+
       {error && <p className="text-xs lg:text-sm text-yellow-eske-70">{error}</p>}
-      <div className="flex gap-2">
-        {pendingConfirm?.territorio ? (
-          <PillButton variant="solid" onClick={() => handleSubmit(true, false)} disabled={loading}>Confirmar pese a territorio distinto</PillButton>
-        ) : pendingConfirm?.vigencia ? (
-          <PillButton variant="solid" onClick={() => handleSubmit(false, true)} disabled={loading}>Confirmar pese a vigencia</PillButton>
-        ) : (
-          <PillButton variant="solid" onClick={() => handleSubmit(false, false)} disabled={loading || !file || !nombreHerramienta || !fechaObtencion}>
-            {loading ? "Vinculando…" : "Vincular fuente"}
+
+      {!compatibilidad && (
+        <div className="flex gap-2">
+          <PillButton
+            variant="solid"
+            onClick={handleEvaluar}
+            disabled={evaluando || !nombreHerramienta || !fechaObtencion || !metodoDeclarado}
+          >
+            {evaluando ? "Evaluando…" : "Evaluar compatibilidad"}
           </PillButton>
-        )}
-        <PillButton onClick={onCancel} disabled={loading} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
-      </div>
+          <PillButton onClick={onCancel} disabled={evaluando} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
+        </div>
+      )}
+
+      {compatibilidad && !compatibilidad.pertinencia.cumple && (
+        <div className="space-y-2">
+          <p className="text-xs lg:text-sm text-red-eske">{compatibilidad.pertinencia.detalle}</p>
+          <div className="flex gap-2">
+            <PillButton onClick={() => setCompatibilidad(null)} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Editar y reintentar</PillButton>
+            <PillButton onClick={onCancel} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
+          </div>
+        </div>
+      )}
+
+      {compatibilidad && compatibilidad.pertinencia.cumple && (
+        <div className="space-y-2 rounded-md border border-gray-eske-20 dark:border-white/10 p-2">
+          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.pertinencia.detalle}</p>
+          {compatibilidad.pertinencia.territorioRequiereConfirmacion && (
+            <label className="flex items-start gap-2 text-xs lg:text-sm text-yellow-eske-70">
+              <input type="checkbox" checked={confirmarTerritorio} onChange={(e) => setConfirmarTerritorio(e.target.checked)} className="mt-0.5" />
+              <span>{compatibilidad.pertinencia.territorioDetalle} Confirmo que es el mismo territorio pese a la diferencia.</span>
+            </label>
+          )}
+          {!compatibilidad.vigencia.cumple && (
+            <label className="flex items-start gap-2 text-xs lg:text-sm text-yellow-eske-70">
+              <input type="checkbox" checked={confirmarVigencia} onChange={(e) => setConfirmarVigencia(e.target.checked)} className="mt-0.5" />
+              <span>{compatibilidad.vigencia.detalle} Confirmo que quiero usar este dato pese a la fecha.</span>
+            </label>
+          )}
+          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.compatibilidadMetodologica.detalle}</p>
+
+          <div className="flex gap-2">
+            <PillButton variant="solid" onClick={handleVincular} disabled={loading || !file || !puedeVincular}>
+              {loading ? "Vinculando…" : "Vincular fuente"}
+            </PillButton>
+            <PillButton onClick={() => setCompatibilidad(null)} disabled={loading} className="dark:border-blue-eske-20 dark:text-blue-eske-20">
+              Volver a evaluar
+            </PillButton>
+            <PillButton onClick={onCancel} disabled={loading} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

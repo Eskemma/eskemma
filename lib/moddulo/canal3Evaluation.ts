@@ -43,13 +43,9 @@ export function evaluarCompatibilidad(
         : `El dato se obtuvo (${metadatos.fechaObtencion}) después de que el hito del proyecto ya venció (${fechaLimite}).`,
   };
 
-  const metodoLabel =
-    "tecnicaId" in metadatos.metodoDeclarado
-      ? metadatos.metodoDeclarado.tecnicaId
-      : `otro: ${metadatos.metodoDeclarado.otro}`;
   const compatibilidadMetodologica = {
     cumple: true,
-    detalle: `Declarado por el usuario (${metodoLabel}), no verificado automáticamente.`,
+    detalle: `Declarado por el usuario (${metadatos.metodoDeclarado}), no verificado automáticamente.`,
   };
 
   return { pertinencia, vigencia, compatibilidadMetodologica };

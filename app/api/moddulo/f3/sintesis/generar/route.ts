@@ -13,6 +13,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { TareaPIP, PIPItem, SintesisF3, ActorVetoF2 } from "@/types/moddulo.types";
+import { tareasConSustentoUnico } from "@/lib/moddulo/triangulacion";
 
 function extractText(response: Anthropic.Message): string {
   return response.content
@@ -78,10 +79,15 @@ export async function POST(request: NextRequest) {
     .map((d) => ({ resultadoId: d.id, ...d.data() }))
     .filter((r) => (r as { aprobado?: boolean }).aprobado === true);
 
+  // Triangulación informativa: usa `tareas` SIN filtrar (no `tareasParaPrompt`)
+  // — activada solo gatea la suficiencia de M4, nunca qué evidencia cuenta
+  // para esta señal de M3.
+  const sustentoUnico = tareasConSustentoUnico(tareas, resultadosAprobados);
+
   const system = `Eres M3, el motor de Síntesis de hallazgos de la Fase 3 (Moddulo). Cruzas los resultados de investigación aprobados con las tareas del PIP y produces un cuerpo coherente de evidencia.
 
 Cada tarea del PIP puede tener varias asignaciones (vías para responderla) en vez de un solo canal. El tablero que recibes ya viene FILTRADO a solo las asignaciones que el usuario dejó activas — las que desactivó no aparecen, porque esa decisión ya se registra aparte y no debe duplicarse aquí. Identifica:
-- convergencias: hallazgos consistentes entre dos o más resultados.
+- convergencias: hallazgos consistentes entre dos o más resultados. Cada convergencia lleva un campo booleano \`sustentoUnico\`: márcalo \`true\` únicamente cuando la convergencia dependa principalmente de resultados de una tarea que aparece en la lista "Tareas con sustento metodológico único" (más abajo) — es decir, cuando toda la evidencia detrás de ese hallazgo viene de la misma familia metodológica, sin variedad. Es puramente informativo para el usuario, nunca cambia si algo es o no convergencia.
 - contradicciones: hallazgos que se oponen entre sí — no las resuelvas, solo repórtalas.
 - vaciosResiduales: dos tipos, NUNCA omitas el segundo tipo solo porque la tarea ya tenga otra asignación cubierta:
   1. Tarea completa sin ninguna asignación (de las activas) con resultado aprobado — vacío SIN asignacionId, con destino "alta urgencia y resolución pendiente" (RDA) o "naturaleza continua o baja resolución" (SIP). Si una tarea trae el campo \`sinViasActivas: true\`, trátala igual que si ninguna asignación tuviera resultado — genera este vacío de tarea completa para ella también, aunque su arreglo de asignaciones venga vacío.
@@ -90,9 +96,9 @@ Cada tarea del PIP puede tener varias asignaciones (vías para responderla) en v
 - fodaAdversariosInsumo: un FODA por cada actor de veto relevante (más profundo para riesgo "rojo" que "ambar"/"verde").
 
 Responde ÚNICAMENTE con JSON con esta forma exacta:
-{"convergencias": [...], "contradicciones": [...], "vaciosResiduales": [{"numero": N, "asignacionId": "opcional, solo para vacíos de complementaria", "pregunta": "...", "urgencia": "alta|media|baja", "destino": "RDA|SIP"}], "fodaPropioInsumo": {"fortalezas": [...], "oportunidades": [...], "debilidades": [...], "amenazas": [...]}, "fodaAdversariosInsumo": {"<nombre actor>": {"fortalezas": [...], "oportunidades": [...], "debilidades": [...], "amenazas": [...]}}}`;
+{"convergencias": [{"texto": "...", "sustentoUnico": true|false}], "contradicciones": [...], "vaciosResiduales": [{"numero": N, "asignacionId": "opcional, solo para vacíos de complementaria", "pregunta": "...", "urgencia": "alta|media|baja", "destino": "RDA|SIP"}], "fodaPropioInsumo": {"fortalezas": [...], "oportunidades": [...], "debilidades": [...], "amenazas": [...]}, "fodaAdversariosInsumo": {"<nombre actor>": {"fortalezas": [...], "oportunidades": [...], "debilidades": [...], "amenazas": [...]}}}`;
 
-  const user = `PIP:\n${JSON.stringify(pip, null, 2)}\n\nTablero de tareas (M1, ya filtrado a asignaciones activas):\n${JSON.stringify(tareasParaPrompt, null, 2)}\n\nResultados aprobados (M2):\n${JSON.stringify(resultadosAprobados, null, 2)}\n\nActores de veto (Semáforo F2):\n${JSON.stringify(actoresVeto, null, 2)}`;
+  const user = `PIP:\n${JSON.stringify(pip, null, 2)}\n\nTablero de tareas (M1, ya filtrado a asignaciones activas):\n${JSON.stringify(tareasParaPrompt, null, 2)}\n\nResultados aprobados (M2):\n${JSON.stringify(resultadosAprobados, null, 2)}\n\nActores de veto (Semáforo F2):\n${JSON.stringify(actoresVeto, null, 2)}\n\nTareas con sustento metodológico único (todas sus fuentes con resultado aprobado son de la misma familia metodológica): ${JSON.stringify(sustentoUnico)}`;
 
   let raw: string;
   try {

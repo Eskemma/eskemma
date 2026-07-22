@@ -66,7 +66,19 @@ export default function F3Sintesis({
       <div>
         <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Convergencias</p>
         <ul className="text-xs lg:text-sm space-y-1 list-disc list-inside text-black-eske-80 dark:text-[#C5D8E8]">
-          {convergencias.map((c, i) => <li key={i}>{c}</li>)}
+          {convergencias.map((c, i) => (
+            <li key={i}>
+              {c.texto}
+              {c.sustentoUnico && (
+                <span
+                  className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-yellow-eske/15 text-yellow-eske-70 dark:text-yellow-eske"
+                  title="Toda la evidencia detrás de este hallazgo viene de una sola familia metodológica"
+                >
+                  Sustento único
+                </span>
+              )}
+            </li>
+          ))}
         </ul>
       </div>
       <div>

@@ -450,8 +450,17 @@ export interface FODAInsumo {
   amenazas: string[];
 }
 
+// sustentoUnico: informativo, calculado por M3 a partir de la triangulación
+// de familias metodológicas (ver lib/moddulo/triangulacion.ts) — true cuando
+// la convergencia depende de resultados que son todos de la misma familia
+// metodológica. Nunca bloquea ni condiciona nada, solo se muestra en la UI.
+export interface Convergencia {
+  texto: string;
+  sustentoUnico?: boolean;
+}
+
 export interface SintesisF3 {
-  convergencias: string[];
+  convergencias: Convergencia[];
   contradicciones: string[];
   vaciosResiduales: VacioResidual[];
   fodaPropioInsumo: FODAInsumo;

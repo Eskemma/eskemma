@@ -227,7 +227,7 @@ export function formatF3Report(
     const convergencias = sintesis.convergencias ?? [];
     const contradicciones = sintesis.contradicciones ?? [];
     const vaciosResiduales = sintesis.vaciosResiduales ?? [];
-    if (convergencias.length) sections.push("**Convergencias:**", ...convergencias.map((c) => `- ${c}`), "");
+    if (convergencias.length) sections.push("**Convergencias:**", ...convergencias.map((c) => `- ${c.texto}${c.sustentoUnico ? " _(sustento único)_" : ""}`), "");
     if (contradicciones.length) sections.push("**Contradicciones:**", ...contradicciones.map((c) => `- ${c}`), "");
     if (vaciosResiduales.length) {
       sections.push("**Vacíos residuales:**");
