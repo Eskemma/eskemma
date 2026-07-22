@@ -1,6 +1,6 @@
 // types/moddulo.types.ts
 import type { Timestamp } from "firebase/firestore";
-import type { Territorio, NivelTerritorial, AppSourceKind, OrigenTrazabilidad } from "./shared.types";
+import type { Territorio, NivelTerritorial, AppSourceKind, OrigenTrazabilidad, TecnicaId } from "./shared.types";
 export type { Territorio, NivelTerritorial };
 
 // Vínculo persistido de F2 (Exploración) a una fuente externa (Centinela
@@ -219,7 +219,7 @@ export type EstadoRDAItem = "activo" | "resuelto" | "aceptado";
 export interface RDAItem {
   id: string; // determinístico: `${faseOrigen}:${criterioId}`
   faseOrigen: PhaseId;
-  origenMecanismo: "criterio_suficiencia" | "vacio_residual";
+  origenMecanismo: "criterio_suficiencia" | "vacio_residual" | "asignacion_desactivada";
   criterioId?: string;
   nombre: string;
   descripcion: string;
@@ -230,6 +230,13 @@ export interface RDAItem {
   fechaCreacion: Timestamp;
   fechaResolucion?: Timestamp;
   resueltoPor?: "usuario" | "sistema";
+  // Solo para origenMecanismo === "asignacion_desactivada": el usuario ya
+  // tomó la decisión al desactivar la vía, así que no pasa por el flujo
+  // normal de "Aceptar como condición del proyecto" — la UI lo trata como
+  // aceptado sin pedir esa acción, aunque `estado` se mantenga en "activo"
+  // para que el motor de reconciliación de rda.ts lo auto-resuelva solo en
+  // cuanto la asignación se reactive (ver lib/moddulo/rda.ts).
+  aceptadoAutomaticamente?: boolean;
 }
 
 // ==========================================
@@ -269,6 +276,17 @@ export interface PhaseState {
   pip?: PIPItem[];
   // Incertidumbres heredadas de F2 (F3)
   incertidumbres?: IncertidumbreF2[];
+  // F3 — tablero de tareas (M1)
+  f3TareasPIP?: TareaPIP[];
+  // F3 — síntesis de hallazgos + insumos FODA (M3)
+  f3Sintesis?: SintesisF3;
+  // F3 — veredicto sobre la HEI, draft hasta aprobarPorUsuario (M4)
+  f3Veredicto?: VeredictoHEI;
+  // F3 — DIE final, snapshot análogo a `dvs` en F2
+  f3DIE?: DIE;
+  // F3 — ISO string de la última vez que el usuario visitó el chat, para
+  // avisar de resultados nuevos al montar (ver page.tsx).
+  chatUltimaVisita?: string;
 }
 
 // ==========================================
@@ -372,6 +390,91 @@ export interface DVSF2 {
   semaforo: ActorVetoF2[];           // M3
   incertidumbres: IncertidumbreF2[]; // M4
   pip: PIPItem[];
+}
+
+// ==========================================
+// FASE 3 — INVESTIGACIÓN
+// ==========================================
+
+// M1 — una tarea del PIP puede requerir más de un canal a la vez (ej. una
+// técnica del ecosistema para señales públicas + gestión humana directa
+// para entrevistas de élite) — asignaciones[] reemplaza el canal único.
+export interface AsignacionCanal {
+  // Estable, generado por el endpoint (no por Claude) — ej. `${numero}-${índice}`.
+  // Es lo que vincula un resultado recibido a ESTA asignación específica,
+  // independiente del canal (Canal 2/3 también pueden tener más de una
+  // asignación por tarea, no solo Canal 1).
+  asignacionId: string;
+  tipo: "primaria" | "complementaria";
+  canal: "canal1" | "canal2" | "canal3";
+  tecnicaId?: TecnicaId; // solo si canal === "canal1"
+  // Solo si canal === "canal1" — calculado server-side contra
+  // APP_TO_F3_CONTRACTS, nunca confiado al modelo.
+  estadoApp?: "disponible" | "proximamente";
+  justificacion: string; // por qué esta asignación — propuesta por M1
+  estado: "pendiente" | "en_curso" | "recibido" | "derivado";
+  resultadoId?: string; // → moddulo_projects/{projectId}/f3Resultados/{resultadoId}
+  // Activar/desactivar es independiente por asignación (no exclusivo entre
+  // ellas, a diferencia del extinto intercambio de "tipo" primaria/
+  // complementaria). Desactivar NUNCA modifica `estado` — solo oculta el
+  // badge de estado en la UI y hace que esta asignación deje de contar
+  // para tareaCubierta(), aunque su estado siga siendo "recibido"/etc.
+  activada: boolean;
+}
+
+// M1 — tablero de tareas del PIP heredado de F2
+export interface TareaPIP {
+  numero: number; // vínculo a PIPItem.numero
+  asignaciones: AsignacionCanal[];
+}
+
+// M3 — vacío residual con destino ya determinado
+export interface VacioResidual {
+  numero: number; // PIPItem.numero no cubierto por ningún canal
+  // Presente solo cuando el vacío es de una asignación COMPLEMENTARIA
+  // específica cuya tarea, en conjunto, sí está cubierta por su primaria —
+  // ausente cuando el vacío es de la tarea completa (ninguna asignación
+  // resuelta). Ver lib/moddulo/f3Suficiencia.ts.
+  asignacionId?: string;
+  pregunta: string;
+  urgencia: "alta" | "media" | "baja";
+  // alta urgencia + resolución pendiente → RDA; naturaleza continua o baja
+  // resolución → SIP (Sistema de Investigación Permanente).
+  destino: "RDA" | "SIP";
+}
+
+export interface FODAInsumo {
+  fortalezas: string[];
+  oportunidades: string[];
+  debilidades: string[];
+  amenazas: string[];
+}
+
+export interface SintesisF3 {
+  convergencias: string[];
+  contradicciones: string[];
+  vaciosResiduales: VacioResidual[];
+  fodaPropioInsumo: FODAInsumo;
+  fodaAdversariosInsumo: Record<string, FODAInsumo>; // key = nombre del actor (Semáforo de Veto)
+}
+
+// M4
+export interface VeredictoHEI {
+  resultado: "validada" | "ajustada" | "refutada";
+  contraste: string;
+  argumentacion: string;
+  premisaResultante: string;
+  aprobadoPorUsuario: boolean;
+}
+
+// Snapshot final del DIE — análogo a `dvs` en PhaseState, se genera al
+// aprobar el Veredicto HEI (mismo momento que finalize-dvs en F2).
+export interface DIE {
+  sintesisPorDimension: SintesisF3;
+  tableroTareasPIP: TareaPIP[];
+  veredictoHEI: VeredictoHEI;
+  // RDA e IAI del DIE se leen en vivo de project.rda / IAI (fuera de
+  // alcance) al renderizar el reporte — no se duplican en el snapshot.
 }
 
 // ==========================================

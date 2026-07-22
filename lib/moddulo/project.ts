@@ -10,10 +10,54 @@ import type {
   PhaseStatus,
   XPCTO,
   LinkedSourceRef,
+  TareaPIP,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
 const COLLECTION = "moddulo_projects";
+
+// Forma de TareaPIP anterior al rediseño de multi-asignación (un solo canal
+// por tarea, campos planos en vez de asignaciones[]). Proyectos reales
+// creados antes de ese cambio siguen así en Firestore — normalizeTareaPIP
+// los reacomoda al leer, sin fabricar datos: reconstruye una única
+// asignación primaria a partir de los campos planos que sí existen.
+interface LegacyTareaPIP {
+  numero: number;
+  canalAsignado?: "canal1" | "canal2" | "canal3";
+  tecnicaId?: string;
+  estado?: "pendiente" | "en_curso" | "recibido" | "derivado";
+  justificacion?: string;
+  resultadoId?: string;
+  asignaciones?: TareaPIP["asignaciones"];
+}
+
+function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
+  if (Array.isArray(t.asignaciones)) {
+    // Defensivo: asignaciones de antes de la Ronda 5 (activar/desactivar
+    // por asignación) no traen el campo `activada` — se normaliza a `true`
+    // (mismo criterio que el resto de este archivo: nunca fabricar un
+    // valor con significado, solo el default seguro).
+    return {
+      numero: t.numero,
+      asignaciones: t.asignaciones.map((a) => ({ ...a, activada: a.activada ?? true })),
+    };
+  }
+  return {
+    numero: t.numero,
+    asignaciones: [
+      {
+        asignacionId: `${t.numero}-0`,
+        tipo: "primaria",
+        canal: t.canalAsignado ?? "canal2",
+        ...(t.tecnicaId ? { tecnicaId: t.tecnicaId as TareaPIP["asignaciones"][number]["tecnicaId"] } : {}),
+        justificacion: t.justificacion ?? "",
+        estado: t.estado ?? "pendiente",
+        ...(t.resultadoId ? { resultadoId: t.resultadoId } : {}),
+        activada: true,
+      },
+    ],
+  };
+}
 
 // ==========================================
 // ESTADO INICIAL DE UNA FASE
@@ -146,6 +190,15 @@ export async function getProject(
   await snap.ref.update({ lastAccessedAt: FieldValue.serverTimestamp() });
 
   const { id: _id, ...rest } = data as ModduloProject & { id?: string };
+
+  // Normaliza f3TareasPIP heredado del esquema anterior (un canal por
+  // tarea) al esquema actual (asignaciones[]) — proyectos reales creados
+  // antes del rediseño de F3 siguen con el formato viejo en Firestore.
+  const f3Tareas = rest.phases?.investigacion?.f3TareasPIP as unknown as LegacyTareaPIP[] | undefined;
+  if (Array.isArray(f3Tareas)) {
+    rest.phases.investigacion.f3TareasPIP = f3Tareas.map(normalizeTareaPIP);
+  }
+
   return { id: snap.id, ...rest };
 }
 

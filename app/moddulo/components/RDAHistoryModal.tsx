@@ -100,13 +100,20 @@ export default function RDAHistoryModal({
               <div className="space-y-3">
                 {items.map((item) => {
                   const isAceptado = item.estado === "aceptado";
+                  // Las asignaciones desactivadas por el usuario en F3 ya
+                  // vienen decididas — no pasan por el flujo normal de
+                  // "Aceptar como condición" (estado se mantiene "activo"
+                  // para que rda.ts las auto-resuelva solas al reactivar la
+                  // vía, pero visualmente se muestran como ya resueltas).
+                  const isAutoAceptado = item.aceptadoAutomaticamente === true;
+                  const mostrarComoAceptado = isAceptado || isAutoAceptado;
                   const dims = getVinculacionPESTEL(item.criterioId);
                   const { nombre, descripcion, recomendacion } = getDisplayTextForRDAItem(item);
                   return (
                     <div
                       key={item.id}
                       className={`rounded-lg border p-4 ${
-                        isAceptado
+                        mostrarComoAceptado
                           ? "border-gray-eske-30 bg-gray-eske-10/50 dark:border-white/10 dark:bg-white/5"
                           : item.nivelImpacto === "prioritario"
                             ? "border-red-eske/30 bg-red-eske/5"
@@ -115,15 +122,15 @@ export default function RDAHistoryModal({
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <p className={`text-xs font-bold ${
-                          isAceptado
+                          mostrarComoAceptado
                             ? "text-black-eske-80 dark:text-[#9AAEBE]"
                             : item.nivelImpacto === "prioritario" ? "text-red-eske" : "text-purple-700 dark:text-yellow-eske"
                         }`}>
                           {nombre}
                         </p>
-                        {isAceptado && (
+                        {mostrarComoAceptado && (
                           <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-eske-20 text-black-eske-80 dark:bg-white/10 dark:text-[#C7D6E0] shrink-0">
-                            Aceptado como condición
+                            {isAutoAceptado ? "Aceptado automáticamente" : "Aceptado como condición"}
                           </span>
                         )}
                       </div>
@@ -138,7 +145,7 @@ export default function RDAHistoryModal({
                           Dimensiones PESTEL más afectadas: {dims.map((d) => DIMENSION_LABEL_ES[d] ?? d).join(", ")}
                         </p>
                       )}
-                      {!isAceptado && (
+                      {!mostrarComoAceptado && (
                         <button
                           onClick={() => setAcceptingId(item.id)}
                           className="mt-1 text-xs font-medium text-bluegreen-eske underline hover:text-bluegreen-eske-60 dark:text-[#6BA4C6]"

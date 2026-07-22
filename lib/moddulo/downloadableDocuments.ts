@@ -32,7 +32,10 @@ export const PHASE_DOWNLOADABLE_DOCS: Partial<Record<PhaseId, DownloadableDocCon
     { id: "reporte", label: "Reporte F2 - Exploratorio", formats: ["md", "pdf", "docx"] },
     { id: "pestel", label: "Análisis PESTEL", formats: ["md", "pdf", "docx"] },
   ],
-  // investigacion..evaluacion: se definen conforme se desarrolle cada fase.
+  investigacion: [
+    { id: "reporte", label: "Reporte F3 - Investigación", formats: ["md", "pdf", "docx"] },
+  ],
+  // exploracion..evaluacion restantes: se definen conforme se desarrolle cada fase.
 };
 
 export const DOWNLOAD_FORMAT_LABEL: Record<DownloadFormat, string> = {

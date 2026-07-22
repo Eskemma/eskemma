@@ -11,7 +11,12 @@ import type {
   XPCTO,
   DVSF2,
   MapaPESTEL,
+  PIPItem,
+  TareaPIP,
+  SintesisF3,
+  VeredictoHEI,
 } from "@/types/moddulo.types";
+import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 
 // ─────────────────────────────────────────────────────────────
 // F1 — Historial del chat
@@ -182,6 +187,63 @@ export function formatPestelAnalysis(mapaPESTEL: MapaPESTEL): string {
 
   if (missing.length > 0) {
     sections.push("---", "", `_(Dimensiones no generadas aún: ${missing.join(", ")})_`, "");
+  }
+
+  return sections.join("\n") + "\n";
+}
+
+// ─────────────────────────────────────────────────────────────
+// F3 — Reporte de Investigación (tablero de tareas + síntesis + veredicto)
+// ─────────────────────────────────────────────────────────────
+
+export function formatF3Report(
+  pip: PIPItem[],
+  tareas: TareaPIP[],
+  sintesis: SintesisF3 | undefined,
+  veredicto: VeredictoHEI | undefined
+): string {
+  const sections: string[] = ["# Reporte F3 — Investigación", ""];
+
+  sections.push("## M1 · Tablero de tareas");
+  if (tareas.length > 0) {
+    for (const t of tareas) {
+      const item = pip.find((p) => p.numero === t.numero);
+      sections.push(`### P${t.numero} — ${item?.pregunta ?? "Necesidad de información"}`);
+      // Defensivo: tareas/sintesis pueden llegar aquí sin pasar por
+      // normalizeTareaPIP() de getProject() (ej. datos legacy o de una
+      // respuesta parcial de Claude) — no debe tronar la descarga del
+      // reporte, mismo criterio que en los componentes de UI.
+      for (const a of t.asignaciones ?? []) {
+        sections.push(`- **${asignacionEtiquetaCompleta(a)}** — ${a.estado}. ${a.justificacion}`);
+      }
+      sections.push("");
+    }
+  } else {
+    sections.push("_(Sección pendiente — motor M1 no generado aún)_", "");
+  }
+
+  sections.push("## M3 · Síntesis de hallazgos");
+  if (sintesis) {
+    const convergencias = sintesis.convergencias ?? [];
+    const contradicciones = sintesis.contradicciones ?? [];
+    const vaciosResiduales = sintesis.vaciosResiduales ?? [];
+    if (convergencias.length) sections.push("**Convergencias:**", ...convergencias.map((c) => `- ${c}`), "");
+    if (contradicciones.length) sections.push("**Contradicciones:**", ...contradicciones.map((c) => `- ${c}`), "");
+    if (vaciosResiduales.length) {
+      sections.push("**Vacíos residuales:**");
+      for (const v of vaciosResiduales) sections.push(`- P${v.numero} — ${v.pregunta} (urgencia: ${v.urgencia}, destino: ${v.destino})`);
+      sections.push("");
+    }
+  } else {
+    sections.push("_(Sección pendiente — motor M3 no generado aún)_", "");
+  }
+
+  sections.push("## M4 · Veredicto sobre la Hipótesis Estratégica Inicial (HEI)");
+  if (veredicto) {
+    sections.push(`**Resultado:** ${veredicto.resultado}`, "", veredicto.contraste, "", veredicto.argumentacion, "");
+    if (veredicto.premisaResultante) sections.push(`**Premisa resultante:** ${veredicto.premisaResultante}`, "");
+  } else {
+    sections.push("_(Sección pendiente — motor M4 no generado aún)_", "");
   }
 
   return sections.join("\n") + "\n";

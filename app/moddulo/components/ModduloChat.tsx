@@ -58,10 +58,28 @@ export default function ModduloChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Scroll interno al contenedor — nunca afecta el documento
+  // Scroll interno al contenedor — nunca afecta el documento. Al ENTRAR a la
+  // vista del chat, el usuario debe ver el inicio del texto (ej. el mensaje
+  // de bienvenida completo empieza por "Fase 3 — Investigación...") — solo a
+  // partir de la primera interacción real (nuevo mensaje/streaming) tiene
+  // sentido bajar automáticamente al final para seguir la conversación.
+  //
+  // El efecto corre dos veces al montar con mensajes vacíos (initialMessages
+  // === []): primero con messages=[], y de nuevo cuando el efecto de abajo
+  // inserta el mensaje de bienvenida. Si "primera vez" se consumiera en la
+  // corrida vacía, la corrida real (con contenido) ya caería al scroll-to-
+  // bottom por defecto — por eso el flag solo se consume cuando ya hay
+  // mensajes que mostrar.
+  const isFirstScrollRef = useRef(true);
   useEffect(() => {
     const el = scrollContainerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el || messages.length === 0) return;
+    if (isFirstScrollRef.current) {
+      isFirstScrollRef.current = false;
+      el.scrollTop = 0;
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
   }, [messages, streamingContent]);
 
   useEffect(() => {
@@ -478,7 +496,7 @@ function getWelcomeMessage(phaseId: PhaseId): string {
   const welcomes: Record<PhaseId, string> = {
     proposito: "Bienvenido a la **Fase 1 — Propósito**. Aquí vamos a definir el ADN de tu proyecto mediante las variables XPCTO.\n\nEmpecemos por lo más importante: ¿cuál es el **Hito (X)** de este proyecto? Es decir, ¿qué resultado concreto, específico y medible buscas lograr?",
     exploracion: "Estamos en la Fase 2 — Exploración. Aquí realizaremos el escaneo situacional del entorno de tu proyecto para contrastar el contexto real con las variables XPCTO que ya definimos.\n\nTienes dos vías para este análisis:\n\n**Análisis de contexto express** — Yo propongo el escaneo PESTEL directamente aquí en F2, a partir del Propósito que ya definimos. Si tienes documentos, estudios o reportes sobre el entorno —encuestas, notas de campo, análisis previos— puedes adjuntarlos aquí o pegar el texto en el chat para enriquecer el análisis.\n\n**Análisis PESTEL** — Usa la app PESTEL de Centinela: configurarás las variables con pesos, agregarás fuentes de datos y obtendrás interpretación, informes y monitoreo continuo. Si compartes documentos aquí primero, PESTEL los recuperará automáticamente.\n\n¿Con qué información cuentas y cuál vía prefieres?",
-    investigacion: "**Fase 3 — Investigación**. Es el momento de trabajar con los datos de campo.\n\n¿Cuáles son los principales hallazgos de la investigación que ya tienes disponible?",
+    investigacion: "Fase 3 — Investigación. Voy a traducir el Programa de Investigación Profunda (PIP) heredado de F2 en un tablero de tareas concretas. Para cada pregunta  te propondré el canal más adecuado: activar una app del ecosistema, pedirte que cargues un documento o vincular alguna herramienta que ya usaste por tu cuenta.\n\nAbre \"Ver tablero\" cuando quieras revisar las tareas propuestas y aprobar cada asignación. Aquí, en en el chat, te avisaré conforme lleguen resultados nuevos.\n\nSi durante la investigación identificas que falta agregar alguna pregunta en el PIP, regresa a F2-Exploración, usa \"Editar análisis\" y el botón \"Añadir pregunta\" al final del Reporte F2. Esa pregunta nueva no se propaga automáticamente al tablero de F3 todavía, así que tendrás que revisar manualmente si conviene incorporarla aquí.",
     diagnostico: "Estamos en la **Fase 4 — Diagnóstico**. Transformamos la inteligencia en un dictamen de viabilidad.\n\n¿Cómo caracterizarías el entorno actual del proyecto: de **Continuidad**, **Ruptura**, **Terciopelo** o **Caos**?",
     estrategia: "**Fase 5 — Diseño Estratégico**. La inteligencia se convierte en narrativa.\n\n¿Cuál es la propuesta de valor única que diferencia a este proyecto de sus competidores?",
     tactica: "**Fase 6 — Diseño Táctico**. La estrategia se convierte en planes de acción concretos.\n\n¿Cuál frente debe recibir la mayor atención: **Aire** (medios), **Tierra** (territorial) o **Agua** (digital)?",

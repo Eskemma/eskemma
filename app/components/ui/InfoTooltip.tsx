@@ -119,7 +119,7 @@ export default function InfoTooltip({
   const tooltipId = `tooltip-${Math.random().toString(36).slice(2, 8)}`;
 
   return (
-    <span ref={containerRef} className={`relative inline-flex ${className}`}>
+    <span ref={containerRef} className={`relative inline-flex normal-case font-normal ${className}`}>
       <button
         ref={buttonRef}
         type="button"
@@ -159,9 +159,16 @@ export default function InfoTooltip({
             maxWidth: "calc(100vw - 24px)",
           }}
         >
-          <p className="text-xs text-black-eske dark:text-[#C7D6E0] leading-relaxed">{content}</p>
+          {/* Estilo idéntico al texto de la HEI en F3Tablero.tsx (referencia
+              de diseño para todo tooltip del sistema): mismo tamaño
+              (text-xs lg:text-sm), mismo color (text-black-eske-80 /
+              dark:text-[#C5D8E8] — no text-black-eske ni otro hex, aunque
+              se vean casi iguales) y sin leading-relaxed (la HEI no fuerza
+              ningún leading-*, así que usa el companion line-height por
+              defecto de Tailwind para su tamaño). */}
+          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{content}</p>
           {example && (
-            <p className="text-xs text-gray-eske-60 dark:text-[#6D8294] italic border-t border-gray-eske-10 dark:border-white/10 pt-1.5">
+            <p className="text-xs lg:text-sm text-gray-eske-60 dark:text-[#6D8294] italic border-t border-gray-eske-10 dark:border-white/10 pt-1.5">
               <span className="not-italic font-medium text-gray-eske-70 dark:text-[#9AAEBE]">
                 Ej:{" "}
               </span>

@@ -201,6 +201,16 @@
     box-sizing: border-box;
   }
 
+  /* Los navegadores no ponen cursor:pointer en <button> por defecto (solo en
+     <a href>, y ni siquiera siempre) — sin esto, cualquier botón nativo
+     muestra la flecha normal en vez de la manita, en todo el sitio. Excluye
+     explícitamente los deshabilitados para no pelear con las utilidades
+     disabled:cursor-not-allowed ya usadas en varios componentes. */
+  button:not(:disabled),
+  a[href] {
+    cursor: pointer;
+  }
+
   *,
   *:before,
   *:after {

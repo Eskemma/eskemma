@@ -12,12 +12,18 @@ import {
   getCriterioDVSDescripcion,
   getRecomendacionDVS,
 } from "@/lib/moddulo/dvs-criteria";
+import {
+  evaluarCriteriosInvestigacion,
+  vacioResidualToRDAItem,
+  evaluarDesactivaciones,
+  asignacionDesactivadaToRDAItem,
+} from "@/lib/moddulo/criterios-investigacion";
 import type { PhaseId, ModduloProject, RDAItem } from "@/types/moddulo.types";
 
-// Fases con evaluador de criterios implementado. F3+ no tiene evaluador
+// Fases con evaluador de criterios implementado. F4+ no tiene evaluador
 // todavía — se agregan aquí cuando exista, sin tocar el resto de este
 // archivo.
-const FASES_CON_EVALUADOR: PhaseId[] = ["proposito", "exploracion"];
+const FASES_CON_EVALUADOR: PhaseId[] = ["proposito", "exploracion", "investigacion"];
 
 type ProjectForRDA = Pick<ModduloProject, "xpcto" | "phases" | "type" | "rda">;
 
@@ -43,6 +49,20 @@ function computeRDAItemsParaFase(
     const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload;
     const criterios = evaluarCriteriosDVS(dvs, mapaPESTEL, project.type);
     return criterios.filter((c) => !c.satisfecho).map(criterioDVSToRDAItem);
+  }
+  if (phaseId === "investigacion") {
+    const sintesis = project.phases?.investigacion?.f3Sintesis;
+    const tareas = project.phases?.investigacion?.f3TareasPIP;
+    const vacios = evaluarCriteriosInvestigacion(sintesis);
+    // Las desactivaciones se evalúan independientemente de si ya hay
+    // síntesis (M3) — un usuario puede desactivar una vía en M1 antes de
+    // llegar a M3, y esa trazabilidad no debe esperar a que exista síntesis.
+    const desactivaciones = evaluarDesactivaciones(tareas);
+    if (vacios === null && desactivaciones === null) return null;
+    return [
+      ...(vacios ?? []).map(vacioResidualToRDAItem),
+      ...(desactivaciones ?? []).map(asignacionDesactivadaToRDAItem),
+    ];
   }
   return null;
 }

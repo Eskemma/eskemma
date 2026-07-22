@@ -11,7 +11,6 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
-import { FAMILIA_METODOLOGICA_POR_TECNICA } from "@/types/f3.types";
 import type { MetadatosCargaManual, ResultadoCargaManual } from "@/types/f3.types";
 import type { CoberturaDeclarada } from "@/types/shared.types";
 
@@ -65,14 +64,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // familiaMetodologica: única fuente de verdad es el catálogo cuando el
-  // método es una técnica del MMEE — se ignora lo que mande el cliente para
-  // ese caso, igual que NOMBRES_COMERCIALES.
-  const familiaMetodologica =
-    "tecnicaId" in metadatosCarga.metodoUtilizado
-      ? FAMILIA_METODOLOGICA_POR_TECNICA[metadatosCarga.metodoUtilizado.tecnicaId]
-      : metadatosCarga.familiaMetodologica;
-
+  // Canal 2 es texto libre (tecnicaDescrita) — no hay catálogo que resolver
+  // aquí, familiaMetodologica es declarativa: se persiste tal como la manda
+  // el cliente (sugerida por sugerirFamiliaMetodologica(), editable por el usuario).
   const extractoTexto = await extractTextPerFile({ nombre, tipo, url: "", storagePath });
 
   const resultado: ResultadoCargaManual = {
@@ -85,7 +79,7 @@ export async function POST(request: NextRequest) {
     },
     cobertura,
     payload: { archivoUrl: storagePath, extractoTexto },
-    metadatosCarga: { ...metadatosCarga, familiaMetodologica },
+    metadatosCarga,
   };
 
   await adminDb

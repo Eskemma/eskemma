@@ -32,6 +32,10 @@ export interface ResultadoF3<TPayload = unknown> {
   origen: OrigenTrazabilidad;
   cobertura: CoberturaDeclarada;
   payload: TPayload;
+  // M2 — aprobación explícita del usuario antes de que el resultado entre
+  // a la síntesis (M3). Se hereda a ResultadoCargaManual/ResultadoFuenteExterna.
+  aprobado?: boolean;
+  notasUsuario?: string;
 }
 
 export interface AppContractConfig {
@@ -51,14 +55,20 @@ export const APP_TO_F3_CONTRACTS: Partial<Record<TecnicaId, AppContractConfig>> 
 
 export type FamiliaMetodologica = "cuantitativa" | "cualitativa" | "documental" | "mixta";
 
+// Canal 3 sigue usando MetodoUtilizado (tecnicaId del catálogo MMEE | otro) —
+// ahí sí aplica, es una herramienta del ecosistema usada de forma
+// independiente. Canal 2 (carga manual) usa tecnicaDescrita (texto libre) en
+// MetadatosCargaManual — no aplica el catálogo, es contenido fuera del ecosistema.
 export type MetodoUtilizado = { tecnicaId: TecnicaId } | { otro: string };
 
 export interface MetadatosCargaManual {
   fuente: string;
   fechaObtencion: string; // ISO — cuándo se obtuvo el dato originalmente, no cuándo se sube
-  metodoUtilizado: MetodoUtilizado;
-  // auto-poblada si metodoUtilizado es tecnicaId (vía
-  // FAMILIA_METODOLOGICA_POR_TECNICA); capturada del usuario si es 'otro'.
+  // Texto libre (ej. "Entrevista a profundidad", "Encuesta telefónica
+  // propia") — sin autocompletado contra el catálogo MMEE, no aplica aquí.
+  tecnicaDescrita: string;
+  // Sugerida por lib/moddulo/sugerirFamiliaMetodologica() a partir de
+  // tecnicaDescrita, editable por el usuario — declarativa, no verificada.
   familiaMetodologica: FamiliaMetodologica;
   formato: "documento" | "audio" | "video" | "imagen" | "texto";
   viaAcademy?: boolean;
@@ -109,5 +119,47 @@ export interface ResultadoFuenteExterna<TPayload = { archivoUrl: string; extract
   // Evaluación que justificó el vínculo, conservada por trazabilidad.
   compatibilidad: EvaluacionCompatibilidad;
 }
+
+// Títulos cortos de las 35 técnicas del MMEE (docs/specs/MMEE_v2_0.md,
+// Sección 2) — usado por el prompt de M1 (tareas/generar) para evaluar el
+// catálogo completo, no solo las técnicas con contrato poblado en
+// APP_TO_F3_CONTRACTS. Extraído textualmente del documento, no inventado.
+export const TECNICA_TITULOS: Record<TecnicaId, string> = {
+  T01: "Encuesta de opinión pública (cara a cara)",
+  T02: "Encuesta telefónica / CATI",
+  T03: "Encuesta en línea / CAWI",
+  T04: "Sondeo rápido de salida (exit poll)",
+  T05: "Panel de seguimiento transversal",
+  T06: "Investigación de electorado",
+  T07: "Monitoreo de métricas digitales",
+  T08: "Análisis de encuadre mediático (framing cuantitativo)",
+  T09: "Registro y conteo de eventos",
+  T10: "Análisis de datos abiertos",
+  T11: "Grupo focal (focus group)",
+  T12: "Entrevista en profundidad",
+  T13: "Entrevista a expertos (Delphi simplificado)",
+  T14: "Observación participante / etnografía política",
+  T15: "Análisis de discurso político",
+  T16: "Análisis de narrativas mediáticas",
+  T17: "Análisis de sentimiento en redes sociales",
+  T18: "Mapeo de actores y grupos de interés (mapa de poder real)",
+  T19: "FODA participativo",
+  T20: "Análisis de agenda setting",
+  T21: "Análisis interno del sujeto P",
+  T22: "Análisis PESTEL profundo",
+  T23: "Revisión hemerográfica sistematizada",
+  T24: "Mapeo de red de alianzas, multiplicadores y recursos disponibles",
+  T25: "Benchmarking de campañas y proyectos similares",
+  T26: "Análisis documental por tipo de proyecto",
+  T27: "Evaluación de viabilidad financiera del proyecto",
+  T28: "Investigación acción participativa (IAP)",
+  T29: "Inventario de recursos internos",
+  T30: "Investigación de medios",
+  T31: "Psicografía y segmentación estratégica de audiencias",
+  T32: "Análisis de necesidades por segmento",
+  T33: "Microsegmentación: nichos, clústeres y segmentos meta",
+  T34: "Monitoreo de medios (continuo)",
+  T35: "Seguimiento de autoridades",
+};
 
 export type { TecnicaId, AppSourceKind };
