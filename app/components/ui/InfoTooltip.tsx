@@ -17,6 +17,12 @@ export interface InfoTooltipProps {
   content: string;
   /** Optional short example to illustrate (shown after content) */
   example?: string;
+  /**
+   * Optional source citation (e.g. "INEGI, Censo 2020, vía ECEG"), shown
+   * in italics at a smaller size than content — distinct from `example`
+   * (which renders a hardcoded "Ej:" label; not appropriate for a source).
+   */
+  fuente?: string;
   /** Additional CSS classes for the trigger button */
   className?: string;
   /**
@@ -32,6 +38,7 @@ const VIEWPORT_PADDING = 12;
 export default function InfoTooltip({
   content,
   example,
+  fuente,
   className = "",
   placement = "right",
 }: InfoTooltipProps) {
@@ -167,6 +174,9 @@ export default function InfoTooltip({
               ningún leading-*, así que usa el companion line-height por
               defecto de Tailwind para su tamaño). */}
           <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{content}</p>
+          {fuente && (
+            <p className="text-[10px] lg:text-[12px] italic text-gray-eske-60 dark:text-[#6D8294]">{fuente}</p>
+          )}
           {example && (
             <p className="text-xs lg:text-sm text-gray-eske-60 dark:text-[#6D8294] italic border-t border-gray-eske-10 dark:border-white/10 pt-1.5">
               <span className="not-italic font-medium text-gray-eske-70 dark:text-[#9AAEBE]">

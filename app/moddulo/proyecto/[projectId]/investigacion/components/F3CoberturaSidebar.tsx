@@ -8,8 +8,14 @@ import type { TareaPIP, SintesisF3, PIPItem, AsignacionCanal } from "@/types/mod
 import { tareaCubierta } from "@/lib/moddulo/f3Suficiencia";
 import { asignacionNombreCorto, asignacionPrefijoCorto } from "@/lib/moddulo/asignacionLabel";
 
-function asignacionHref(a: AsignacionCanal): string | undefined {
-  return a.canal === "canal1" && a.tecnicaId ? `/ecosistema/${a.tecnicaId}` : undefined;
+// Solo T10 (Fontana) tiene una ruta real de navegación en este incremento
+// — mismo patrón que F3TareasPIP.tsx (Paso 5, Fontana). "/ecosistema/{id}"
+// no existe en el proyecto; no se usa como fallback genérico. `estadoApp`
+// ya llega recalculado en vivo desde getProject() (lib/moddulo/project.ts),
+// nunca es un valor congelado del momento de generación del tablero.
+function asignacionHref(a: AsignacionCanal, projectId: string, tareaNumero: number): string | undefined {
+  if (a.canal !== "canal1" || a.tecnicaId !== "T10" || a.estadoApp !== "disponible") return undefined;
+  return `/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tareaNumero}`;
 }
 
 // Mismo esquema de 3 colores que ESTADO_COLORS en F3TareasPIP.tsx: naranja
@@ -29,10 +35,11 @@ function semaforo(t: TareaPIP, sintesis: SintesisF3 | undefined): { icon: string
   return { icon: "🟠", label: "Pendiente" };
 }
 
-export default function F3CoberturaSidebar({ pip, tareas, sintesis }: {
+export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }: {
   pip: PIPItem[];
   tareas: TareaPIP[];
   sintesis: SintesisF3 | undefined;
+  projectId: string;
 }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
@@ -56,7 +63,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis }: {
                     <span className="block mt-0.5 space-y-0.5">
                       {(t.asignaciones ?? []).map((a) => {
                         const nombre = asignacionNombreCorto(a);
-                        const href = asignacionHref(a);
+                        const href = asignacionHref(a, projectId, t.numero);
                         const prefijo = asignacionPrefijoCorto(a);
                         // Desactivada: burbuja y texto en gris neutro, sin
                         // mostrar la palabra de estado real aunque exista

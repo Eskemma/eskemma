@@ -38,16 +38,50 @@ export interface ResultadoF3<TPayload = unknown> {
   notasUsuario?: string;
 }
 
+// Subconjunto deliberado de OrigenTrazabilidad["componente"]: solo las apps
+// del ecosistema que pueden tener un contrato real con F3 (Canal 1). Excluye
+// a propósito "external" | "moddulo" | "manual" — esos son orígenes sin app
+// con contrato (carga manual, vínculo Canal 3, generado dentro de Moddulo),
+// no aplican aquí. Derivado por Extract, no copiado como union literal
+// aparte, para que un valor nuevo en OrigenTrazabilidad no quede
+// desincronizado en silencio — mismo patrón que LinkedSourceRef.componente
+// en moddulo.types.ts.
+export type AppConContrato = Extract<
+  OrigenTrazabilidad["componente"],
+  "sefix" | "centinela" | "recursos"
+>;
+
 export interface AppContractConfig {
   tecnicaId: TecnicaId;
-  componente: "sefix" | "centinela" | "recursos";
+  componente: AppConContrato;
   pipModulos: string[];
   deliveryMechanism: "api-push" | "link-manual";
   payloadSchema?: string;
 }
 
-// Vacío por ahora — se puebla conforme cada técnica se construya.
-export const APP_TO_F3_CONTRACTS: Partial<Record<TecnicaId, AppContractConfig>> = {};
+// Se puebla conforme cada técnica se construya. T10 (Fontana) es la
+// primera entrada real — Paso 5, incremento Familia 1 vía ECEG. Habilita
+// estadoApp: "disponible" en tareas/generar/route.ts para asignaciones
+// canal1+T10, lo que a su vez activa la navegación real hacia Fontana en
+// F3TareasPIP.tsx. deliveryMechanism: "api-push" está declarado por
+// contrato (Arquitectura Paso3 v2, §4) pero el endpoint de entrega
+// (/api/moddulo/f3/canal1/entregar) todavía no existe — queda para un
+// incremento posterior.
+export const APP_TO_F3_CONTRACTS: Partial<Record<TecnicaId, AppContractConfig>> = {
+  T10: {
+    tecnicaId: "T10",
+    componente: "centinela",
+    pipModulos: [
+      "contexto_pestel_social",
+      "contexto_pestel_economico",
+      "contexto_pestel_politico",
+      "contexto_pestel_ecologico",
+      "contexto_pestel_tecnologico",
+    ],
+    deliveryMechanism: "api-push",
+    payloadSchema: "FontanaContextoTerritorial",
+  },
+};
 
 // ==========================================
 // CANAL 2 — CARGA MANUAL

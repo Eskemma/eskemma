@@ -437,6 +437,24 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ========== FONTANA: Sesiones (T10) ==========
+    // Colección raíz, no anidada bajo moddulo_projects — una sesión puede
+    // existir sin proyecto (escenarios b/c de uso independiente). uid es
+    // el dueño; modduloProjectId es opcional y, cuando está presente, se
+    // valida cruzado contra moddulo_projects.userId (NO .uid — ese campo
+    // no existe en moddulo_projects, ver types/moddulo.types.ts).
+    match /fontana_sesiones/{sesionId} {
+      allow read, update, delete: if request.auth != null
+                                   && request.auth.uid == resource.data.uid;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.uid
+                    && (
+                         !("modduloProjectId" in request.resource.data)
+                         || get(/databases/$(database)/documents/moddulo_projects/$(request.resource.data.modduloProjectId)).data.userId == request.auth.uid
+                       );
+    }
+
     // ========== Cola de Emails (Firebase Extension: Trigger Email) ==========
     match /mail/{mailId} {
       allow read, write: if false;

@@ -11,10 +11,32 @@ import type {
   XPCTO,
   LinkedSourceRef,
   TareaPIP,
+  AsignacionCanal,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
+import { APP_TO_F3_CONTRACTS } from "@/types/f3.types";
+import type { TecnicaId } from "@/types/shared.types";
 
 const COLLECTION = "moddulo_projects";
+
+// estadoApp de una asignación canal1 se calculó una sola vez, al generar
+// el tablero (tareas/generar/route.ts), contra el APP_TO_F3_CONTRACTS
+// vigente EN ESE MOMENTO — y quedó persistido en Firestore. Como
+// APP_TO_F3_CONTRACTS crece con el tiempo (cada app nueva que completa su
+// desarrollo), un tablero generado antes de que una técnica se agregue
+// queda con estadoApp: "proximamente" para siempre si se confía en el
+// valor guardado. Se recalcula aquí, en cada lectura, contra el registro
+// ACTUAL — mismo criterio que el resto de esta función (nunca fabricar un
+// valor con significado, pero tampoco confiar en un snapshot congelado
+// cuando la fuente de verdad puede haber cambiado desde entonces). Bug
+// real detectado en producción con Fontana (T10) — primera app en poblar
+// APP_TO_F3_CONTRACTS después de que existieran tableros ya generados;
+// aplica igual a cualquiera de las 34 técnicas restantes del catálogo.
+function recalcularEstadoApp(a: AsignacionCanal): AsignacionCanal {
+  if (a.canal !== "canal1" || !a.tecnicaId) return a;
+  const estadoApp = APP_TO_F3_CONTRACTS[a.tecnicaId as TecnicaId] ? "disponible" : "proximamente";
+  return { ...a, estadoApp };
+}
 
 // Forma de TareaPIP anterior al rediseño de multi-asignación (un solo canal
 // por tarea, campos planos en vez de asignaciones[]). Proyectos reales
@@ -39,13 +61,13 @@ function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
     // valor con significado, solo el default seguro).
     return {
       numero: t.numero,
-      asignaciones: t.asignaciones.map((a) => ({ ...a, activada: a.activada ?? true })),
+      asignaciones: t.asignaciones.map((a) => recalcularEstadoApp({ ...a, activada: a.activada ?? true })),
     };
   }
   return {
     numero: t.numero,
     asignaciones: [
-      {
+      recalcularEstadoApp({
         asignacionId: `${t.numero}-0`,
         tipo: "primaria",
         canal: t.canalAsignado ?? "canal2",
@@ -54,7 +76,7 @@ function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
         estado: t.estado ?? "pendiente",
         ...(t.resultadoId ? { resultadoId: t.resultadoId } : {}),
         activada: true,
-      },
+      }),
     ],
   };
 }

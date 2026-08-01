@@ -24,7 +24,7 @@ export interface InegiDataPoint {
 export const INEGI_DEFAULT_SERIES = ["628229", "444612", "381016"];
 
 // IDs BISE verificados 2026-07-08 vía GET /INDICATOR/{id}/es/14/false/BISE/2.0/{TOKEN}
-// 1002000001 → pob. total: nacional 126,014,024 (2020), Jalisco 8,948,653 (area=14)
+// 1002000001 → pob. total: nacional 126,014,024 (2020), Jalisco 8,348,151 (area=14)
 // 1002000002 → pob. masculina (confirmado por magnitud, ~49% del total por entidad)
 // 1002000003 → pob. femenina  (confirmado por magnitud, ~51% del total por entidad)
 // Sistema censal: actualiza cada 5-10 años (Censo / Conteo de Población y Vivienda).

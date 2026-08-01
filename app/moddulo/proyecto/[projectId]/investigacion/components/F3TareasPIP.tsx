@@ -4,6 +4,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { uploadMedia } from "@/firebase/storageUtils";
 import type { TareaPIP, AsignacionCanal, PIPItem, ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FamiliaMetodologica } from "@/types/f3.types";
@@ -149,12 +150,23 @@ export default function F3TareasPIP({
 
                     {!readOnly && asig.estado !== "recibido" && (
                       <div className="mt-2">
-                        <PillButton
-                          onClick={() => setExpandedAsignacionId(expandedAsignacionId === asig.asignacionId ? null : asig.asignacionId)}
-                          className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20"
-                        >
-                          {asig.canal === "canal1" ? "Activar app" : asig.canal === "canal2" ? "Cargar archivo" : "Vincular fuente externa"}
-                        </PillButton>
+                        {asig.canal === "canal1" && asig.tecnicaId === "T10" && disponible ? (
+                          // Único destino real de Canal 1 hoy — navega directo,
+                          // no alterna el panel expandido (no hay nada que
+                          // expandir: la acción ES la navegación).
+                          <Link href={`/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tarea.numero}`}>
+                            <PillButton className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20">
+                              Activar app
+                            </PillButton>
+                          </Link>
+                        ) : (
+                          <PillButton
+                            onClick={() => setExpandedAsignacionId(expandedAsignacionId === asig.asignacionId ? null : asig.asignacionId)}
+                            className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20"
+                          >
+                            {asig.canal === "canal1" ? "Activar app" : asig.canal === "canal2" ? "Cargar archivo" : "Vincular fuente externa"}
+                          </PillButton>
+                        )}
                       </div>
                     )}
 
@@ -178,7 +190,7 @@ export default function F3TareasPIP({
                             onCancel={() => setExpandedAsignacionId(null)}
                           />
                         )}
-                        {asig.canal === "canal1" && (
+                        {asig.canal === "canal1" && !(asig.tecnicaId === "T10" && disponible) && (
                           <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
                             Activación de apps del ecosistema aún no está disponible como
                             integración automática — usa carga manual o vincula una herramienta externa mientras tanto.

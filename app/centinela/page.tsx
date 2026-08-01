@@ -59,6 +59,31 @@ const MONITOR_APPS: Array<{
     ),
   },
   {
+    name: "Fontana",
+    description:
+      "Datos abiertos institucionales de México — INEGI, CONEVAL, CONAPO y más — organizados en indicadores sociodemográficos, socioeconómicos, geopolíticos y territoriales listos para tu análisis.",
+    href: "/centinela/fontana",
+    available: true,
+    tag: "Nuevo",
+    accentColor: "#248cc1",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M3 3v18h18M8 17V10m5 7V6m5 11v-4"
+        />
+      </svg>
+    ),
+  },
+  {
     name: "Termómetro",
     description:
       "Mide el pulso de la opinión pública con encuestas automatizadas y análisis de sentimiento en redes sociales por territorio.",

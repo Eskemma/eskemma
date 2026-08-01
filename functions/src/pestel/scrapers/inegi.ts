@@ -24,7 +24,7 @@ export const INEGI_DEFAULT_SERIES = ["628229", "444612", "381016"];
 
 // IDs BISE verificados 2026-07-08
 // GET /INDICATOR/{id}/es/14/false/BISE/2.0/{TOKEN}
-// 1002000001 → pob. total: 126,014,024 nacional, 8,948,653 Jalisco
+// 1002000001 → pob. total: 126,014,024 nacional, 8,348,151 Jalisco
 // 1002000002 → pob. masculina (~49% del total por entidad)
 // 1002000003 → pob. femenina  (~51% del total por entidad)
 // Sistema censal: actualiza cada 5-10 años.

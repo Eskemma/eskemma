@@ -113,17 +113,43 @@ Responde ÚNICAMENTE con JSON: {"tareas": [{"numero": N, "asignaciones": [{"tipo
 
   // asignacionId, estadoApp y activada nunca se confían al modelo — se
   // calculan aquí, mismo criterio que familiaMetodologica/NOMBRES_COMERCIALES.
-  const tareas: TareaPIP[] = tareasClaude.map((t) => ({
-    numero: t.numero,
-    asignaciones: t.asignaciones.map((a, index) => ({
-      ...a,
-      asignacionId: `${t.numero}-${index}`,
-      activada: true,
-      ...(a.canal === "canal1" && a.tecnicaId
-        ? { estadoApp: APP_TO_F3_CONTRACTS[a.tecnicaId as TecnicaId] ? ("disponible" as const) : ("proximamente" as const) }
-        : {}),
-    })),
-  }));
+  //
+  // asignacionId se deriva del CONTENIDO de la asignación (pregunta + canal
+  // + vía), no de la posición en el arreglo — dos generaciones distintas del
+  // tablero que propongan la misma pregunta con la misma vía producen el
+  // mismo ID. Esto es lo que permitiría en el futuro tratar una regeneración
+  // como diff/merge en vez de reemplazo total (ver documento de diseño
+  // pendiente), y es la base de estabilidad que necesitaría un resultadoId
+  // determinístico de Canal 1 (ej. `canal1_${asignacionId}`). Colisión (dos
+  // asignaciones con mismo tipo/canal/técnica para la misma pregunta, caso
+  // no previsto por el prompt de arriba pero no imposible) se resuelve con
+  // un sufijo de desempate, sin sacrificar la estabilidad del caso común.
+  const tareas: TareaPIP[] = tareasClaude.map((t) => {
+    const idsUsados = new Set<string>();
+    return {
+      numero: t.numero,
+      asignaciones: t.asignaciones.map((a) => {
+        const base = `${t.numero}_${a.canal}_${a.tipo}${
+          a.canal === "canal1" && a.tecnicaId ? `_${a.tecnicaId}` : ""
+        }`;
+        let asignacionId = base;
+        let sufijo = 1;
+        while (idsUsados.has(asignacionId)) {
+          asignacionId = `${base}_${sufijo}`;
+          sufijo += 1;
+        }
+        idsUsados.add(asignacionId);
+        return {
+          ...a,
+          asignacionId,
+          activada: true,
+          ...(a.canal === "canal1" && a.tecnicaId
+            ? { estadoApp: APP_TO_F3_CONTRACTS[a.tecnicaId as TecnicaId] ? ("disponible" as const) : ("proximamente" as const) }
+            : {}),
+        };
+      }),
+    };
+  });
 
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.investigacion.f3TareasPIP": tareas,

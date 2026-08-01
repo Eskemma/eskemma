@@ -369,7 +369,7 @@ export default function InvestigacionPage() {
 
           <div className={`flex-col w-full lg:w-80 xl:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-gray-eske-20 dark:border-white/10 overflow-hidden bg-gray-eske-10/50 dark:bg-[#112230] ${mobileTab === "cobertura" ? "flex" : "hidden lg:flex"}`}>
             <ErrorBoundary fallbackLabel="Algo salió mal al mostrar la cobertura del PIP.">
-              <F3CoberturaSidebar pip={pip} tareas={tareas} sintesis={sintesis} />
+              <F3CoberturaSidebar pip={pip} tareas={tareas} sintesis={sintesis} projectId={projectId} />
             </ErrorBoundary>
           </div>
         </>)}
