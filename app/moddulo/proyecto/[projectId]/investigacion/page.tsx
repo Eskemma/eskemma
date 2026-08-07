@@ -12,6 +12,7 @@ import F3Onboarding from "./components/F3Onboarding";
 import F3Tablero from "./components/F3Tablero";
 import F3CoberturaSidebar from "./components/F3CoberturaSidebar";
 import F3ReporteDIE from "./components/F3ReporteDIE";
+import { detectPipStaleness, type PipCambio } from "@/lib/moddulo/pipPropagation";
 import type {
   ProjectType, Territorio, PIPItem, IncertidumbreF2, HEIF2, ActorVetoF2,
   TareaPIP, SintesisF3, VeredictoHEI, DIE, RDAItem, ChatMessage,
@@ -57,6 +58,15 @@ export default function InvestigacionPage() {
   const noticeInsertedRef = useRef(false);
 
   const [generandoTareas, setGenerandoTareas] = useState(false);
+  const [conflictoRegenerar, setConflictoRegenerar] = useState<{
+    mensaje: string;
+    resumen: { conResultadoAprobado: number; desactivadas: number; tareasAfectadas: { numero: number; pregunta: string; motivos: string[] }[] };
+  } | null>(null);
+  // Propagación PIP(F2)→tablero(F3) — detectada al cargar el proyecto,
+  // igual momento y patrón visual que detectForwardStaleness en
+  // exploracion/page.tsx (banner + confirmación explícita del usuario).
+  const [pipStaleChanges, setPipStaleChanges] = useState<PipCambio[]>([]);
+  const [sincronizandoPip, setSincronizandoPip] = useState(false);
   const [generandoSintesis, setGenerandoSintesis] = useState(false);
   const [generandoVeredicto, setGenerandoVeredicto] = useState(false);
   const [aprobandoVeredicto, setAprobandoVeredicto] = useState(false);
@@ -99,6 +109,8 @@ export default function InvestigacionPage() {
 
       const f3 = p.phases?.investigacion;
       setTareas(f3?.f3TareasPIP ?? []);
+      const staleDiffs = detectPipStaleness(p);
+      setPipStaleChanges(staleDiffs ?? []);
       setSintesis(f3?.f3Sintesis);
       setVeredicto(f3?.f3Veredicto);
       setDie(f3?.f3DIE);
@@ -168,16 +180,42 @@ export default function InvestigacionPage() {
     }).catch(() => {});
   }, [projectId]);
 
-  const handleGenerarTareas = useCallback(async () => {
+  const handleGenerarTareas = useCallback(async (confirmar = false) => {
     setGenerandoTareas(true);
     try {
       const r = await fetch("/api/moddulo/f3/tareas/generar", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, confirmar }),
       });
-      if (r.ok) { const d = await r.json(); setTareas(d.tareas); }
+      if (r.status === 409) {
+        const d = await r.json();
+        setConflictoRegenerar({ mensaje: d.mensaje, resumen: d.resumen });
+        return;
+      }
+      if (r.ok) {
+        const d = await r.json();
+        setTareas(d.tareas);
+        setConflictoRegenerar(null);
+      }
     } finally {
       setGenerandoTareas(false);
+    }
+  }, [projectId]);
+
+  const handleSincronizarTablero = useCallback(async () => {
+    setSincronizandoPip(true);
+    try {
+      const r = await fetch("/api/moddulo/f3/tareas/sincronizar", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ projectId }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setTareas(d.tareas);
+        setPipStaleChanges([]);
+      }
+    } finally {
+      setSincronizandoPip(false);
     }
   }, [projectId]);
 
@@ -232,6 +270,11 @@ export default function InvestigacionPage() {
     projectId, projectType, projectTerritory, pip, incertidumbres, hei, semaforo,
     tareas, resultados, sintesis, veredicto,
     onGenerarTareas: handleGenerarTareas,
+    conflictoRegenerar,
+    onCancelarConflicto: () => setConflictoRegenerar(null),
+    pipStaleChanges,
+    sincronizandoPip,
+    onSincronizarTablero: handleSincronizarTablero,
     onRefresh: () => { loadProject(); loadResultados(); },
     onGenerarSintesis: handleGenerarSintesis,
     onGenerarVeredicto: handleGenerarVeredicto,

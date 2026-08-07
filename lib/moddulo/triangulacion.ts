@@ -46,7 +46,10 @@ export function tareasConSustentoUnico(
         : undefined;
       if (familia) familias.add(familia);
     }
-    if (conteo > 1 && familias.size === 1) out.push(tarea.numero);
+    // tarea.numero se adjunta en getProject() y siempre está poblado para
+    // cualquier TareaPIP cuyo pipItemId siga vigente en el PIP actual (caso
+    // normal) — se omite defensivamente si llegara huérfana (undefined).
+    if (conteo > 1 && familias.size === 1 && tarea.numero !== undefined) out.push(tarea.numero);
   }
 
   return out;

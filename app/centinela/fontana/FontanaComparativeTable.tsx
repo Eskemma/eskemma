@@ -14,9 +14,35 @@
 // variante distinta por modo claro/oscuro (no solo un tono más oscuro),
 // mismo criterio ya verificado en PESTLPanelV2.tsx (nivelConfianza).
 
+import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
+import NaturalezaBadge from "./NaturalezaBadge";
+import CoberturaAdvertencia from "./CoberturaAdvertencia";
+import FontanaMunicipiosModal, { type TipoElementoNacional, type TipoDistrito } from "./FontanaMunicipiosModal";
+import type { NivelTerritorial } from "@/types/shared.types";
+
+const UMBRAL_COBERTURA = 99;
+
+const ETIQUETA_BOTON_DESGLOSE: Record<TipoElementoNacional, string> = {
+  estados: "Ver estados",
+  municipios: "Ver municipios",
+  distritos_fed: "Ver distritos federales",
+  distritos_loc: "Ver distritos locales",
+};
+
+const TIPO_ELEMENTO_A_TIPO_DISTRITO: Record<"distritos_fed" | "distritos_loc", TipoDistrito> = {
+  distritos_fed: "federal",
+  distritos_loc: "local",
+};
+
+interface ModalConfig {
+  indicadorId: string;
+  scope: "distrito" | "estado" | "municipio" | "nacional";
+  tipoElemento?: TipoElementoNacional;
+  tipoDistrito?: TipoDistrito;
+}
 
 export interface IndicadorFilaFontana {
   id: string;
@@ -28,66 +54,142 @@ export interface IndicadorFilaFontana {
 }
 
 interface Props {
+  sesionId: string;
   columnas: NivelTablaFontana[];
   indicadores: IndicadorFilaFontana[];
   onQuitar: (indicadorId: string) => void;
   quitando?: string | null;
+  // Nivel del territorio del proyecto — necesario porque las celdas
+  // "distrital_federal"/"distrital_local" tienen la MISMA forma
+  // (motivo + desglosesEstado) tanto en proyectos Municipal (columnas
+  // inversas, "sin dominante") como en proyectos Nacional — no se puede
+  // distinguir por el contenido de la celda, hace falta el contexto
+  // del proyecto (cierre 2026-08-06).
+  territorioNivel: NivelTerritorial;
 }
 
-type Confiabilidad = "alta" | "media" | "baja";
+function BotonesDesgloseEstado({
+  celda,
+  onAbrir,
+}: {
+  celda: CeldaTablaFontana;
+  onAbrir: (tipoElemento: TipoElementoNacional) => void;
+}) {
+  if (!celda.desglosesEstado || celda.desglosesEstado.length === 0) return null;
+  return (
+    <>
+      {celda.desglosesEstado.map((d) => (
+        <button
+          key={d.tipo}
+          type="button"
+          onClick={() => onAbrir(d.tipo)}
+          className="block text-[11px] text-bluegreen-eske hover:underline"
+        >
+          {ETIQUETA_BOTON_DESGLOSE[d.tipo]} ({d.total})
+        </button>
+      ))}
+    </>
+  );
+}
 
-// Verde en ambos modos; café en claro / amarillo en oscuro; rojo en
-// claro / naranja en oscuro — tokens ya existentes del sistema, ninguno
-// nuevo. No asumir "oscuro = mismo tono más oscuro": la familia de color
-// cambia por nivel, igual que en el precedente real (PESTLPanelV2.tsx).
-const CONFIABILIDAD_BORDE: Record<Confiabilidad, string> = {
-  alta: "border-green-eske dark:border-green-eske",
-  media: "border-brown-eske-60 dark:border-yellow-eske",
-  baja: "border-red-eske dark:border-orange-eske-40",
-};
+function Celda({
+  celda,
+  territorioNivel,
+  onVerMunicipios,
+  onVerDesgloseEstado,
+  onVerDesgloseMunicipio,
+  onVerDesgloseNacional,
+}: {
+  celda: CeldaTablaFontana;
+  territorioNivel: NivelTerritorial;
+  onVerMunicipios?: () => void;
+  onVerDesgloseEstado: (tipoElemento: TipoElementoNacional) => void;
+  onVerDesgloseMunicipio: (tipoDistrito: TipoDistrito) => void;
+  onVerDesgloseNacional: (tipoElemento: TipoElementoNacional) => void;
+}) {
+  const mostrarBotonMunicipios =
+    celda.nivel === "municipal" && (celda.municipiosEnDistrito ?? 0) > 1;
+  // Bug real (2026-08-06, encontrado en verificación visual): "estatal"/
+  // "municipal"/"distrital_federal"/"distrital_local" tienen la MISMA
+  // forma (motivo + desglosesEstado) tanto en proyectos Estatal/Municipal
+  // como en proyectos Nacional — el destino del botón de desglose
+  // ("estado → sus X" vs. "país → todos sus X") se decide por
+  // territorioNivel PRIMERO, nunca por el nivel de la celda ni por su
+  // contenido (indistinguibles entre ambos casos). Antes solo se
+  // corregía para distrital_federal/local — estatal/municipal quedaban
+  // enrutados siempre a scope="estado", causando cve duplicados entre
+  // los 32 estados (React "same key" en el modal).
+  const esColumnaDistritalInvertida = celda.nivel === "distrital_federal" || celda.nivel === "distrital_local";
+  const onAbrirDesglose: (tipo: TipoElementoNacional) => void =
+    territorioNivel === "nacional"
+      ? onVerDesgloseNacional
+      : esColumnaDistritalInvertida && territorioNivel === "municipal"
+        ? (tipo) => {
+            if (tipo === "distritos_fed" || tipo === "distritos_loc") onVerDesgloseMunicipio(TIPO_ELEMENTO_A_TIPO_DISTRITO[tipo]);
+          }
+        : onVerDesgloseEstado;
 
-const NATURALEZA_A_CONFIABILIDAD: Record<string, Confiabilidad> = {
-  dato_directo: "alta",
-  calculo_directo: "alta",
-  estimacion_modelada: "media",
-  estimacion_agregada: "media",
-  proxy_conceptual: "baja",
-};
-
-const NATURALEZA_LABEL: Record<string, string> = {
-  dato_directo: "Dato directo",
-  calculo_directo: "Cálculo directo",
-  estimacion_modelada: "Estimación modelada",
-  estimacion_agregada: "Estimación agregada",
-  proxy_conceptual: "Proxy conceptual",
-};
-
-function Celda({ celda }: { celda: CeldaTablaFontana }) {
   if (celda.valor !== undefined) {
-    const confiabilidad = celda.naturaleza ? NATURALEZA_A_CONFIABILIDAD[celda.naturaleza] : undefined;
     return (
       <div className="space-y-1">
         <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
           {celda.valor.toLocaleString("es-MX")}
           {celda.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{celda.unidad}</span> : null}
         </p>
-        {celda.naturaleza && (
-          <span
-            className={`inline-block px-1.5 py-0.5 rounded border text-[10px] text-black-eske-80 dark:text-[#9AAEBE] ${
-              confiabilidad ? CONFIABILIDAD_BORDE[confiabilidad] : "border-gray-eske-40"
-            }`}
-          >
-            {NATURALEZA_LABEL[celda.naturaleza] ?? celda.naturaleza}
-          </span>
-        )}
+        {celda.naturaleza && <NaturalezaBadge naturaleza={celda.naturaleza} />}
         {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">{celda.fuenteEtiqueta}</p>}
+        {celda.nivel === "distrital" && celda.coberturaPct !== undefined && celda.coberturaPct < UMBRAL_COBERTURA && celda.tipoDistritoPropio && (
+          <CoberturaAdvertencia nivel="distrito" tipoDistrito={celda.tipoDistritoPropio} coberturaPct={celda.coberturaPct} />
+        )}
+        {esColumnaDistritalInvertida && celda.municipioEnDistritoPct !== undefined && celda.municipioEnDistritoPct < 99.95 && (
+          <p className="text-[10px] italic text-gray-eske-60 dark:text-[#6D8294]">
+            {celda.municipioEnDistritoPct}% de este municipio pertenece a este distrito.
+          </p>
+        )}
+        {mostrarBotonMunicipios && (
+          <button
+            type="button"
+            onClick={onVerMunicipios}
+            className="block text-[11px] text-bluegreen-eske hover:underline"
+          >
+            Ver datos municipales ({celda.municipiosEnDistrito})
+          </button>
+        )}
+        <BotonesDesgloseEstado celda={celda} onAbrir={onAbrirDesglose} />
       </div>
     );
   }
-  return <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{celda.motivo}</p>;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{celda.motivo}</p>
+      {esColumnaDistritalInvertida && celda.municipioCoberturaPct !== undefined && (
+        <CoberturaAdvertencia
+          nivel="municipio_propio"
+          tipoDistrito={celda.nivel === "distrital_federal" ? "federal" : "local"}
+          coberturaPct={celda.municipioCoberturaPct}
+        />
+      )}
+      {mostrarBotonMunicipios && (
+        <button
+          type="button"
+          onClick={onVerMunicipios}
+          className="block text-[11px] text-bluegreen-eske hover:underline"
+        >
+          Ver datos municipales ({celda.municipiosEnDistrito})
+        </button>
+      )}
+      <BotonesDesgloseEstado celda={celda} onAbrir={onAbrirDesglose} />
+    </div>
+  );
 }
 
-export default function FontanaComparativeTable({ columnas, indicadores, onQuitar, quitando }: Props) {
+export default function FontanaComparativeTable({ sesionId, columnas, indicadores, onQuitar, quitando, territorioNivel }: Props) {
+  // Configuración del modal de desglose abierto — un modal a la vez,
+  // cada apertura es independiente (fetch propio, nunca comparte estado
+  // entre indicadores). scope="distrito" (Ver datos municipales) o
+  // scope="estado" (Ver municipios/distritos del estado, Encargo 2).
+  const [modalConfig, setModalConfig] = useState<ModalConfig | null>(null);
+  const indicadorModal = indicadores.find((i) => i.id === modalConfig?.indicadorId);
   if (indicadores.length === 0) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
@@ -136,7 +238,14 @@ export default function FontanaComparativeTable({ columnas, indicadores, onQuita
                     <p className="text-[10px] uppercase tracking-wide text-black-eske-80 dark:text-[#9AAEBE] mb-1">
                       {NOMBRE_NIVEL_TABLA[nivel]}
                     </p>
-                    <Celda celda={celda} />
+                    <Celda
+                      celda={celda}
+                      territorioNivel={territorioNivel}
+                      onVerMunicipios={() => setModalConfig({ indicadorId: ind.id, scope: "distrito" })}
+                      onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
+                      onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
+                      onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
+                    />
                   </div>
                 );
               })}
@@ -179,7 +288,16 @@ export default function FontanaComparativeTable({ columnas, indicadores, onQuita
                   const celda = ind.celdas.find((c) => c.nivel === nivel);
                   return (
                     <td key={nivel} className="px-3 py-2 align-top">
-                      {celda ? <Celda celda={celda} /> : null}
+                      {celda ? (
+                        <Celda
+                          celda={celda}
+                          territorioNivel={territorioNivel}
+                          onVerMunicipios={() => setModalConfig({ indicadorId: ind.id, scope: "distrito" })}
+                          onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
+                          onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
+                          onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
+                        />
+                      ) : null}
                     </td>
                   );
                 })}
@@ -200,6 +318,18 @@ export default function FontanaComparativeTable({ columnas, indicadores, onQuita
           </tbody>
         </table>
       </div>
+
+      {indicadorModal && modalConfig && (
+        <FontanaMunicipiosModal
+          sesionId={sesionId}
+          indicadorId={indicadorModal.id}
+          indicadorNombre={indicadorModal.nombre}
+          scope={modalConfig.scope}
+          tipoElemento={modalConfig.tipoElemento}
+          tipoDistrito={modalConfig.tipoDistrito}
+          onClose={() => setModalConfig(null)}
+        />
+      )}
     </>
   );
 }

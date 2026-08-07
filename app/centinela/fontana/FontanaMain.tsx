@@ -162,9 +162,9 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
         Tabla comparativa por nivel
       </h3>
       {cargando ? (
-        <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Cargando indicadores…</p>
+        <p className="text-sm text-red-eske">Cargando indicadores…</p>
       ) : (
-        <FontanaComparativeTable columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} />
+        <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} />
       )}
 
       <div className="mt-6 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] flex items-center gap-1">

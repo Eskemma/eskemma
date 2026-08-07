@@ -39,6 +39,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No hay draftDVS para finalizar" }, { status: 400 });
   }
 
+  // Defensivo: un draft en memoria del cliente puede venir de una pestaña
+  // abierta desde antes de que pipItemId existiera (o de una edición manual
+  // vía M5Panel de un ítem ya persistido sin el campo) — nunca persistir un
+  // PIPItem sin identidad estable. Mismo criterio que normalizePIPItem() en
+  // lib/moddulo/project.ts (determinístico, no aleatorio, para que un
+  // pipItemId legado siga correlacionando con TareaPIP legado por numero).
+  if (Array.isArray(dvs.pip)) {
+    dvs.pip = dvs.pip.map((p) => ({ ...p, pipItemId: p.pipItemId ?? `legacy-${p.numero}` }));
+  }
+
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.dvs": dvs,
     "phases.exploracion.estado": "lista",

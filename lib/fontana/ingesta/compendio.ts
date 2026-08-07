@@ -25,7 +25,7 @@
 // contra Guadalajara, Zapopan y Monterrey (2026-07-31).
 
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
-import { resolverIndicadorIter } from "@/lib/fontana/ingesta/iter";
+import { resolverIndicadorIter, resolverNacionalIter } from "@/lib/fontana/ingesta/iter";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
@@ -66,7 +66,12 @@ async function fetchYParsearCompendio(estadoCve: string, municipioCve: string): 
   const parser = new PDFParse({ data: buf });
   const result = await parser.getText();
 
-  const match = result.text.match(/Ocupa\s+el\s+([\d.]+)%\s+de\s+la\s+superficie\s+del\s+estado/i);
+  // Espacio opcional antes del "%" — verificado 2026-08-02 contra los
+  // 125 PDFs de Jalisco: el PDF de Puerto Vallarta (14067) trae "0.86 %
+  // de la superficie" (con espacio), a diferencia de los demás ("1.48%",
+  // sin espacio). Regex tolerante corrige ese caso sin romper ninguno de
+  // los otros 124 ya funcionando.
+  const match = result.text.match(/Ocupa\s+el\s+([\d.]+)\s*%\s+de\s+la\s+superficie\s+del\s+estado/i);
   if (!match) return null;
 
   const porcentajeEstatal = parseFloat(match[1]);
@@ -99,22 +104,46 @@ async function resolverSuperficieMunicipal(estadoCve: string, municipioCve: stri
 // depende de qué municipios se hayan consultado antes (ajuste acordado:
 // ya no se agrega desde municipios parciales).
 export async function resolverDensidad(territorio: Territorio): Promise<CeldaFontana[]> {
+  const nacional = await resolverDensidadNacional();
+
   if (!territorio.estado) {
     const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
   const [estatal, municipal] = await Promise.all([
     resolverDensidadEstatal(estadoCve),
     resolverDensidadMunicipal(estadoCve, territorio),
   ]);
-  return [estatal, municipal];
+  return [nacional, estatal, municipal];
+}
+
+// Superficie nacional oficial: INEGI, Anuario estadístico y geográfico
+// por entidad federativa 2020, Cuadro 1.1 ("Superficie territorial (km2)
+// 1 964 375 / Continental 1 959 248 / Insular 5 127") — cifra más precisa
+// ya documentada, preferida sobre sumar las 32 SUPERFICIE_ESTATAL_KM2
+// (que difieren 0.07%, ver superficieEstatal.ts).
+const SUPERFICIE_NACIONAL_KM2 = 1_964_375;
+
+async function resolverDensidadNacional(): Promise<CeldaFontana> {
+  const nacionalIter = await resolverNacionalIter("F1-2");
+  if (!("valor" in nacionalIter)) {
+    return { nivel: "nacional", motivo: "No fue posible resolver la población nacional (ITER) para calcular la densidad" };
+  }
+  const densidad = Math.round((nacionalIter.valor / SUPERFICIE_NACIONAL_KM2) * 100) / 100;
+  return {
+    nivel: "nacional",
+    valor: densidad,
+    unidad: "hab/km²",
+    naturaleza: "calculo_directo",
+    fuenteEtiqueta: `${FUENTE_ETIQUETA_COMPENDIO} + INEGI (ITER, Censo 2020)`,
+  };
 }
 
 // POBTOT estatal vía la pirámide de ITER (misma fila agregada, no se

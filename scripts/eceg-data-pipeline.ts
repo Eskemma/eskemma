@@ -69,7 +69,11 @@ const CURATED_COLUMNS = [
   // Vivienda
   "VPH_PISODT", "VPH_PISOTI", "VPH_AGUADV", "VPH_SINRTV",
   "VPH_S_ELEC", "VPH_DRENAJ", "VPH_NODREN", "VPH_EXCSA", "VPH_TINACO", "VPH_CISTER",
-  "VPH_1CUART", "VPH_NDEAED", "VPH_SNBIEN",
+  "VPH_1CUART", "VPH_NDEAED", "VPH_SNBIEN", "VPH_C_SERV",
+  // Estado civil (F1-12, Fontana) — verificado 2026-08-02 vía Diccionario
+  // de Datos ECEG: P12YM_CASA incluye unión libre; P12YM_SEPA cubre
+  // separadas/divorciadas/viudas — las 3 cubren el 100% de 12+ años.
+  "P12YM_SOLT", "P12YM_CASA", "P12YM_SEPA",
   // Conectividad
   "VPH_INTER", "VPH_CEL", "VPH_PC", "VPH_SINCIN",
   "VPH_TELEF", "VPH_SINLTC", "VPH_SINTIC",
@@ -153,18 +157,42 @@ async function buildSeccionMunMap(estadoId: string): Promise<Map<number, string>
   return map;
 }
 
+// Guerrero, Michoacán y Veracruz: el shapefile propio de ECEG (censo
+// 2020, geografía electoral vigente 2017-2020) tiene 1 distrito MÁS que
+// mgs_2025_INE en cada uno (12: 9 vs 8, 16: 12 vs 11, 30: 20 vs 19) —
+// verificado 2026-08-03 comparando el conjunto EXACTO de números de
+// distrito (no solo el total) contra los 11 estados que usan este
+// atajo: la redistritación 2022 fusionó/eliminó un distrito en cada uno
+// de estos 3 estados; ECEG, por ser censo 2020, todavía refleja el
+// distrito eliminado (ej. Guerrero 12009 — POBTOT 405,907 — ya no
+// existe en la cartografía vigente). El atajo daba cobertura 100% con
+// máxima confianza sobre un dato territorialmente equivocado — peor que
+// el gap de cobertura que el atajo pretendía evitar. Los otros 8
+// estados con este atajo (01, 03, 04, 06, 10, 13, 17, 18) SÍ coinciden
+// exactamente, número por número, contra mgs_2025_INE — confirmado, no
+// asumido.
+const ESTADOS_ECEG_DISTRITO_DESACTUALIZADO = new Set(["12", "16", "30"]);
+
 /**
  * Reads SECCION.shp for one state and returns a Map:
  *   seccion_number → padded DISTRITO_FED (3-digit string)
  *
- * Most ECEG shapefiles only have MUNICIPIO+SECCION (no DISTRITO field).
- * Falls back to INE electoral sections (mgs_2025_INE) which always have DISTRITO_F.
+ * Verificado 2026-08-03 (los 32 estados, no solo inspección de código):
+ * 11 de 32 shapefiles propios de ECEG SÍ traen el campo DISTRITO
+ * (01, 03, 04, 06, 10, 12, 13, 16, 17, 18, 30) — para esos estados,
+ * Federal obtiene cobertura 100% sin depender de mgs_2025_INE. Los
+ * otros 21 caen al fallback INE (campo DISTRITO_F) — mismo origen y
+ * mismo gap de cobertura que Local (ver buildSeccionDistLocalMap), que
+ * nunca tiene este atajo porque ECEG jamás publica distrito LOCAL.
+ * Excepción dentro de esos 11: 12, 16 y 30 se fuerzan al fallback INE
+ * pese a tener el campo DISTRITO — ver ESTADOS_ECEG_DISTRITO_DESACTUALIZADO.
  *
  * @param estadoId zero-padded state ID e.g. "01"
  */
 async function buildSeccionDistMap(estadoId: string): Promise<Map<number, string>> {
-  // 1. Try ECEG shapefile (field "DISTRITO", uppercase)
-  const ecegDir = findEcegEstadoDir(estadoId);
+  // 1. Try ECEG shapefile (field "DISTRITO", uppercase) — salvo los 3
+  // estados con geografía desactualizada, forzados al fallback INE.
+  const ecegDir = ESTADOS_ECEG_DISTRITO_DESACTUALIZADO.has(estadoId) ? null : findEcegEstadoDir(estadoId);
   if (ecegDir) {
     const shpPath = path.join(ecegDir, "SECCION.shp");
     if (fs.existsSync(shpPath)) {
@@ -202,6 +230,40 @@ async function buildSeccionDistMap(estadoId: string): Promise<Map<number, string
     for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
     const sec  = Number(raw["SECCION"]);
     const dist = String(raw["DISTRITO_F"] ?? "").padStart(3, "0");
+    if (sec && dist && dist !== "000") map.set(sec, dist);
+  }
+  return map;
+}
+
+/**
+ * Reads SECCION.shp for one state and returns a Map:
+ *   seccion_number → padded DISTRITO_LOC (3-digit string)
+ *
+ * Sin el paso 1 de buildSeccionDistMap (ECEG propio) — ECEG nunca
+ * publica distrito local, así que Local depende SIEMPRE de
+ * mgs_2025_INE, para los 32 estados sin excepción (confirmado en vivo,
+ * 2026-08-03: distrito_l poblado al 100% en los 32 estados).
+ *
+ * @param estadoId zero-padded state ID e.g. "01"
+ */
+async function buildSeccionDistLocalMap(estadoId: string): Promise<Map<number, string>> {
+  const ineDir = findIneEstadoDir(estadoId);
+  if (!ineDir) return new Map();
+
+  const shpPath = path.join(ineDir, "SECCION.shp");
+  if (!fs.existsSync(shpPath)) return new Map();
+
+  const map = new Map<number, string>();
+  const src = await shapefile.open(shpPath);
+  while (true) {
+    const result = await src.read();
+    if (result.done) break;
+    const p = result.value?.properties as Record<string, unknown>;
+    if (!p) continue;
+    const raw: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) raw[k.toUpperCase()] = v;
+    const sec  = Number(raw["SECCION"]);
+    const dist = String(raw["DISTRITO_L"] ?? "").padStart(3, "0");
     if (sec && dist && dist !== "000") map.set(sec, dist);
   }
   return map;
@@ -362,6 +424,93 @@ function buildDistritosData(
   return out;
 }
 
+interface DistritosMunicipiosData {
+  composicion: Record<string, Record<string, number>>; // { [CVE_DISTRITO]: { [CVE_MUN]: pctPOBTOT } }
+  coberturaDistritos: Record<string, number>; // { [CVE_DISTRITO]: pctCobertura }
+  coberturaMunicipios: Record<string, number>; // { [CVE_MUN]: pctCobertura }
+}
+
+/**
+ * Builds distritos_municipios JSON — composición municipio↔distrito
+ * para Fontana (modal de desglose municipal, T10) — % del POBTOT total
+ * de cada municipio que cae en cada distrito, MÁS % de cobertura
+ * (cuánta población de cada municipio/distrito sí logró vincularse a
+ * una sección con distrito asignado — ver nota de cobertura abajo).
+ * Reutiliza seccionMunMap/seccionDistMap y las filas ya cargadas en
+ * memoria por processEstado — no relee ningún shapefile adicional.
+ *
+ * ⚠️ NOTA DE COBERTURA (hallazgo real, 2026-08-02): buildSeccionDistMap
+ * resuelve sección→distrito desde mgs_2025_INE (cartografía electoral
+ * 2025), pero las filas agregadas aquí son del censo 2020 (ECEG) — una
+ * fracción de las secciones 2020 no tiene correspondencia en la
+ * cartografía 2025 y queda sin distrito asignado (gap medido: 0% en
+ * Aguascalientes hasta 17.83% en Jalisco). Diagnóstico geográfico
+ * (investigación de este mismo incremento): el gap NO se reparte
+ * uniforme dentro de cada municipio — se concentra en secciones "mega"
+ * específicas de la periferia de zonas metropolitanas en crecimiento
+ * explosivo (ej. Zapopan/Tonalá/Tlajomulco en Jalisco, secciones de
+ * 27,000-42,000 habitantes cada una, muy por encima del tamaño típico).
+ * La fórmula de coberturaDistritos de abajo SÍ asume reparto uniforme
+ * dentro de cada municipio contribuyente (para poder estimar una
+ * "población esperada" sin más información) — es una aproximación
+ * razonable dado lo que sabemos, NO una medición exacta: si el hueco
+ * real está concentrado en 1-2 secciones grandes de un municipio, el
+ * número de cobertura puede sub/sobre-estimar el efecto en distritos
+ * específicos de ese municipio. Ver investigación completa en el plan
+ * de este incremento para la vía de corrección de raíz (CSV DERFE 2023,
+ * no implementada — decisión pendiente, fuera de este fix).
+ */
+function buildDistritosMunicipiosData(
+  rows: EcegRow[],
+  seccionMunMap: Map<number, string>,
+  seccionDistMap: Map<number, string>
+): DistritosMunicipiosData {
+  const pobtotPorMun: Record<string, number> = {};
+  const pobtotPorMunDist: Record<string, Record<string, number>> = {};
+
+  for (const row of rows) {
+    if (row.SECCION == null) continue;
+    const mun = seccionMunMap.get(row.SECCION);
+    if (!mun) continue;
+    const pob = typeof row.POBTOT === "number" ? row.POBTOT : 0;
+    pobtotPorMun[mun] = (pobtotPorMun[mun] ?? 0) + pob;
+
+    const dist = seccionDistMap.get(row.SECCION);
+    if (!dist) continue;
+    if (!pobtotPorMunDist[dist]) pobtotPorMunDist[dist] = {};
+    pobtotPorMunDist[dist][mun] = (pobtotPorMunDist[dist][mun] ?? 0) + pob;
+  }
+
+  // Cobertura por municipio: % de su POBTOT total que sí resolvió a
+  // ALGÚN distrito (exacta, sin supuestos — suma directa).
+  const coberturaMunicipios: Record<string, number> = {};
+  for (const [mun, total] of Object.entries(pobtotPorMun)) {
+    let resuelto = 0;
+    for (const porMun of Object.values(pobtotPorMunDist)) {
+      resuelto += porMun[mun] ?? 0;
+    }
+    coberturaMunicipios[mun] = total > 0 ? Math.round((resuelto / total) * 1000) / 10 : 0;
+  }
+
+  const composicion: Record<string, Record<string, number>> = {};
+  const coberturaDistritos: Record<string, number> = {};
+  for (const [dist, porMun] of Object.entries(pobtotPorMunDist)) {
+    composicion[dist] = {};
+    let actual = 0;
+    let estimado = 0;
+    for (const [mun, pob] of Object.entries(porMun)) {
+      const total = pobtotPorMun[mun];
+      composicion[dist][mun] = total > 0 ? Math.round((pob / total) * 1000) / 10 : 0;
+      actual += pob;
+      const coberturaMun = coberturaMunicipios[mun];
+      estimado += coberturaMun > 0 ? pob / (coberturaMun / 100) : pob;
+    }
+    coberturaDistritos[dist] = estimado > 0 ? Math.round((actual / estimado) * 1000) / 10 : 0;
+  }
+
+  return { composicion, coberturaDistritos, coberturaMunicipios };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Firebase
 // ─────────────────────────────────────────────────────────────────────────────
@@ -427,37 +576,84 @@ async function processEstado(
   process.stdout.write(`  → ${rows.length} rows\n`);
 
   // Build sección→municipio and sección→distrito mappings from shapefile
-  const [seccionMunMap, seccionDistMap] = await Promise.all([
+  const [seccionMunMap, seccionDistMap, seccionDistLocalMap] = await Promise.all([
     buildSeccionMunMap(estadoId),
     buildSeccionDistMap(estadoId),
+    buildSeccionDistLocalMap(estadoId),
   ]);
   process.stdout.write(
-    `  → ${seccionMunMap.size} sección→municipio, ${seccionDistMap.size} sección→distrito pairs\n`
+    `  → ${seccionMunMap.size} sección→municipio, ${seccionDistMap.size} sección→distrito federal, ` +
+    `${seccionDistLocalMap.size} sección→distrito local pairs\n`
   );
 
   const seccionesData = buildSeccionesData(rows);
   const municipiosData = buildMunicipiosData(rows, seccionMunMap);
   const distritosData  = buildDistritosData(rows, seccionDistMap);
+  const { composicion, coberturaDistritos, coberturaMunicipios } =
+    buildDistritosMunicipiosData(rows, seccionMunMap, seccionDistMap);
+  const distritosMunicipiosData = { composicion, coberturaDistritos, coberturaMunicipios };
+
+  const distritosLocalesData = buildDistritosData(rows, seccionDistLocalMap);
+  const localComposicion = buildDistritosMunicipiosData(rows, seccionMunMap, seccionDistLocalMap);
+  const distritosLocalesMunicipiosData = {
+    composicion: localComposicion.composicion,
+    coberturaDistritos: localComposicion.coberturaDistritos,
+    coberturaMunicipios: localComposicion.coberturaMunicipios,
+  };
+
+  // Cobertura por distrito, embebida directamente en distritosData/
+  // distritosLocalesData — verificado seguro (app/api/sefix/eceg-datos/route.ts
+  // solo hace rec[variable] contra una whitelist estática, nunca
+  // Object.entries de un registro completo) — ver nota de cobertura en
+  // buildDistritosMunicipiosData.
+  for (const key of Object.keys(distritosData)) {
+    const cveDistrito = key.slice(2); // key = CVE_ENT(2) + CVE_DISTRITO(3)
+    const cobertura = coberturaDistritos[cveDistrito];
+    if (cobertura != null) {
+      (distritosData[key] as DataRecord & { _coberturaPct?: number })._coberturaPct = cobertura;
+    }
+  }
+  for (const key of Object.keys(distritosLocalesData)) {
+    const cveDistrito = key.slice(2);
+    const cobertura = localComposicion.coberturaDistritos[cveDistrito];
+    if (cobertura != null) {
+      (distritosLocalesData[key] as DataRecord & { _coberturaPct?: number })._coberturaPct = cobertura;
+    }
+  }
+
   process.stdout.write(
     `  → ${Object.keys(seccionesData).length} secciones, ` +
     `${Object.keys(municipiosData).length} municipios, ` +
-    `${Object.keys(distritosData).length} distritos\n`
+    `${Object.keys(distritosData).length} distritos federales, ` +
+    `${Object.keys(distritosLocalesData).length} distritos locales\n`
   );
 
   const secPath  = `${STORAGE_PREFIX}/secciones/${estadoId}.json`;
   const munPath  = `${STORAGE_PREFIX}/municipios/${estadoId}.json`;
   const distPath = `${STORAGE_PREFIX}/distritos/${estadoId}.json`;
+  const distMunPath = `${STORAGE_PREFIX}/distritos_municipios/${estadoId}.json`;
+  const distLocPath = `${STORAGE_PREFIX}/distritos_locales/${estadoId}.json`;
+  const distLocMunPath = `${STORAGE_PREFIX}/distritos_locales_municipios/${estadoId}.json`;
 
   if (dryRun) {
     const secOut  = path.join(os.tmpdir(), `eceg_secciones_${estadoId}.json`);
     const munOut  = path.join(os.tmpdir(), `eceg_municipios_${estadoId}.json`);
     const distOut = path.join(os.tmpdir(), `eceg_distritos_${estadoId}.json`);
+    const distMunOut = path.join(os.tmpdir(), `eceg_distritos_municipios_${estadoId}.json`);
+    const distLocOut = path.join(os.tmpdir(), `eceg_distritos_locales_${estadoId}.json`);
+    const distLocMunOut = path.join(os.tmpdir(), `eceg_distritos_locales_municipios_${estadoId}.json`);
     fs.writeFileSync(secOut,  JSON.stringify(seccionesData));
     fs.writeFileSync(munOut,  JSON.stringify(municipiosData));
     fs.writeFileSync(distOut, JSON.stringify(distritosData));
+    fs.writeFileSync(distMunOut, JSON.stringify(distritosMunicipiosData));
+    fs.writeFileSync(distLocOut, JSON.stringify(distritosLocalesData));
+    fs.writeFileSync(distLocMunOut, JSON.stringify(distritosLocalesMunicipiosData));
     process.stdout.write(`  [dry-run] → ${secOut}\n`);
     process.stdout.write(`  [dry-run] → ${munOut}\n`);
     process.stdout.write(`  [dry-run] → ${distOut}\n`);
+    process.stdout.write(`  [dry-run] → ${distMunOut}\n`);
+    process.stdout.write(`  [dry-run] → ${distLocOut}\n`);
+    process.stdout.write(`  [dry-run] → ${distLocMunOut}\n`);
   } else {
     process.stdout.write(`  ↑ ${secPath}…\n`);
     await uploadJson(app!, secPath, seccionesData);
@@ -465,6 +661,12 @@ async function processEstado(
     await uploadJson(app!, munPath, municipiosData);
     process.stdout.write(`  ↑ ${distPath}…\n`);
     await uploadJson(app!, distPath, distritosData);
+    process.stdout.write(`  ↑ ${distMunPath}…\n`);
+    await uploadJson(app!, distMunPath, distritosMunicipiosData);
+    process.stdout.write(`  ↑ ${distLocPath}…\n`);
+    await uploadJson(app!, distLocPath, distritosLocalesData);
+    process.stdout.write(`  ↑ ${distLocMunPath}…\n`);
+    await uploadJson(app!, distLocMunPath, distritosLocalesMunicipiosData);
     process.stdout.write(`  ✓ Done\n`);
   }
 

@@ -185,7 +185,10 @@ async function runMultiMotorPath(
 
   let m3: ActorVetoF2[];
   try {
-    m3 = parseJSON<ActorVetoF2[]>(m3Raw, "M3");
+    const m3Parsed = parseJSON<Omit<ActorVetoF2, "actorId">[]>(m3Raw, "M3");
+    // Identidad estable — generada una sola vez aquí, nunca confiada a
+    // Claude (mismo criterio que PIPItem.pipItemId).
+    m3 = m3Parsed.map((a) => ({ ...a, actorId: crypto.randomUUID() }));
   } catch {
     return NextResponse.json({ error: `M3: no se pudo parsear la respuesta`, motor: "M3", raw: m3Raw.slice(0, 400) }, { status: 500 });
   }
@@ -372,6 +375,8 @@ function sanitizeDVS(dvs: DVSF2): DVSF2 {
       senalesPESTEL: arr<string>(c.senalesPESTEL),
     })),
     semaforo: arr<Record<string, unknown>>(dvs.semaforo).map((a) => ({
+      // Identidad estable — nunca confiada al modelo.
+      actorId: typeof a.actorId === "string" ? a.actorId : crypto.randomUUID(),
       nombre: str(a.nombre),
       tipo: str(a.tipo),
       nivelRiesgo: str(a.nivelRiesgo, "ambar") as "rojo" | "ambar" | "verde",
@@ -386,6 +391,8 @@ function sanitizeDVS(dvs: DVSF2): DVSF2 {
       destino: str(i.destino, "F3") as "F3" | "SIP",
     })),
     pip: arr<Record<string, unknown>>(dvs.pip).map((p, idx) => ({
+      // Identidad estable — generada una sola vez aquí, nunca recalculada.
+      pipItemId: typeof p.pipItemId === "string" ? p.pipItemId : crypto.randomUUID(),
       numero: typeof p.numero === "number" ? p.numero : idx + 1,
       pregunta: str(p.pregunta),
       metodo: str(p.metodo),

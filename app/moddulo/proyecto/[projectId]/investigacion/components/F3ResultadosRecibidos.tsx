@@ -34,7 +34,7 @@ function sourceKindToCanal(sourceKind: string): AsignacionCanal["canal"] {
 }
 
 export default function F3ResultadosRecibidos({ resultados, tareas, pip, projectId, readOnly, onAprobado }: Props) {
-  const [numeroSeleccion, setNumeroSeleccion] = useState<Record<string, number>>({});
+  const [pipItemIdSeleccion, setPipItemIdSeleccion] = useState<Record<string, string>>({});
   const [asignacionSeleccion, setAsignacionSeleccion] = useState<Record<string, string>>({});
 
   if (resultados.length === 0) {
@@ -50,8 +50,8 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
   return (
     <div className="space-y-2">
       {resultados.map((r) => {
-        const numero = numeroSeleccion[r.resultadoId];
-        const tarea = tareas.find((t) => t.numero === numero);
+        const pipItemId = pipItemIdSeleccion[r.resultadoId];
+        const tarea = tareas.find((t) => t.pipItemId === pipItemId);
         const canalEsperado = sourceKindToCanal(r.origen.sourceKind);
         let candidatas = tarea?.asignaciones?.filter((a) => a.canal === canalEsperado && !a.resultadoId) ?? [];
         if (tarea && candidatas.length === 0) {
@@ -83,9 +83,9 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
             {!readOnly && !r.aprobado && (
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <select
-                  value={numero ?? ""}
+                  value={pipItemId ?? ""}
                   onChange={(e) => {
-                    setNumeroSeleccion((prev) => ({ ...prev, [r.resultadoId]: Number(e.target.value) }));
+                    setPipItemIdSeleccion((prev) => ({ ...prev, [r.resultadoId]: e.target.value }));
                     setAsignacionSeleccion((prev) => ({ ...prev, [r.resultadoId]: "" }));
                   }}
                   className="text-xs lg:text-sm px-2 py-1 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230]"
@@ -93,7 +93,7 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
                   <option value="">¿A qué tarea del PIP responde?</option>
                   {tareas.map((t) => {
                     const item = pip.find((p) => p.numero === t.numero);
-                    return <option key={t.numero} value={t.numero}>P{t.numero} — {item?.pregunta ?? ""}</option>;
+                    return <option key={t.pipItemId} value={t.pipItemId}>P{t.numero} — {item?.pregunta ?? ""}</option>;
                   })}
                 </select>
 
@@ -113,11 +113,11 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
                 )}
 
                 <PillButton
-                  disabled={!numero || !asignacionId}
+                  disabled={!pipItemId || !asignacionId}
                   onClick={async () => {
                     await fetch("/api/moddulo/f3/resultados/aprobar", {
                       method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ projectId, resultadoId: r.resultadoId, numero, asignacionId, aprobado: true }),
+                      body: JSON.stringify({ projectId, resultadoId: r.resultadoId, pipItemId, asignacionId, aprobado: true }),
                     });
                     onAprobado();
                   }}

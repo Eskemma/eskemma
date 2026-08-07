@@ -8,7 +8,7 @@ import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { extractTextPerFile, isExtractionError } from "@/lib/moddulo/attachments";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { PhaseId, ChatRequest, ChatAttachment, XPCTO } from "@/types/moddulo.types";
+import type { PhaseId, ChatRequest, ChatAttachment, XPCTO, PIPItem, TareaPIP } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 
 export async function POST(
@@ -56,6 +56,8 @@ export async function POST(
       maniobra:
         (project.phases?.diagnostico?.data?.maniobra as string | undefined) ?? undefined,
       kpisSeleccionados,
+      pip: (project.phases?.exploracion?.dvs?.pip as PIPItem[] | undefined) ?? undefined,
+      tareas: (project.phases?.investigacion?.f3TareasPIP as TareaPIP[] | undefined) ?? undefined,
     });
 
     // Build XPCTO context server-side from Firestore on every request.

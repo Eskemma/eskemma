@@ -14,7 +14,11 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
     <div className="space-y-6">
       <section>
         <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">1–3. Síntesis por dimensión + insumos FODA</h2>
-        <F3Sintesis sintesis={die.sintesisPorDimension} readOnly onGenerar={async () => {}} generando={false} puedeGenerar={false} />
+        {/* actoresVeto=[] deliberado: el DIE es un snapshot de cierre que
+            nunca vuelve a mutar — siempre debe mostrar el nombre CONGELADO
+            del actor al momento de generar la síntesis (foda.nombreActor),
+            nunca resolverlo contra un semáforo "vigente" que aquí no aplica. */}
+        <F3Sintesis sintesis={die.sintesisPorDimension} actoresVeto={[]} readOnly onGenerar={async () => {}} generando={false} puedeGenerar={false} />
       </section>
 
       <section>

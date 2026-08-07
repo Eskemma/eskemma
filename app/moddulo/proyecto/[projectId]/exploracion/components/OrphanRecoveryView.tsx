@@ -128,7 +128,7 @@ export default function OrphanRecoveryView({ pestAnalysisId, deadProjectId: _dea
 
         {/* Loading meta */}
         {loading && (
-          <div className="rounded-xl border border-gray-eske-30 bg-white p-6 text-sm text-black-eske/60 text-center">
+          <div className="rounded-xl border border-gray-eske-30 bg-white p-6 text-sm text-red-eske text-center">
             Cargando información del análisis…
           </div>
         )}

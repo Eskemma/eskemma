@@ -219,7 +219,7 @@ export type EstadoRDAItem = "activo" | "resuelto" | "aceptado";
 export interface RDAItem {
   id: string; // determinístico: `${faseOrigen}:${criterioId}`
   faseOrigen: PhaseId;
-  origenMecanismo: "criterio_suficiencia" | "vacio_residual" | "asignacion_desactivada";
+  origenMecanismo: "criterio_suficiencia" | "vacio_residual" | "asignacion_desactivada" | "pregunta_pip_eliminada";
   criterioId?: string;
   nombre: string;
   descripcion: string;
@@ -230,12 +230,14 @@ export interface RDAItem {
   fechaCreacion: Timestamp;
   fechaResolucion?: Timestamp;
   resueltoPor?: "usuario" | "sistema";
-  // Solo para origenMecanismo === "asignacion_desactivada": el usuario ya
-  // tomó la decisión al desactivar la vía, así que no pasa por el flujo
-  // normal de "Aceptar como condición del proyecto" — la UI lo trata como
-  // aceptado sin pedir esa acción, aunque `estado` se mantenga en "activo"
-  // para que el motor de reconciliación de rda.ts lo auto-resuelva solo en
-  // cuanto la asignación se reactive (ver lib/moddulo/rda.ts).
+  // Para "asignacion_desactivada" y "pregunta_pip_eliminada": el usuario ya
+  // tomó la decisión (al desactivar la vía, o al confirmar la sincronización
+  // del tablero tras editar el PIP), así que no pasa por el flujo normal de
+  // "Aceptar como condición del proyecto" — la UI lo trata como aceptado sin
+  // pedir esa acción. En "asignacion_desactivada", `estado` se mantiene en
+  // "activo" para que rda.ts lo auto-resuelva si la asignación se reactiva;
+  // en "pregunta_pip_eliminada" no hay reconciliación en vivo posible (la
+  // pregunta ya no existe en ningún lado) — es un registro histórico fijo.
   aceptadoAutomaticamente?: boolean;
 }
 
@@ -287,6 +289,11 @@ export interface PhaseState {
   // F3 — ISO string de la última vez que el usuario visitó el chat, para
   // avisar de resultados nuevos al montar (ver page.tsx).
   chatUltimaVisita?: string;
+  // F3 — snapshot del PIP (JSON.stringify(PIPItem[])) tal como estaba al
+  // generar/sincronizar por última vez f3TareasPIP. Base de comparación de
+  // lib/moddulo/pipPropagation.ts (mismo patrón que xpctoSnapshotAtGeneration
+  // para F1→F2, forma de dato distinta).
+  pipSnapshotAtGeneration?: string;
 }
 
 // ==========================================
@@ -360,6 +367,11 @@ export interface ContrasteXPCTO {
 }
 
 export interface ActorVetoF2 {
+  // Identidad estable, generada una sola vez al crear el actor — mismo
+  // patrón que PIPItem.pipItemId. Nunca usar `nombre` para correlacionar
+  // este actor con SintesisF3.fodaAdversariosInsumo: el nombre es editable
+  // (M3Panel) y no sobrevive a un renombre/eliminación.
+  actorId: string;
   nombre: string;
   tipo: string;
   nivelRiesgo: "rojo" | "ambar" | "verde";
@@ -376,6 +388,13 @@ export interface IncertidumbreF2 {
 }
 
 export interface PIPItem {
+  // Identidad estable, generada una sola vez al crear la pregunta (crypto.randomUUID()),
+  // nunca recalculada ni reasignada. Invisible para el usuario — lib/moddulo/project.ts
+  // le da un valor sintético determinístico (`legacy-${numero}`) a los PIPItem legados
+  // que no lo tengan, para que sigan correlacionando con sus TareaPIP/VacioResidual.
+  pipItemId: string;
+  // Número de despliegue — secuencial, sin huecos, recalculado en cada edición del
+  // PIP (igual que hoy). NUNCA es identidad: usar pipItemId para vincular/comparar.
   numero: number;
   pregunta: string;
   metodo: string;
@@ -424,13 +443,26 @@ export interface AsignacionCanal {
 
 // M1 — tablero de tareas del PIP heredado de F2
 export interface TareaPIP {
-  numero: number; // vínculo a PIPItem.numero
+  // Vínculo real a PIPItem.pipItemId — NUNCA se persiste `numero` dentro de
+  // TareaPIP (lib/moddulo/project.ts lo adjunta en memoria al leer, según
+  // la posición vigente de este pipItemId en dvs.pip). La única excepción
+  // es DIE.tableroTareasPIP, snapshot de cierre que sí congela `numero`
+  // deliberadamente — ver veredicto/aprobar/route.ts.
+  pipItemId: string;
+  // Adjuntado dinámicamente en lectura (getProject()) — nunca escribir este
+  // campo de vuelta a f3TareasPIP en Firestore (construir el payload de
+  // escritura explícitamente desde { pipItemId, asignaciones }).
+  numero?: number;
   asignaciones: AsignacionCanal[];
 }
 
 // M3 — vacío residual con destino ya determinado
 export interface VacioResidual {
-  numero: number; // PIPItem.numero no cubierto por ningún canal
+  // Vínculo real a PIPItem.pipItemId — alimenta el id del RDA
+  // (lib/moddulo/criterios-investigacion.ts), por eso debe sobrevivir a una
+  // reindexación del PIP. `numero` se adjunta en lectura solo para mostrar.
+  pipItemId: string;
+  numero?: number; // PIPItem.numero vigente al momento de leer — solo display
   // Presente solo cuando el vacío es de una asignación COMPLEMENTARIA
   // específica cuya tarea, en conjunto, sí está cubierta por su primaria —
   // ausente cuando el vacío es de la tarea completa (ninguna asignación
@@ -464,7 +496,15 @@ export interface SintesisF3 {
   contradicciones: string[];
   vaciosResiduales: VacioResidual[];
   fodaPropioInsumo: FODAInsumo;
-  fodaAdversariosInsumo: Record<string, FODAInsumo>; // key = nombre del actor (Semáforo de Veto)
+  // key = ActorVetoF2.actorId (identidad estable) — NUNCA nombre, un actor
+  // se puede renombrar/eliminar en F2 después de generada esta síntesis.
+  // `nombreActor` congela el nombre al momento de esta generación, para
+  // seguir mostrando algo legible si el actor ya no existe en el semáforo
+  // vigente; F3Sintesis.tsx prefiere el nombre EN VIVO del semáforo actual
+  // cuando el actorId todavía existe. Claves de datos legados (generados
+  // antes de este campo) siguen siendo el nombre crudo del actor — se leen
+  // como fallback de compatibilidad, no se migran.
+  fodaAdversariosInsumo: Record<string, FODAInsumo & { nombreActor: string }>;
 }
 
 // M4

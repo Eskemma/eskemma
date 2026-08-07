@@ -63,6 +63,10 @@ function sanitizeM5(raw: { hei?: Partial<HEIF2>; pip?: unknown[] }): { hei: HEIF
   };
 
   const pip: PIPItem[] = arr<Record<string, unknown>>(raw.pip).map((p, idx) => ({
+    // Identidad estable — regenerate-m5 reemplaza el PIP completo (sin
+    // correlación con el anterior, igual que hoy), así que cada ítem recibe
+    // un pipItemId nuevo.
+    pipItemId: typeof p.pipItemId === "string" ? p.pipItemId : crypto.randomUUID(),
     numero: typeof p.numero === "number" ? p.numero : idx + 1,
     pregunta: str(p.pregunta),
     metodo: str(p.metodo),

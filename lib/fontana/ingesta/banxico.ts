@@ -17,7 +17,7 @@
 // excepción, tal como se acordó.
 
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
-import { resolverIndicadorIter } from "@/lib/fontana/ingesta/iter";
+import { resolverIndicadorIter, resolverNacionalIter } from "@/lib/fontana/ingesta/iter";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { esValorDisponible } from "@/lib/fontana/ingesta/types";
@@ -67,6 +67,11 @@ const BANXICO_REMESAS_ESTATAL_SERIES: Record<string, string> = {
   "32": "SE29701", // Zacatecas
 };
 
+// Verificado en vivo 2026-08-02: serie SE29702, "Ingresos por Remesas
+// Familiares TOTAL" — total nacional, mismo cuadro CA79 que las 32
+// series estatales.
+const SERIE_NACIONAL = "SE29702";
+
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días — remesas se publican trimestralmente
 
 interface RemesaCache {
@@ -102,13 +107,10 @@ async function fetchRemesasSerie(serieId: string): Promise<{ remesasMillonesUsd:
   return { remesasMillonesUsd: valor, fecha: latest.fecha };
 }
 
-async function resolverRemesasEstatal(estadoCve: string): Promise<RemesaCache | null> {
-  const path = `banxico_remesas/${estadoCve}.json`;
+async function resolverRemesasSerieCacheada(cacheKey: string, serieId: string): Promise<RemesaCache | null> {
+  const path = `banxico_remesas/${cacheKey}.json`;
   const cached = await readFromBodega<RemesaCache>(path);
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) return cached;
-
-  const serieId = BANXICO_REMESAS_ESTATAL_SERIES[estadoCve];
-  if (!serieId) return null;
 
   const fetched = await fetchRemesasSerie(serieId);
   if (!fetched) return cached ?? null; // si falla el refresh, prefiere dato cacheado vencido a nada
@@ -118,41 +120,79 @@ async function resolverRemesasEstatal(estadoCve: string): Promise<RemesaCache | 
   return result;
 }
 
+async function resolverRemesasEstatal(estadoCve: string): Promise<RemesaCache | null> {
+  const serieId = BANXICO_REMESAS_ESTATAL_SERIES[estadoCve];
+  if (!serieId) return null;
+  return resolverRemesasSerieCacheada(estadoCve, serieId);
+}
+
+// Nacional — serie SE29702, total país (mismo cuadro que las 32 series
+// estatales) ÷ POBTOT nacional (ITER, resolverNacionalIter — sin nueva
+// descarga). calculo_directo: división directa de 2 totales oficiales.
+async function resolverRemesasNacional(): Promise<CeldaFontana> {
+  let remesas: RemesaCache | null;
+  try {
+    remesas = await resolverRemesasSerieCacheada("nacional", SERIE_NACIONAL);
+  } catch {
+    return { nivel: "nacional", motivo: "Error de conexión con Banxico (SIE)" };
+  }
+  if (!remesas) {
+    return { nivel: "nacional", motivo: "Banxico no reportó remesas nacionales (token ausente o serie no disponible)" };
+  }
+
+  const nacionalIter = await resolverNacionalIter("F1-2");
+  if (!("valor" in nacionalIter)) {
+    return { nivel: "nacional", motivo: "No fue posible resolver la población nacional (ITER) para calcular el per cápita" };
+  }
+
+  const remesasUsd = remesas.remesasMillonesUsd * 1_000_000;
+  const perCapita = Math.round((remesasUsd / nacionalIter.valor) * 100) / 100;
+  return {
+    nivel: "nacional",
+    valor: perCapita,
+    unidad: `USD/hab (trimestre ${remesas.fecha})`,
+    naturaleza: "calculo_directo",
+    fuenteEtiqueta: `${FUENTE_ETIQUETA_BANXICO} + INEGI (ITER, Censo 2020)`,
+  };
+}
+
 export async function resolverRemesasPerCapita(territorio: Territorio): Promise<CeldaFontana[]> {
+  const nacional = await resolverRemesasNacional();
   const municipal: CeldaFontana = {
     nivel: "municipal",
     motivo: "Banxico no publica remesas a nivel municipal con un mecanismo de serie individual confirmado",
   };
 
   if (!territorio.estado) {
-    return [{ nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" }, municipal];
+    return [nacional, { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" }, municipal];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
-    return [{ nivel: "estatal", motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, municipal];
+    return [nacional, { nivel: "estatal", motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, municipal];
   }
 
   let remesas: RemesaCache | null;
   try {
     remesas = await resolverRemesasEstatal(estadoCve);
   } catch {
-    return [{ nivel: "estatal", motivo: "Error de conexión con Banxico (SIE)" }, municipal];
+    return [nacional, { nivel: "estatal", motivo: "Error de conexión con Banxico (SIE)" }, municipal];
   }
   if (!remesas) {
-    return [{ nivel: "estatal", motivo: "Banxico no reportó remesas para este territorio (token ausente o serie no disponible)" }, municipal];
+    return [nacional, { nivel: "estatal", motivo: "Banxico no reportó remesas para este territorio (token ausente o serie no disponible)" }, municipal];
   }
 
   const piramideCeldas = await resolverIndicadorIter("F1-2", territorio);
   const celdaEstatal = piramideCeldas.find((c) => c.nivel === "estatal");
   if (!celdaEstatal || !esValorDisponible(celdaEstatal)) {
-    return [{ nivel: "estatal", motivo: "No fue posible resolver la población estatal (ITER) para calcular el per cápita" }, municipal];
+    return [nacional, { nivel: "estatal", motivo: "No fue posible resolver la población estatal (ITER) para calcular el per cápita" }, municipal];
   }
 
   const remesasUsd = remesas.remesasMillonesUsd * 1_000_000;
   const perCapita = Math.round((remesasUsd / celdaEstatal.valor) * 100) / 100;
 
   return [
+    nacional,
     {
       nivel: "estatal",
       valor: perCapita,

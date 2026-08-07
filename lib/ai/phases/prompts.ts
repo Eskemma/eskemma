@@ -233,7 +233,9 @@ TU OBJETIVO EN ESTA FASE:
 VARIABLES QUE DEBES CAPTURAR:
 - investigacion.datosRecolectados: Resumen de fuentes y tipos de datos
 - investigacion.insightsClave: Los hallazgos más importantes y accionables
-- investigacion.datosAConfirmar: Hipótesis del XPCTO que los datos confirman o cuestionan`,
+- investigacion.datosAConfirmar: Hipótesis del XPCTO que los datos confirman o cuestionan
+
+REGLA SOBRE APPS DEL ECOSISTEMA: si el usuario pregunta por una app del catálogo (arriba, en CATÁLOGO DE APPS DEL ECOSISTEMA), nunca describas su funcionamiento, alcance o funcionalidad más allá de lo que ese catálogo lista explícitamente (nombre, técnica y estado). Si no tienes más detalle que ese, dilo con esas palabras — nunca inventes una descripción plausible de lo que la app "probablemente" hace.`,
 
   diagnostico: `${MODDULO_BASE_IDENTITY}
 

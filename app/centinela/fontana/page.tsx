@@ -20,7 +20,7 @@ type Estado =
   | {
       tipo: "wizard";
       proyecto: { nombre: string; tipo: ProjectType; territorio: Territorio | null };
-      tareaPip: number;
+      pipItemId: string;
       minimosPreview: string[];
     }
   | { tipo: "sesion"; sesion: FontanaSesion };
@@ -28,20 +28,23 @@ type Estado =
 export default function FontanaPage() {
   const searchParams = useSearchParams();
   const modduloProjectId = searchParams.get("moddulo_project_id");
-  const tareaPip = searchParams.get("tarea_pip");
+  // El query param se sigue llamando `tarea_pip` (URL pública, no romper
+  // enlaces existentes), pero desde la migración a identidad estable su
+  // valor es un pipItemId (string), no el numero de despliegue.
+  const pipItemId = searchParams.get("tarea_pip");
 
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const [confirmando, setConfirmando] = useState(false);
 
   const cargar = useCallback(async () => {
-    if (!modduloProjectId || !tareaPip) {
+    if (!modduloProjectId || !pipItemId) {
       setEstado({ tipo: "sin_proyecto" });
       return;
     }
     setEstado({ tipo: "cargando" });
     try {
       const res = await fetch(
-        `/api/fontana/sesion?moddulo_project_id=${modduloProjectId}&tarea_pip=${tareaPip}`
+        `/api/fontana/sesion?moddulo_project_id=${modduloProjectId}&tarea_pip=${pipItemId}`
       );
       if (!res.ok) {
         const err = (await res.json()) as { error?: string };
@@ -55,27 +58,27 @@ export default function FontanaPage() {
         setEstado({
           tipo: "wizard",
           proyecto: data.proyecto,
-          tareaPip: data.tareaPip,
+          pipItemId: data.pipItemId,
           minimosPreview: data.minimosPreview,
         });
       }
     } catch {
       setEstado({ tipo: "error", mensaje: "Error de conexión al cargar Fontana." });
     }
-  }, [modduloProjectId, tareaPip]);
+  }, [modduloProjectId, pipItemId]);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
 
   async function handleConfirmarWizard() {
-    if (!modduloProjectId || !tareaPip) return;
+    if (!modduloProjectId || !pipItemId) return;
     setConfirmando(true);
     try {
       const res = await fetch("/api/fontana/sesion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modduloProjectId, tareaPip: Number(tareaPip) }),
+        body: JSON.stringify({ modduloProjectId, pipItemId }),
       });
       if (!res.ok) {
         const err = (await res.json()) as { error?: string };
@@ -94,7 +97,7 @@ export default function FontanaPage() {
   if (estado.tipo === "cargando") {
     return (
       <main className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620] flex items-center justify-center">
-        <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Cargando Fontana…</p>
+        <p className="text-sm text-red-eske">Cargando Fontana…</p>
       </main>
     );
   }

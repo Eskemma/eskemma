@@ -26,6 +26,7 @@ import { readFromBodega } from "@/lib/fontana/bodegaStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { sumarConteo } from "@/lib/fontana/ingesta/nacionalAgregado";
 import type { Territorio } from "@/types/shared.types";
 import type { NivelFontanaF1, ValorIndicadorFontana, CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -72,20 +73,64 @@ export async function resolverIndicadorIter(
   indicadorId: "F1-2" | "F1-11",
   territorio: Territorio
 ): Promise<CeldaFontana[]> {
+  const nacional = await resolverNacionalIter(indicadorId);
+
   if (!territorio.estado) {
     const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
-  return indicadorId === "F1-2"
-    ? resolverPiramide(estadoCve, territorio)
-    : resolverUrbanoRural(estadoCve, territorio);
+  const celdas = indicadorId === "F1-2"
+    ? await resolverPiramide(estadoCve, territorio)
+    : await resolverUrbanoRural(estadoCve, territorio);
+  return [nacional, ...celdas];
+}
+
+// Nacional — ni ITER expone una fila agregada de país (32 archivos por
+// estado, verificado en vivo) — Fontana suma los 32 registros ya en
+// Storage (mismos archivos *_estatal.json que ya lee resolverPiramide/
+// resolverUrbanoRural, sin nueva descarga). estimacion_agregada.
+export async function resolverNacionalIter(indicadorId: "F1-2" | "F1-11"): Promise<CeldaFontana> {
+  try {
+    if (indicadorId === "F1-2") {
+      const estatal = await readFromBodega<Record<string, PiramideRecord>>("iter_2020/piramide/estatal.json");
+      if (!estatal) return { nivel: "nacional", motivo: "Error de conexión con la bodega de datos" };
+      const distribucion: Record<string, number> = {};
+      for (const g of QUINQUENAL_GROUPS) distribucion[g] = sumarConteo(estatal, g);
+      return {
+        nivel: "nacional",
+        valor: sumarConteo(estatal, "POBTOT"),
+        distribucion,
+        unidad: "habitantes",
+        naturaleza: "estimacion_agregada",
+        fuenteEtiqueta: FUENTE_ETIQUETA_ITER,
+      };
+    }
+
+    const estatal = await readFromBodega<Record<string, UrbanoRuralRecord>>("iter_2020/urbano_rural/estatal.json");
+    if (!estatal) return { nivel: "nacional", motivo: "Error de conexión con la bodega de datos" };
+    const registros = Object.values(estatal);
+    const urbano = registros.reduce((acc, r) => acc + r.urbano, 0);
+    const rural = registros.reduce((acc, r) => acc + r.rural, 0);
+    const total = urbano + rural;
+    if (total === 0) return { nivel: "nacional", motivo: "INEGI no reportó clasificación urbano/rural" };
+    return {
+      nivel: "nacional",
+      valor: Math.round((urbano / total) * 10000) / 100,
+      distribucion: { urbano, rural },
+      unidad: "% urbano",
+      naturaleza: "estimacion_agregada",
+      fuenteEtiqueta: FUENTE_ETIQUETA_ITER,
+    };
+  } catch {
+    return { nivel: "nacional", motivo: "Error de conexión con la bodega de datos" };
+  }
 }
 
 async function resolverPiramide(estadoCve: string, territorio: Territorio): Promise<CeldaFontana[]> {

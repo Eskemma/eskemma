@@ -180,6 +180,12 @@ export default function ExploracionPage() {
   const [showReview, setShowReview] = useState(false);
   const [isClosingPhase, setIsClosingPhase] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  // Antes, un fallo de red/servidor en "Guardar cambios" quedaba en
+  // silencio: el botón volvía a su estado normal sin ninguna señal, y el
+  // usuario asumía que su edición (ej. una pregunta nueva del PIP) se
+  // había persistido cuando en realidad no. Ver docs de la investigación
+  // de propagación PIP→tablero F3.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
@@ -1060,6 +1066,7 @@ export default function ExploracionPage() {
     if (dvs !== null) {
       if (!draftDVS) return;
       setIsSaving(true);
+      setSaveError(null);
       try {
         const r = await fetch("/api/moddulo/f2/finalize-dvs", {
           method: "POST",
@@ -1076,9 +1083,15 @@ export default function ExploracionPage() {
             setMode("completed");
             setShowReporte(true);
             setLastSaved(new Date());
+          } else {
+            setSaveError("No se pudo guardar — respuesta inesperada del servidor. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
           }
+        } else {
+          setSaveError("No se pudo guardar los cambios. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
         }
-      } catch {/* silencioso */} finally {
+      } catch {
+        setSaveError("Error de conexión al guardar. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
+      } finally {
         setIsSaving(false);
       }
       return;
@@ -1086,13 +1099,19 @@ export default function ExploracionPage() {
 
     // ── Modo edición de formulario (dvs aún no existe) ───────────────────────
     setIsSaving(true);
+    setSaveError(null);
     try {
-      await fetch(`/api/moddulo/projects/${projectId}`, {
+      const rForm = await fetch(`/api/moddulo/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ phaseData: { phaseId: "exploracion", data: editForm } }),
       });
+      if (!rForm.ok) {
+        setSaveError("No se pudo guardar los cambios. Intenta de nuevo.");
+        setIsSaving(false);
+        return;
+      }
       setForm(structuredClone(editForm));
       setLastSaved(new Date());
 
@@ -1114,7 +1133,9 @@ export default function ExploracionPage() {
       const affected = await checkBackPropagation(projectId);
       if (affected.length > 0) setPropagationWarning(affected);
       else { setMode("completed"); setShowReporte(true); }
-    } catch {/* silencioso */} finally {
+    } catch {
+      setSaveError("Error de conexión al guardar. Intenta de nuevo.");
+    } finally {
       setIsSaving(false);
       setGenerandoDVS(false);
     }
@@ -1162,6 +1183,8 @@ export default function ExploracionPage() {
             <span className="text-xs hidden sm:block">
               {isSaving || generandoDVS ? (
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">{generandoDVS ? "Generando..." : "Guardando..."}</span>
+              ) : saveError ? (
+                <span className="text-red-eske font-medium">⚠ {saveError}</span>
               ) : lastSaved ? (
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
               ) : null}
@@ -1572,7 +1595,7 @@ export default function ExploracionPage() {
                     className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {pestlVia === "pestel" && pestProjectId
-                      ? pestStageLoading ? "Cargando…" : "Regresar a PESTEL →"
+                      ? pestStageLoading ? <span className="text-red-eske">Cargando…</span> : "Regresar a PESTEL →"
                       : "Abrir PESTEL"}
                   </button>
                 </div>

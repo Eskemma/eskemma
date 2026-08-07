@@ -192,7 +192,7 @@ function InlineEdit({
         type="button"
         onClick={() => { setDraft(value); setEditing(true); }}
         aria-label="Editar campo"
-        className="shrink-0 mt-0.5 text-gray-eske-30 dark:text-white/20 hover:text-bluegreen-eske dark:hover:text-bluegreen-eske opacity-0 group-hover:opacity-100 transition-all"
+        className="shrink-0 mt-0.5 text-gray-eske-60 dark:text-[#9AAEBE] hover:text-bluegreen-eske dark:hover:text-bluegreen-eske-20 transition-colors cursor-pointer"
       >
         <PencilIcon />
       </button>
@@ -321,7 +321,7 @@ function M3Panel({ actores, editable, onChange }: {
     next[i] = { ...next[i], ...patch };
     onChange(next);
   };
-  const add = () => onChange([...actores, { nombre: "", tipo: "", nivelRiesgo: "ambar", capacidadVeto: "", motivacion: "", requiereInvestigacion: false }]);
+  const add = () => onChange([...actores, { actorId: crypto.randomUUID(), nombre: "", tipo: "", nivelRiesgo: "ambar", capacidadVeto: "", motivacion: "", requiereInvestigacion: false }]);
   const remove = (i: number) => onChange(actores.filter((_, idx) => idx !== i));
 
   if (!actores.length && !editable)
@@ -330,7 +330,7 @@ function M3Panel({ actores, editable, onChange }: {
   return (
     <div className="space-y-3">
       {actores.map((actor, i) => (
-        <div key={i} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
+        <div key={actor.actorId ?? i} className="bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
           {editable ? (
             <>
               {/* Two-column layout: dot+nombre LEFT, select+X+desc RIGHT */}
@@ -349,7 +349,7 @@ function M3Panel({ actores, editable, onChange }: {
                 {/* RIGHT: select + delete button */}
                 <div className="flex items-center gap-1 shrink-0">
                   <SelectField value={actor.nivelRiesgo} onChange={(v) => update(i, { nivelRiesgo: v })} options={NIVEL_RIESGO_OPTS} />
-                  <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0 mt-0.5">
+                  <button type="button" onClick={() => remove(i)} aria-label="Eliminar actor" className="text-gray-eske-60 dark:text-[#9AAEBE] hover:text-red-eske dark:hover:text-red-eske transition-colors cursor-pointer shrink-0 mt-0.5">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -467,7 +467,7 @@ function M4Panel({ items, editable, onChange }: {
       {items.map((item, i) => (
         <div key={i} className="relative bg-white-eske dark:bg-[#1A3347] rounded-lg p-3 border border-gray-eske-20 dark:border-white/10 space-y-2">
           {editable && (
-            <button type="button" onClick={() => remove(i)} aria-label="Eliminar incertidumbre" className="absolute top-2 right-2 text-gray-eske-40 hover:text-red-eske transition-colors">
+            <button type="button" onClick={() => remove(i)} aria-label="Eliminar incertidumbre" className="absolute top-2 right-2 text-gray-eske-60 dark:text-[#9AAEBE] hover:text-red-eske dark:hover:text-red-eske transition-colors cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -527,7 +527,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
   onHEIChange: (h: HEIF2) => void; onPIPChange: (p: PIPItem[]) => void;
 }) {
   const updatePIP   = (i: number, patch: Partial<PIPItem>) => { const n = [...pip]; n[i] = { ...n[i], ...patch }; onPIPChange(n); };
-  const addPIP      = () => onPIPChange([...pip, { numero: pip.length + 1, pregunta: "", metodo: "", vinculoHito: "", orden: pip.length + 1, profundidad: "exploratoria" }]);
+  const addPIP      = () => onPIPChange([...pip, { pipItemId: crypto.randomUUID(), numero: pip.length + 1, pregunta: "", metodo: "", vinculoHito: "", orden: pip.length + 1, profundidad: "exploratoria" }]);
   const removePIP   = (i: number) => onPIPChange(pip.filter((_, idx) => idx !== i).map((p, idx) => ({ ...p, numero: idx + 1 })));
 
   const isEmpty = !hei.tensionCentral && !hei.contexto && pip.length === 0;
@@ -571,7 +571,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         onChange={(e) => { const a = [...hei.condicionesFavorables]; a[i] = e.target.value; onHEIChange({ ...hei, condicionesFavorables: a }); }}
                         className="flex-1 text-xs bg-transparent border-b border-gray-eske-20 dark:border-white/10 focus:outline-none focus:border-bluegreen-eske text-black-eske dark:text-[#C5D8E8] py-0.5"
                       />
-                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: hei.condicionesFavorables.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-30 hover:text-red-eske shrink-0 transition-colors">
+                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: hei.condicionesFavorables.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-60 dark:text-[#9AAEBE] hover:text-red-eske dark:hover:text-red-eske shrink-0 transition-colors cursor-pointer">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </li>
@@ -590,7 +590,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         onChange={(e) => { const a = [...hei.condicionesAdversas]; a[i] = e.target.value; onHEIChange({ ...hei, condicionesAdversas: a }); }}
                         className="flex-1 text-xs bg-transparent border-b border-gray-eske-20 dark:border-white/10 focus:outline-none focus:border-bluegreen-eske text-black-eske dark:text-[#C5D8E8] py-0.5"
                       />
-                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: hei.condicionesAdversas.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-30 hover:text-red-eske shrink-0 transition-colors">
+                      <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: hei.condicionesAdversas.filter((_, j) => j !== i) })} aria-label="Eliminar" className="text-gray-eske-60 dark:text-[#9AAEBE] hover:text-red-eske dark:hover:text-red-eske shrink-0 transition-colors cursor-pointer">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </li>
@@ -638,7 +638,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                       <div className="flex-1">
                         <InlineEdit value={item.vinculoHito} onChange={(v) => updatePIP(i, { vinculoHito: v })} placeholder="Vínculo al hito XPCTO…" rows={1} />
                       </div>
-                      <button type="button" onClick={() => removePIP(i)} aria-label="Eliminar pregunta" className="text-gray-eske-40 hover:text-red-eske transition-colors shrink-0 mt-0.5">
+                      <button type="button" onClick={() => removePIP(i)} aria-label="Eliminar pregunta" className="text-gray-eske-60 dark:text-[#9AAEBE] hover:text-red-eske dark:hover:text-red-eske transition-colors cursor-pointer shrink-0 mt-0.5">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>

@@ -13,9 +13,9 @@ import { asignacionNombreCorto, asignacionPrefijoCorto } from "@/lib/moddulo/asi
 // no existe en el proyecto; no se usa como fallback genérico. `estadoApp`
 // ya llega recalculado en vivo desde getProject() (lib/moddulo/project.ts),
 // nunca es un valor congelado del momento de generación del tablero.
-function asignacionHref(a: AsignacionCanal, projectId: string, tareaNumero: number): string | undefined {
+function asignacionHref(a: AsignacionCanal, projectId: string, pipItemId: string): string | undefined {
   if (a.canal !== "canal1" || a.tecnicaId !== "T10" || a.estadoApp !== "disponible") return undefined;
-  return `/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tareaNumero}`;
+  return `/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${pipItemId}`;
 }
 
 // Mismo esquema de 3 colores que ESTADO_COLORS en F3TareasPIP.tsx: naranja
@@ -54,7 +54,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
             const item = pip.find((p) => p.numero === t.numero);
             const s = semaforo(t, sintesis);
             return (
-              <li key={t.numero} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-2.5 bg-white-eske dark:bg-[#18324A]">
+              <li key={t.pipItemId} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-2.5 bg-white-eske dark:bg-[#18324A]">
                 <div className="flex items-start gap-2 text-xs lg:text-sm">
                   <span aria-hidden="true">{s.icon}</span>
                   <span className="min-w-0 flex-1">
@@ -63,7 +63,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
                     <span className="block mt-0.5 space-y-0.5">
                       {(t.asignaciones ?? []).map((a) => {
                         const nombre = asignacionNombreCorto(a);
-                        const href = asignacionHref(a, projectId, t.numero);
+                        const href = asignacionHref(a, projectId, t.pipItemId);
                         const prefijo = asignacionPrefijoCorto(a);
                         // Desactivada: burbuja y texto en gris neutro, sin
                         // mostrar la palabra de estado real aunque exista

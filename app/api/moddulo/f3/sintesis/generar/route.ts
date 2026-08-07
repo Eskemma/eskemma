@@ -12,7 +12,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { TareaPIP, PIPItem, SintesisF3, ActorVetoF2 } from "@/types/moddulo.types";
+import type { TareaPIP, PIPItem, SintesisF3, ActorVetoF2, FODAInsumo } from "@/types/moddulo.types";
 import { tareasConSustentoUnico } from "@/lib/moddulo/triangulacion";
 
 function extractText(response: Anthropic.Message): string {
@@ -120,6 +120,37 @@ Responde ÚNICAMENTE con JSON con esta forma exacta:
   } catch {
     return NextResponse.json({ error: "No se pudo parsear la respuesta de Claude", raw: raw.slice(0, 400) }, { status: 500 });
   }
+
+  // Claude recibe y devuelve `numero` (número de despliegue vigente al
+  // momento de este prompt) para referenciar cada vacío residual — se
+  // traduce aquí a `pipItemId` (identidad estable) contra el `pip` de esta
+  // misma ejecución, antes de persistir. `numero` NUNCA se persiste dentro
+  // de VacioResidual (se adjunta dinámicamente en getProject(), igual que
+  // en TareaPIP) — evita que un vacío quede con un numero congelado que se
+  // desalinee tras la siguiente edición del PIP.
+  const pipPorNumero = new Map(pip.map((p) => [p.numero, p]));
+  sintesis.vaciosResiduales = sintesis.vaciosResiduales.map((v) => ({
+    pipItemId: pipPorNumero.get(v.numero ?? -1)?.pipItemId ?? `unresolved-${v.numero}`,
+    ...(v.asignacionId ? { asignacionId: v.asignacionId } : {}),
+    pregunta: v.pregunta,
+    urgencia: v.urgencia,
+    destino: v.destino,
+  }));
+
+  // Claude recibe y devuelve el NOMBRE del actor como clave de
+  // fodaAdversariosInsumo (más natural para el modelo que manejar UUIDs) —
+  // se traduce aquí a `actorId` contra el semáforo vigente de esta misma
+  // ejecución, congelando `nombreActor` para poder seguir mostrando algo
+  // legible si el actor se renombra o se elimina después en F2. Nunca se
+  // persiste indexado por nombre — ver comentario en el tipo.
+  const actorPorNombre = new Map(actoresVeto.map((a) => [a.nombre, a]));
+  const fodaAdversariosPorActorId: Record<string, FODAInsumo & { nombreActor: string }> = {};
+  for (const [nombreClaude, foda] of Object.entries(sintesis.fodaAdversariosInsumo ?? {})) {
+    const actor = actorPorNombre.get(nombreClaude);
+    const actorId = actor?.actorId ?? `unresolved-${nombreClaude}`;
+    fodaAdversariosPorActorId[actorId] = { ...(foda as FODAInsumo), nombreActor: actor?.nombre ?? nombreClaude };
+  }
+  sintesis.fodaAdversariosInsumo = fodaAdversariosPorActorId;
 
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.investigacion.f3Sintesis": sintesis,

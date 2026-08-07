@@ -148,22 +148,37 @@ async function resolverRazDepMunicipal(estadoCve: string, municipioCve: string):
 }
 
 export async function resolverRazonDependencia(territorio: Territorio): Promise<CeldaFontana[]> {
+  const nacional = await resolverNacionalCelda();
+
   if (!territorio.estado) {
     const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
-    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
 
   const [estatal, municipal] = await Promise.all([
     resolverEstatalCelda(estadoCve),
     resolverMunicipalCelda(estadoCve, territorio),
   ]);
-  return [estatal, municipal];
+  return [nacional, estatal, municipal];
+}
+
+// Nacional — CONAPO publica RAZ_DEP directo a nivel país dentro del mismo
+// RESOURCE_ESTATAL (CVE_GEO=0, ENTIDAD="República Mexicana", verificado
+// en vivo) — sin agregación de Fontana. dato_directo.
+async function resolverNacionalCelda(): Promise<CeldaFontana> {
+  try {
+    const rec = await resolverRazDepEstatal("0");
+    if (!rec) return { nivel: "nacional", motivo: "CONAPO no reportó razón de dependencia nacional" };
+    return { nivel: "nacional", valor: rec.razDep, unidad: "razón de dependencia", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO };
+  } catch {
+    return { nivel: "nacional", motivo: "Error de conexión con CONAPO (datos.gob.mx)" };
+  }
 }
 
 async function resolverEstatalCelda(estadoCve: string): Promise<CeldaFontana> {

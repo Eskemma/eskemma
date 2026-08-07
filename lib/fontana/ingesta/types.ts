@@ -6,7 +6,11 @@
 
 import type { NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 
-export type NivelFontanaF1 = "estatal" | "municipal";
+// "nacional"/"distrital" se agregaron en el cierre de Familia 1
+// (2026-08-02) — solo ECEG los resuelve hoy; el resto de adaptadores
+// (iter/compendio/banxico/conapo) siguen regresando solo estatal/
+// municipal, subset válido del mismo tipo.
+export type NivelFontanaF1 = "nacional" | "estatal" | "distrital" | "municipal";
 
 export interface ValorIndicadorFontana {
   nivel: NivelFontanaF1;
@@ -18,6 +22,12 @@ export interface ValorIndicadorFontana {
   unidad?: string;
   naturaleza: NaturalezaDato;
   fuenteEtiqueta: string;
+  // Solo nivel "distrital" de ECEG — % de la población del distrito que
+  // sí logró vincularse a una sección con distrito asignado (cartografía
+  // 2025 vs. censo 2020, ver nota de cobertura en
+  // scripts/eceg-data-pipeline.ts). < 100 cuando el valor puede
+  // subestimar la cifra real.
+  coberturaPct?: number;
 }
 
 export interface CeldaNoDisponible {

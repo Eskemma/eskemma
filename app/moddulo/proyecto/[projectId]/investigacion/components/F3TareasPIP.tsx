@@ -39,26 +39,59 @@ interface Props {
   projectType: ProjectType;
   projectTerritory: Territorio | null;
   readOnly?: boolean;
-  onGenerar: () => Promise<void>;
+  onGenerar: (confirmar?: boolean) => Promise<void>;
+  conflictoRegenerar: {
+    mensaje: string;
+    resumen: { conResultadoAprobado: number; desactivadas: number; tareasAfectadas: { numero: number; pregunta: string; motivos: string[] }[] };
+  } | null;
+  onCancelarConflicto: () => void;
   onRefresh: () => void;
   generando: boolean;
 }
 
 export default function F3TareasPIP({
-  projectId, pip, tareas, projectType, projectTerritory, readOnly, onGenerar, onRefresh, generando,
+  projectId, pip, tareas, projectType, projectTerritory, readOnly, onGenerar, conflictoRegenerar, onCancelarConflicto, onRefresh, generando,
 }: Props) {
   const [expandedAsignacionId, setExpandedAsignacionId] = useState<string | null>(null);
 
   if (tareas.length === 0) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-3">
-          Aún no se ha generado el tablero de tareas a partir del PIP heredado de F2.
-        </p>
-        {!readOnly && (
-          <PillButton variant="solid" onClick={onGenerar} disabled={generando || pip.length === 0}>
-            {generando ? "Generando…" : "Generar tablero (M1)"}
-          </PillButton>
+        {conflictoRegenerar ? (
+          <div className="text-left bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3">
+            <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-2">
+              {conflictoRegenerar.mensaje}
+            </p>
+            {conflictoRegenerar.resumen.tareasAfectadas.length > 0 && (
+              <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-1 mb-2">
+                {conflictoRegenerar.resumen.tareasAfectadas.map((t) => (
+                  <li key={t.numero}>
+                    <span className="font-medium">P{t.numero} — {t.pregunta}:</span>{" "}
+                    {t.motivos.join("; ")}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex items-center justify-end gap-2 mt-2">
+              <PillButton variant="outline" onClick={onCancelarConflicto} disabled={generando}>
+                Cancelar
+              </PillButton>
+              <PillButton variant="solid" onClick={() => onGenerar(true)} disabled={generando}>
+                {generando ? "Regenerando…" : "Sí, perder el progreso y regenerar"}
+              </PillButton>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-3">
+              Aún no se ha generado el tablero de tareas a partir del PIP heredado de F2.
+            </p>
+            {!readOnly && (
+              <PillButton variant="solid" onClick={() => onGenerar(false)} disabled={generando || pip.length === 0}>
+                {generando ? "Generando…" : "Generar tablero (M1)"}
+              </PillButton>
+            )}
+          </>
         )}
       </div>
     );
@@ -79,7 +112,7 @@ export default function F3TareasPIP({
           (a, b) => (a.canal === "canal1" ? 0 : 1) - (b.canal === "canal1" ? 0 : 1)
         );
         return (
-          <div key={tarea.numero} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-3 bg-white-eske dark:bg-[#18324A]">
+          <div key={tarea.pipItemId} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-3 bg-white-eske dark:bg-[#18324A]">
             <p className="text-xs lg:text-sm font-semibold text-bluegreen-eske dark:text-blue-eske-10">
               P{tarea.numero} — {item?.pregunta ?? "Necesidad de información"}
             </p>
@@ -117,7 +150,7 @@ export default function F3TareasPIP({
                             await fetch("/api/moddulo/f3/tareas/aprobar", {
                               method: "POST", headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
-                                projectId, numero: tarea.numero, asignacionId: asig.asignacionId,
+                                projectId, pipItemId: tarea.pipItemId, asignacionId: asig.asignacionId,
                                 activada: e.target.value === "activada",
                               }),
                             });
@@ -154,7 +187,7 @@ export default function F3TareasPIP({
                           // Único destino real de Canal 1 hoy — navega directo,
                           // no alterna el panel expandido (no hay nada que
                           // expandir: la acción ES la navegación).
-                          <Link href={`/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tarea.numero}`}>
+                          <Link href={`/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tarea.pipItemId}`}>
                             <PillButton className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20">
                               Activar app
                             </PillButton>

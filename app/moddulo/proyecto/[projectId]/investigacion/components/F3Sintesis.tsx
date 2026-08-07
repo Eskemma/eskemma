@@ -2,7 +2,7 @@
 // insumos de FODA Propio / FODA de Adversarios.
 "use client";
 
-import type { SintesisF3, FODAInsumo } from "@/types/moddulo.types";
+import type { SintesisF3, FODAInsumo, ActorVetoF2 } from "@/types/moddulo.types";
 import PillButton from "@/app/moddulo/components/PillButton";
 
 function FODAGrid({ foda }: { foda: FODAInsumo }) {
@@ -29,9 +29,10 @@ function FODAGrid({ foda }: { foda: FODAInsumo }) {
 }
 
 export default function F3Sintesis({
-  sintesis, readOnly, onGenerar, generando, puedeGenerar,
+  sintesis, actoresVeto, readOnly, onGenerar, generando, puedeGenerar,
 }: {
   sintesis: SintesisF3 | undefined;
+  actoresVeto: ActorVetoF2[];
   readOnly?: boolean;
   onGenerar: () => Promise<void>;
   generando: boolean;
@@ -93,7 +94,7 @@ export default function F3Sintesis({
           {vaciosResiduales.length === 0 ? (
             <p className="text-xs lg:text-sm opacity-60">Ninguno</p>
           ) : vaciosResiduales.map((v) => (
-            <div key={v.numero} className="flex items-center justify-between text-xs lg:text-sm px-2 py-1 rounded bg-gray-eske-10/60 dark:bg-white/5">
+            <div key={v.pipItemId} className="flex items-center justify-between text-xs lg:text-sm px-2 py-1 rounded bg-gray-eske-10/60 dark:bg-white/5">
               <span className="text-bluegreen-eske font-semibold">P{v.numero} — {v.pregunta}</span>
               <span className={`px-1.5 py-0.5 rounded-full font-medium ${v.destino === "RDA" ? "bg-red-eske/10 text-red-eske" : "bg-bluegreen-eske/10 text-bluegreen-eske"}`}>
                 {v.destino} · {v.urgencia}
@@ -106,14 +107,27 @@ export default function F3Sintesis({
         <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Insumo FODA Propio</p>
         <FODAGrid foda={fodaPropioInsumo} />
       </div>
-      {Object.entries(fodaAdversariosInsumo).map(([nombre, foda]) => (
-        <div key={nombre}>
-          <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">
-            Insumo FODA — {nombre}
-          </p>
-          <FODAGrid foda={foda} />
-        </div>
-      ))}
+      {Object.entries(fodaAdversariosInsumo).map(([actorId, foda]) => {
+        // El actor pudo renombrarse o eliminarse en F2 desde que se generó
+        // esta síntesis — se prefiere el nombre VIGENTE del semáforo actual
+        // (la edición se refleja sola, sin regenerar nada); si el actor ya
+        // no existe, se usa el nombre congelado al momento de generar, con
+        // una nota — el contenido del FODA nunca se pierde ni queda huérfano
+        // sin explicación.
+        const actorVigente = actoresVeto.find((a) => a.actorId === actorId);
+        const nombreMostrado = actorVigente?.nombre ?? foda.nombreActor ?? actorId;
+        return (
+          <div key={actorId}>
+            <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+              Insumo FODA — {nombreMostrado}
+              {!actorVigente && (
+                <span className="ml-1.5 normal-case font-normal text-gray-eske-50 dark:text-[#6D8294]">(ya no está en el Semáforo vigente)</span>
+              )}
+            </p>
+            <FODAGrid foda={foda} />
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -12,6 +12,9 @@ import type {
   LinkedSourceRef,
   TareaPIP,
   AsignacionCanal,
+  PIPItem,
+  VacioResidual,
+  ActorVetoF2,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import { APP_TO_F3_CONTRACTS } from "@/types/f3.types";
@@ -45,6 +48,7 @@ function recalcularEstadoApp(a: AsignacionCanal): AsignacionCanal {
 // asignación primaria a partir de los campos planos que sí existen.
 interface LegacyTareaPIP {
   numero: number;
+  pipItemId?: string;
   canalAsignado?: "canal1" | "canal2" | "canal3";
   tecnicaId?: string;
   estado?: "pendiente" | "en_curso" | "recibido" | "derivado";
@@ -53,19 +57,32 @@ interface LegacyTareaPIP {
   asignaciones?: TareaPIP["asignaciones"];
 }
 
+// Id sintético determinístico para PIPItem/TareaPIP/VacioResidual legados
+// que no tienen pipItemId todavía — mismo criterio que el resto de este
+// archivo: nunca fabricar un valor con significado nuevo, solo el
+// equivalente seguro de lo que ya existía (numero era la única correlación
+// disponible antes de este campo). Determinístico y estable entre lecturas
+// (no aleatorio) para que dos generaciones/lecturas del mismo documento
+// legado sigan correlacionando igual, incluyendo el snapshot de propagación
+// PIP→tablero (lib/moddulo/pipPropagation.ts).
+function legacyPipItemId(numero: number): string {
+  return `legacy-${numero}`;
+}
+
 function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
+  const pipItemId = t.pipItemId ?? legacyPipItemId(t.numero);
   if (Array.isArray(t.asignaciones)) {
     // Defensivo: asignaciones de antes de la Ronda 5 (activar/desactivar
     // por asignación) no traen el campo `activada` — se normaliza a `true`
     // (mismo criterio que el resto de este archivo: nunca fabricar un
     // valor con significado, solo el default seguro).
     return {
-      numero: t.numero,
+      pipItemId,
       asignaciones: t.asignaciones.map((a) => recalcularEstadoApp({ ...a, activada: a.activada ?? true })),
     };
   }
   return {
-    numero: t.numero,
+    pipItemId,
     asignaciones: [
       recalcularEstadoApp({
         asignacionId: `${t.numero}-0`,
@@ -79,6 +96,42 @@ function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
       }),
     ],
   };
+}
+
+// Backfill de pipItemId en el PIP de F2 — mismo criterio determinístico que
+// normalizeTareaPIP. Se hace en lectura, nunca se escribe de vuelta a
+// Firestore aquí (igual que el resto de esta normalización).
+function normalizePIPItem(p: PIPItem & { pipItemId?: string }): PIPItem {
+  return { ...p, pipItemId: p.pipItemId ?? legacyPipItemId(p.numero) };
+}
+
+function normalizeVacioResidual(v: VacioResidual & { pipItemId?: string }): VacioResidual {
+  // v.numero siempre viene poblado en datos legados (era campo requerido
+  // antes de esta migración) — el fallback a 0 es solo para satisfacer el
+  // tipo ahora que numero es opcional (adjuntado en lectura de aquí en más).
+  return { ...v, pipItemId: v.pipItemId ?? legacyPipItemId(v.numero ?? 0) };
+}
+
+// Adjunta `numero` (número de despliegue) a cada TareaPIP/VacioResidual
+// según la posición ACTUAL de su pipItemId dentro del PIP vigente — nunca
+// se persiste este valor de vuelta a Firestore (ver comentario en
+// TareaPIP.numero/VacioResidual.numero, types/moddulo.types.ts). Un
+// pipItemId que ya no existe en el PIP vigente (huérfano — no debería
+// ocurrir tras pasar por tareas/sincronizar, pero es posible en proyectos
+// que aún no se han sincronizado) se deja sin numero en vez de fabricar uno.
+export function attachNumero<T extends { pipItemId: string }>(items: T[], pip: PIPItem[]): (T & { numero?: number })[] {
+  const posicionPorPipItemId = new Map(pip.map((p, idx) => [p.pipItemId, idx + 1]));
+  return items.map((item) => ({ ...item, numero: posicionPorPipItemId.get(item.pipItemId) }));
+}
+
+// Backfill de actorId en el Semáforo de Veto — mismo criterio determinístico
+// que legacyPipItemId (basado en el único dato que sí existía antes: el
+// nombre). Actores legados que se rendericen dos veces con el mismo nombre
+// obtienen el mismo id sintético — no es un problema porque solo importa
+// para correlacionar con SintesisF3.fodaAdversariosInsumo generado ANTES de
+// este campo, cuyas claves ya eran el nombre crudo.
+function normalizeActorVeto(a: ActorVetoF2 & { actorId?: string }): ActorVetoF2 {
+  return { ...a, actorId: a.actorId ?? `legacy-${a.nombre}` };
 }
 
 // ==========================================
@@ -213,12 +266,40 @@ export async function getProject(
 
   const { id: _id, ...rest } = data as ModduloProject & { id?: string };
 
+  // Backfill de pipItemId en el PIP de F2 — proyectos creados antes de este
+  // campo no lo tienen. Debe ocurrir ANTES de normalizar f3TareasPIP/
+  // vaciosResiduales para que ambos lados correlacionen con el mismo
+  // esquema sintético determinístico (legacyPipItemId).
+  const dvs = rest.phases?.exploracion?.dvs;
+  const pip = dvs?.pip as unknown as (PIPItem & { pipItemId?: string })[] | undefined;
+  if (dvs && Array.isArray(pip)) {
+    dvs.pip = pip.map(normalizePIPItem);
+  }
+  const pipVigente = (rest.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
+
+  // Backfill de actorId en el Semáforo de Veto — mismo momento/criterio que
+  // el backfill de pipItemId de arriba.
+  const semaforo = dvs?.semaforo as unknown as (ActorVetoF2 & { actorId?: string })[] | undefined;
+  if (dvs && Array.isArray(semaforo)) {
+    dvs.semaforo = semaforo.map(normalizeActorVeto);
+  }
+
   // Normaliza f3TareasPIP heredado del esquema anterior (un canal por
   // tarea) al esquema actual (asignaciones[]) — proyectos reales creados
   // antes del rediseño de F3 siguen con el formato viejo en Firestore.
+  // También adjunta `numero` (nunca persistido) según la posición vigente
+  // del pipItemId en el PIP actual — ver attachNumero().
   const f3Tareas = rest.phases?.investigacion?.f3TareasPIP as unknown as LegacyTareaPIP[] | undefined;
   if (Array.isArray(f3Tareas)) {
-    rest.phases.investigacion.f3TareasPIP = f3Tareas.map(normalizeTareaPIP);
+    rest.phases.investigacion.f3TareasPIP = attachNumero(f3Tareas.map(normalizeTareaPIP), pipVigente);
+  }
+
+  // Mismo backfill + adjunto de numero para los vacíos residuales de la
+  // síntesis (M3) — alimentan el id del RDA (lib/moddulo/criterios-investigacion.ts)
+  // y deben sobrevivir a una reindexación del PIP igual que f3TareasPIP.
+  const vacios = rest.phases?.investigacion?.f3Sintesis?.vaciosResiduales as unknown as (VacioResidual & { pipItemId?: string })[] | undefined;
+  if (Array.isArray(vacios)) {
+    rest.phases.investigacion.f3Sintesis!.vaciosResiduales = attachNumero(vacios.map(normalizeVacioResidual), pipVigente);
   }
 
   return { id: snap.id, ...rest };

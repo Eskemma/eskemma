@@ -35,13 +35,9 @@ export const FAMILIA1_NOMBRES: Record<string, string> = {
   "F1-19": "% Población indígena monolingüe",
 };
 
-// Cierre de incremento (2026-07-31): F1-2, F1-11, F1-16, F1-17, F1-18 ya
-// tienen conector real (lib/fontana/ingesta/{iter,compendio,banxico,conapo}.ts).
-// Quedan solo F1-10 y F1-12, bloqueados en ECEG — sus claves crudas
-// (VPH_C_SERV, P12YM_SOLT/CASA/SEPA) nunca se extrajeron del ECEG crudo,
-// no están en CURATED_COLUMNS de scripts/eceg-data-pipeline.ts ni en
-// ningún JSON ya subido a Storage. Pendiente de que se reprocesen los
-// XLSX crudos (workstream aparte).
-export const FAMILIA1_DIFERIDOS = new Set([
-  "F1-10", "F1-12",
-]);
+// Cierre de Familia 1 (2026-08-02): los 19 indicadores tienen conector
+// real — F1-10/F1-12 se desbloquearon extendiendo CURATED_COLUMNS de
+// scripts/eceg-data-pipeline.ts y re-ejecutando el pipeline de ECEG.
+// Conjunto vacío conservado (no eliminado) porque FontanaComparativeTable
+// y el resto del código que lo consulta esperan que exista.
+export const FAMILIA1_DIFERIDOS = new Set<string>([]);

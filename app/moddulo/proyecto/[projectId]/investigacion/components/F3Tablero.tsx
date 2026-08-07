@@ -16,6 +16,8 @@ import F3Veredicto from "./F3Veredicto";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
+import type { PipCambio } from "@/lib/moddulo/pipPropagation";
+import PillButton from "@/app/moddulo/components/PillButton";
 
 const URGENCIA_LABEL: Record<string, string> = { alta: "Alta", media: "Media", baja: "Baja" };
 const NIVEL_RIESGO_LABEL: Record<string, string> = { rojo: "🔴 Rojo", ambar: "🟡 Ámbar", verde: "🟢 Verde" };
@@ -79,7 +81,15 @@ interface Props {
   sintesis: SintesisF3 | undefined;
   veredicto: VeredictoHEI | undefined;
   readOnly?: boolean;
-  onGenerarTareas: () => Promise<void>;
+  onGenerarTareas: (confirmar?: boolean) => Promise<void>;
+  conflictoRegenerar: {
+    mensaje: string;
+    resumen: { conResultadoAprobado: number; desactivadas: number; tareasAfectadas: { numero: number; pregunta: string; motivos: string[] }[] };
+  } | null;
+  onCancelarConflicto: () => void;
+  pipStaleChanges: PipCambio[];
+  sincronizandoPip: boolean;
+  onSincronizarTablero: () => Promise<void>;
   onRefresh: () => void;
   onGenerarSintesis: () => Promise<void>;
   onGenerarVeredicto: () => Promise<void>;
@@ -93,7 +103,8 @@ interface Props {
 export default function F3Tablero({
   projectId, projectType, projectTerritory, pip, incertidumbres, hei, semaforo,
   tareas, resultados, sintesis, veredicto, readOnly,
-  onGenerarTareas, onRefresh, onGenerarSintesis, onGenerarVeredicto, onAprobarVeredicto,
+  onGenerarTareas, conflictoRegenerar, onCancelarConflicto, pipStaleChanges, sincronizandoPip, onSincronizarTablero,
+  onRefresh, onGenerarSintesis, onGenerarVeredicto, onAprobarVeredicto,
   generandoTareas, generandoSintesis, generandoVeredicto, aprobandoVeredicto,
 }: Props) {
   const [modalAbierto, setModalAbierto] = useState<"incertidumbres" | "semaforo" | null>(null);
@@ -101,6 +112,46 @@ export default function F3Tablero({
 
   return (
     <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-6">
+      {/* Propagación PIP(F2)→tablero(F3) — mismo estilo visual que el
+          banner de staleness XPCTO en exploracion/page.tsx. Solo tiene
+          sentido mostrarlo cuando ya hay tablero generado (readOnly o no):
+          si el tablero está vacío, "Generar tablero" ya cubre el PIP
+          vigente completo. */}
+      {!readOnly && pipStaleChanges.length > 0 && tareas.length > 0 && (
+        <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+                El PIP cambió desde que se generó el tablero de investigación.
+              </p>
+              <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
+                {pipStaleChanges.slice(0, 3).map((c) => (
+                  <li key={c.pipItemId}>
+                    {c.tipo === "agregada" && <>Pregunta agregada: <span className="font-medium">{c.pregunta}</span></>}
+                    {c.tipo === "editada" && <>Pregunta editada: <span className="line-through opacity-60">{c.preguntaAnterior.slice(0, 40)}</span> {" → "}{c.pregunta.slice(0, 40)}</>}
+                    {c.tipo === "eliminada" && <>Pregunta eliminada: <span className="line-through opacity-60">{c.preguntaAnterior}</span></>}
+                  </li>
+                ))}
+                {pipStaleChanges.length > 3 && (
+                  <li className="opacity-60">+{pipStaleChanges.length - 3} cambios más</li>
+                )}
+              </ul>
+              <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
+                Las tareas no afectadas conservan su progreso (asignaciones, resultados aprobados, vías desactivadas). Las preguntas editadas se regeneran desde cero.
+              </p>
+            </div>
+            <PillButton
+              variant="solid"
+              onClick={onSincronizarTablero}
+              disabled={sincronizandoPip}
+              className="shrink-0 whitespace-nowrap"
+            >
+              {sincronizandoPip ? "Sincronizando…" : "Sincronizar tablero ↺"}
+            </PillButton>
+          </div>
+        </div>
+      )}
+
       {/* Resumen heredado de F2 */}
       <section>
         <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-2">
@@ -148,6 +199,8 @@ export default function F3Tablero({
           projectTerritory={projectTerritory}
           readOnly={readOnly}
           onGenerar={onGenerarTareas}
+          conflictoRegenerar={conflictoRegenerar}
+          onCancelarConflicto={onCancelarConflicto}
           onRefresh={onRefresh}
           generando={generandoTareas}
         />
@@ -177,6 +230,7 @@ export default function F3Tablero({
         </h2>
         <F3Sintesis
           sintesis={sintesis}
+          actoresVeto={semaforo}
           readOnly={readOnly}
           onGenerar={onGenerarSintesis}
           generando={generandoSintesis}

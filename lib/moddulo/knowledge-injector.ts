@@ -1,7 +1,7 @@
 // lib/moddulo/knowledge-injector.ts
 // Builds the knowledge context block injected at the start of each Claude system prompt.
 // Selection logic is per-phase, as defined in docs/moddulo/arquitectura/knowledge-base-injection.md.
-import type { PhaseId } from "@/types/moddulo.types";
+import type { PhaseId, PIPItem, TareaPIP } from "@/types/moddulo.types";
 import type {
   RAEAxioma,
   RPFEntry,
@@ -19,6 +19,9 @@ import {
   getKPIsByType,
   getKPIsByIds,
 } from "./knowledge-repository";
+import { NOMBRES_COMERCIALES, TECNICA_TITULOS, APP_TO_F3_CONTRACTS } from "@/types/f3.types";
+import { asignacionEtiquetaCompleta } from "./asignacionLabel";
+import type { TecnicaId } from "@/types/shared.types";
 
 // ==========================================
 // CAP DE AXIOMAS POR VARIABLE XPCTO
@@ -102,12 +105,15 @@ export interface BuildPhaseContextParams {
   maniobra?: string;
   // IDs of KPIs confirmed in F6 — used in F7 and F8
   kpisSeleccionados?: string[];
+  // F3 only — PIP heredado de F2 y tablero de tareas actual, si ya existen.
+  pip?: PIPItem[];
+  tareas?: TareaPIP[];
 }
 
 export async function buildPhaseContext(
   params: BuildPhaseContextParams
 ): Promise<string> {
-  const { phaseId, projectType, maniobra, kpisSeleccionados } = params;
+  const { phaseId, projectType, maniobra, kpisSeleccionados, pip, tareas } = params;
   const phaseNum = PHASE_NUMBER[phaseId];
 
   const sections: string[] = [];
@@ -137,6 +143,16 @@ export async function buildPhaseContext(
     if (axiomas.length > 0) {
       sections.push(formatRAE(axiomas, raeVersion));
     }
+  }
+
+  // ---- Catálogo de apps del ecosistema + PIP + tablero (F3 only) ----
+  // Agnóstico a cualquier app específica: se lee dinámicamente de
+  // NOMBRES_COMERCIALES/APP_TO_F3_CONTRACTS — una técnica nueva con
+  // contrato poblado queda disponible en el contexto sin tocar esta función.
+  if (phaseNum === 3) {
+    sections.push(formatCatalogoApps());
+    if (pip && pip.length > 0) sections.push(formatPIP(pip));
+    if (tareas && tareas.length > 0) sections.push(formatTableroF3(tareas));
   }
 
   // ---- MEC, MVP, FODA (F4 only) ----
@@ -210,6 +226,66 @@ function formatRAE(axiomas: RAEAxioma[], version: string): string {
       lines.push(`Variable XPCTO: ${a.variable_xpcto.join(", ")}`);
     }
     lines.push(`Aplicación: ${a.protocolo_accion}`);
+    lines.push("---");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Catálogo de las 35 técnicas MMEE con su nombre comercial y estado real
+ * (disponible = tiene entrada poblada en APP_TO_F3_CONTRACTS, próximamente
+ * si no). Deliberadamente sin descripción extendida — solo lo necesario
+ * para identificar qué apps existen y en qué estado, sin dar pie a que el
+ * modelo infiera o invente funcionalidad no confirmada.
+ */
+function formatCatalogoApps(): string {
+  const lines: string[] = [
+    "=== CATÁLOGO DE APPS DEL ECOSISTEMA (Canal 1 — F3 Investigación) ===",
+    "Estas son las únicas apps reales del ecosistema Eskemma que pueden cubrir una tarea del tablero como Canal 1. 'disponible' significa que la app tiene un contrato activo con F3 y puede usarse ya; 'próximamente' significa que la técnica existe en el catálogo metodológico pero la app todavía no está construida ni conectada — no tiene ninguna funcionalidad operativa hoy.",
+    "REGLA OBLIGATORIA: no describas el funcionamiento interno, alcance o funcionalidad de ninguna app más allá de su nombre, técnica y estado listados aquí. Si el usuario pide más detalle del que aparece en este catálogo, dile explícitamente que no tienes esa información todavía — nunca inventes ni infieras qué hace una app.",
+    "",
+  ];
+
+  const tecnicaIds = Object.keys(TECNICA_TITULOS) as TecnicaId[];
+  for (const id of tecnicaIds) {
+    const estado = APP_TO_F3_CONTRACTS[id] ? "disponible" : "próximamente";
+    lines.push(`${id} — ${NOMBRES_COMERCIALES[id]} (${TECNICA_TITULOS[id]}) — ${estado}`);
+  }
+
+  return lines.join("\n");
+}
+
+/** PIP heredado de F2 — contexto para que el chat de F3 sepa qué preguntas está investigando el proyecto. */
+function formatPIP(pip: PIPItem[]): string {
+  const lines: string[] = [
+    "=== PROGRAMA DE INVESTIGACIÓN PROFUNDA (PIP, heredado de F2) ===",
+    "",
+  ];
+
+  for (const item of [...pip].sort((a, b) => a.orden - b.orden)) {
+    lines.push(`P${item.numero} — ${item.pregunta}`);
+    lines.push(`Método: ${item.metodo} · Profundidad: ${item.profundidad} · Vínculo con el hito: ${item.vinculoHito}`);
+    lines.push("---");
+  }
+
+  return lines.join("\n");
+}
+
+/** Tablero de tareas actual (M1) — qué vía(s) cubre cada pregunta y en qué estado. */
+function formatTableroF3(tareas: TareaPIP[]): string {
+  const lines: string[] = [
+    "=== TABLERO DE TAREAS ACTUAL (M1) ===",
+    "",
+  ];
+
+  for (const tarea of tareas) {
+    lines.push(`P${tarea.numero}:`);
+    for (const a of tarea.asignaciones ?? []) {
+      const etiqueta = asignacionEtiquetaCompleta(a);
+      const activa = a.activada ? "activada" : "desactivada";
+      lines.push(`  - ${etiqueta} — estado: ${a.estado} (${activa})`);
+    }
     lines.push("---");
   }
 

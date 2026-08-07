@@ -10,11 +10,11 @@
 // the tooltip fully visible on mobile even when the trigger sits near a
 // screen edge — a plain CSS left/right offset isn't enough there.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export interface InfoTooltipProps {
-  /** Main explanation of what the field/action does and why it matters */
-  content: string;
+  /** Main explanation of what the field/action does and why it matters — string o JSX (ej. con <strong> para resaltar un número dentro del texto) */
+  content: ReactNode;
   /** Optional short example to illustrate (shown after content) */
   example?: string;
   /**
@@ -23,7 +23,17 @@ export interface InfoTooltipProps {
    * (which renders a hardcoded "Ej:" label; not appropriate for a source).
    */
   fuente?: string;
-  /** Additional CSS classes for the trigger button */
+  /**
+   * Custom trigger content — replaces the default "i" icon. Use this to
+   * make an existing element (e.g. a badge) clickable to open the same
+   * tooltip panel, without adding a separate (i) icon next to it. The
+   * element is still wrapped in the same <button> (same a11y/positioning
+   * behavior) — pass only the visual content, not your own <button>.
+   */
+  trigger?: ReactNode;
+  /** Overrides the default "i" icon button classes when `trigger` is set */
+  triggerClassName?: string;
+  /** Additional CSS classes for the trigger's wrapping <span> */
   className?: string;
   /**
    * Initial alignment hint relative to the trigger button.
@@ -39,6 +49,8 @@ export default function InfoTooltip({
   content,
   example,
   fuente,
+  trigger,
+  triggerClassName,
   className = "",
   placement = "right",
 }: InfoTooltipProps) {
@@ -133,18 +145,21 @@ export default function InfoTooltip({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={tooltipId}
-        aria-label="Más información"
-        className={[
-          "inline-flex items-center justify-center",
-          "w-4 h-4 rounded-full text-[10px] font-bold leading-none",
-          "bg-bluegreen-eske/10 text-bluegreen-eske",
-          "hover:bg-bluegreen-eske/20 transition-colors",
-          "focus:outline-none focus-visible:ring-2",
-          "focus-visible:ring-bluegreen-eske focus-visible:ring-offset-1",
-          "cursor-pointer shrink-0",
-        ].join(" ")}
+        aria-label={trigger ? undefined : "Más información"}
+        className={
+          triggerClassName ??
+          [
+            "inline-flex items-center justify-center",
+            "w-4 h-4 rounded-full text-[10px] font-bold leading-none",
+            "bg-bluegreen-eske/10 text-bluegreen-eske",
+            "hover:bg-bluegreen-eske/20 transition-colors",
+            "focus:outline-none focus-visible:ring-2",
+            "focus-visible:ring-bluegreen-eske focus-visible:ring-offset-1",
+            "cursor-pointer shrink-0",
+          ].join(" ")
+        }
       >
-        i
+        {trigger ?? "i"}
       </button>
 
       {open && (
@@ -173,12 +188,16 @@ export default function InfoTooltip({
               se vean casi iguales) y sin leading-relaxed (la HEI no fuerza
               ningún leading-*, así que usa el companion line-height por
               defecto de Tailwind para su tamaño). */}
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{content}</p>
+          {/* text-left explícito: el panel es position:fixed pero text-align
+              SÍ hereda de ancestros en el DOM (ej. una tabla o modal con
+              text-center) — sin esto, el contenido se veía centrado cuando
+              el trigger vivía dentro de un contexto centrado. */}
+          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8] text-left">{content}</p>
           {fuente && (
-            <p className="text-[10px] lg:text-[12px] italic text-gray-eske-60 dark:text-[#6D8294]">{fuente}</p>
+            <p className="text-[10px] lg:text-[12px] italic text-gray-eske-60 dark:text-[#6D8294] text-left">{fuente}</p>
           )}
           {example && (
-            <p className="text-xs lg:text-sm text-gray-eske-60 dark:text-[#6D8294] italic border-t border-gray-eske-10 dark:border-white/10 pt-1.5">
+            <p className="text-xs lg:text-sm text-gray-eske-60 dark:text-[#6D8294] italic border-t border-gray-eske-10 dark:border-white/10 pt-1.5 text-left">
               <span className="not-italic font-medium text-gray-eske-70 dark:text-[#9AAEBE]">
                 Ej:{" "}
               </span>

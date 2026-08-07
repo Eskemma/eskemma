@@ -19,10 +19,10 @@ const COLLECTION = "fontana_sesiones";
 function resolverPreguntaYJustificacion(
   pip: PIPItem[],
   f3Tareas: TareaPIP[],
-  tareaPipNumero: number
+  pipItemId: string
 ): { pregunta: string; justificacion?: string } {
-  const item = pip.find((p) => p.numero === tareaPipNumero);
-  const tarea = f3Tareas.find((t) => t.numero === tareaPipNumero);
+  const item = pip.find((p) => p.pipItemId === pipItemId);
+  const tarea = f3Tareas.find((t) => t.pipItemId === pipItemId);
   const asignacion = tarea?.asignaciones.find(
     (a) => a.canal === "canal1" && a.tecnicaId === "T10"
   );
@@ -65,21 +65,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ existe: true, sesion: existente }, { status: 200 });
   }
 
-  const tareaPip = tareaPipParam ? Number(tareaPipParam) : null;
-  if (tareaPip === null || Number.isNaN(tareaPip)) {
-    return NextResponse.json({ error: "tarea_pip es requerido y debe ser numérico" }, { status: 400 });
+  if (!tareaPipParam) {
+    return NextResponse.json({ error: "tarea_pip es requerido" }, { status: 400 });
   }
+  const pipItemId = tareaPipParam;
 
   const pip = (project.phases?.investigacion?.pip ?? project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const f3Tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
-  const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, tareaPip);
+  const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, pipItemId);
   const minimosPreview = derivarMinimosFamilia1(pregunta, justificacion);
 
   return NextResponse.json(
     {
       existe: false,
       proyecto: { nombre: project.name, tipo: project.type, territorio: project.territorio ?? null },
-      tareaPip,
+      pipItemId,
       minimosPreview,
     },
     { status: 200 }
@@ -92,16 +92,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { modduloProjectId?: string; tareaPip?: number };
+  let body: { modduloProjectId?: string; pipItemId?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { modduloProjectId, tareaPip } = body;
-  if (!modduloProjectId || typeof tareaPip !== "number") {
-    return NextResponse.json({ error: "modduloProjectId y tareaPip son requeridos" }, { status: 400 });
+  const { modduloProjectId, pipItemId } = body;
+  if (!modduloProjectId || typeof pipItemId !== "string") {
+    return NextResponse.json({ error: "modduloProjectId y pipItemId son requeridos" }, { status: 400 });
   }
 
   const project = await getProject(modduloProjectId, session.uid);
@@ -118,14 +118,14 @@ export async function POST(request: NextRequest) {
   // haber viajado al cliente en el GET previo.
   const pip = (project.phases?.investigacion?.pip ?? project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const f3Tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
-  const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, tareaPip);
+  const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, pipItemId);
   const minimos = derivarMinimosFamilia1(pregunta, justificacion);
 
   const nowIso = new Date().toISOString();
   const nuevaSesion: Omit<FontanaSesion, "sesionId"> = {
     uid: session.uid,
     modduloProjectId,
-    tareaPipIds: [String(tareaPip)],
+    tareaPipIds: [pipItemId],
     tipoProyecto: project.type,
     territorio: project.territorio ?? { nivel: "nacional", nombre: "México" },
     indicadoresPorFamilia: {
