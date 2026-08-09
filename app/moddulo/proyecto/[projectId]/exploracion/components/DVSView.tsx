@@ -91,7 +91,7 @@ function M2Panel({ items }: { items: ContrasteXPCTO[] }) {
           {item.senalesPESTEL.length > 0 && (
             <ul className="space-y-0.5 mt-1.5 list-disc list-inside">
               {item.senalesPESTEL.map((s, i) => (
-                <li key={i} className="text-xs text-bluegreen-eske dark:text-[#6BA4C6] leading-snug">
+                <li key={i} className="text-xs text-bluegreen-eske dark:text-blue-eske-20 leading-snug">
                   {s}
                 </li>
               ))}
@@ -130,7 +130,7 @@ function M3Panel({ actores }: { actores: ActorVetoF2[] }) {
           <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8] mb-1">
             <span className="font-medium">Capacidad de veto:</span> {actor.capacidadVeto}
           </p>
-          <p className="text-xs text-bluegreen-eske/60 dark:text-[#6BA4C6]/80">
+          <p className="text-xs text-bluegreen-eske/60 dark:text-blue-eske-20/80">
             <span className="font-medium">Motivación:</span> {actor.motivacion}
           </p>
           {actor.requiereInvestigacion && (
@@ -164,7 +164,7 @@ function M4Panel({ items }: { items: IncertidumbreF2[] }) {
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                 item.destino === "F3"
-                  ? "border-bluegreen-eske-40 text-bluegreen-eske-80 dark:border-bluegreen-eske/40"
+                  ? "border-bluegreen-eske-40 text-bluegreen-eske-80 dark:border-bluegreen-eske/40 dark:text-blue-eske-20"
                   : "border-gray-eske-40 text-gray-eske-70 dark:border-white/20 dark:text-[#9AAEBE]"
               }`}
             >
@@ -195,7 +195,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
         className="rounded-xl p-4 border-l-4 border-bluegreen-eske"
         style={{ backgroundColor: "rgba(var(--color-bluegreen-eske-10, 2 105 136) / 0.15)" }}
       >
-        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-1">
+        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-1">
           Hipótesis Estratégica Inicial
         </p>
         <p className="font-semibold text-sm text-black-eske dark:text-white mb-2">
@@ -253,8 +253,8 @@ export default function DVSView({ dvs }: DVSViewProps) {
               className={[
                 "px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap",
                 activeTab === tab.id
-                  ? "border-bluegreen-eske text-bluegreen-eske dark:text-[#6BA4C6]"
-                  : "border-transparent text-gray-eske-60 dark:text-[#9AAEBE] hover:text-bluegreen-eske",
+                  ? "border-bluegreen-eske text-bluegreen-eske dark:text-blue-eske-20"
+                  : "border-transparent text-gray-eske-60 dark:text-[#9AAEBE] hover:text-bluegreen-eske dark:hover:text-blue-eske-20",
               ].join(" ")}
             >
               {tab.label}
@@ -272,7 +272,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
 
       {/* PIP — Programa de Investigación Profunda */}
       <div className="rounded-xl p-4 bg-gray-eske-10 dark:bg-[#1A3347] border-t-2 border-bluegreen-eske">
-        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-3">
           Programa de Investigación Profunda → F3
         </p>
         <ol className="space-y-3">
@@ -287,7 +287,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
                     {item.pregunta}
                   </p>
                   {item.profundidad && (
-                    <span className="text-xs px-2 py-0.5 rounded-full border border-bluegreen-eske-40 text-bluegreen-eske-70 dark:border-bluegreen-eske/40 dark:text-bluegreen-eske-30 shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full border border-bluegreen-eske-40 text-bluegreen-eske-70 dark:border-bluegreen-eske/40 dark:text-blue-eske-20 shrink-0">
                       {item.profundidad}
                     </span>
                   )}
@@ -295,7 +295,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
                 <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-0.5">
                   Método: {item.metodo}
                 </p>
-                <p className="text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6] mt-0.5">
+                <p className="text-xs text-bluegreen-eske-70 dark:text-blue-eske-20 mt-0.5">
                   Vínculo: {item.vinculoHito}
                 </p>
                 {item.orden !== undefined && item.orden !== item.numero && (

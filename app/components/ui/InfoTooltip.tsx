@@ -181,18 +181,16 @@ export default function InfoTooltip({
             maxWidth: "calc(100vw - 24px)",
           }}
         >
-          {/* Estilo idéntico al texto de la HEI en F3Tablero.tsx (referencia
-              de diseño para todo tooltip del sistema): mismo tamaño
-              (text-xs lg:text-sm), mismo color (text-black-eske-80 /
-              dark:text-[#C5D8E8] — no text-black-eske ni otro hex, aunque
-              se vean casi iguales) y sin leading-relaxed (la HEI no fuerza
-              ningún leading-*, así que usa el companion line-height por
-              defecto de Tailwind para su tamaño). */}
+          {/* Unificado al estilo estándar de texto secundario del cuerpo de
+              la app (text-black-eske-80 / dark:text-[#9AAEBE], mismo tono
+              que usa F3Tablero.tsx fuera de tooltips) — antes usaba
+              dark:text-[#C5D8E8], un tono más claro exclusivo de este
+              componente que desentonaba con el resto de la UI. */}
           {/* text-left explícito: el panel es position:fixed pero text-align
               SÍ hereda de ancestros en el DOM (ej. una tabla o modal con
               text-center) — sin esto, el contenido se veía centrado cuando
               el trigger vivía dentro de un contexto centrado. */}
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8] text-left">{content}</p>
+          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1 text-left">{content}</p>
           {fuente && (
             <p className="text-[10px] lg:text-[12px] italic text-gray-eske-60 dark:text-[#6D8294] text-left">{fuente}</p>
           )}

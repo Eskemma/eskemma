@@ -12,7 +12,7 @@ import * as path from "path";
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 async function main() {
-  const { resolverIndicadorF1, FONTANA_F1_ECEG_CONFIG } = await import("../lib/fontana/ingesta/eceg");
+  const { resolverIndicadorECEG, FONTANA_ECEG_CONFIG } = await import("../lib/fontana/ingesta/eceg");
   const { esValorDisponible } = await import("../lib/fontana/ingesta/types");
 
   const territorios = [
@@ -27,14 +27,14 @@ async function main() {
 
   for (const territorio of territorios) {
     console.log(`\n=== ${territorio.nombre} ===`);
-    for (const indicadorId of Object.keys(FONTANA_F1_ECEG_CONFIG)) {
-      const celdas = await resolverIndicadorF1(indicadorId, territorio);
+    for (const indicadorId of Object.keys(FONTANA_ECEG_CONFIG)) {
+      const celdas = await resolverIndicadorECEG(indicadorId, territorio);
       const partes = celdas.map((c) =>
         esValorDisponible(c)
           ? `${c.nivel}=${c.valor}${c.unidad ? " " + c.unidad : ""} [${c.naturaleza}]`
           : `${c.nivel}=SIN DATO (${c.motivo})`
       );
-      console.log(`  ${indicadorId} (${FONTANA_F1_ECEG_CONFIG[indicadorId].key}): ${partes.join(" | ")}`);
+      console.log(`  ${indicadorId} (${FONTANA_ECEG_CONFIG[indicadorId].key}): ${partes.join(" | ")}`);
     }
   }
 }

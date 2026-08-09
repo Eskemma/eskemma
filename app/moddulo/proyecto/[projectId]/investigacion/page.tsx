@@ -263,7 +263,7 @@ export default function InvestigacionPage() {
   }, [projectId]);
 
   const isLista = !!die;
-  const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
+  const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5 dark:hover:bg-blue-eske-20/10";
   const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
 
   const tableroProps = {
@@ -298,7 +298,7 @@ export default function InvestigacionPage() {
         <div className="flex">
           <div className="flex-1 flex items-center justify-between min-w-0">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske shrink-0">F3</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 shrink-0">F3</span>
               <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Investigación</h1>
               {isLista && (
                 <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
@@ -371,8 +371,8 @@ export default function InvestigacionPage() {
             { id: "cobertura" as const, label: "Cobertura" },
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 dark:text-bluegreen-eske-20 ${
-                mobileTab === id ? "border-bluegreen-eske dark:border-bluegreen-eske-20 text-bluegreen-eske" : "border-transparent text-gray-eske-50"
+              className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 dark:text-blue-eske-20 ${
+                mobileTab === id ? "border-bluegreen-eske dark:border-blue-eske-20 text-bluegreen-eske" : "border-transparent text-gray-eske-50"
               }`}>
               {label}
             </button>

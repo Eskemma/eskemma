@@ -13,7 +13,7 @@ import * as path from "path";
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 async function main() {
-  const { resolverIndicadorFamilia1 } = await import("../lib/fontana/ingesta");
+  const { resolverIndicadorFontana } = await import("../lib/fontana/ingesta");
   const { esValorDisponible } = await import("../lib/fontana/ingesta/types");
   const { FAMILIA1_DIFERIDOS, FAMILIA1_ORDEN, FAMILIA1_NOMBRES } = await import("../lib/fontana/familia1Catalogo");
 
@@ -32,7 +32,7 @@ async function main() {
   for (const territorio of territorios) {
     console.log(`\n=== ${territorio.nombre} — 5 indicadores cerrados en este incremento ===`);
     for (const id of nuevos) {
-      const celdas = await resolverIndicadorFamilia1(id, territorio);
+      const celdas = await resolverIndicadorFontana(id, territorio);
       const partes = celdas.map((c) =>
         esValorDisponible(c)
           ? `${c.nivel}=${c.valor}${c.unidad ? " " + c.unidad : ""} (${c.naturaleza})`
@@ -43,7 +43,7 @@ async function main() {
   }
 
   console.log("\n=== Caso límite: F1-10 (todavía diferido) ===");
-  const diferido = await resolverIndicadorFamilia1("F1-10", territorios[0]);
+  const diferido = await resolverIndicadorFontana("F1-10", territorios[0]);
   console.log(JSON.stringify(diferido, null, 2));
 
   console.log("\n=== FAMILIA1_ORDEN cubre los 19 IDs, ninguno huérfano ===");

@@ -64,6 +64,7 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
+import { familiaDeIndicador } from "@/types/fontana.types";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
 
@@ -182,7 +183,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
     setMunicipios(null);
     setError(null);
 
-    fetch(`/api/fontana/familia/F1/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}`, {
+    fetch(`/api/fontana/familia/${familiaDeIndicador(indicadorId)}/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}`, {
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -223,7 +224,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 id="municipios-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
-              Datos municipales — <span className="text-bluegreen-eske">{indicadorNombre}</span>
+              Datos municipales — <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
             <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
               Valor por cada municipio que compone el distrito electoral del proyecto.
@@ -380,7 +381,7 @@ function ModalEstado({
     setSeleccion(new Set());
     setValoresCargados(new Map());
 
-    fetch(`/api/fontana/familia/F1/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}&tipoElemento=${tipoElemento}`, {
+    fetch(`/api/fontana/familia/${familiaDeIndicador(indicadorId)}/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}&tipoElemento=${tipoElemento}`, {
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -447,7 +448,7 @@ function ModalEstado({
             }) }
           : { sesionId, indicadorId, tipoElemento, seleccion: [...seleccion] };
 
-      const res = await fetch(`/api/fontana/familia/F1/municipios`, {
+      const res = await fetch(`/api/fontana/familia/${familiaDeIndicador(indicadorId)}/municipios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -490,7 +491,7 @@ function ModalEstado({
           <div>
             <h2 id="estado-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
               {tituloTipo.charAt(0).toUpperCase() + tituloTipo.slice(1)} —{" "}
-              <span className="text-bluegreen-eske">{indicadorNombre}</span>
+              <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
             <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
               {esBuscador
@@ -529,7 +530,7 @@ function ModalEstado({
               type="button"
               onClick={seleccionarTodos}
               disabled={!indiceBuscador || indiceBuscador.length === 0}
-              className="text-[11px] text-bluegreen-eske underline underline-offset-2 hover:text-bluegreen-eske-70
+              className="text-[11px] text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 hover:text-bluegreen-eske-70
                 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               Seleccionar todos
@@ -538,7 +539,7 @@ function ModalEstado({
               type="button"
               onClick={limpiarSeleccion}
               disabled={seleccion.size === 0}
-              className="text-[11px] text-bluegreen-eske underline underline-offset-2 hover:text-bluegreen-eske-70
+              className="text-[11px] text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 hover:text-bluegreen-eske-70
                 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               Limpiar seleccionados
@@ -684,6 +685,9 @@ function FilaElementoBuscador({
                   <NaturalezaBadge naturaleza={valorCargado.naturaleza} />
                 </div>
               )}
+              {valorCargado.fuenteEtiqueta && (
+                <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{valorCargado.fuenteEtiqueta}</p>
+              )}
             </>
           ) : (
             <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{valorCargado.motivo}</p>
@@ -715,7 +719,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
     setDistritos(null);
     setError(null);
 
-    fetch(`/api/fontana/familia/F1/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}&tipoDistrito=${tipoDistrito}`, {
+    fetch(`/api/fontana/familia/${familiaDeIndicador(indicadorId)}/municipios?sesionId=${sesionId}&indicadorId=${indicadorId}&tipoDistrito=${tipoDistrito}`, {
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -757,7 +761,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
           <div>
             <h2 id="municipio-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
               {tituloTipo.charAt(0).toUpperCase() + tituloTipo.slice(1)} —{" "}
-              <span className="text-bluegreen-eske">{indicadorNombre}</span>
+              <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
             <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
               Este municipio no tiene un distrito dominante — valor por cada {tituloTipo.slice(0, -1)} que lo toca.

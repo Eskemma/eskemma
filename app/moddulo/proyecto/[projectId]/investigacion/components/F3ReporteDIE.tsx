@@ -13,7 +13,7 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
   return (
     <div className="space-y-6">
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">1–3. Síntesis por dimensión + insumos FODA</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">1–3. Síntesis por dimensión + insumos FODA</h2>
         {/* actoresVeto=[] deliberado: el DIE es un snapshot de cierre que
             nunca vuelve a mutar — siempre debe mostrar el nombre CONGELADO
             del actor al momento de generar la síntesis (foda.nombreActor),
@@ -22,11 +22,11 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
       </section>
 
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">4. Tablero de tareas del PIP (estado final)</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">4. Tablero de tareas del PIP (estado final)</h2>
         <div className="space-y-1">
           {die.tableroTareasPIP.map((t) => (
             <div key={t.numero} className="flex items-center justify-between text-xs lg:text-sm px-2 py-1 rounded bg-gray-eske-10/60 dark:bg-white/5">
-              <span className="text-bluegreen-eske font-semibold">P{t.numero}</span>
+              <span className="text-bluegreen-eske dark:text-blue-eske-20 font-semibold">P{t.numero}</span>
               <span className="font-medium">
                 {(t.asignaciones ?? []).map((a) => `${asignacionEtiquetaCompleta(a)}: ${a.estado}`).join(" · ")}
               </span>
@@ -36,7 +36,7 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
       </section>
 
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">5. Veredicto HEI</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">5. Veredicto HEI</h2>
         <F3Veredicto
           veredicto={die.veredictoHEI}
           tareas={die.tableroTareasPIP}
@@ -49,18 +49,18 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
       </section>
 
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">6. Inventario de Activos de Inteligencia (IAI)</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">6. Inventario de Activos de Inteligencia (IAI)</h2>
         <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">Fuera de alcance en esta entrega — pendiente.</p>
       </section>
 
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">7. Vacíos residuales</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">7. Vacíos residuales</h2>
         <div className="space-y-1">
           {die.sintesisPorDimension.vaciosResiduales.length === 0 ? (
             <p className="text-xs lg:text-sm opacity-60">Ninguno</p>
           ) : die.sintesisPorDimension.vaciosResiduales.map((v) => (
             <div key={v.numero} className="flex items-center justify-between text-xs lg:text-sm px-2 py-1 rounded bg-gray-eske-10/60 dark:bg-white/5">
-              <span className="text-bluegreen-eske font-semibold">P{v.numero} — {v.pregunta}</span>
+              <span className="text-bluegreen-eske dark:text-blue-eske-20 font-semibold">P{v.numero} — {v.pregunta}</span>
               <span className="font-medium">{v.destino}</span>
             </div>
           ))}
@@ -68,7 +68,7 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
       </section>
 
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2">8. RDA actualizado</h2>
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">8. RDA actualizado</h2>
         {rdaDeInvestigacion.length === 0 ? (
           <p className="text-xs lg:text-sm opacity-60">Sin deficiencias registradas desde F3.</p>
         ) : (

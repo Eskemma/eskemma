@@ -211,7 +211,7 @@ function SelectField<T extends string>({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as T)}
-      className="text-xs font-semibold px-2 py-1 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white focus:outline-none focus:ring-1 focus:ring-bluegreen-eske cursor-pointer"
+      className="w-full max-w-full text-xs font-semibold px-2 py-1 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-white focus:outline-none focus:ring-1 focus:ring-bluegreen-eske cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
@@ -278,7 +278,7 @@ function M2Panel({ items, editable, onChange }: {
             )}
           </div>
           {/* Description spans full card width — two lines split at period */}
-          <DescTwoLines text={VEREDICTO_DESC[item.veredicto]} className="text-xs text-bluegreen-eske dark:text-bluegreen-eske-20 text-right" />
+          <DescTwoLines text={VEREDICTO_DESC[item.veredicto]} className="text-xs text-bluegreen-eske dark:text-blue-eske-20 text-right" />
           {editable ? (
             <InlineEdit
               value={item.argumentacion}
@@ -357,7 +357,7 @@ function M3Panel({ actores, editable, onChange }: {
                 </div>
               </div>
               {/* Description at full card width — two lines split at period */}
-              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 text-right" />
+              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 text-right" />
             </>
           ) : (
             <>
@@ -399,7 +399,7 @@ function M3Panel({ actores, editable, onChange }: {
         </div>
       ))}
       {editable && (
-        <button type="button" onClick={add} className="text-xs font-semibold text-bluegreen-eske hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
+        <button type="button" onClick={add} className="text-xs font-semibold text-bluegreen-eske dark:text-blue-eske-20 hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
           </svg>
@@ -480,17 +480,17 @@ function M4Panel({ items, editable, onChange }: {
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Urgencia</p>
                   <SelectField value={item.urgencia}   onChange={(v) => update(i, { urgencia: v })}   options={URGENCIA_OPTS} />
-                  <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
+                  <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Resolución</p>
                   <SelectField value={item.resolucion} onChange={(v) => update(i, { resolucion: v })} options={RESOLUCION_OPTS} />
-                  <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
+                  <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Destino</p>
                   <SelectField value={item.destino}    onChange={(v) => update(i, { destino: v })}    options={DESTINO_OPTS} />
-                  <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-bluegreen-eske-20 mt-1" />
+                  <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
               </div>
             </>
@@ -509,7 +509,7 @@ function M4Panel({ items, editable, onChange }: {
         </div>
       ))}
       {editable && (
-        <button type="button" onClick={add} className="text-xs font-semibold text-bluegreen-eske hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
+        <button type="button" onClick={add} className="text-xs font-semibold text-bluegreen-eske dark:text-blue-eske-20 hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
           </svg>
@@ -550,7 +550,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
     <div className="space-y-4">
       {/* HEI */}
       <div className="rounded-xl p-4 bg-bluegreen-eske-10/60 border-l-4 border-bluegreen-eske dark:bg-bluegreen-eske/10 space-y-3">
-        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6]">Hipótesis Estratégica Inicial</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20">Hipótesis Estratégica Inicial</p>
         {editable ? (
           <>
             <div><FieldLabel>Tensión central</FieldLabel>
@@ -577,7 +577,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                     </li>
                   ))}
                 </ul>
-                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: [...hei.condicionesFavorables, ""] })} className="text-xs text-bluegreen-eske hover:underline">+ Añadir condición</button>
+                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesFavorables: [...hei.condicionesFavorables, ""] })} className="text-xs text-bluegreen-eske dark:text-blue-eske-20 hover:underline">+ Añadir condición</button>
               </div>
               <div>
                 <FieldLabel>Condiciones adversas</FieldLabel>
@@ -596,7 +596,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                     </li>
                   ))}
                 </ul>
-                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: [...hei.condicionesAdversas, ""] })} className="text-xs text-bluegreen-eske hover:underline">+ Añadir condición</button>
+                <button type="button" onClick={() => onHEIChange({ ...hei, condicionesAdversas: [...hei.condicionesAdversas, ""] })} className="text-xs text-bluegreen-eske dark:text-blue-eske-20 hover:underline">+ Añadir condición</button>
               </div>
             </div>
             <div><FieldLabel>Premisa estratégica</FieldLabel>
@@ -624,7 +624,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
 
       {/* PIP */}
       <div className="rounded-xl p-4 bg-gray-eske-10 dark:bg-[#1A3347] border-t-2 border-bluegreen-eske">
-        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-3">Programa de Investigación Profunda → F3</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-3">Programa de Investigación Profunda → F3</p>
         <ol className="space-y-3">
           {pip.map((item, i) => (
             <li key={item.numero} className="flex gap-3">
@@ -659,7 +659,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="text-sm font-medium text-black-eske dark:text-white leading-snug">{item.pregunta}</p>
                       {item.profundidad && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-bluegreen-eske-10 text-bluegreen-eske-70 dark:bg-bluegreen-eske-80/20 dark:text-bluegreen-eske-30 shrink-0">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-bluegreen-eske-10 text-bluegreen-eske-70 dark:bg-bluegreen-eske-80/20 dark:text-blue-eske-20 shrink-0">
                           {item.profundidad}
                         </span>
                       )}
@@ -678,7 +678,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
           ))}
         </ol>
         {editable && (
-          <button type="button" onClick={addPIP} className="mt-3 text-xs font-semibold text-bluegreen-eske hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
+          <button type="button" onClick={addPIP} className="mt-3 text-xs font-semibold text-bluegreen-eske dark:text-blue-eske-20 hover:text-bluegreen-eske/80 flex items-center gap-1 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
             </svg>
@@ -806,7 +806,7 @@ export default function MotoresSequentialView({
   return (
     <div className="space-y-2 pb-4">
       {isGenerating && (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-bluegreen-eske-70 dark:text-[#6BA4C6]">
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-bluegreen-eske-70 dark:text-blue-eske-20">
           <span className="w-3.5 h-3.5 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin shrink-0" />
           Actualizando análisis… lo que ves abajo es la última versión válida.
         </div>

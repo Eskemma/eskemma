@@ -1,9 +1,11 @@
 "use client";
 
 // app/centinela/fontana/FontanaMain.tsx
-// Contenedor principal post-wizard — este incremento solo renderiza
-// Familia 1 (Sociodemográficos). El resto de familias, el Canvas y el
-// panel del agente no se construyen todavía; sus tabs se muestran
+// Contenedor principal post-wizard — generalizado a familia activa
+// (2026-08-07, habilitación del tab F2): antes solo renderizaba Familia 1
+// hardcodeada; ahora recibe la familia activa como estado LOCAL (no
+// prop — page.tsx no necesita conocerla) y deriva catálogo/fetch/PATCH de
+// esa familia. F3-F5 siguen sin conector real — sus tabs se muestran
 // deshabilitadas (ver FontanaFamiliaTabs.tsx).
 
 import { useCallback, useEffect, useState } from "react";
@@ -11,7 +13,8 @@ import type { FamiliaFontanaId, FontanaSesion } from "@/types/fontana.types";
 import type { NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import FontanaComparativeTable, { type IndicadorFilaFontana } from "./FontanaComparativeTable";
 import FontanaFamiliaTabs from "./FontanaFamiliaTabs";
-import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES } from "@/lib/fontana/familia1Catalogo";
+import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/fontana/familia1Catalogo";
+import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import Button from "@/app/components/Button";
 
@@ -20,7 +23,37 @@ interface Props {
   onSesionActualizada: (sesion: FontanaSesion) => void;
 }
 
+interface FamiliaCatalogo {
+  orden: string[];
+  nombres: Record<string, string>;
+  diferidos: Set<string>;
+  titulo: string;
+  descripcion: string;
+  color: string;
+}
+
+// Mismos colores ya aprobados en FontanaFamiliaTabs.tsx (Fontana_T10_Cierre_Paso4.md §5).
+const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> = {
+  F1: {
+    orden: FAMILIA1_ORDEN,
+    nombres: FAMILIA1_NOMBRES,
+    diferidos: FAMILIA1_DIFERIDOS,
+    titulo: "Familia 1 — Sociodemográficos",
+    descripcion: "Indicadores derivados del Censo de Población y Vivienda 2020 (INEGI).",
+    color: "#026988",
+  },
+  F2: {
+    orden: FAMILIA2_ORDEN,
+    nombres: FAMILIA2_NOMBRES,
+    diferidos: FAMILIA2_DIFERIDOS,
+    titulo: "Familia 2 — Socioeconómicos",
+    descripcion: "Indicadores de pobreza, marginación, bienestar y acceso a servicios — fuentes oficiales (CONAPO, Bienestar, INEGI).",
+    color: "#DB6015",
+  },
+};
+
 export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
+  const [familiaActiva, setFamiliaActiva] = useState<FamiliaFontanaId>("F1");
   const [indicadores, setIndicadores] = useState<IndicadorFilaFontana[] | null>(null);
   const [columnas, setColumnas] = useState<NivelTablaFontana[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -29,12 +62,14 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
   const [agregando, setAgregando] = useState(false);
   const [seleccionAgregar, setSeleccionAgregar] = useState("");
 
+  const catalogo = CATALOGO_POR_FAMILIA[familiaActiva] ?? CATALOGO_POR_FAMILIA.F1!;
+
   const cargarIndicadores = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(`/api/fontana/familia/F1?sesionId=${sesion.sesionId}`);
-      if (!res.ok) throw new Error("No se pudieron cargar los indicadores de Familia 1");
+      const res = await fetch(`/api/fontana/familia/${familiaActiva}?sesionId=${sesion.sesionId}`);
+      if (!res.ok) throw new Error(`No se pudieron cargar los indicadores de ${catalogo.titulo}`);
       const data = (await res.json()) as { indicadores: IndicadorFilaFontana[]; columnas: NivelTablaFontana[] };
       setIndicadores(data.indicadores);
       setColumnas(data.columnas);
@@ -43,9 +78,13 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
     } finally {
       setCargando(false);
     }
-  }, [sesion.sesionId]);
+    // catalogo.titulo depende solo de familiaActiva — no se agrega como
+    // dependencia extra para no recalcular el callback en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion.sesionId, familiaActiva]);
 
   useEffect(() => {
+    setSeleccionAgregar("");
     cargarIndicadores();
   }, [cargarIndicadores]);
 
@@ -53,7 +92,7 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
     const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accion, familiaId: "F1", indicadorId }),
+      body: JSON.stringify({ accion, familiaId: familiaActiva, indicadorId }),
     });
     if (!res.ok) {
       const err = (await res.json()) as { mensaje?: string; error?: string };
@@ -88,16 +127,20 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
     }
   }
 
-  const familia = sesion.indicadoresPorFamilia.F1;
+  const familia = sesion.indicadoresPorFamilia[familiaActiva];
   const idsEnSesion = new Set([...familia.minimos, ...familia.seleccionUsuario]);
-  const disponiblesParaAgregar = FAMILIA1_ORDEN.filter((id) => !idsEnSesion.has(id));
+  // Excluye diferidos del selector manual — solo indicadores con conector
+  // real son ofrecidos como opción de "+ Añadir" (decisión confirmada
+  // 2026-08-07, sin precedente real de Familia 1 que copiar — investigado
+  // que FAMILIA1_DIFERIDOS nunca tuvo consumidor en este repo).
+  const disponiblesParaAgregar = catalogo.orden.filter((id) => !idsEnSesion.has(id) && !catalogo.diferidos.has(id));
 
   const conteosPorFamilia: Record<FamiliaFontanaId, number> = {
-    F1: idsEnSesion.size,
-    F2: 0,
-    F3: 0,
-    F4: 0,
-    F5: 0,
+    F1: new Set([...sesion.indicadoresPorFamilia.F1.minimos, ...sesion.indicadoresPorFamilia.F1.seleccionUsuario]).size,
+    F2: new Set([...sesion.indicadoresPorFamilia.F2.minimos, ...sesion.indicadoresPorFamilia.F2.seleccionUsuario]).size,
+    F3: new Set([...sesion.indicadoresPorFamilia.F3.minimos, ...sesion.indicadoresPorFamilia.F3.seleccionUsuario]).size,
+    F4: new Set([...sesion.indicadoresPorFamilia.F4.minimos, ...sesion.indicadoresPorFamilia.F4.seleccionUsuario]).size,
+    F5: new Set([...sesion.indicadoresPorFamilia.F5.minimos, ...sesion.indicadoresPorFamilia.F5.seleccionUsuario]).size,
   };
 
   return (
@@ -110,24 +153,27 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
             {sesion.territorio.nombre || [sesion.territorio.estado, sesion.territorio.municipio].filter(Boolean).join(" › ")}
           </p>
         </div>
-        <div className="inline-block w-fit" title="Disponible próximamente">
+        {/* w-full flex justify-center en mobile: centra el/los botón(es) de
+            cierre de la fila en vez de dejarlos alineados a la izquierda por
+            defecto (align-items:stretch de la fila en flex-col). Funciona
+            igual con 1 o 2 botones (gap-2) cuando este bloque pase a
+            "Vincular a proyecto" / "Iniciar nuevo proyecto". */}
+        <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start" title="Disponible próximamente">
           <Button label="Regresar a Moddulo F3 con resultados" disabled className="px-5" />
         </div>
       </div>
 
       <FontanaFamiliaTabs
-        familiaActiva="F1"
+        familiaActiva={familiaActiva}
         conteos={conteosPorFamilia}
-        onCambiar={() => {
-          /* solo Familia 1 está habilitada este incremento */
-        }}
+        onCambiar={setFamiliaActiva}
       />
 
-      <h2 className="text-base md:text-lg font-semibold mt-4 mb-1" style={{ color: "#026988" }}>
-        Familia 1 — Sociodemográficos
+      <h2 className="text-base md:text-lg font-semibold mt-4 mb-1" style={{ color: catalogo.color }}>
+        {catalogo.titulo}
       </h2>
       <p className="text-xs md:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-4">
-        Indicadores derivados del Censo de Población y Vivienda 2020 (INEGI).
+        {catalogo.descripcion}
       </p>
 
       {/* + Añadir indicador */}
@@ -140,7 +186,7 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
           >
             <option value="">+ Añadir indicador…</option>
             {disponiblesParaAgregar.map((id) => (
-              <option key={id} value={id}>{FAMILIA1_NOMBRES[id]}</option>
+              <option key={id} value={id}>{catalogo.nombres[id]}</option>
             ))}
           </select>
           <button

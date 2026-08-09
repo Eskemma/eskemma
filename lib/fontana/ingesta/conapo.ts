@@ -53,12 +53,15 @@ import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
-export const FUENTE_ETIQUETA_CONAPO = "CONAPO (Proyecciones de población)";
-
 const CKAN_BASE = "https://www.datos.gob.mx/api/3/action/datastore_search";
 const RESOURCE_MUNICIPAL = "e9160552-769b-41ee-88d1-afc765552608";
 const RESOURCE_ESTATAL = "b4fe49a8-c86a-4c32-8450-8f3c4cc83125";
 const ANO_VIGENTE = "2026";
+
+// Año incluido dinámicamente desde ANO_VIGENTE — al hacer el bump anual
+// documentado en el runbook (Fontana_T10_Runbook_Bodega.md), la etiqueta
+// de fuente se actualiza sola, sin un segundo lugar que recordar tocar.
+export const FUENTE_ETIQUETA_CONAPO = `CONAPO (Proyecciones de población, ${ANO_VIGENTE})`;
 
 interface RazDepRecord {
   razDep: number;

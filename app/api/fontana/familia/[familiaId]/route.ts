@@ -1,13 +1,14 @@
 // app/api/fontana/familia/[familiaId]/route.ts
 // GET ?sesionId=  — indicadores de una familia (mínimos + selección del
 // usuario) con su valor por nivel geográfico. Un endpoint por familia
-// (Arquitectura Paso3 v2, §5.1) — este incremento solo implementa F1;
-// las demás responden 400 explícito, no un array vacío silencioso.
+// (Arquitectura Paso3 v2, §5.1) — F1 y F2 implementadas (Incremento 1 de
+// Familia 2, 2026-08-07); F3-F5 responden 400 explícito, no un array
+// vacío silencioso.
 //
 // Columnas por nivel: el tipo de proyecto decide el patrón ofrecido
 // (§5.2) — electoral → Nacional/Estatal/Distrital/Municipal; el resto →
 // Nacional/Estatal/Municipal/AGEB. Cierre de Familia 1 (2026-08-02):
-// resolverIndicadorFamilia1 ya regresa hasta 4 celdas reales (nacional,
+// resolverIndicadorFontana ya regresa hasta 4 celdas reales (nacional,
 // estatal, distrital, municipal) — este endpoint solo mapea "distrital"
 // a "ageb" cuando el proyecto no es electoral (AGEB nunca tuvo mecanismo
 // construido, se declara "nivel no cubierto" explícitamente).
@@ -16,14 +17,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
-import { resolverIndicadorFamilia1 } from "@/lib/fontana/ingesta";
+import { resolverIndicadorFontana } from "@/lib/fontana/ingesta";
 import {
-  FONTANA_F1_ECEG_CONFIG,
+  FONTANA_ECEG_CONFIG,
   resolverDistritalDeMunicipio,
   type CeldaDistritalDeMunicipio,
 } from "@/lib/fontana/ingesta/eceg";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { FAMILIA1_NOMBRES, FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
+import { FAMILIA2_NOMBRES, FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, getMunicipiosOptions, resolveMunicipioCve, getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
@@ -49,6 +51,22 @@ import {
 // límite default de la plataforma (10s Hobby/15s Pro sin config). Mismo
 // patrón que app/api/sefix/semanal-tabla/route.ts.
 export const maxDuration = 60;
+
+// Fuentes no-ECEG con mecanismo real de "Ver municipios" en proyectos
+// Estatal (2026-08-08) — ver resolverDesgloseMunicipiosEstado en
+// lib/fontana/ingesta/index.ts, único punto de ruteo por fuente para
+// este mecanismo. Nunca implica distrital (esas fuentes no publican por
+// distrito electoral) — el gate de abajo lo aplica solo a `.municipal`.
+const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set(["conapo_marginacion", "bienestar_ckan", "coneval_pobreza", "coneval_irs"]);
+
+// Índices nacionales completos (2026-08-09) — por INDICADOR, no por
+// fuenteSlug: CONAPO y CONEVAL tienen indicadores en ambos grupos (ej.
+// F2-3/F2-4 son índices compuestos, sin mecanismo de agregación
+// municipio→distrito; F2-1/F2-2/F2-14 sí lo tienen), así que un gate
+// por fuenteSlug no distinguiría correctamente. F2-8 (Bienestar) fuera
+// de ambos — diferido, misma varianza de red ya documentada.
+const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7"]);
+const INDICADORES_DISTRITAL_NACIONAL = new Set(["F2-1", "F2-2", "F2-7", "F2-14"]);
 
 interface IndicadorRespuesta {
   id: string;
@@ -84,17 +102,19 @@ export async function GET(
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
 
-  if (familiaId !== "F1") {
+  if (familiaId !== "F1" && familiaId !== "F2") {
     return NextResponse.json(
       { error: "familia_no_disponible", mensaje: `Familia ${familiaId} aún no está disponible en Fontana.` },
       { status: 400 }
     );
   }
+  const [ordenFamilia, nombresFamilia] =
+    familiaId === "F2" ? [FAMILIA2_ORDEN, FAMILIA2_NOMBRES] : [FAMILIA1_ORDEN, FAMILIA1_NOMBRES];
 
   const columnas = columnasParaTipoProyecto(sesion.tipoProyecto, sesion.territorio.nivel);
   const familia = sesion.indicadoresPorFamilia[familiaId as FamiliaFontanaId];
   const idsEnSesion = new Set([...familia.minimos, ...familia.seleccionUsuario]);
-  const idsOrdenados = FAMILIA1_ORDEN.filter((id) => idsEnSesion.has(id));
+  const idsOrdenados = ordenFamilia.filter((id) => idsEnSesion.has(id));
 
   // Composición municipal del distrito — una sola resolución por
   // request (mismo estado/distrito para todos los indicadores de la
@@ -127,9 +147,58 @@ export async function GET(
     idsOrdenados.map(async (id) => {
       const [registro, celdasReales] = await Promise.all([
         getIndicadorRegistro(id),
-        resolverIndicadorFamilia1(id, sesion.territorio),
+        resolverIndicadorFontana(id, sesion.territorio),
       ]);
-      const tieneMecanismoDistrital = id in FONTANA_F1_ECEG_CONFIG;
+      const tieneMecanismoDistrital = id in FONTANA_ECEG_CONFIG;
+      // Desglose "Ver municipios" en proyectos Estatal — generalizado más
+      // allá de ECEG (2026-08-08): CONAPO/Bienestar sí tienen dato
+      // municipal real, aunque nunca distrital (esas fuentes no publican
+      // por distrito electoral). Gate POR COLUMNA, no por indicador
+      // completo — nunca se ofrece "Ver distritos federales/locales" para
+      // estas fuentes. municipiosEnDistrito/desglosesNacional/columnas
+      // inversas Municipal se quedan ECEG-only por ahora (deferido,
+      // requieren mecanismo de composición sección→distrito o índice
+      // nacional que CONAPO/Bienestar no tienen listo).
+      const soportaDesgloseMunicipal =
+        tieneMecanismoDistrital || FUENTES_DESGLOSE_MUNICIPAL_EXTRA.has(registro?.fuenteSlug ?? "");
+      const desglosesEstadoIndicador = tieneMecanismoDistrital
+        ? desglosesEstado
+        : soportaDesgloseMunicipal
+          ? { municipal: desglosesEstado.municipal, distrital: null }
+          : null;
+      // "Ver estados" en proyectos Nacional (2026-08-09) — mismo gate por
+      // columna que "Ver municipios" en Estatal. F2-8 excluido a propósito
+      // (id !== "F2-8"): mecanismo escrito pero DIFERIDO — investigada la
+      // varianza real medida (8.0s-29.9s, 8 mediciones independientes) sin
+      // encontrar causa controlable (latencia externa de datos.gob.mx, no
+      // un bug propio) — mostrar el botón sin mecanismo conectado
+      // rompería la UX. .distritalFederal/.distritalLocal/.municipal de
+      // Nacional siguen ECEG-only (deferido, requieren índice nacional de
+      // 300/679/2,477 que estas fuentes no tienen construido).
+      const soportaDesgloseEstadosNacional = soportaDesgloseMunicipal && id !== "F2-8";
+      // Municipal/Distrital Federal/Local nacional (2026-08-09) — gate
+      // por indicador (no por fuenteSlug, ver comentario junto a
+      // INDICADORES_MUNICIPAL_NACIONAL arriba). F2-3/F2-4 (índices
+      // compuestos) obtienen Municipal pero NUNCA Distrital — mismo
+      // criterio que su propio Nacional (sin metodología de agregación
+      // válida para un índice compuesto).
+      const soportaMunicipalNacional = tieneMecanismoDistrital || INDICADORES_MUNICIPAL_NACIONAL.has(id);
+      const soportaDistritalNacional = tieneMecanismoDistrital || INDICADORES_DISTRITAL_NACIONAL.has(id);
+      const desglosesNacionalIndicador = tieneMecanismoDistrital
+        ? desglosesNacional
+        : soportaDesgloseEstadosNacional || soportaMunicipalNacional || soportaDistritalNacional
+          ? {
+              estatal: soportaDesgloseEstadosNacional ? desglosesNacional.estatal : null,
+              distritalFederal: soportaDistritalNacional ? desglosesNacional.distritalFederal : null,
+              distritalLocal: soportaDistritalNacional ? desglosesNacional.distritalLocal : null,
+              municipal: soportaMunicipalNacional ? desglosesNacional.municipal : null,
+            }
+          : null;
+      // Desglose municipal ("Ver datos municipales") en proyectos
+      // distrito_federal/distrito_local (2026-08-09) — municipiosEnDistrito
+      // es 100% geografía (cuenta de distritos_municipios/{estado}.json,
+      // sin ninguna dependencia de ECEG), su gate pasa de
+      // tieneMecanismoDistrital a soportaDesgloseMunicipal.
       const distritalesMunicipio =
         tieneMecanismoDistrital && contextoMunicipal
           ? await Promise.all([
@@ -140,15 +209,15 @@ export async function GET(
       const celdas = construirCeldasTabla(
         columnas,
         celdasReales,
-        tieneMecanismoDistrital ? municipiosEnDistrito : null,
-        tieneMecanismoDistrital ? desglosesEstado : null,
+        soportaDesgloseMunicipal ? municipiosEnDistrito : null,
+        desglosesEstadoIndicador,
         distritalesMunicipio,
         tipoDistritoPropio,
-        tieneMecanismoDistrital ? desglosesNacional : null
+        desglosesNacionalIndicador
       );
       return {
         id,
-        nombre: registro?.nombre ?? FAMILIA1_NOMBRES[id] ?? id,
+        nombre: registro?.nombre ?? nombresFamilia[id] ?? id,
         definicion: registro?.definicion,
         fuenteEtiqueta: registro?.fuenteEtiqueta,
         esMinimo: familia.minimos.includes(id),
@@ -157,7 +226,7 @@ export async function GET(
     })
   );
 
-  return NextResponse.json({ familiaId: "F1", columnas, indicadores }, { status: 200 });
+  return NextResponse.json({ familiaId, columnas, indicadores }, { status: 200 });
 }
 
 async function contarMunicipiosEnDistrito(territorio: FontanaSesion["territorio"]): Promise<number | null> {
@@ -280,7 +349,7 @@ interface DistritalesMunicipio {
 }
 
 // Mapea las hasta 4 celdas reales (nacional/estatal/distrital/municipal,
-// de resolverIndicadorFamilia1) al set de columnas de la tabla según el
+// de resolverIndicadorFontana) al set de columnas de la tabla según el
 // tipo de proyecto. "ageb" nunca tiene mecanismo (no electoral) — motivo
 // explícito de nivel no cubierto, nunca simulado. "distrital_federal"/
 // "distrital_local" (columnas inversas, proyectos Municipal) no vienen
@@ -288,7 +357,7 @@ interface DistritalesMunicipio {
 // insertan directo, mismo criterio que ageb de tener su propia rama.
 function construirCeldasTabla(
   columnas: NivelTablaFontana[],
-  celdasReales: Awaited<ReturnType<typeof resolverIndicadorFamilia1>>,
+  celdasReales: Awaited<ReturnType<typeof resolverIndicadorFontana>>,
   municipiosEnDistrito: number | null,
   desglosesEstado: DesglosesEstadoTabla | null,
   distritalesMunicipio: DistritalesMunicipio | null,

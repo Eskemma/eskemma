@@ -11,6 +11,16 @@ import type { ProjectType } from "./moddulo.types";
 
 export type FamiliaFontanaId = "F1" | "F2" | "F3" | "F4" | "F5";
 
+// Extrae la familia del prefijo del ID de indicador (ej. "F2-13" → "F2")
+// — convención ya usada implícitamente en varios lugares
+// (`id.startsWith("F1-")` en pipMinimos.ts, etc.), nunca antes extraída
+// a función porque hasta abrir Familia 2 (2026-08-07) la familia activa
+// siempre era F1. Bug real que motivó esta extracción: FontanaMunicipiosModal.tsx
+// hardcodeaba "F1" en sus URLs sin importar el indicador real.
+export function familiaDeIndicador(indicadorId: string): FamiliaFontanaId {
+  return indicadorId.split("-")[0] as FamiliaFontanaId;
+}
+
 export interface SeleccionFamiliaFontana {
   minimos: string[]; // del PIP — no editables/eliminables en la interfaz
   seleccionUsuario: string[]; // añadidos libremente por el usuario

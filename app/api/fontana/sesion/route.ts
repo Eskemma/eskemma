@@ -12,7 +12,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import type { PIPItem, TareaPIP } from "@/types/moddulo.types";
 import type { FontanaSesion } from "@/types/fontana.types";
 import { familiaVacia } from "@/types/fontana.types";
-import { derivarMinimosFamilia1 } from "@/lib/fontana/pipMinimos";
+import { derivarMinimosPorFamilia } from "@/lib/fontana/pipMinimos";
 
 const COLLECTION = "fontana_sesiones";
 
@@ -73,7 +73,12 @@ export async function GET(request: NextRequest) {
   const pip = (project.phases?.investigacion?.pip ?? project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const f3Tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
   const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, pipItemId);
-  const minimosPreview = derivarMinimosFamilia1(pregunta, justificacion);
+  // minimosPreview es un string[] plano (family-agnostic) — FontanaOnboarding.tsx
+  // solo cuenta y lista IDs, sin distinguir familia.
+  const minimosPreview = [
+    ...derivarMinimosPorFamilia(pregunta, justificacion, "F1-"),
+    ...derivarMinimosPorFamilia(pregunta, justificacion, "F2-"),
+  ];
 
   return NextResponse.json(
     {
@@ -119,7 +124,8 @@ export async function POST(request: NextRequest) {
   const pip = (project.phases?.investigacion?.pip ?? project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const f3Tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
   const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, pipItemId);
-  const minimos = derivarMinimosFamilia1(pregunta, justificacion);
+  const minimosF1 = derivarMinimosPorFamilia(pregunta, justificacion, "F1-");
+  const minimosF2 = derivarMinimosPorFamilia(pregunta, justificacion, "F2-");
 
   const nowIso = new Date().toISOString();
   const nuevaSesion: Omit<FontanaSesion, "sesionId"> = {
@@ -129,8 +135,8 @@ export async function POST(request: NextRequest) {
     tipoProyecto: project.type,
     territorio: project.territorio ?? { nivel: "nacional", nombre: "México" },
     indicadoresPorFamilia: {
-      F1: { minimos, seleccionUsuario: [] },
-      F2: familiaVacia(),
+      F1: { minimos: minimosF1, seleccionUsuario: [] },
+      F2: { minimos: minimosF2, seleccionUsuario: [] },
       F3: familiaVacia(),
       F4: familiaVacia(),
       F5: familiaVacia(),

@@ -49,7 +49,7 @@ export default function F3Veredicto({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="px-2 py-0.5 rounded-full text-xs lg:text-sm font-bold bg-bluegreen-eske/10 text-bluegreen-eske">
+        <span className="px-2 py-0.5 rounded-full text-xs lg:text-sm font-bold bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20">
           {RESULTADO_LABELS[veredicto.resultado]}
         </span>
         {veredicto.aprobadoPorUsuario && (

@@ -58,7 +58,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
                 <div className="flex items-start gap-2 text-xs lg:text-sm">
                   <span aria-hidden="true">{s.icon}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-bluegreen-eske dark:text-bluegreen-eske-20 font-semibold">P{t.numero} {item?.pregunta ?? ""}</span>
+                    <span className="block text-bluegreen-eske dark:text-blue-eske-20 font-semibold">P{t.numero} {item?.pregunta ?? ""}</span>
                     <span className="text-black-eske-80 dark:text-[#9AAEBE]">Estado: {s.label}</span>
                     <span className="block mt-0.5 space-y-0.5">
                       {(t.asignaciones ?? []).map((a) => {
@@ -70,11 +70,16 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
                         // internamente — solo el sufijo Activada/Desactivada.
                         const colorTexto = a.activada ? "text-black-eske-80 dark:text-[#9AAEBE]" : "text-gray-eske-50 dark:text-[#6D8294]";
                         const colorDot = a.activada ? ESTADO_DOT[a.estado] : "bg-gray-eske-40";
+                        // Nombre de app en negritas en modo claro; en modo
+                        // oscuro mismo color que el resto del texto de la
+                        // fila (sin acento aparte) — mismo criterio que el
+                        // badge de F3TareasPIP.tsx.
+                        const nombreClassName = a.canal === "canal1" ? "font-bold text-bluegreen-eske dark:font-normal dark:text-[#9AAEBE]" : "";
                         return (
                           <span key={a.asignacionId} className={`flex items-center gap-1.5 ${colorTexto}`}>
                             <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colorDot}`} aria-hidden="true" />
                             <span>
-                              {prefijo} {href ? <Link href={href} className="text-bluegreen-eske dark:text-bluegreen-eske-20 hover:underline">{nombre}</Link> : nombre}
+                              {prefijo} {href ? <Link href={href} className={`hover:underline ${nombreClassName}`}>{nombre}</Link> : <span className={nombreClassName}>{nombre}</span>}
                               {" — "}{a.activada ? "Activada" : "Desactivada"}
                             </span>
                           </span>

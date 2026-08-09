@@ -113,7 +113,7 @@ export default function F3TareasPIP({
         );
         return (
           <div key={tarea.pipItemId} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-3 bg-white-eske dark:bg-[#18324A]">
-            <p className="text-xs lg:text-sm font-semibold text-bluegreen-eske dark:text-blue-eske-10">
+            <p className="text-xs lg:text-sm font-semibold text-bluegreen-eske dark:text-blue-eske-20">
               P{tarea.numero} — {item?.pregunta ?? "Necesidad de información"}
             </p>
 
@@ -131,8 +131,12 @@ export default function F3TareasPIP({
                         columna deja libre para la derecha. */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-xs lg:text-sm font-medium bg-gray-eske-10 dark:bg-white/10 ${
-                          asig.canal === "canal1" && asig.tecnicaId ? "text-bluegreen-eske dark:text-bluegreen-eske-20" : "text-black-eske-80 dark:text-[#C5D8E8]"
+                        <span className={`px-2 py-0.5 rounded text-xs lg:text-sm bg-gray-eske-10 dark:bg-white/10 ${
+                          // Nombres de app en negritas en modo claro (destacan
+                          // sobre "Acción a realizar..."); en modo oscuro
+                          // mismo peso y mismo color de texto que "Acción a
+                          // realizar" — no un tono de acento aparte.
+                          asig.canal === "canal1" && asig.tecnicaId ? "font-bold text-bluegreen-eske dark:font-medium dark:text-[#C5D8E8]" : "font-medium text-black-eske-80 dark:text-[#C5D8E8]"
                         }`}>
                           {asignacionEtiquetaCompleta(asig)}
                         </span>

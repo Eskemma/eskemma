@@ -30,7 +30,7 @@ export default function F3Onboarding({
       <div className="w-full max-w-xl space-y-6">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5 mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">F3 — Investigación</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20">F3 — Investigación</span>
           </div>
           {projectName && (
             <h1 className="text-xl sm:text-2xl font-bold text-black-eske dark:text-[#EAF2F8] leading-tight">
@@ -39,7 +39,7 @@ export default function F3Onboarding({
           )}
           <div className="flex flex-wrap gap-1.5">
             {projectType && (
-              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-[#6BA4C6] rounded-full text-xs font-medium">
+              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20 rounded-full text-xs font-medium">
                 {TYPE_LABELS[projectType] ?? projectType}
               </span>
             )}
@@ -67,7 +67,7 @@ export default function F3Onboarding({
               <div key={m.code}
                 className="flex gap-3 p-3 rounded-lg bg-gray-eske-10/60 dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10">
                 <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full
-                  bg-bluegreen-eske/10 text-bluegreen-eske text-xs font-bold">
+                  bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20 text-xs font-bold">
                   {m.code}
                 </span>
                 <div>

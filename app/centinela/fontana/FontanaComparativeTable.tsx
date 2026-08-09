@@ -83,7 +83,7 @@ function BotonesDesgloseEstado({
           key={d.tipo}
           type="button"
           onClick={() => onAbrir(d.tipo)}
-          className="block text-[11px] text-bluegreen-eske hover:underline"
+          className="block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
         >
           {ETIQUETA_BOTON_DESGLOSE[d.tipo]} ({d.total})
         </button>
@@ -150,7 +150,7 @@ function Celda({
           <button
             type="button"
             onClick={onVerMunicipios}
-            className="block text-[11px] text-bluegreen-eske hover:underline"
+            className="block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
           >
             Ver datos municipales ({celda.municipiosEnDistrito})
           </button>
@@ -173,7 +173,7 @@ function Celda({
         <button
           type="button"
           onClick={onVerMunicipios}
-          className="block text-[11px] text-bluegreen-eske hover:underline"
+          className="block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
         >
           Ver datos municipales ({celda.municipiosEnDistrito})
         </button>

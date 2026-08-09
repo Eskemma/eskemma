@@ -17,17 +17,21 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
 import {
-  resolverMunicipiosDeDistrito,
   resolverElementosDeEstado,
   getOpcionesElementoEstado,
   resolverDistritosDeMunicipio,
-  resolverEstadosNacional,
   getOpcionesElementoNacional,
-  resolverElementosDeNacional,
   type TipoElementoEstado,
   type TipoDistrito,
   type TipoElementoNacional,
 } from "@/lib/fontana/ingesta/eceg";
+import {
+  resolverDesgloseMunicipiosEstado,
+  resolverDesgloseEstadosNacional,
+  resolverMunicipiosDeDistritoFontana,
+  resolverDesgloseMunicipiosNacional,
+  resolverDesgloseDistritosNacional,
+} from "@/lib/fontana/ingesta";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { getMunicipiosOptions, normalizeGeoName, resolveMunicipioCve } from "@/lib/geo/municipios";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
@@ -56,6 +60,10 @@ interface ElementoRespuesta {
   naturaleza?: string;
   fuenteEtiqueta?: string;
   motivo?: string;
+  // Solo presente para Distrital Federal/Local Nacional de fuentes
+  // no-ECEG (2026-08-09) — valor ponderado desde municipios, propaga la
+  // misma advertencia de cobertura ya usada en el resto del sistema.
+  coberturaPct?: number;
 }
 
 interface DistritoDeMunicipioRespuesta {
@@ -86,7 +94,7 @@ async function cargarSesionValidada(
   const session = await getSessionFromRequest(request);
   if (!session) return { error: NextResponse.json({ error: "No autorizado" }, { status: 401 }) } as const;
 
-  if (familiaId !== "F1") {
+  if (familiaId !== "F1" && familiaId !== "F2") {
     return {
       error: NextResponse.json(
         { error: "familia_no_disponible", mensaje: `Familia ${familiaId} aún no está disponible en Fontana.` },
@@ -110,7 +118,12 @@ async function cargarSesionValidada(
   const familia = sesion.indicadoresPorFamilia[familiaId as FamiliaFontanaId];
   const idsEnSesion = new Set([...familia.minimos, ...familia.seleccionUsuario]);
   if (!idsEnSesion.has(indicadorId)) {
-    return { error: NextResponse.json({ error: "indicador_no_en_sesion" }, { status: 404 }) } as const;
+    return {
+      error: NextResponse.json(
+        { error: "indicador_no_en_sesion", mensaje: "No se pudo cargar el desglose municipal para este indicador." },
+        { status: 404 }
+      ),
+    } as const;
   }
 
   return { sesion } as const;
@@ -164,7 +177,7 @@ export async function GET(
   }
 
   const [municipios, opciones] = await Promise.all([
-    resolverMunicipiosDeDistrito(indicadorId!, estadoCve, numeroDistrito, tipoDistrito),
+    resolverMunicipiosDeDistritoFontana(indicadorId!, estadoCve, numeroDistrito, tipoDistrito),
     getMunicipiosOptions(estadoCve),
   ]);
 
@@ -246,7 +259,15 @@ async function handleGetEstado(
     return NextResponse.json({ modo: "buscador", indice: opciones }, { status: 200 });
   }
 
-  const elementos = await resolverElementosDeEstado(indicadorId, estadoCve, tipoElemento);
+  // "municipios" ya tiene mecanismo fuera de ECEG (CONAPO/Bienestar,
+  // 2026-08-08) — resolverDesgloseMunicipiosEstado rutea por fuente.
+  // "distritos_fed"/"distritos_loc" siguen exclusivos de ECEG
+  // (resolverElementosDeEstado regresa null para indicadores no-ECEG,
+  // cae en el mismo 400 "sin mecanismo" ya existente).
+  const elementos =
+    tipoElemento === "municipios"
+      ? await resolverDesgloseMunicipiosEstado(indicadorId, estadoCve)
+      : await resolverElementosDeEstado(indicadorId, estadoCve, tipoElemento);
   if (!elementos) {
     return NextResponse.json({ error: "Este indicador no tiene mecanismo de desglose para este nivel" }, { status: 400 });
   }
@@ -278,7 +299,7 @@ async function handleGetNacional(searchParams: URLSearchParams, indicadorId: str
   }
 
   if (tipoElemento === "estados") {
-    const elementos = await resolverEstadosNacional(indicadorId);
+    const elementos = await resolverDesgloseEstadosNacional(indicadorId);
     if (!elementos) {
       return NextResponse.json({ error: "Este indicador no tiene mecanismo de desglose para este nivel" }, { status: 400 });
     }
@@ -301,18 +322,24 @@ async function handleGetNacional(searchParams: URLSearchParams, indicadorId: str
   if (indice.length > UMBRAL_PRECARGA_COMPLETA) {
     return NextResponse.json({ modo: "buscador", indice }, { status: 200 });
   }
-  const elementos = await resolverElementosDeNacional(
-    indicadorId,
-    tipoElemento,
-    indice.map((o) => ({ estadoCve: o.estadoCve, cve: o.cve }))
-  );
+  const seleccionCompleta = indice.map((o) => ({ estadoCve: o.estadoCve, cve: o.cve }));
+  const elementos =
+    tipoElemento === "municipios"
+      ? await resolverDesgloseMunicipiosNacional(indicadorId, seleccionCompleta)
+      : await resolverDesgloseDistritosNacional(indicadorId, tipoElemento, seleccionCompleta);
   const respuesta: ElementoNacionalRespuesta[] = (elementos ?? [])
     .map(({ cve, nombre, estadoCve, celda }) => ({
       cve,
       nombre,
       estadoCve,
       ...(esValorDisponible(celda)
-        ? { valor: celda.valor, unidad: celda.unidad, naturaleza: celda.naturaleza, fuenteEtiqueta: celda.fuenteEtiqueta }
+        ? {
+            valor: celda.valor,
+            unidad: celda.unidad,
+            naturaleza: celda.naturaleza,
+            fuenteEtiqueta: celda.fuenteEtiqueta,
+            ...(celda.coberturaPct != null ? { coberturaPct: celda.coberturaPct } : {}),
+          }
         : { motivo: celda.motivo }),
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -415,7 +442,13 @@ export async function POST(
     return NextResponse.json({ error: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }
 
-  const elementos = await resolverElementosDeEstado(indicadorId!, estadoCve, tipoElemento, seleccion);
+  // Mismo criterio que el GET — "municipios" rutea por fuente (ECEG,
+  // CONAPO, Bienestar); "distritos_fed"/"distritos_loc" siguen
+  // exclusivos de ECEG.
+  const elementos =
+    tipoElemento === "municipios"
+      ? await resolverDesgloseMunicipiosEstado(indicadorId!, estadoCve, seleccion)
+      : await resolverElementosDeEstado(indicadorId!, estadoCve, tipoElemento, seleccion);
   if (!elementos) {
     return NextResponse.json({ error: "Este indicador no tiene mecanismo de desglose para este nivel" }, { status: 400 });
   }
@@ -434,9 +467,10 @@ export async function POST(
 // Batch de valores para una selección Nacional — a diferencia de Estatal
 // (un solo estado implícito), aquí la selección puede cruzar hasta 32
 // estados: body manda {estadoCve, cve}[], no cve[] plano.
-// resolverElementosDeNacional agrupa por estado (nunca N llamadas) —
-// verificado en frío con el caso extremo real (2,477 municipios, 32
-// estados en paralelo): 5,713ms, mismo rango que la descarga+conversión
+// resolverDesgloseMunicipiosNacional/resolverDesgloseDistritosNacional
+// agrupan por estado (nunca N llamadas) — verificado en frío con el
+// caso extremo real de ECEG (2,477 municipios, 32 estados en paralelo):
+// 5,713ms, mismo rango que la descarga+conversión
 // única ya esperada tras el fix de concurrencia de Fase 1.
 async function handlePostNacional(body: unknown, indicadorId: string) {
   const b = body as { tipoElemento?: TipoElementoNacional; seleccion?: { estadoCve: string; cve: string }[] } | null;
@@ -453,7 +487,15 @@ async function handlePostNacional(body: unknown, indicadorId: string) {
     return NextResponse.json({ error: "'seleccion' ({estadoCve, cve}[]) es requerido y no puede estar vacío" }, { status: 400 });
   }
 
-  const elementos = await resolverElementosDeNacional(indicadorId, tipoElemento, seleccion);
+  // "municipios" reutiliza el mecanismo de "Ver municipios"/Estatal ya
+  // construido (agrupado por estado); "distritos_fed"/"distritos_loc"
+  // usa el cálculo ponderado nuevo (2026-08-09) — ambos ya rutean ECEG
+  // vs. las 7 fuentes no-ECEG internamente, mismo criterio que el resto
+  // del endpoint.
+  const elementos =
+    tipoElemento === "municipios"
+      ? await resolverDesgloseMunicipiosNacional(indicadorId, seleccion)
+      : await resolverDesgloseDistritosNacional(indicadorId, tipoElemento, seleccion);
   if (!elementos) {
     return NextResponse.json({ error: "Este indicador no tiene mecanismo de desglose para este nivel" }, { status: 400 });
   }
@@ -463,7 +505,13 @@ async function handlePostNacional(body: unknown, indicadorId: string) {
     nombre,
     estadoCve,
     ...(esValorDisponible(celda)
-      ? { valor: celda.valor, unidad: celda.unidad, naturaleza: celda.naturaleza, fuenteEtiqueta: celda.fuenteEtiqueta }
+      ? {
+          valor: celda.valor,
+          unidad: celda.unidad,
+          naturaleza: celda.naturaleza,
+          fuenteEtiqueta: celda.fuenteEtiqueta,
+          ...(celda.coberturaPct != null ? { coberturaPct: celda.coberturaPct } : {}),
+        }
       : { motivo: celda.motivo }),
   }));
 

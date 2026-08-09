@@ -19,6 +19,12 @@ import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import type { PipCambio } from "@/lib/moddulo/pipPropagation";
 import PillButton from "@/app/moddulo/components/PillButton";
 
+// Override del ícono "i" default de InfoTooltip (bg-bluegreen-eske/10, poco
+// legible en modo oscuro sobre el fondo de F3) — solo para estos 4 usos en
+// F3, sin tocar el componente compartido ni su default en otras fases.
+// Conserva el azul del ícono; solo cambia el fondo del círculo a blanco.
+const TOOLTIP_TRIGGER_CLASS = "inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none bg-bluegreen-eske/10 dark:bg-white text-bluegreen-eske hover:bg-bluegreen-eske/20 dark:hover:bg-white/90 transition-colors cursor-pointer";
+
 const URGENCIA_LABEL: Record<string, string> = { alta: "Alta", media: "Media", baja: "Baja" };
 const NIVEL_RIESGO_LABEL: Record<string, string> = { rojo: "🔴 Rojo", ambar: "🟡 Ámbar", verde: "🟢 Verde" };
 
@@ -166,7 +172,7 @@ export default function F3Tablero({
               type="button"
               onClick={() => setModalAbierto("incertidumbres")}
               aria-label="Ver detalle de incertidumbres"
-              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none bg-bluegreen-eske/10 text-bluegreen-eske hover:bg-bluegreen-eske/20 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none bg-bluegreen-eske/10 dark:bg-white text-bluegreen-eske hover:bg-bluegreen-eske/20 dark:hover:bg-white/90 transition-colors cursor-pointer"
             >
               i
             </button>
@@ -177,7 +183,7 @@ export default function F3Tablero({
               type="button"
               onClick={() => setModalAbierto("semaforo")}
               aria-label="Ver detalle del semáforo de veto"
-              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none bg-bluegreen-eske/10 text-bluegreen-eske hover:bg-bluegreen-eske/20 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none bg-bluegreen-eske/10 dark:bg-white text-bluegreen-eske hover:bg-bluegreen-eske/20 dark:hover:bg-white/90 transition-colors cursor-pointer"
             >
               i
             </button>
@@ -187,9 +193,9 @@ export default function F3Tablero({
 
       {/* M1 */}
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2 flex items-center gap-1.5">
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2 flex items-center gap-1.5">
           M1 · Tablero de tareas
-          <InfoTooltip content={MOTOR_TOOLTIP.M1} />
+          <InfoTooltip content={MOTOR_TOOLTIP.M1} triggerClassName={TOOLTIP_TRIGGER_CLASS} />
         </h2>
         <F3TareasPIP
           projectId={projectId}
@@ -208,9 +214,9 @@ export default function F3Tablero({
 
       {/* M2 */}
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2 flex items-center gap-1.5">
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2 flex items-center gap-1.5">
           M2 · Resultados recibidos
-          <InfoTooltip content={MOTOR_TOOLTIP.M2} />
+          <InfoTooltip content={MOTOR_TOOLTIP.M2} triggerClassName={TOOLTIP_TRIGGER_CLASS} />
         </h2>
         <F3ResultadosRecibidos
           resultados={resultados}
@@ -224,9 +230,9 @@ export default function F3Tablero({
 
       {/* M3 */}
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2 flex items-center gap-1.5">
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2 flex items-center gap-1.5">
           M3 · Síntesis de hallazgos
-          <InfoTooltip content={MOTOR_TOOLTIP.M3} />
+          <InfoTooltip content={MOTOR_TOOLTIP.M3} triggerClassName={TOOLTIP_TRIGGER_CLASS} />
         </h2>
         <F3Sintesis
           sintesis={sintesis}
@@ -240,9 +246,9 @@ export default function F3Tablero({
 
       {/* M4 */}
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske mb-2 flex items-center gap-1.5">
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2 flex items-center gap-1.5">
           M4 · Veredicto HEI
-          <InfoTooltip content={MOTOR_TOOLTIP.M4} />
+          <InfoTooltip content={MOTOR_TOOLTIP.M4} triggerClassName={TOOLTIP_TRIGGER_CLASS} />
         </h2>
         <F3Veredicto
           veredicto={veredicto}

@@ -60,10 +60,12 @@ export interface EcegIndicadorConfig {
   denominadorKey?: string; // requerido si tipo === "porcentaje"
 }
 
-// Los 14 indicadores de Familia 1 con dato real disponible vía ECEG.
-// F1-2, F1-11, F1-16, F1-17, F1-18 (otros adaptadores) están
-// deliberadamente ausentes de este mapa.
-export const FONTANA_F1_ECEG_CONFIG: Record<string, EcegIndicadorConfig> = {
+// Los 14 indicadores de Familia 1 con dato real disponible vía ECEG, más
+// F2-11/F2-13 (Familia 2, Socioeconómicos — mismo mecanismo, ya curados
+// en CURATED_COLUMNS/ECEG_INDICATOR_MAP, cero ingesta nueva, cierre
+// Incremento 1 de Familia 2, 2026-08-07). F1-2, F1-11, F1-16, F1-17,
+// F1-18 (otros adaptadores) están deliberadamente ausentes de este mapa.
+export const FONTANA_ECEG_CONFIG: Record<string, EcegIndicadorConfig> = {
   "F1-1": { key: "POBTOT", tipo: "directo" },
   "F1-3": { key: "P3YM_HLI", tipo: "porcentaje", denominadorKey: "POBTOT" },
   "F1-4": { key: "HOGJEF_F", tipo: "porcentaje", denominadorKey: "TOTHOG" },
@@ -84,6 +86,8 @@ export const FONTANA_F1_ECEG_CONFIG: Record<string, EcegIndicadorConfig> = {
   "F1-14": { key: "P18YM_PB", tipo: "porcentaje", denominadorKey: "P_18YMAS" },
   "F1-15": { key: "PCON_DISC", tipo: "porcentaje", denominadorKey: "POBTOT" },
   "F1-19": { key: "P3HLINHE", tipo: "porcentaje", denominadorKey: "POBTOT" },
+  "F2-11": { key: "VPH_INTER", tipo: "porcentaje", denominadorKey: "VIVPAR_HAB" },
+  "F2-13": { key: "PDER_SS", tipo: "porcentaje", denominadorKey: "POBTOT" },
 };
 
 // F1-12 no tiene una sola columna de denominador — su denominador es la
@@ -99,7 +103,7 @@ function resolverDenominador(registro: Record<string, number>, denominadorKey: s
   return registro[denominadorKey];
 }
 
-const MOTIVO_CONECTOR_PENDIENTE =
+export const MOTIVO_CONECTOR_PENDIENTE =
   "Conector pendiente — disponible en el siguiente incremento de Fontana";
 
 function resolveEstadoCve(estadoNombre: string): string | null {
@@ -112,11 +116,11 @@ function resolveEstadoCve(estadoNombre: string): string | null {
 // Nacional siempre se intenta (no depende del territorio del proyecto);
 // Distrital solo si el territorio es distrito_federal/distrito_local y
 // se puede resolver el número de distrito.
-export async function resolverIndicadorF1(
+export async function resolverIndicadorECEG(
   indicadorId: string,
   territorio: Territorio
 ): Promise<CeldaFontana[]> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) {
     return [
       { nivel: "nacional", motivo: MOTIVO_CONECTOR_PENDIENTE },
@@ -301,7 +305,10 @@ async function resolverDistrital(
 
 // Forma real de distritos_municipios/{estado}.json — ver
 // buildDistritosMunicipiosData en scripts/eceg-data-pipeline.ts.
-interface DistritosMunicipiosStorage {
+// Exportado (2026-08-09): geografía electoral pura, reutilizada por
+// lib/fontana/ingesta/index.ts (resolverMunicipiosDeDistritoFontana)
+// para cruzar con valores de fuentes no-ECEG, sin duplicar este tipo.
+export interface DistritosMunicipiosStorage {
   composicion: Record<string, Record<string, number>>;
   coberturaDistritos: Record<string, number>;
   coberturaMunicipios: Record<string, number>;
@@ -330,7 +337,7 @@ export async function resolverMunicipiosDeDistrito(
   distritoCve: string,
   tipoDistrito: TipoDistrito = "federal"
 ): Promise<MunicipioDeDistrito[] | null> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return null;
 
   const nivelStorage = tipoDistrito === "federal" ? "distritos_municipios" : "distritos_locales_municipios";
@@ -416,7 +423,7 @@ export async function resolverElementosDeEstado(
   tipoElemento: TipoElementoEstado,
   soloCves?: string[]
 ): Promise<ElementoDeEstado[] | null> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return null;
 
   const nivelStorage = NIVEL_STORAGE_ELEMENTO[tipoElemento];
@@ -615,7 +622,7 @@ export async function resolverDistritalDeMunicipio(
   tipoDistrito: TipoDistrito
 ): Promise<CeldaDistritalDeMunicipio> {
   const nivel = tipoDistrito === "federal" ? "distrital_federal" : "distrital_local";
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return { nivel, motivo: MOTIVO_CONECTOR_PENDIENTE };
 
   let clasificacion: ClasificacionDistritoDeMunicipio | null;
@@ -690,7 +697,7 @@ export async function resolverDistritosDeMunicipio(
   municipioCve: string,
   tipoDistrito: TipoDistrito
 ): Promise<DistritoDeMunicipioConValor[] | null> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return null;
 
   const clasificacion = await clasificarDistritoDeMunicipio(estadoCve, municipioCve, tipoDistrito);
@@ -748,7 +755,7 @@ const CVE_ESTADO_NOMBRE: Record<string, string> = Object.fromEntries(
 // a un elemento — una sola lectura de Storage, sin importar que sean 32
 // "filas" a mostrar. Siempre precarga completa (32 ≤ 119).
 export async function resolverEstadosNacional(indicadorId: string): Promise<ElementoDeEstado[] | null> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return null;
 
   const path = buildEcegStoragePath("nacional")!;
@@ -790,7 +797,7 @@ export async function resolverElementosDeNacional(
   tipoElemento: Exclude<TipoElementoNacional, "estados">,
   seleccion: { estadoCve: string; cve: string }[]
 ): Promise<ElementoDeNacional[] | null> {
-  const config = FONTANA_F1_ECEG_CONFIG[indicadorId];
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
   if (!config) return null;
 
   const porEstado = new Map<string, string[]>();

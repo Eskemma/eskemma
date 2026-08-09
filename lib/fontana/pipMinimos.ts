@@ -146,3 +146,16 @@ export function derivarMinimosPIP(pregunta: string, justificacion?: string): str
 export function derivarMinimosFamilia1(pregunta: string, justificacion?: string): string[] {
   return derivarMinimosPIP(pregunta, justificacion).filter((id) => id.startsWith("F1-"));
 }
+
+// Genérica por familia — reemplaza a derivarMinimosFamilia1 en los
+// llamadores reales (app/api/fontana/sesion/route.ts) al abrir Familia 2
+// (2026-08-07). derivarMinimosFamilia1 se conserva por compatibilidad
+// (mismo resultado que derivarMinimosPorFamilia(..., "F1-")), sin
+// consumidores nuevos.
+export function derivarMinimosPorFamilia(
+  pregunta: string,
+  justificacion: string | undefined,
+  prefijoFamilia: string
+): string[] {
+  return derivarMinimosPIP(pregunta, justificacion).filter((id) => id.startsWith(prefijoFamilia));
+}

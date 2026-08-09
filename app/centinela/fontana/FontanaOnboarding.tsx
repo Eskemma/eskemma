@@ -32,7 +32,7 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 md:py-16">
       <div className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 md:p-8">
-        <h1 className="text-xl md:text-2xl font-semibold text-bluegreen-eske dark:text-bluegreen-eske-20">
+        <h1 className="text-xl md:text-2xl font-semibold text-bluegreen-eske dark:text-blue-eske-20">
           Fontana — datos abiertos para tu proyecto
         </h1>
         <p className="mt-2 text-sm text-black-eske-80 dark:text-[#9AAEBE]">
@@ -41,15 +41,15 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
 
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex flex-col sm:flex-row sm:gap-2 text-left">
-            <dt className="text-bluegreen-eske dark:text-bluegreen-eske-20 sm:w-28 shrink-0">Proyecto</dt>
+            <dt className="text-bluegreen-eske dark:text-blue-eske-20 sm:w-28 shrink-0">Proyecto</dt>
             <dd className="font-medium text-black-eske dark:text-[#EAF2F8] text-left">{proyecto.nombre}</dd>
           </div>
           <div className="flex flex-col sm:flex-row sm:gap-2 text-left">
-            <dt className="text-bluegreen-eske dark:text-bluegreen-eske-20 sm:w-28 shrink-0">Tipo</dt>
+            <dt className="text-bluegreen-eske dark:text-blue-eske-20 sm:w-28 shrink-0">Tipo</dt>
             <dd className="font-medium text-black-eske dark:text-[#EAF2F8] text-left">{NOMBRE_TIPO_PROYECTO[proyecto.tipo] ?? proyecto.tipo}</dd>
           </div>
           <div className="flex flex-col sm:flex-row sm:gap-2 text-left">
-            <dt className="text-bluegreen-eske dark:text-bluegreen-eske-20 sm:w-28 shrink-0">Territorio</dt>
+            <dt className="text-bluegreen-eske dark:text-blue-eske-20 sm:w-28 shrink-0">Territorio</dt>
             <dd className="font-medium text-black-eske dark:text-[#EAF2F8] text-left">{rutaTerritorial(proyecto.territorio)}</dd>
           </div>
         </dl>
@@ -66,7 +66,7 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
               {minimosPreview.map((id) => (
                 <li
                   key={id}
-                  className="px-2 py-1 rounded-full text-xs border border-bluegreen-eske-40 text-bluegreen-eske dark:text-bluegreen-eske-20 dark:border-bluegreen-eske-20"
+                  className="px-2 py-1 rounded-full text-xs border border-bluegreen-eske-40 text-bluegreen-eske dark:text-blue-eske-20 dark:border-blue-eske-20"
                 >
                   {FAMILIA1_NOMBRES[id] ?? id}
                 </li>

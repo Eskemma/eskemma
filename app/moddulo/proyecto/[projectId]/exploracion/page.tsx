@@ -1170,7 +1170,7 @@ export default function ExploracionPage() {
         {/* Fila 1: título + badge + descarga */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske shrink-0">F2</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 shrink-0">F2</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Exploración</h1>
             {dvs !== null && mode !== "editing" && (
               <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
@@ -1202,7 +1202,7 @@ export default function ExploracionPage() {
 
         {/* Fila 2: 3 chips — idéntico a F1 */}
         {(() => {
-          const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
+          const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5 dark:hover:bg-blue-eske-20/10";
           const btnClose = "px-2.5 py-1.5 bg-bluegreen-eske-60 text-white-eske rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors";
 
           return (
@@ -1261,7 +1261,7 @@ export default function ExploracionPage() {
           </span>
           <Link
             href={`/moddulo/proyecto/${projectId}/proposito`}
-            className="ml-auto text-bluegreen-eske underline text-xs shrink-0 hover:text-bluegreen-eske-60"
+            className="ml-auto text-bluegreen-eske dark:text-blue-eske-20 underline text-xs shrink-0 hover:text-bluegreen-eske-60"
           >
             Ir a Propósito →
           </Link>
@@ -1277,7 +1277,7 @@ export default function ExploracionPage() {
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
               className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
-                mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske" : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+                mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske dark:border-blue-eske-20 dark:text-blue-eske-20" : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
               }`}>
               {label}
             </button>
@@ -1309,7 +1309,7 @@ export default function ExploracionPage() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => setShowReporte(false)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske hover:text-bluegreen-eske/80 transition-colors"
+                    className="flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske dark:text-blue-eske-20 hover:text-bluegreen-eske/80 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1325,7 +1325,7 @@ export default function ExploracionPage() {
                     <button
                       onClick={handleRegenerarReporteF2}
                       disabled={isRegeneratingReport}
-                      className="p-1 rounded text-bluegreen-eske hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
+                      className="p-1 rounded text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
                       aria-label="Regenerar reporte F2"
                       title="Regenerar reporte F2"
                     >
@@ -1352,7 +1352,7 @@ export default function ExploracionPage() {
           ) : mode === "editing" && dvs !== null ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="shrink-0 mb-2 px-1">
-                <p className="text-xs text-bluegreen-eske/60 dark:text-[#6BA4C6]/70">
+                <p className="text-xs text-bluegreen-eske/60 dark:text-blue-eske-20/70">
                   Edita los motores y guarda los cambios para actualizar el reporte.
                 </p>
               </div>
@@ -1413,7 +1413,7 @@ export default function ExploracionPage() {
                   <div className="shrink-0 flex items-center gap-2">
                     <button
                       onClick={() => router.push(`/centinela/pestel/${pestProjectId}/analisis`)}
-                      className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                      className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
                     >
                       Regresar a PESTEL →
                     </button>
@@ -1504,7 +1504,7 @@ export default function ExploracionPage() {
               <div className="flex-1 overflow-y-auto">
                 {mode === "completed" && dvs !== null && !showReporte ? (
                   <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">
-                    <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-[#6BA4C6] mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-2">
                       Análisis de exploración completo
                     </p>
                     <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed mb-5">
@@ -1592,7 +1592,7 @@ export default function ExploracionPage() {
                         }
                       : handleAbrirPESTEL}
                     disabled={!!(pestlVia === "pestel" && pestProjectId && pestStageLoading)}
-                    className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-[#6BA4C6] dark:text-[#6BA4C6] rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {pestlVia === "pestel" && pestProjectId
                       ? pestStageLoading ? <span className="text-red-eske">Cargando…</span> : "Regresar a PESTEL →"
@@ -1776,7 +1776,7 @@ function ExplorationFormPanel({
         ) : pestProjectId ? (
           <Link
             href={`/centinela/pestel/${pestProjectId}/analisis`}
-            className="text-xs text-bluegreen-eske hover:underline font-medium"
+            className="text-xs text-bluegreen-eske dark:text-blue-eske-20 hover:underline font-medium"
           >
             Ver en Centinela →
           </Link>
@@ -1786,7 +1786,7 @@ function ExplorationFormPanel({
               type="button"
               onClick={onRelinkPestel}
               disabled={isRelinkingPestel}
-              className="text-xs text-bluegreen-eske hover:underline font-medium disabled:opacity-50"
+              className="text-xs text-bluegreen-eske dark:text-blue-eske-20 hover:underline font-medium disabled:opacity-50"
             >
               {isRelinkingPestel ? "Vinculando…" : "Vincular de nuevo ↺"}
             </button>
@@ -1824,7 +1824,7 @@ function ExplorationFormPanel({
                   <button
                     type="button"
                     onClick={() => { setKebabOpen(false); onAnalizarConPESTEL(); }}
-                    className="w-full text-left px-3 py-2 text-sm font-medium text-bluegreen-eske hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                    className="w-full text-left px-3 py-2 text-sm font-medium text-bluegreen-eske dark:text-blue-eske-20 hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
                   >
                     Analizar con PESTEL
                   </button>
@@ -1862,7 +1862,7 @@ function ExplorationFormPanel({
             <button key={sec.id} onClick={() => onSectionChange(sec.id)}
               className={`shrink-0 px-3 py-2 text-xs font-semibold transition-colors border-b-2 flex items-center gap-1 ${
                 activeSection === sec.id
-                  ? "border-bluegreen-eske text-bluegreen-eske"
+                  ? "border-bluegreen-eske text-bluegreen-eske dark:border-blue-eske-20 dark:text-blue-eske-20"
                   : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8]"
               }`}>
               <span className="hidden sm:inline">{sec.label}</span>
@@ -2089,7 +2089,7 @@ function SignalGroup({
               <span>{s.fuente}</span>
               {s.fechaCorte && <span>· {s.fechaCorte}</span>}
               {s.origenInternacional && (
-                <span className="px-1.5 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-70 rounded text-xs dark:bg-bluegreen-eske/20">
+                <span className="px-1.5 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-70 rounded text-xs dark:bg-bluegreen-eske/20 dark:text-blue-eske-20">
                   Intl.
                 </span>
               )}
@@ -2615,7 +2615,7 @@ function EleccionCard({
     ? "rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3 space-y-2"
     : "rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230] p-3 space-y-1.5";
   const headerCls = isPrimary
-    ? "text-xs font-bold uppercase tracking-widest text-bluegreen-eske"
+    ? "text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20"
     : "text-xs font-semibold uppercase tracking-wider text-black-eske-80 dark:text-[#C7D6E0]";
 
   return (
@@ -2886,7 +2886,7 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
       {/* Padrón */}
       {padron && (
         <div className="rounded-lg border border-bluegreen-eske/20 bg-bluegreen-eske/5 p-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske leading-snug">
+          <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 leading-snug">
             {isElectoral ? `LNE y Padrón Electoral — ${data.padronLabel}` : "Contexto Electoral de Referencia"}
           </p>
           <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-2">
@@ -3176,7 +3176,7 @@ function F2LandingView({
         {/* Encabezado del proyecto */}
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5 mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske">F2 — Exploración</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20">F2 — Exploración</span>
           </div>
           {projectName && (
             <h1 className="text-xl sm:text-2xl font-bold text-black-eske dark:text-[#EAF2F8] leading-tight">
@@ -3185,7 +3185,7 @@ function F2LandingView({
           )}
           <div className="flex flex-wrap gap-1.5">
             {projectType && (
-              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-[#6BA4C6] rounded-full text-xs font-medium">
+              <span className="px-2 py-0.5 bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20 rounded-full text-xs font-medium">
                 {TYPE_LABELS[projectType] ?? projectType}
               </span>
             )}
@@ -3214,7 +3214,7 @@ function F2LandingView({
               <div key={m.code}
                 className="flex gap-3 p-3 rounded-lg bg-gray-eske-10/60 dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10">
                 <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full
-                  bg-bluegreen-eske/10 text-bluegreen-eske text-xs font-bold">
+                  bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20 text-xs font-bold">
                   {m.code}
                 </span>
                 <div>

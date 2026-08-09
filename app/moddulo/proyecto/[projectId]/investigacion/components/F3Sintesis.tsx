@@ -10,7 +10,7 @@ function FODAGrid({ foda }: { foda: FODAInsumo }) {
   // faltante en la respuesta no debe tronar el render.
   const cuadrantes: { label: string; items: string[]; color: string }[] = [
     { label: "Fortalezas", items: foda.fortalezas ?? [], color: "bg-green-eske/10 text-green-eske" },
-    { label: "Oportunidades", items: foda.oportunidades ?? [], color: "bg-bluegreen-eske/10 text-bluegreen-eske" },
+    { label: "Oportunidades", items: foda.oportunidades ?? [], color: "bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20" },
     { label: "Debilidades", items: foda.debilidades ?? [], color: "bg-yellow-eske/15 text-black-eske" },
     { label: "Amenazas", items: foda.amenazas ?? [], color: "bg-red-eske/10 text-red-eske" },
   ];
@@ -95,8 +95,8 @@ export default function F3Sintesis({
             <p className="text-xs lg:text-sm opacity-60">Ninguno</p>
           ) : vaciosResiduales.map((v) => (
             <div key={v.pipItemId} className="flex items-center justify-between text-xs lg:text-sm px-2 py-1 rounded bg-gray-eske-10/60 dark:bg-white/5">
-              <span className="text-bluegreen-eske font-semibold">P{v.numero} — {v.pregunta}</span>
-              <span className={`px-1.5 py-0.5 rounded-full font-medium ${v.destino === "RDA" ? "bg-red-eske/10 text-red-eske" : "bg-bluegreen-eske/10 text-bluegreen-eske"}`}>
+              <span className="text-bluegreen-eske dark:text-blue-eske-20 font-semibold">P{v.numero} — {v.pregunta}</span>
+              <span className={`px-1.5 py-0.5 rounded-full font-medium ${v.destino === "RDA" ? "bg-red-eske/10 text-red-eske" : "bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20"}`}>
                 {v.destino} · {v.urgencia}
               </span>
             </div>

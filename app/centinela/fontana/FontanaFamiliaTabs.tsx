@@ -8,8 +8,9 @@
 // el Paso 2/4 — Fontana_T10_Cierre_Paso4.md §5), no la de PESTEL (que usa
 // un solo color para las 6 dimensiones).
 //
-// Solo Familia 1 está construida este incremento — F2-F5 se muestran con
-// su color y contador (siempre 0) pero deshabilitadas, sin onClick real.
+// Familia 1 y Familia 2 están construidas (2026-08-07: Incremento 1 de
+// F2, 5/22 indicadores con conector real) — F3-F5 se muestran con su
+// color y contador (siempre 0) pero deshabilitadas, sin onClick real.
 
 import type { FamiliaFontanaId } from "@/types/fontana.types";
 
@@ -27,7 +28,7 @@ const FAMILIAS: FamiliaTabInfo[] = [
   { id: "F5", nombre: "Características territoriales", color: "#FFD14A" },
 ];
 
-const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1"];
+const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1", "F2"];
 
 interface Props {
   familiaActiva: FamiliaFontanaId;
