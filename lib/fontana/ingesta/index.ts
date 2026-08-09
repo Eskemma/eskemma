@@ -27,6 +27,9 @@ import {
 } from "@/lib/fontana/ingesta/eceg";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { esValorDisponible } from "@/lib/fontana/ingesta/types";
+import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import { normalizeGeoName } from "@/lib/geo/municipios";
+import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import { resolverIndicadorIter } from "@/lib/fontana/ingesta/iter";
 import { resolverDensidad } from "@/lib/fontana/ingesta/compendio";
 import { resolverRazonDependencia } from "@/lib/fontana/ingesta/conapo";
@@ -84,6 +87,33 @@ function completarA4Celdas(celdas: CeldaFontana[]): CeldaFontana[] {
   );
 }
 
+// Celda "distrital" PROPIA de un proyecto de nivel distrito_federal/
+// distrito_local, para F2-1/F2-2/F2-7/F2-14 — Encargo de cierre,
+// 2026-08-09. Hallazgo real: calcularValorDistritoPonderado (más abajo
+// en este archivo) ya existía y ya estaba verificado (caso Zapopan,
+// encargo anterior) pero solo se había conectado al browsing Nacional
+// (resolverDesgloseDistritosNacional) — nunca a la resolución de la
+// celda propia de un proyecto que YA ES de ese nivel de territorio, así
+// que completarA4Celdas la rellenaba con el motivo genérico aunque el
+// mecanismo para calcularla ya existía. F2-3/F2-4 (índices compuestos)
+// y F2-8 (Bienestar, diferido) deliberadamente no pasan por aquí —
+// mismo criterio que su propio Nacional/Distrital-nacional.
+async function conCeldaDistritalPropia(
+  indicadorId: string,
+  territorio: Territorio,
+  celdasBase: CeldaFontana[]
+): Promise<CeldaFontana[]> {
+  if (territorio.nivel !== "distrito_federal" && territorio.nivel !== "distrito_local") return celdasBase;
+  if (!territorio.estado) return celdasBase;
+  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  if (!estadoCve) return celdasBase;
+  const numeroDistrito = extraerNumeroDistrito(territorio.municipio ?? territorio.nombre, territorio.cve_distrito);
+  if (!numeroDistrito) return celdasBase;
+  const tipoDistrito: TipoDistrito = territorio.nivel === "distrito_local" ? "local" : "federal";
+  const distrital = await calcularValorDistritoPonderado(indicadorId, estadoCve, numeroDistrito, tipoDistrito);
+  return [...celdasBase, distrital];
+}
+
 export async function resolverIndicadorFontana(
   indicadorId: string,
   territorio: Territorio
@@ -107,22 +137,22 @@ export async function resolverIndicadorFontana(
     return completarA4Celdas(await resolverIndiceMarginacion(territorio));
   }
   if (indicadorId === "F2-7") {
-    return completarA4Celdas(await resolverBeneficiariosProduccion(territorio));
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverBeneficiariosProduccion(territorio)));
   }
   if (indicadorId === "F2-8") {
     return completarA4Celdas(await resolverBeneficiariosBecaBJ(territorio));
   }
   if (indicadorId === "F2-1") {
-    return completarA4Celdas(await resolverPobreza(territorio));
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverPobreza(territorio)));
   }
   if (indicadorId === "F2-2") {
-    return completarA4Celdas(await resolverPobrezaExtrema(territorio));
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverPobrezaExtrema(territorio)));
   }
   if (indicadorId === "F2-3") {
     return completarA4Celdas(await resolverRezagoSocial(territorio));
   }
   if (indicadorId === "F2-14") {
-    return completarA4Celdas(await resolverCarenciaSocial(territorio));
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverCarenciaSocial(territorio)));
   }
 
   // Ningún indicador real (F1 o F2 con conector) llega aquí hoy — esta
