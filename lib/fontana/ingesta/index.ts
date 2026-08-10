@@ -68,6 +68,11 @@ import {
   resolverNumeradorDenominadorMunicipios,
   FUENTE_ETIQUETA_CONEVAL_POBREZA,
 } from "@/lib/fontana/ingesta/coneval";
+import {
+  resolverIngresoCorrienteMunicipal,
+  resolverMunicipiosEstadoIcmm,
+  resolverEstadosIcmm,
+} from "@/lib/fontana/ingesta/icmm";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -154,6 +159,9 @@ export async function resolverIndicadorFontana(
   if (indicadorId === "F2-14") {
     return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverCarenciaSocial(territorio)));
   }
+  if (indicadorId === "F2-18") {
+    return completarA4Celdas(await resolverIngresoCorrienteMunicipal(territorio));
+  }
 
   // Ningún indicador real (F1 o F2 con conector) llega aquí hoy — esta
   // rama solo la ejercitan los 17 indicadores diferidos de Familia 2
@@ -206,6 +214,9 @@ export async function resolverDesgloseMunicipiosEstado(
   if (indicadorId === "F2-14") {
     return resolverMunicipiosEstadoCarenciaSocial(estadoCve, soloCves);
   }
+  if (indicadorId === "F2-18") {
+    return resolverMunicipiosEstadoIcmm(estadoCve, soloCves);
+  }
   return null;
 }
 
@@ -236,6 +247,9 @@ export async function resolverDesgloseEstadosNacional(indicadorId: string): Prom
   }
   if (indicadorId === "F2-14") {
     return resolverEstadosCarenciaSocial();
+  }
+  if (indicadorId === "F2-18") {
+    return resolverEstadosIcmm();
   }
   // F2-8 (y cualquier otro sin mecanismo) cae aquí — null, mismo
   // contrato que "sin mecanismo de desglose para este nivel".
@@ -295,7 +309,7 @@ export async function resolverMunicipiosDeDistritoFontana(
 // por adaptador, el mecanismo de Incremento 1 ya alcanza. F2-8 excluido
 // (mismo motivo que "Ver estados" — diferido, varianza de red no
 // controlable).
-const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7"]);
+const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7", "F2-18"]);
 
 export async function resolverDesgloseMunicipiosNacional(
   indicadorId: string,
@@ -404,6 +418,15 @@ async function calcularValorDistritoPonderado(
     }
     if (denominador > 0) valor = Math.round((numerador / denominador) * 10000) / 100;
     fuenteEtiqueta = FUENTE_ETIQUETA_CONEVAL_POBREZA;
+  } else if (indicadorId === "F2-18") {
+    // ICMM no es un índice compuesto (es un promedio monetario), pero
+    // igual es una estimación modelada (SEBLUP) de la fuente — mismo
+    // criterio de cautela que F2-3/F2-4, mensaje propio porque el texto
+    // genérico de abajo ("índice compuesto") no describe bien este caso.
+    return {
+      nivel: "distrital",
+      motivo: "No corresponde calcular — ICMM es una estimación modelada (SEBLUP) de la fuente, sin metodología de agregación municipio→distrito validada",
+    };
   } else {
     // F2-3/F2-4 (índices compuestos) y cualquier otro sin mecanismo —
     // mismo motivo que su propio Nacional.
@@ -439,9 +462,9 @@ export async function resolverDesgloseDistritosNacional(
   }
   // F2-8 diferido — mismo motivo que "Ver estados"/Municipal nacional.
   if (indicadorId === "F2-8") return null;
-  // Fuentes no-ECEG sin ningún mecanismo en absoluto (17 diferidos) —
+  // Fuentes no-ECEG sin ningún mecanismo en absoluto (12 diferidos) —
   // sin composición que mostrar.
-  const FUENTES_CON_ALGUN_MECANISMO = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7"]);
+  const FUENTES_CON_ALGUN_MECANISMO = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7", "F2-18"]);
   if (!FUENTES_CON_ALGUN_MECANISMO.has(indicadorId)) return null;
 
   const tipoDistrito: TipoDistrito = tipoElemento === "distritos_fed" ? "federal" : "local";

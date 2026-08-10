@@ -57,15 +57,17 @@ export const maxDuration = 60;
 // lib/fontana/ingesta/index.ts, único punto de ruteo por fuente para
 // este mecanismo. Nunca implica distrital (esas fuentes no publican por
 // distrito electoral) — el gate de abajo lo aplica solo a `.municipal`.
-const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set(["conapo_marginacion", "bienestar_ckan", "coneval_pobreza", "coneval_irs"]);
+const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set(["conapo_marginacion", "bienestar_ckan", "coneval_pobreza", "coneval_irs", "icmm"]);
 
 // Índices nacionales completos (2026-08-09) — por INDICADOR, no por
 // fuenteSlug: CONAPO y CONEVAL tienen indicadores en ambos grupos (ej.
 // F2-3/F2-4 son índices compuestos, sin mecanismo de agregación
 // municipio→distrito; F2-1/F2-2/F2-14 sí lo tienen), así que un gate
 // por fuenteSlug no distinguiría correctamente. F2-8 (Bienestar) fuera
-// de ambos — diferido, misma varianza de red ya documentada.
-const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7"]);
+// de ambos — diferido, misma varianza de red ya documentada. F2-18
+// (ICMM, Incremento 3) agregado 2026-08-09 — mismo grupo que F2-3/F2-4:
+// índice municipal completo disponible, pero sin agregación distrital.
+const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7", "F2-18"]);
 const INDICADORES_DISTRITAL_NACIONAL = new Set(["F2-1", "F2-2", "F2-7", "F2-14"]);
 
 interface IndicadorRespuesta {

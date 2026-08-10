@@ -42,10 +42,14 @@ export const FAMILIA2_NOMBRES: Record<string, string> = {
 
 // Incremento 1 (2026-08-07): 5 de 22 con conector real (F2-4, F2-7,
 // F2-8, F2-11, F2-13). Incremento 2 (2026-08-09): +4 (F2-1, F2-2, F2-3,
-// F2-14, CONEVAL) — 9 de 22 con conector real. El resto queda diferido
-// (F2-9/10 ENOE, F2-18 ICMM, F2-5/6/12/15/16/17/19/20/21/22).
+// F2-14, CONEVAL) — 9 de 22. Incremento 3 (2026-08-09): +1 (F2-18 ICMM,
+// vía "Datos abiertos" de inegi.org.mx/investigacion/icmm/, no el
+// dashboard Tableau de la misma página) — 10 de 22 con conector real.
+// El resto queda diferido (F2-9/10 ENOE — 2 rondas de investigación sin
+// mecanismo de bajo/medio costo, no se reintenta salvo información
+// nueva; F2-5/6/12/15/16/17/19/20/21/22 sin investigar todavía).
 export const FAMILIA2_DIFERIDOS = new Set<string>([
   "F2-5", "F2-6", "F2-9", "F2-10", "F2-12",
-  "F2-15", "F2-16", "F2-17", "F2-18", "F2-19", "F2-20", "F2-21",
+  "F2-15", "F2-16", "F2-17", "F2-19", "F2-20", "F2-21",
   "F2-22",
 ]);

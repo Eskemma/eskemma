@@ -28,6 +28,13 @@ export interface ValorIndicadorFontana {
   // scripts/eceg-data-pipeline.ts). < 100 cuando el valor puede
   // subestimar la cifra real.
   coberturaPct?: number;
+  // Coeficiente de variación (%) que la propia fuente ya cuantifica para
+  // estimaciones modeladas (ej. F2-18 ICMM, small-area estimation SEBLUP)
+  // — señal de confiabilidad distinta de coberturaPct (esa mide cobertura
+  // geográfica de Fontana, esta mide precisión estadística de la fuente).
+  // No se expone visualmente todavía (2026-08-09) — se carga para tenerla
+  // disponible si se decide usarla como señal de calidad por territorio.
+  coeficienteVariacionPct?: number;
 }
 
 export interface CeldaNoDisponible {
