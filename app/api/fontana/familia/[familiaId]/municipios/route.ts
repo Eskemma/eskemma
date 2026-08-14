@@ -14,9 +14,10 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { adminDb } from "@/lib/firebase-admin";
+import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
 import {
+  FONTANA_ECEG_CONFIG,
   resolverElementosDeEstado,
   getOpcionesElementoEstado,
   resolverDistritosDeMunicipio,
@@ -106,14 +107,11 @@ async function cargarSesionValidada(
     return { error: NextResponse.json({ error: "sesionId e indicadorId son requeridos" }, { status: 400 }) } as const;
   }
 
-  const snap = await adminDb.collection("fontana_sesiones").doc(sesionId).get();
-  if (!snap.exists) {
+  const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+  if (!cargada) {
     return { error: NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 }) } as const;
   }
-  const sesion = snap.data() as FontanaSesion;
-  if (sesion.uid !== session.uid) {
-    return { error: NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 }) } as const;
-  }
+  const { sesion } = cargada;
 
   const familia = sesion.indicadoresPorFamilia[familiaId as FamiliaFontanaId];
   const idsEnSesion = new Set([...familia.minimos, ...familia.seleccionUsuario]);
@@ -261,13 +259,25 @@ async function handleGetEstado(
 
   // "municipios" ya tiene mecanismo fuera de ECEG (CONAPO/Bienestar,
   // 2026-08-08) — resolverDesgloseMunicipiosEstado rutea por fuente.
-  // "distritos_fed"/"distritos_loc" siguen exclusivos de ECEG
-  // (resolverElementosDeEstado regresa null para indicadores no-ECEG,
-  // cae en el mismo 400 "sin mecanismo" ya existente).
+  // "distritos_fed"/"distritos_loc" (Hallazgo E, revisión de
+  // consistencia 2ª ronda, 2026-08-12): para ECEG sigue siendo
+  // resolverElementosDeEstado; para las fuentes con recombinación
+  // ponderada válida (F2-1/F2-2/F2-7/F2-14/F2-18) reutiliza
+  // resolverDesgloseDistritosNacional (ya construido para "Ver
+  // distritos" en Nacional) acotado a los distritos de ESTE estado —
+  // mismo cálculo, mismo criterio de "no corresponde calcular" para
+  // F2-3/F2-4 sin fabricar cifra. Cualquier otro indicador (PNUD/ENIGH/
+  // IMCO/STPS/F2-8) regresa null → mismo 400 "sin mecanismo" de siempre.
   const elementos =
     tipoElemento === "municipios"
       ? await resolverDesgloseMunicipiosEstado(indicadorId, estadoCve)
-      : await resolverElementosDeEstado(indicadorId, estadoCve, tipoElemento);
+      : indicadorId in FONTANA_ECEG_CONFIG
+        ? await resolverElementosDeEstado(indicadorId, estadoCve, tipoElemento)
+        : await resolverDesgloseDistritosNacional(
+            indicadorId,
+            tipoElemento,
+            opciones.map((o) => ({ estadoCve, cve: o.cve }))
+          );
   if (!elementos) {
     return NextResponse.json({ error: "Este indicador no tiene mecanismo de desglose para este nivel" }, { status: 400 });
   }

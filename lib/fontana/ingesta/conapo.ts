@@ -154,8 +154,11 @@ export async function resolverRazonDependencia(territorio: Territorio): Promise<
   const nacional = await resolverNacionalCelda();
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);

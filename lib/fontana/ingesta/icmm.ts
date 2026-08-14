@@ -309,8 +309,11 @@ export async function resolverIngresoCorrienteMunicipal(territorio: Territorio):
   const nacional = celdaDesdeValor("nacional", datos.nacional, "INEGI no reportó el valor nacional de ICMM");
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {

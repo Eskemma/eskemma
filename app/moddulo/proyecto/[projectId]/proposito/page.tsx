@@ -12,6 +12,7 @@ import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen, Territorio } f
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
 import { formatChatHistory, formatXpctoForm } from "@/lib/moddulo/reportFormatters";
+import TerritorySelector from "@/app/components/shared/TerritorySelector";
 
 // ==========================================
 // TIPOS LOCALES
@@ -65,6 +66,15 @@ export default function PropositoPage() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [dictamen, setDictamen] = useState<Dictamen | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  // Edición de territorio post-creación (Fase 1 del rediseño de territorio,
+  // 26-08-13) — antes no existía ningún camino de UI para reeditar el
+  // territorio de un proyecto ya creado; necesario para que un proyecto
+  // distrital existente (ej. el que originó este trabajo) pueda
+  // re-seleccionarse con el selector estructurado nuevo sin recrear el
+  // proyecto desde cero.
+  const [showEditTerritory, setShowEditTerritory] = useState(false);
+  const [isSavingTerritory, setIsSavingTerritory] = useState(false);
+  const [territoryError, setTerritoryError] = useState<string | null>(null);
   const prevFormComplete = useRef(false);
   const preEditModeRef = useRef<PageMode>("active");
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
@@ -397,6 +407,34 @@ export default function PropositoPage() {
     setTimeout(() => setSaveStatus("idle"), 3000);
   };
 
+  // Guardar territorio editado (Fase 1 del rediseño de territorio) — PATCH
+  // directo, sin propagación/regeneración de reporte (a diferencia de XPCTO,
+  // el territorio no alimenta el reporte de F1; sí afecta F2 en adelante,
+  // pero eso es responsabilidad del snapshot/diff ya existente en F2, no de
+  // esta pantalla).
+  const handleSaveTerritory = async (nuevoTerritorio: Territorio) => {
+    setIsSavingTerritory(true);
+    setTerritoryError(null);
+    try {
+      const res = await fetch(`/api/moddulo/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ territorio: nuevoTerritorio }),
+      });
+      if (!res.ok) throw new Error("save territorio failed");
+      setProjectTerritory(nuevoTerritorio);
+      setShowEditTerritory(false);
+    } catch {
+      // Nunca degradar en silencio (mismo criterio que esParcial/
+      // granularidadReal ya establecido en el proyecto) — el modal
+      // permanece abierto con el error visible para que el usuario reintente.
+      setTerritoryError("No se pudo guardar el territorio. Intenta de nuevo.");
+    } finally {
+      setIsSavingTerritory(false);
+    }
+  };
+
   // Detectar cuando se completa el formulario por primera vez en modo activo
   const formComplete = isFormComplete(form);
   useEffect(() => {
@@ -443,6 +481,17 @@ export default function PropositoPage() {
           projectType={projectType}
           projectTerritory={projectTerritory}
           onComenzar={handleComenzarF1}
+          onEditTerritory={() => setShowEditTerritory(true)}
+        />
+      )}
+
+      {showEditTerritory && (
+        <EditTerritoryModal
+          territorio={projectTerritory}
+          isSaving={isSavingTerritory}
+          error={territoryError}
+          onSave={handleSaveTerritory}
+          onClose={() => { setShowEditTerritory(false); setTerritoryError(null); }}
         />
       )}
 
@@ -1099,11 +1148,13 @@ function F1LandingView({
   projectType,
   projectTerritory,
   onComenzar,
+  onEditTerritory,
 }: {
   projectName: string;
   projectType: ProjectType;
   projectTerritory: Territorio | null;
   onComenzar: () => void;
+  onEditTerritory: () => void;
 }) {
   return (
     <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-4 py-8 sm:py-12">
@@ -1130,6 +1181,13 @@ function F1LandingView({
                 {projectTerritory.nombre}
               </span>
             )}
+            <button
+              type="button"
+              onClick={onEditTerritory}
+              className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+            >
+              {projectTerritory?.nombre ? "Editar territorio" : "Definir territorio"}
+            </button>
           </div>
         </div>
 
@@ -1178,6 +1236,49 @@ function F1LandingView({
         >
           Comenzar Fase 1
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal de edición de territorio post-creación (Fase 1 del rediseño de
+// territorio, 26-08-13). Envuelve TerritorySelector (mismo componente que
+// el modal de creación de proyecto y el wizard de PESTEL — no una copia
+// paralela) en un flujo de un solo paso: "Guardar" reemplaza "Continuar",
+// no hay "Atrás" porque no hay paso previo dentro del modal.
+function EditTerritoryModal({
+  territorio,
+  isSaving,
+  error,
+  onSave,
+  onClose,
+}: {
+  territorio: Territorio | null;
+  isSaving: boolean;
+  error: string | null;
+  onSave: (t: Territorio) => void;
+  onClose: () => void;
+}) {
+  const [pending, setPending] = useState<Territorio | null>(territorio);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+        <TerritorySelector
+          territorio={pending}
+          onChange={setPending}
+          onNext={() => pending && onSave(pending)}
+          onBack={onClose}
+          label="Editar territorio del proyecto"
+          nextLabel={isSaving ? "Guardando…" : "Guardar"}
+          backLabel="Cancelar"
+        />
+        {error && (
+          <p className="text-xs text-red-eske mt-3" role="alert">{error}</p>
+        )}
+        {isSaving && (
+          <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-3">Guardando…</p>
+        )}
       </div>
     </div>
   );

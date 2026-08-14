@@ -133,8 +133,12 @@ export async function resolverIndicadorECEG(
   const nacional = await resolverNacional(indicadorId, config);
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "distrital", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      { nivel: "distrital", motivo: "El proyecto no tiene un distrito federal o local definido en su territorio" },
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
 
   const estadoCve = resolveEstadoCve(territorio.estado);

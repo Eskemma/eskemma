@@ -4,10 +4,9 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { adminDb } from "@/lib/firebase-admin";
+import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
 
-const COLLECTION = "fontana_sesiones";
 const FAMILIAS_VALIDAS: FamiliaFontanaId[] = ["F1", "F2", "F3", "F4", "F5"];
 
 export async function PATCH(
@@ -39,16 +38,11 @@ export async function PATCH(
     return NextResponse.json({ error: "accion debe ser 'agregar' o 'quitar'" }, { status: 400 });
   }
 
-  const ref = adminDb.collection(COLLECTION).doc(sesionId);
-  const snap = await ref.get();
-  if (!snap.exists) {
+  const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+  if (!cargada) {
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
-
-  const sesion = snap.data() as FontanaSesion;
-  if (sesion.uid !== session.uid) {
-    return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
-  }
+  const { sesion, ref } = cargada;
 
   const familia = sesion.indicadoresPorFamilia[familiaId];
 

@@ -343,8 +343,13 @@ export interface CreateProjectInput {
   pestAnalysisId?: string;
 }
 
+// territorio agregado 26-08-13 (Fase 1 del rediseño de territorio) — antes
+// no existía ningún camino de API para editar el territorio de un proyecto
+// ya creado (solo se podía definir al crear). Necesario para que un
+// proyecto distrital existente pueda re-seleccionarse con el selector
+// estructurado nuevo sin tener que crear un proyecto desde cero.
 export type UpdateProjectInput = Partial<
-  Pick<ModduloProject, "name" | "description" | "color" | "xpcto" | "status" | "settings">
+  Pick<ModduloProject, "name" | "description" | "color" | "xpcto" | "status" | "settings" | "territorio">
 >;
 
 // ==========================================

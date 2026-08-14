@@ -7,14 +7,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { PESTELProject, Territorio } from "@/types/pestel.types";
+import type { PESTELProject } from "@/types/pestel.types";
 import type { ModduloProject } from "@/types/moddulo.types";
-
-// ==========================================
-// TERRITORY COMPATIBILITY
-// ==========================================
-
-type TerritoryMatch = "exact" | "approximate" | "mismatch";
+import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 
 const TIPO_LABELS: Record<string, string> = {
   electoral: "Electoral",
@@ -22,32 +17,6 @@ const TIPO_LABELS: Record<string, string> = {
   legislativo: "Legislativo",
   ciudadano: "Ciudadano",
 };
-
-function checkTerritoryMatch(
-  p: Territorio,
-  m: Territorio | undefined
-): TerritoryMatch {
-  if (!m) return "approximate";
-  if (p.nivel !== m.nivel) return "mismatch";
-  if (p.pais && m.pais && p.pais !== m.pais) return "mismatch";
-  if (p.estado && m.estado && p.estado !== m.estado) return "mismatch";
-
-  const isDistrito = ["distrito_federal", "distrito_local", "distrito"].includes(p.nivel);
-  if (isDistrito) {
-    if (p.cve_distrito && m.cve_distrito) {
-      return p.cve_distrito === m.cve_distrito ? "exact" : "mismatch";
-    }
-    if (p.municipio && m.municipio && p.municipio !== m.municipio) return "mismatch";
-    return "approximate";
-  }
-
-  if (p.nivel === "municipal") {
-    if (p.municipio && m.municipio && p.municipio !== m.municipio) return "mismatch";
-    return "approximate";
-  }
-
-  return "exact";
-}
 
 // ==========================================
 // PICKER MODAL

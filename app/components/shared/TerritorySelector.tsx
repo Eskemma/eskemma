@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import type { Territorio, NivelTerritorial } from "@/types/pestel.types";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import { useGeoOptions } from "@/app/components/geo/hooks/useGeoOptions";
+import type { GeoOptionDistrito } from "@/lib/geo/distritos";
+import { getCveEntidad } from "@/lib/geo/estadoCve";
 
 // ==========================================
 // DATOS GEOGRÁFICOS
@@ -56,6 +59,10 @@ interface Props {
   onBack: () => void;
   /** Texto de la pregunta principal. Varía por contexto. */
   label?: string;
+  /** Texto del botón de avance. Default "Continuar →" (wizards de creación). */
+  nextLabel?: string;
+  /** Texto del botón de retroceso. Default "← Atrás". */
+  backLabel?: string;
 }
 
 // ==========================================
@@ -68,12 +75,22 @@ export default function TerritorySelector({
   onNext,
   onBack,
   label = "¿Cuál es el territorio de este análisis?",
+  nextLabel = "Continuar →",
+  backLabel = "← Atrás",
 }: Props) {
   const [pais, setPais] = useState(territorio?.pais ?? "");
   const [nivel, setNivel] = useState<NivelTerritorial>(territorio?.nivel ?? "estatal");
   // México: dropdown de estado
   const [estado, setEstado] = useState(territorio?.estado ?? "");
+  // México nivel municipal: texto libre (sin catálogo de municipios en esta fase)
   const [municipio, setMunicipio] = useState(territorio?.municipio ?? "");
+  // México nivel distrital: selector estructurado contra /api/geo/options
+  // (Fase 1 del rediseño de territorio, 26-08-13) — reemplaza el input de
+  // texto libre que dependía de que el usuario escribiera "con cabecera en
+  // X" para que Fontana pudiera resolver el municipio (nunca ocurría en la
+  // práctica: el placeholder anterior ni siquiera usaba esa frase).
+  const [distritoSeleccionado, setDistritoSeleccionado] = useState<GeoOptionDistrito | null>(null);
+  const [distritoFallbackTexto, setDistritoFallbackTexto] = useState(""); // solo si /api/geo/options falla
   // Países no-México: texto libre
   const [estadoTexto, setEstadoTexto] = useState(territorio?.estado ?? "");
   const [municipioTexto, setMunicipioTexto] = useState(territorio?.municipio ?? "");
@@ -83,12 +100,37 @@ export default function TerritorySelector({
   const esDistrito = nivel === "distrito_federal" || nivel === "distrito_local" || nivel === "distrito";
   const requiresMunicipio = nivel === "municipal" || esDistrito;
 
+  const estadoCveParaDistritos = esMexico && esDistrito && estado ? getCveEntidad(estado) : null;
+  const {
+    options: distritoOptions,
+    isLoading: loadingDistritos,
+    error: distritoError,
+  } = useGeoOptions<GeoOptionDistrito>({
+    tipo: nivel === "distrito_federal" ? "distritos_fed" : "distritos_loc",
+    estadoId: estadoCveParaDistritos ?? "",
+  });
+
+  // Pre-selecciona el distrito actual del proyecto (si ya tiene cve_distrito
+  // válido, ej. al editar un proyecto existente) una vez que el catálogo del
+  // estado correspondiente termina de cargar.
+  useEffect(() => {
+    if (distritoSeleccionado) return;
+    if (!territorio?.cve_distrito || distritoOptions.length === 0) return;
+    const match = distritoOptions.find((o) => o.cve === territorio.cve_distrito);
+    if (match) setDistritoSeleccionado(match);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distritoOptions]);
+
   // Construir nombre legible y emitir cambio
   useEffect(() => {
     if (!pais) return;
 
     const estadoVal = esMexico ? estado : estadoTexto;
-    const municipioVal = esMexico ? municipio : municipioTexto;
+    const municipioVal = esMexico
+      ? (esDistrito
+          ? (distritoSeleccionado ? (distritoSeleccionado.cabecera ?? distritoSeleccionado.nombre) : distritoFallbackTexto)
+          : municipio)
+      : municipioTexto;
 
     const parts: string[] = [];
     if (nivel === "nacional") {
@@ -107,9 +149,14 @@ export default function TerritorySelector({
       pais,
       estado: nivel !== "nacional" && estadoVal ? estadoVal : undefined,
       municipio: requiresMunicipio && municipioVal ? municipioVal : undefined,
+      cve_distrito: esMexico && esDistrito && distritoSeleccionado ? distritoSeleccionado.cve : undefined,
+      distritosSeleccionados:
+        esMexico && esDistrito && distritoSeleccionado
+          ? [{ cve: distritoSeleccionado.cve, nombre: distritoSeleccionado.cabecera ?? distritoSeleccionado.nombre }]
+          : undefined,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pais, nivel, estado, municipio, estadoTexto, municipioTexto]);
+  }, [pais, nivel, estado, municipio, estadoTexto, municipioTexto, distritoSeleccionado, distritoFallbackTexto]);
 
   const canContinue = (() => {
     if (!pais) return false;
@@ -117,6 +164,9 @@ export default function TerritorySelector({
     const estadoVal = esMexico ? estado : estadoTexto.trim();
     if (!estadoVal) return false;
     if (requiresMunicipio) {
+      if (esMexico && esDistrito) {
+        return distritoSeleccionado !== null || distritoFallbackTexto.trim().length > 0;
+      }
       const municipioVal = esMexico ? municipio.trim() : municipioTexto.trim();
       return municipioVal.length > 0;
     }
@@ -160,6 +210,8 @@ export default function TerritorySelector({
             setEstadoTexto("");
             setMunicipio("");
             setMunicipioTexto("");
+            setDistritoSeleccionado(null);
+            setDistritoFallbackTexto("");
           }}
           className={selectClass}
         >
@@ -187,6 +239,8 @@ export default function TerritorySelector({
               setNivel(e.target.value as NivelTerritorial);
               setMunicipio("");
               setMunicipioTexto("");
+              setDistritoSeleccionado(null);
+              setDistritoFallbackTexto("");
             }}
             className={selectClass}
           >
@@ -212,7 +266,13 @@ export default function TerritorySelector({
           <select
             id="estado-mx"
             value={estado}
-            onChange={(e) => setEstado(e.target.value)}
+            onChange={(e) => {
+              setEstado(e.target.value);
+              // El catálogo de distritos es por estado — un distrito
+              // seleccionado del estado anterior ya no aplica.
+              setDistritoSeleccionado(null);
+              setDistritoFallbackTexto("");
+            }}
             className={selectClass}
           >
             <option value="">Selecciona un estado</option>
@@ -223,13 +283,13 @@ export default function TerritorySelector({
         </div>
       )}
 
-      {esMexico && requiresMunicipio && (
+      {esMexico && requiresMunicipio && !esDistrito && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="municipio-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
-            {esDistrito ? "Distrito / descripción" : "Municipio"}
+            Municipio
             <InfoTooltip
               content="Permite segmentar los datos al nivel más específico posible dentro del estado."
-              example={esDistrito ? "Distrito 02 Jiutepec" : "Jiutepec"}
+              example="Jiutepec"
             />
           </label>
           <input
@@ -237,9 +297,69 @@ export default function TerritorySelector({
             type="text"
             value={municipio}
             onChange={(e) => setMunicipio(e.target.value)}
-            placeholder={esDistrito ? "ej. Distrito 5 — Atizapán de Zaragoza" : "ej. Atizapán de Zaragoza"}
+            placeholder="ej. Atizapán de Zaragoza"
             className={inputClass}
           />
+        </div>
+      )}
+
+      {/* Distrito electoral (federal/local) — selector estructurado contra
+          el catálogo real del INE (lib/geo/distritos.ts vía
+          /api/geo/options), en vez del texto libre que dependía de que el
+          usuario escribiera un formato exacto que Fontana pudiera parsear. */}
+      {esMexico && requiresMunicipio && esDistrito && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="distrito-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
+            {nivel === "distrito_federal" ? "Distrito electoral federal" : "Distrito electoral local"}
+            <InfoTooltip
+              content="Identifica el distrito exacto dentro del estado. El municipio/cabecera se resuelve automáticamente del catálogo del INE."
+              example="D.L. 027 – Iztapalapa"
+            />
+          </label>
+          {!estado ? (
+            <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+              Selecciona primero un estado.
+            </p>
+          ) : distritoError ? (
+            <>
+              <input
+                id="distrito-mx"
+                type="text"
+                value={distritoFallbackTexto}
+                onChange={(e) => setDistritoFallbackTexto(e.target.value)}
+                placeholder="ej. Distrito 27 — Iztapalapa"
+                className={inputClass}
+              />
+              <p className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
+                No se pudo cargar el catálogo estructurado de distritos. Escribe el distrito y su
+                cabecera manualmente — podrás corregirlo después.
+              </p>
+            </>
+          ) : (
+            <select
+              id="distrito-mx"
+              value={distritoSeleccionado?.cve ?? ""}
+              disabled={loadingDistritos}
+              onChange={(e) => {
+                const opt = distritoOptions.find((o) => o.cve === e.target.value) ?? null;
+                setDistritoSeleccionado(opt);
+              }}
+              className={selectClass}
+            >
+              <option value="">
+                {loadingDistritos ? "Cargando distritos…" : "Selecciona un distrito"}
+              </option>
+              {distritoOptions.map((o) => (
+                <option key={o.cve} value={o.cve}>{o.nombre}</option>
+              ))}
+            </select>
+          )}
+          {distritoSeleccionado && !distritoSeleccionado.cabecera && (
+            <p className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
+              Este distrito no tiene una cabecera registrada en el catálogo — se usará la descripción
+              genérica ({distritoSeleccionado.nombre}). Verifica que sea correcta.
+            </p>
+          )}
         </div>
       )}
 
@@ -300,7 +420,7 @@ export default function TerritorySelector({
           className="px-5 py-2.5 border border-gray-eske-30 dark:border-white/10 text-gray-eske-80 dark:text-[#C7D6E0]
             rounded-lg text-sm font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
         >
-          ← Atrás
+          {backLabel}
         </button>
         <button
           type="button"
@@ -310,7 +430,7 @@ export default function TerritorySelector({
             font-medium transition-colors hover:bg-bluegreen-eske-60
             disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Continuar →
+          {nextLabel}
         </button>
       </div>
     </div>

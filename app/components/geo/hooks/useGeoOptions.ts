@@ -15,22 +15,31 @@ interface UseGeoOptionsParams {
   cve_loc?: string;
 }
 
-// Module-level cache shared across hook instances
+// Module-level cache shared across hook instances. Tipado como GeoOption[]
+// (el shape mínimo común) — cada call site castea a su T vía el genérico
+// del hook; el `key` ya incluye `tipo`, así que dos calls con distinto T
+// nunca comparten entrada de caché por accidente.
 const cache = new Map<string, GeoOption[]>();
 
 function buildKey(p: UseGeoOptionsParams): string {
   return `${p.tipo}:${p.estadoId}:${p.distrito_fed ?? ""}:${p.distrito_loc ?? ""}:${p.municipio ?? ""}:${p.cve_loc ?? ""}`;
 }
 
-export function useGeoOptions({
+// T genérico (default GeoOption, sin cambio para los consumidores
+// existentes): permite a TerritorySelector.tsx pedir GeoOptionDistrito
+// (cve+nombre+cabecera) para tipo=distritos_fed/distritos_loc sin duplicar
+// este hook — la respuesta cruda del endpoint ya trae `cabecera` cuando
+// aplica (app/api/geo/options/route.ts), este hook no la descarta, solo no
+// la tipaba hasta ahora.
+export function useGeoOptions<T extends GeoOption = GeoOption>({
   tipo,
   estadoId,
   distrito_fed,
   distrito_loc,
   municipio,
   cve_loc,
-}: UseGeoOptionsParams): { options: GeoOption[]; isLoading: boolean; error: string | null } {
-  const [options, setOptions] = useState<GeoOption[]>([]);
+}: UseGeoOptionsParams): { options: T[]; isLoading: boolean; error: string | null } {
+  const [options, setOptions] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -46,7 +55,7 @@ export function useGeoOptions({
     const key = buildKey({ tipo, estadoId, distrito_fed, distrito_loc, municipio, cve_loc });
     const cached = cache.get(key);
     if (cached) {
-      setOptions(cached);
+      setOptions(cached as T[]);
       setIsLoading(false);
       setError(null);
       return;
@@ -74,7 +83,7 @@ export function useGeoOptions({
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
-        const data: GeoOption[] = await res.json();
+        const data: T[] = await res.json();
         cache.set(key, data);
         setOptions(data);
         setIsLoading(false);

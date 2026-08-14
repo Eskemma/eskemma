@@ -153,15 +153,26 @@ export async function resolverIndiceMarginacion(territorio: Territorio): Promise
     nivel: "nacional",
     motivo: "CONAPO no publica un índice de marginación nacional agregable — solo por entidad y municipio",
   };
+  // "distrital" (Hallazgo B/C, revisión de consistencia 2ª ronda,
+  // 2026-08-12) — mismo criterio que el nacional, evita el motivo
+  // genérico de completarA4Celdas para esta celda.
+  const distrital: CeldaFontana = {
+    nivel: "distrital",
+    motivo: "CONAPO no publica un índice de marginación distrital agregable — solo por entidad y municipio",
+  };
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      distrital,
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, distrital, { nivel: "municipal", motivo }];
   }
 
   const imnEstado = datos.porEstado.get(estadoCve);
@@ -185,7 +196,7 @@ export async function resolverIndiceMarginacion(territorio: Territorio): Promise
     }
   }
 
-  return [nacional, estatal, municipal];
+  return [nacional, estatal, distrital, municipal];
 }
 
 // Desglose "Ver municipios" en proyectos nivel "estatal" (botón ya

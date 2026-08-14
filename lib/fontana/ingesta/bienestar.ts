@@ -267,8 +267,11 @@ async function resolverCeldas(
     .catch((): CeldaFontana => ({ nivel: "nacional", motivo: "Error de conexión con Bienestar (datos.gob.mx) al calcular el total nacional" }));
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [await nacionalPromise, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      await nacionalPromise,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {

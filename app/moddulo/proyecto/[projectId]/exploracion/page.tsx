@@ -29,6 +29,7 @@ import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 import { detectForwardStaleness, type PropagationDiff } from "@/lib/moddulo/phasePropagation";
 import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 
@@ -2319,31 +2320,15 @@ function ConfirmUnlinkPestelModal({ onCancel, onConfirm }: {
 // mismo endpoint link-moddulo/route.ts sin cambios — es agnóstico a qué lado
 // lo invoca — y la misma lógica de compatibilidad tipo/territorio.
 
-type TerritoryMatchKind = "exact" | "approximate" | "mismatch";
-
-function checkTerritoryMatchInverse(
-  m: Territorio | null,
-  p: Territorio | undefined
-): TerritoryMatchKind {
-  if (!m || !p) return "approximate";
-  if (m.nivel !== p.nivel) return "mismatch";
-  if (m.pais && p.pais && m.pais !== p.pais) return "mismatch";
-  if (m.estado && p.estado && m.estado !== p.estado) return "mismatch";
-
-  const isDistrito = ["distrito_federal", "distrito_local", "distrito"].includes(m.nivel);
-  if (isDistrito) {
-    if (m.cve_distrito && p.cve_distrito) {
-      return m.cve_distrito === p.cve_distrito ? "exact" : "mismatch";
-    }
-    if (m.municipio && p.municipio && m.municipio !== p.municipio) return "mismatch";
-    return "approximate";
-  }
-  if (m.nivel === "municipal") {
-    if (m.municipio && p.municipio && m.municipio !== p.municipio) return "mismatch";
-    return "approximate";
-  }
-  return "exact";
-}
+// checkTerritoryMatchInverse local fue consolidada 26-08-13 en
+// lib/moddulo/linkCompatibility.ts (checkTerritoryMatch) — auditada contra
+// esta versión antes de fusionar: el cuerpo era idéntico, la única
+// diferencia real era que esta aceptaba ambos parámetros como nullable
+// (projectTerritory puede ser null si el proyecto Moddulo no tiene
+// territorio configurado). La versión consolidada ya adoptó esa firma más
+// permisiva, así que el alias de abajo es un import directo, sin wrapper.
+type TerritoryMatchKind = TerritoryMatch;
+const checkTerritoryMatchInverse = checkTerritoryMatch;
 
 type PestelPickerProject = {
   id: string;

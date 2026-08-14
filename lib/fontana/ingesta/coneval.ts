@@ -292,8 +292,11 @@ async function resolverCeldasPobreza(
     : { nivel: "nacional", motivo: "CONEVAL no reportó datos suficientes para agregar el nacional" };
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
@@ -345,22 +348,35 @@ export async function resolverRezagoSocial(territorio: Territorio): Promise<Celd
     datos = await cargarRezagoSocial();
   } catch {
     const motivo = "Error de conexión con CONEVAL (Índice de Rezago Social)";
-    return [{ nivel: "nacional", motivo }, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [{ nivel: "nacional", motivo }, { nivel: "estatal", motivo }, { nivel: "distrital", motivo }, { nivel: "municipal", motivo }];
   }
 
   const nacional: CeldaFontana = {
     nivel: "nacional",
     motivo: "CONEVAL no publica el Índice de Rezago Social a nivel nacional — es un índice compuesto sin metodología de agregación conocida (la propia fuente deja esta celda vacía en su archivo oficial)",
   };
+  // "distrital" (Hallazgo B/C, revisión de consistencia 2ª ronda,
+  // 2026-08-12) — mismo criterio que el nacional: sin celda propia,
+  // completarA4Celdas rellenaba con el motivo genérico de "mecanismo no
+  // disponible", perdiendo la razón metodológica específica (índice
+  // compuesto sin fórmula de recombinación) ya explicada en nacional.
+  const distrital: CeldaFontana = {
+    nivel: "distrital",
+    motivo: "CONEVAL no publica el Índice de Rezago Social a nivel distrital — es un índice compuesto sin metodología de agregación conocida",
+  };
 
   if (!territorio.estado) {
-    const motivo = "El proyecto no tiene un estado definido en su territorio";
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [
+      nacional,
+      { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" },
+      distrital,
+      { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" },
+    ];
   }
   const estadoCve = resolveEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
-    return [nacional, { nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+    return [nacional, { nivel: "estatal", motivo }, distrital, { nivel: "municipal", motivo }];
   }
 
   const indiceEstado = datos.porEstado.get(estadoCve);
@@ -384,7 +400,7 @@ export async function resolverRezagoSocial(territorio: Territorio): Promise<Celd
     }
   }
 
-  return [nacional, estatal, municipal];
+  return [nacional, estatal, distrital, municipal];
 }
 
 // Desglose "Ver municipios" en proyectos nivel "estatal" — mismo patrón

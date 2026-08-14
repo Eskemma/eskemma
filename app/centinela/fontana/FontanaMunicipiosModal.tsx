@@ -496,7 +496,9 @@ function ModalEstado({
             <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
               {esBuscador
                 ? `Busca y selecciona ${tituloTipo} para cargar su valor.`
-                : `Valor por cada uno de los ${tituloTipo} del estado del proyecto.`}
+                : ambito === "nacional"
+                  ? `Valor por cada uno de los ${tituloTipo} del país.`
+                  : `Valor por cada uno de los ${tituloTipo} del estado del proyecto.`}
             </p>
           </div>
           <button

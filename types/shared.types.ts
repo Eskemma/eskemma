@@ -15,6 +15,11 @@ export type NivelTerritorial =
   | "distrito_federal"   // Distrito electoral federal (Diputados Federales)
   | "distrito_local";    // Distrito electoral local (Diputados Locales)
 
+export interface DistritoSeleccionado {
+  cve: string;
+  nombre: string;
+}
+
 export interface Territorio {
   nivel: NivelTerritorial;
   pais?: string;
@@ -22,6 +27,15 @@ export interface Territorio {
   municipio?: string;
   nombre: string;
   cve_distrito?: string;
+  // Campo aditivo (Fase 0 del rediseño de territorio, 26-08-13) — permite
+  // declarar UNO O VARIOS distritos electorales estructurados (cve+nombre
+  // reales del catálogo de lib/geo/, vía /api/geo/options), a diferencia de
+  // cve_distrito (un solo string, solo distrito federal). No reemplaza a
+  // estado/municipio/cve_distrito — proyectos existentes en Firestore no
+  // tienen esta clave; usar lib/moddulo/territorioPlural.ts para leerlo con
+  // fallback seguro hacia los campos legados. Ver CLAUDE.md — Deuda Técnica
+  // Conocida, entrada "Captura de distrito electoral sin estructura".
+  distritosSeleccionados?: DistritoSeleccionado[];
 }
 
 // ==========================================

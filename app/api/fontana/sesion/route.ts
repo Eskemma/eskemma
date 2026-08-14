@@ -13,6 +13,7 @@ import type { PIPItem, TareaPIP } from "@/types/moddulo.types";
 import type { FontanaSesion } from "@/types/fontana.types";
 import { familiaVacia } from "@/types/fontana.types";
 import { derivarMinimosPorFamilia } from "@/lib/fontana/pipMinimos";
+import { buscarSesionPorProyectoConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 
 const COLLECTION = "fontana_sesiones";
 
@@ -29,17 +30,7 @@ function resolverPreguntaYJustificacion(
   return { pregunta: item?.pregunta ?? "", justificacion: asignacion?.justificacion };
 }
 
-async function findExistingSesion(uid: string, modduloProjectId: string) {
-  const snap = await adminDb
-    .collection(COLLECTION)
-    .where("uid", "==", uid)
-    .where("modduloProjectId", "==", modduloProjectId)
-    .limit(1)
-    .get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return { sesionId: doc.id, ...doc.data() } as FontanaSesion;
-}
+const findExistingSesion = buscarSesionPorProyectoConTerritorioActual;
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);

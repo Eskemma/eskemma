@@ -33,7 +33,7 @@ import {
   resolveDistrictCabecera,
   type SefixContextData,
 } from "@/lib/sefix/sefixContext";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import { getCveEntidad } from "@/lib/geo/estadoCve";
 import type { Territorio } from "@/types/pestel.types";
 import { fetchWithCache, CACHE_TTL } from "@/lib/centinela/pestel/cache/indicatorCache";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
@@ -51,14 +51,6 @@ function getNewsTerritory(territorio: Territorio | undefined): string {
     return territorio.municipio;
   }
   return territorio.estado ?? territorio.nombre ?? "";
-}
-
-function getCveEntidad(estadoNombre: string): string | null {
-  const normalized = estadoNombre
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return ESTADO_CVE_MAP[normalized] ?? null;
 }
 
 export async function POST(request: NextRequest) {

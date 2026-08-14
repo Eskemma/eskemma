@@ -15,9 +15,9 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { adminDb } from "@/lib/firebase-admin";
+import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
-import { resolverIndicadorFontana } from "@/lib/fontana/ingesta";
+import { resolverIndicadorFontana, resolverDistritalDeMunicipioPonderado } from "@/lib/fontana/ingesta";
 import {
   FONTANA_ECEG_CONFIG,
   resolverDistritalDeMunicipio,
@@ -57,7 +57,14 @@ export const maxDuration = 60;
 // lib/fontana/ingesta/index.ts, único punto de ruteo por fuente para
 // este mecanismo. Nunca implica distrital (esas fuentes no publican por
 // distrito electoral) — el gate de abajo lo aplica solo a `.municipal`.
-const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set(["conapo_marginacion", "bienestar_ckan", "coneval_pobreza", "coneval_irs", "icmm"]);
+// pnud_idh/pnud_se/pnud_si/pnud_idg agregados en la revisión de
+// consistencia del Incremento 4 (2026-08-10) — nunca se habían
+// conectado pese a que pnud.ts sí tiene mecanismo real de "Ver
+// municipios" desde ese mismo incremento.
+const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set([
+  "conapo_marginacion", "bienestar_ckan", "coneval_pobreza", "coneval_irs", "icmm",
+  "pnud_idh", "pnud_se", "pnud_si", "pnud_idg",
+]);
 
 // Índices nacionales completos (2026-08-09) — por INDICADOR, no por
 // fuenteSlug: CONAPO y CONEVAL tienen indicadores en ambos grupos (ej.
@@ -67,8 +74,46 @@ const FUENTES_DESGLOSE_MUNICIPAL_EXTRA = new Set(["conapo_marginacion", "bienest
 // de ambos — diferido, misma varianza de red ya documentada. F2-18
 // (ICMM, Incremento 3) agregado 2026-08-09 — mismo grupo que F2-3/F2-4:
 // índice municipal completo disponible, pero sin agregación distrital.
-const INDICADORES_MUNICIPAL_NACIONAL = new Set(["F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7", "F2-18"]);
-const INDICADORES_DISTRITAL_NACIONAL = new Set(["F2-1", "F2-2", "F2-7", "F2-14"]);
+// F2-5/19/20/21/22 (PNUD) agregados en BUG NUEVO 2 (revisión de
+// consistencia 3ª ronda, 2026-08-12) — PNUD sí publica dato municipal
+// real (Municipal-confirmado, Nacional/Estatal/Distrital no_viable por
+// ser índice compuesto), mismo perfil que F2-1/F2-7 en este Set.
+// Verificado que este Set NO alimenta el gate de "Ver estados"
+// (soportaDesgloseEstadosNacional usa su propio Set independiente,
+// INDICADORES_ESTADOS_NACIONAL, sin ningún OR compartido — a diferencia
+// del Problema #1 original, aquí no hay riesgo de reabrir ese gate).
+const INDICADORES_MUNICIPAL_NACIONAL = new Set([
+  "F2-4", "F2-1", "F2-2", "F2-3", "F2-14", "F2-7", "F2-18",
+  "F2-5", "F2-19", "F2-20", "F2-21", "F2-22",
+]);
+// F2-18 (ICMM) agregado en la revisión de consistencia del Incremento 4
+// (2026-08-10): es una magnitud monetaria (promedio), no un índice
+// compuesto sin recombinación como F2-3/F2-4 — sí admite suma ponderada
+// por población municipio→distrito (mismo criterio que F2-7), ver
+// calcularValorDistritoPonderado en lib/fontana/ingesta/index.ts para
+// el criterio general documentado ahí.
+const INDICADORES_DISTRITAL_NACIONAL = new Set(["F2-1", "F2-2", "F2-7", "F2-14", "F2-18"]);
+
+// "Ver estados" en Nacional (2026-08-09, revisado 2026-08-10 y de nuevo
+// en la revisión de consistencia 2ª ronda 2026-08-12 — Problema #1
+// original, seguía roto tras el primer fix). Lista completa y explícita
+// de indicadores con mecanismo real en resolverDesgloseEstadosNacional
+// (lib/fontana/ingesta/index.ts) — NUNCA acoplada a soportaDesgloseMunicipal:
+// el primer fix (`soportaDesgloseMunicipal || INDICADORES_ESTADOS_NACIONAL.has(id)`)
+// parecía correcto porque los 7 nuevos (ENIGH/STPS/ENOE/IMCO) no tenían
+// mecanismo municipal, pero cuando el fix de "Ver municipios" agregó
+// pnud_idh/pnud_se/pnud_si/pnud_idg a FUENTES_DESGLOSE_MUNICIPAL_EXTRA,
+// el OR volvió a encender "Ver estados" para PNUD (F2-5/19/20/21/22) —
+// que NO tiene el mecanismo (Nacional/Estatal son no_viable para PNUD,
+// índice compuesto). Confirmado con datos reales: PNUD no aparece en
+// ninguna rama de resolverDesgloseEstadosNacional. F2-1/F2-2/F2-3/F2-4/
+// F2-7/F2-14/F2-18 sí tienen el mecanismo desde antes (por eso el
+// acoplamiento parecía funcionar) — se agregan aquí explícitamente en
+// vez de depender de un proxy indirecto.
+const INDICADORES_ESTADOS_NACIONAL = new Set([
+  "F2-1", "F2-2", "F2-3", "F2-4", "F2-7", "F2-14", "F2-18",
+  "F2-6", "F2-9", "F2-10", "F2-12", "F2-15", "F2-16", "F2-17",
+]);
 
 interface IndicadorRespuesta {
   id: string;
@@ -95,14 +140,11 @@ export async function GET(
     return NextResponse.json({ error: "sesionId es requerido" }, { status: 400 });
   }
 
-  const snap = await adminDb.collection("fontana_sesiones").doc(sesionId).get();
-  if (!snap.exists) {
+  const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+  if (!cargada) {
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
-  const sesion = snap.data() as FontanaSesion;
-  if (sesion.uid !== session.uid) {
-    return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
-  }
+  const { sesion } = cargada;
 
   if (familiaId !== "F1" && familiaId !== "F2") {
     return NextResponse.json(
@@ -163,21 +205,30 @@ export async function GET(
       // nacional que CONAPO/Bienestar no tienen listo).
       const soportaDesgloseMunicipal =
         tieneMecanismoDistrital || FUENTES_DESGLOSE_MUNICIPAL_EXTRA.has(registro?.fuenteSlug ?? "");
+      // "Ver distritos federales/locales" en proyectos Estatal para F2-18
+      // y las demás fuentes con recombinación ponderada válida (Hallazgo
+      // E, revisión de consistencia 2ª ronda, 2026-08-12) — antes
+      // `distrital` se forzaba a null para CUALQUIER indicador no-ECEG,
+      // aunque calcularValorDistritoPonderado (index.ts) ya soporta a
+      // F2-1/F2-2/F2-7/F2-14/F2-18 (INDICADORES_DISTRITAL_NACIONAL). El
+      // endpoint que resuelve los valores al abrir el modal
+      // (municipios/route.ts, handleGetEstado) tiene el fix simétrico.
+      const soportaDesgloseDistritalEstatal = INDICADORES_DISTRITAL_NACIONAL.has(id);
       const desglosesEstadoIndicador = tieneMecanismoDistrital
         ? desglosesEstado
-        : soportaDesgloseMunicipal
-          ? { municipal: desglosesEstado.municipal, distrital: null }
+        : soportaDesgloseMunicipal || soportaDesgloseDistritalEstatal
+          ? {
+              municipal: soportaDesgloseMunicipal ? desglosesEstado.municipal : null,
+              distrital: soportaDesgloseDistritalEstatal ? desglosesEstado.distrital : null,
+            }
           : null;
-      // "Ver estados" en proyectos Nacional (2026-08-09) — mismo gate por
-      // columna que "Ver municipios" en Estatal. F2-8 excluido a propósito
-      // (id !== "F2-8"): mecanismo escrito pero DIFERIDO — investigada la
-      // varianza real medida (8.0s-29.9s, 8 mediciones independientes) sin
-      // encontrar causa controlable (latencia externa de datos.gob.mx, no
-      // un bug propio) — mostrar el botón sin mecanismo conectado
-      // rompería la UX. .distritalFederal/.distritalLocal/.municipal de
-      // Nacional siguen ECEG-only (deferido, requieren índice nacional de
-      // 300/679/2,477 que estas fuentes no tienen construido).
-      const soportaDesgloseEstadosNacional = soportaDesgloseMunicipal && id !== "F2-8";
+      // "Ver estados" en proyectos Nacional (2026-08-09) — gate
+      // desacoplado de soportaDesgloseMunicipal (ver comentario junto a
+      // INDICADORES_ESTADOS_NACIONAL arriba; F2-8 diferido, ya no incluido
+      // en el Set). .distritalFederal/.distritalLocal/.municipal de
+      // Nacional siguen ECEG-only para F1 (deferido, requieren índice
+      // nacional de 300/679/2,477 que esas fuentes no tienen construido).
+      const soportaDesgloseEstadosNacional = INDICADORES_ESTADOS_NACIONAL.has(id);
       // Municipal/Distrital Federal/Local nacional (2026-08-09) — gate
       // por indicador (no por fuenteSlug, ver comentario junto a
       // INDICADORES_MUNICIPAL_NACIONAL arriba). F2-3/F2-4 (índices
@@ -201,12 +252,25 @@ export async function GET(
       // es 100% geografía (cuenta de distritos_municipios/{estado}.json,
       // sin ninguna dependencia de ECEG), su gate pasa de
       // tieneMecanismoDistrital a soportaDesgloseMunicipal.
+      // Columnas inversas para fuentes no-ECEG con recombinación ponderada
+      // válida (Hallazgo A, revisión de consistencia 2ª ronda,
+      // 2026-08-12) — mismo Set que INDICADORES_DISTRITAL_NACIONAL
+      // (F2-1/F2-2/F2-7/F2-14/F2-18), la única diferencia con "Ver
+      // distritos" en Nacional es que aquí el municipio del proyecto ya
+      // fija el estado+municipio, solo falta clasificar el distrito
+      // dominante — ver resolverDistritalDeMunicipioPonderado (index.ts).
+      const soportaColumnasInversasPonderado = INDICADORES_DISTRITAL_NACIONAL.has(id);
       const distritalesMunicipio =
-        tieneMecanismoDistrital && contextoMunicipal
-          ? await Promise.all([
-              resolverDistritalDeMunicipio(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "federal"),
-              resolverDistritalDeMunicipio(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "local"),
-            ]).then(([federal, local]) => ({ federal, local }))
+        contextoMunicipal && (tieneMecanismoDistrital || soportaColumnasInversasPonderado)
+          ? tieneMecanismoDistrital
+            ? await Promise.all([
+                resolverDistritalDeMunicipio(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "federal"),
+                resolverDistritalDeMunicipio(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "local"),
+              ]).then(([federal, local]) => ({ federal, local }))
+            : await Promise.all([
+                resolverDistritalDeMunicipioPonderado(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "federal"),
+                resolverDistritalDeMunicipioPonderado(id, contextoMunicipal.estadoCve, contextoMunicipal.municipioCve, "local"),
+              ]).then(([federal, local]) => ({ federal, local }))
           : null;
       const celdas = construirCeldasTabla(
         columnas,
@@ -380,12 +444,35 @@ function construirCeldasTabla(
           nivel === "distrital_federal" ? distritalesMunicipio.federal : distritalesMunicipio.local
         );
       }
+      // Hallazgo D (revisión de consistencia 2ª ronda, 2026-08-12): en
+      // proyectos Nacional con "Ver distritos" real y navegable
+      // (desgloseNacionalCampo con total>0), el motivo NO puede ser el
+      // genérico "no cubierto todavía" — es contradictorio con un enlace
+      // funcional. Mismo patrón informativo ya usado en la celda propia
+      // de un proyecto distrito_federal/distrito_local sin territorio
+      // definido, adaptado a "usa el enlace" en vez de "define tu
+      // territorio".
       const desgloseNacionalCampo =
         nivel === "distrital_federal" ? desglosesNacional?.distritalFederal : desglosesNacional?.distritalLocal;
       if (desgloseNacionalCampo) {
-        return { nivel, motivo: MOTIVO_NIVEL_NO_CUBIERTO, desglosesEstado: desgloseNacionalCampo };
+        return {
+          nivel,
+          motivo: "Este proyecto es de nivel Nacional — no tiene un distrito propio. Usa el enlace para consultar un distrito específico.",
+          desglosesEstado: desgloseNacionalCampo,
+        };
       }
-      return { nivel, motivo: MOTIVO_NIVEL_NO_CUBIERTO };
+      // Hallazgo B/C (revisión de consistencia 2ª ronda, 2026-08-12):
+      // sin mecanismo de columnas inversas ni de "Ver distritos" Nacional
+      // para este indicador, el texto correcto es el motivo REAL ya
+      // calculado por el adaptador para la celda "distrital" genérica
+      // (resolverIndicadorFontana/completarA4Celdas) — nunca el genérico
+      // "no cubierto en este incremento", que suena a pendiente de
+      // desarrollo cuando en realidad es una limitación permanente de la
+      // fuente (PNUD: índice compuesto sin metodología válida; ENIGH/
+      // IMCO/STPS: fuente sin granularidad municipal/distrital).
+      const celdaDistritalReal = celdasReales.find((c) => c.nivel === "distrital");
+      const motivoReal = celdaDistritalReal && "motivo" in celdaDistritalReal ? celdaDistritalReal.motivo : undefined;
+      return { nivel, motivo: motivoReal ?? MOTIVO_NIVEL_NO_CUBIERTO };
     }
     const real = celdasReales.find((c) => c.nivel === nivel);
     const municipiosEnDistritoField =
@@ -416,6 +503,22 @@ function construirCeldasTabla(
         ...municipiosEnDistritoField,
         ...desglosesEstadoField,
         ...tipoDistritoPropioField,
+      };
+    }
+    // BUG NUEVO 3 (revisión de consistencia 3ª ronda, 2026-08-12) — mismo
+    // patrón que Hallazgo D (ronda anterior), aplicado aquí a la columna
+    // "distrital" ordinaria de un proyecto Estatal: cuando SÍ hay un
+    // desglose real navegable ("Ver distritos federales/locales", ya
+    // poblado por Hallazgo E) pero la celda propia no trae valor, el
+    // motivo real del adaptador ("mecanismo no disponible"/"no cubierto")
+    // es contradictorio con un enlace funcional — usar el mismo texto
+    // informativo que Hallazgo D en vez de `real.motivo` tal cual.
+    if (real && nivel === "distrital" && "desglosesEstado" in desglosesEstadoField) {
+      return {
+        nivel,
+        motivo: "Este proyecto es de nivel Estatal — no tiene un distrito propio. Usa el enlace para consultar un distrito específico.",
+        ...municipiosEnDistritoField,
+        ...desglosesEstadoField,
       };
     }
     if (real) {

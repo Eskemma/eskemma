@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStorage } from "firebase-admin/storage";
 import { adminApp } from "@/lib/firebase-admin";
 import type { GeoOption } from "@/types/geo.types";
+import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import cabecerasFed from "@/lib/geo/cabeceras_fed.json";
 import cabecerasLoc from "@/lib/geo/cabeceras_loc.json";
 import { normalizeGeoName } from "@/lib/geo/municipios";
@@ -16,7 +17,12 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day — data changes once a year
 
 type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades" | "agebs";
 
-interface CacheEntry { options: GeoOption[]; ts: number }
+// GeoOptionDistrito (importado de lib/geo/distritos.ts, no duplicado aquí):
+// cabecera es aditiva — solo poblada para distritos_fed/distritos_loc, ver
+// extractOptions más abajo. GeoOption sigue siendo el tipo base compartido
+// con el resto de tipos (municipios, secciones, etc.) y con otros
+// consumidores del catálogo (Sefix/GeoEcegFilters).
+interface CacheEntry { options: GeoOptionDistrito[]; ts: number }
 const cache = new Map<string, CacheEntry>();
 
 function cacheKey(
@@ -47,7 +53,7 @@ function extractOptions(
   distrito_loc?: string,
   municipio?: string,
   loc?: string
-): GeoOption[] {
+): GeoOptionDistrito[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { feature } = require("topojson-client") as typeof import("topojson-client");
   const obj = topojson.objects as Record<string, unknown>;
@@ -88,12 +94,17 @@ function extractOptions(
   }
 
   const seen = new Set<string>();
-  const options: GeoOption[] = [];
+  // cabecera: campo aditivo, solo poblado para distritos_fed/distritos_loc —
+  // nombre limpio de la cabecera distrital SIN fusionar con cve/prefijo
+  // (nombre sigue trayendo el label compuesto para no romper consumidores
+  // existentes, ej. Sefix/GeoEcegFilters, que parsean nombre.split("–")).
+  const options: GeoOptionDistrito[] = [];
 
   for (const f of features) {
     const p = f.properties;
     let cve = "";
     let nombre = "";
+    let cabecera: string | undefined;
 
     switch (tipo) {
       case "municipios":
@@ -105,6 +116,7 @@ function extractOptions(
         const fedKey = padId + String(Number(p["DISTRITO_FED"])).padStart(2, "0");
         const fedNom = (cabecerasFed as Record<string, string>)[fedKey];
         nombre = fedNom ? `D.F. ${cve} – ${fedNom}` : `D.F. ${cve}`;
+        cabecera = fedNom || undefined;
         break;
       }
       case "distritos_loc": {
@@ -112,6 +124,7 @@ function extractOptions(
         const locKey = padId + String(Number(p["DISTRITO_LOC"])).padStart(2, "0");
         const locNom = (cabecerasLoc as Record<string, string>)[locKey];
         nombre = locNom ? `D.L. ${cve} – ${locNom}` : `D.L. ${cve}`;
+        cabecera = locNom || undefined;
         break;
       }
       case "secciones":
@@ -135,7 +148,7 @@ function extractOptions(
 
     if (cve && !seen.has(cve)) {
       seen.add(cve);
-      options.push({ cve, nombre });
+      options.push(cabecera ? { cve, nombre, cabecera } : { cve, nombre });
     }
   }
 

@@ -28,7 +28,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 día — el TopoJSON cambia una v
 
 type TipoDistritoGeo = "fed" | "loc";
 
-interface CacheEntry { options: GeoOption[]; ts: number }
+interface CacheEntry { options: GeoOptionDistrito[]; ts: number }
 const cachePorTipo: Record<TipoDistritoGeo, Map<string, CacheEntry>> = {
   fed: new Map(),
   loc: new Map(),
@@ -98,7 +98,21 @@ const CABECERAS: Record<TipoDistritoGeo, Record<string, string>> = {
   loc: cabecerasLoc as Record<string, string>,
 };
 
-async function getDistritosOptions(tipo: TipoDistritoGeo, estadoId: string): Promise<GeoOption[]> {
+// Extiende GeoOption con la cabecera SIN fusionar — aditivo, no rompe a los
+// consumidores existentes de GeoOption (Sefix/GeoEcegFilters, que hoy
+// reconstruyen el nombre de cabecera parseando `nombre.split("–")` porque
+// nunca tuvieron el campo separado; confirmado por lectura de código que
+// ningún consumidor desestructura GeoOption de forma que un campo extra
+// rompa algo — todos acceden solo a `.cve`/`.nombre`).
+export interface GeoOptionDistrito extends GeoOption {
+  /** Nombre de la cabecera distrital, sin el prefijo/cve. undefined si el
+   *  catálogo no tiene esa cabecera (cobertura nacional verificada 26-08-13:
+   *  300/300 federal, 679/679 local — el caso undefined no ocurre hoy en la
+   *  práctica, pero se mantiene como fallback defensivo, no eliminado). */
+  cabecera?: string;
+}
+
+async function getDistritosOptions(tipo: TipoDistritoGeo, estadoId: string): Promise<GeoOptionDistrito[]> {
   const padId = estadoId.padStart(2, "0");
   const cache = cachePorTipo[tipo];
   const key = `v1:${padId}`;
@@ -112,7 +126,7 @@ async function getDistritosOptions(tipo: TipoDistritoGeo, estadoId: string): Pro
   );
 
   const seen = new Set<string>();
-  const options: GeoOption[] = [];
+  const options: GeoOptionDistrito[] = [];
   for (const f of features) {
     const p = f.properties;
     const cve = String(p[campo] ?? "").padStart(3, "0");
@@ -123,7 +137,7 @@ async function getDistritosOptions(tipo: TipoDistritoGeo, estadoId: string): Pro
     const cabeceraKey = padId + String(Number(p[campo])).padStart(2, "0");
     const nombreCabecera = CABECERAS[tipo][cabeceraKey];
     const nombre = nombreCabecera ? `${PREFIJO_NOMBRE[tipo]} ${cve} – ${nombreCabecera}` : `${PREFIJO_NOMBRE[tipo]} ${cve}`;
-    options.push({ cve, nombre });
+    options.push({ cve, nombre, cabecera: nombreCabecera || undefined });
   }
   options.sort((a, b) => a.cve.localeCompare(b.cve));
 
@@ -131,11 +145,11 @@ async function getDistritosOptions(tipo: TipoDistritoGeo, estadoId: string): Pro
   return options;
 }
 
-export async function getDistritosFederalesOptions(estadoId: string): Promise<GeoOption[]> {
+export async function getDistritosFederalesOptions(estadoId: string): Promise<GeoOptionDistrito[]> {
   return getDistritosOptions("fed", estadoId);
 }
 
-export async function getDistritosLocalesOptions(estadoId: string): Promise<GeoOption[]> {
+export async function getDistritosLocalesOptions(estadoId: string): Promise<GeoOptionDistrito[]> {
   return getDistritosOptions("loc", estadoId);
 }
 
@@ -146,7 +160,7 @@ const CVE_ESTADO_NOMBRE: Record<string, string> = Object.fromEntries(
 );
 const TODOS_LOS_ESTADOS_CVE = Object.values(ESTADO_CVE_MAP).sort();
 
-export interface GeoOptionNacional extends GeoOption {
+export interface GeoOptionNacional extends GeoOptionDistrito {
   estadoCve: string;
   estadoNombre: string;
 }
