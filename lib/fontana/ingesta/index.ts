@@ -12,17 +12,20 @@
 import {
   resolverIndicadorECEG as resolverIndicadorF1Eceg,
   FONTANA_ECEG_CONFIG,
+  FUENTE_ETIQUETA_ECEG,
   MOTIVO_CONECTOR_PENDIENTE,
   resolverElementosDeEstado,
   resolverMunicipiosDeDistrito,
   resolverEstadosNacional,
   resolverElementosDeNacional,
+  resolverNumeradorDenominadorElementos,
   getOpcionesElementoEstado,
   clasificarDistritoDeMunicipio,
   type ElementoDeEstado,
   type ElementoDeNacional,
   type MunicipioDeDistrito,
   type TipoDistrito,
+  type TipoElementoEstado,
   type TipoElementoNacional,
   type DistritosMunicipiosStorage,
   type CeldaDistritalDeMunicipio,
@@ -111,6 +114,8 @@ import {
 } from "@/lib/fontana/ingesta/enoeInformalidad";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
+import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
+import { resolveMunicipioCve } from "@/lib/geo/municipios";
 
 const MOTIVO_NIVEL_NO_CUBIERTO_ITER_COMPENDIO_ETC =
   "Nivel no cubierto — mecanismo de agregación no disponible para esta fuente";
@@ -701,4 +706,243 @@ export async function resolverDesgloseDistritosNacional(
     })
   );
   return porGrupo.flat();
+}
+
+// ============================================================
+// Fase 3 del rediseño de territorio (26-08-17) — agregación territorial
+// PLURAL peer-a-peer: el usuario seleccionó explícitamente 2+ unidades del
+// mismo nivel (municipiosPorEstado/estadosSeleccionados/distritosSeleccionados,
+// ver types/shared.types.ts) — dirección DISTINTA de la ya existente
+// arriba (columnas inversas, vertical municipio↔distrito). Responde la
+// pregunta original del Punto 0 de Fase 2: "consolidado, desglosado, o
+// ambos" → AMBOS (confirmado por Raúl), usando la MISMA infraestructura de
+// desglose ya construida (resolverDesgloseMunicipiosEstado/
+// resolverElementosDeEstado/resolverEstadosXXX), nunca un fetch nuevo por
+// unidad — soloCves ya filtra a exactamente las unidades seleccionadas.
+// ============================================================
+
+export interface ElementoAgregacionPlural extends ElementoDeEstado {
+  estado: string;
+}
+
+export interface ResultadoAgregacionPlural {
+  valorAgregado: CeldaFontana | null;
+  desglosePorUnidad: ElementoAgregacionPlural[];
+}
+
+const SIN_CLASIFICAR_MOTIVO = "Este indicador aún no tiene definida su regla de agregación territorial";
+
+function nivelCeldaParaTerritorio(nivel: Territorio["nivel"]): CeldaFontana["nivel"] {
+  if (nivel === "estatal") return "estatal";
+  if (nivel === "distrito_federal" || nivel === "distrito_local" || nivel === "distrito") return "distrital";
+  return "municipal";
+}
+
+// Agrupa las unidades peer-plurales del territorio por estado — cve para
+// distritos (ya estructurado, DistritoSeleccionado.cve viene del catálogo
+// INE), resolución nombre→cve para municipios (sin catálogo estructurado,
+// mismo criterio ya documentado — se resuelve vía resolveMunicipioCve,
+// mismo mecanismo que ya usa eceg.ts:resolverMunicipal). Municipios que no
+// se logran resolver se omiten del desglose (nunca se fabrica un cve) —
+// no es un error fatal, simplemente esa unidad no aparece.
+async function agruparUnidadesPorEstado(
+  territorio: Territorio
+): Promise<{ tipoElemento: TipoElementoEstado | null; porEstado: Map<string, string[]> } | null> {
+  const porEstado = new Map<string, string[]>();
+
+  if (territorio.nivel === "municipal" && territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 0) {
+    for (const m of territorio.municipiosPorEstado) {
+      const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(m.estado)];
+      if (!estadoCve) continue;
+      const municipioCve = await resolveMunicipioCve(estadoCve, m.nombre).catch(() => null);
+      if (!municipioCve) continue;
+      if (!porEstado.has(estadoCve)) porEstado.set(estadoCve, []);
+      porEstado.get(estadoCve)!.push(municipioCve);
+    }
+    return porEstado.size > 0 ? { tipoElemento: "municipios", porEstado } : null;
+  }
+
+  if (
+    (territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local") &&
+    territorio.distritosSeleccionados && territorio.distritosSeleccionados.length > 0
+  ) {
+    const tipoElemento: TipoElementoEstado = territorio.nivel === "distrito_federal" ? "distritos_fed" : "distritos_loc";
+    for (const d of territorio.distritosSeleccionados) {
+      const estadoNombre = d.estado ?? territorio.estado;
+      if (!estadoNombre) continue;
+      const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)];
+      if (!estadoCve) continue;
+      if (!porEstado.has(estadoCve)) porEstado.set(estadoCve, []);
+      porEstado.get(estadoCve)!.push(d.cve);
+    }
+    return porEstado.size > 0 ? { tipoElemento, porEstado } : null;
+  }
+
+  return null; // Estatal-plural se maneja aparte (no agrupa "por estado" — los estados SON las unidades)
+}
+
+async function calcularAditivo(desglose: ElementoAgregacionPlural[], nivelCelda: CeldaFontana["nivel"]): Promise<CeldaFontana> {
+  let suma = 0;
+  let unidad: string | undefined;
+  let fuenteEtiqueta = "";
+  let algunoDisponible = false;
+  for (const el of desglose) {
+    if (esValorDisponible(el.celda)) {
+      suma += el.celda.valor;
+      unidad = el.celda.unidad ?? unidad;
+      fuenteEtiqueta = el.celda.fuenteEtiqueta ?? fuenteEtiqueta;
+      algunoDisponible = true;
+    }
+  }
+  if (!algunoDisponible) return { nivel: nivelCelda, motivo: "Sin datos suficientes para agregar las unidades seleccionadas" };
+  return { nivel: nivelCelda, valor: suma, unidad, naturaleza: "estimacion_agregada", fuenteEtiqueta };
+}
+
+// Reconstrucción numerador/denominador — nunca promediar el % ya
+// calculado (mismo criterio ya fijado en todo Fontana). Solo 2 fuentes
+// confirmadas con este mecanismo disponible hoy: CONEVAL (F2-1/F2-2/F2-14,
+// vía resolverNumeradorDenominadorMunicipios) y ECEG (Familia 1 completa +
+// F2-11/F2-13, vía resolverNumeradorDenominadorElementos, agregado en esta
+// misma fase). Para cualquier otro indicador tasa_ponderada (F2-9/10/15/16/18
+// — ENOE/STPS/ENIGH/ICMM) el mecanismo NO está confirmado todavía — se
+// degrada con un motivo explícito, nunca se fabrica un promedio simple.
+async function calcularTasaPonderada(
+  indicadorId: string,
+  tipoElemento: TipoElementoEstado | null,
+  porEstado: Map<string, string[]>,
+  nivelCelda: CeldaFontana["nivel"]
+): Promise<CeldaFontana> {
+  if (!tipoElemento) {
+    return { nivel: nivelCelda, motivo: "Reconstrucción de valor combinado no implementada a nivel Estatal en este incremento" };
+  }
+
+  if (indicadorId in INDICADORES_DISTRITAL_NACIONAL_PORCENTAJE && tipoElemento === "municipios") {
+    const campo = INDICADORES_DISTRITAL_NACIONAL_PORCENTAJE[indicadorId];
+    let numerador = 0;
+    let denominador = 0;
+    for (const [estadoCve, cves] of porEstado) {
+      const datos = await resolverNumeradorDenominadorMunicipios(estadoCve, campo, cves);
+      for (const d of datos.values()) {
+        numerador += d.personas;
+        denominador += d.poblacion;
+      }
+    }
+    if (denominador === 0) {
+      return { nivel: nivelCelda, motivo: "Sin datos suficientes para reconstruir el % combinado" };
+    }
+    return {
+      nivel: nivelCelda,
+      valor: Math.round((numerador / denominador) * 10000) / 100,
+      unidad: "%",
+      naturaleza: "estimacion_agregada",
+      fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_POBREZA,
+    };
+  }
+
+  if (indicadorId in FONTANA_ECEG_CONFIG) {
+    let numerador = 0;
+    let denominador = 0;
+    let huboDatos = false;
+    for (const [estadoCve, cves] of porEstado) {
+      const datos = await resolverNumeradorDenominadorElementos(indicadorId, estadoCve, tipoElemento, cves);
+      if (!datos) continue;
+      for (const d of datos.values()) {
+        numerador += d.numerador;
+        denominador += d.denominador;
+        huboDatos = true;
+      }
+    }
+    if (!huboDatos || denominador === 0) {
+      return { nivel: nivelCelda, motivo: "Sin datos suficientes para reconstruir el % combinado" };
+    }
+    return {
+      nivel: nivelCelda,
+      valor: Math.round((numerador / denominador) * 10000) / 100,
+      unidad: "%",
+      naturaleza: "estimacion_agregada",
+      fuenteEtiqueta: FUENTE_ETIQUETA_ECEG,
+    };
+  }
+
+  return {
+    nivel: nivelCelda,
+    motivo: "Reconstrucción de valor combinado no disponible todavía para este indicador — la fuente no tiene un mecanismo de numerador/denominador confirmado en este incremento",
+  };
+}
+
+export async function resolverAgregacionPlural(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoAgregacionPlural | null> {
+  const nivelCelda = nivelCeldaParaTerritorio(territorio.nivel);
+
+  // Estatal-plural: las unidades SON los estados — desglose vía el
+  // dispatcher "Ver estados" ya existente, filtrado a los seleccionados.
+  if (territorio.nivel === "estatal" && territorio.estadosSeleccionados && territorio.estadosSeleccionados.length > 1) {
+    const registro = await getIndicadorRegistro(indicadorId);
+    const tipo = registro?.agregacionPlural?.tipo;
+    if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [] };
+
+    const todos = await resolverDesgloseEstadosNacional(indicadorId);
+    const seleccionados = new Set(territorio.estadosSeleccionados);
+    const desglose: ElementoAgregacionPlural[] = (todos ?? [])
+      .filter((e) => seleccionados.has(e.nombre))
+      .map((e) => ({ ...e, estado: e.nombre }));
+
+    let valorAgregado: CeldaFontana | null = null;
+    if (tipo === "aditivo") valorAgregado = await calcularAditivo(desglose, nivelCelda);
+    else if (tipo === "tasa_ponderada") {
+      valorAgregado = { nivel: nivelCelda, motivo: "Reconstrucción de valor combinado no implementada a nivel Estatal en este incremento" };
+    }
+    // no_agregable: valorAgregado queda null — solo desglose (ver plan, pendiente confirmación de Raúl).
+    return { valorAgregado, desglosePorUnidad: desglose };
+  }
+
+  // Municipal/Distrital-plural
+  const agrupado = await agruparUnidadesPorEstado(territorio);
+  if (!agrupado) return null;
+  const { tipoElemento, porEstado } = agrupado;
+  if (!tipoElemento) return null;
+
+  const registro = await getIndicadorRegistro(indicadorId);
+  const tipo = registro?.agregacionPlural?.tipo;
+  if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [] };
+
+  // Límite distrital real de la fuente (26-08-17) — CONEVAL/CONAPO
+  // Marginación/Bienestar/ICMM/PNUD no publican por distrito electoral
+  // (confirmado: resolverElementosDeEstado retorna null para cualquier
+  // indicador fuera de FONTANA_ECEG_CONFIG). Motivo explícito y
+  // DISTINTO del genérico de "sin mecanismo confirmado" (SIN_CLASIFICAR_MOTIVO
+  // arriba es para "no clasificado"; este es "clasificado, pero la fuente
+  // no tiene este nivel de detalle geográfico", causa estructural distinta)
+  // — corta antes de intentar un fetch que de todas formas fallaría.
+  if ((tipoElemento === "distritos_fed" || tipoElemento === "distritos_loc") && !(indicadorId in FONTANA_ECEG_CONFIG)) {
+    return {
+      valorAgregado: {
+        nivel: nivelCelda,
+        motivo: "Este indicador no está disponible a nivel distrital — la fuente no publica datos por distrito electoral (solo estatal/municipal).",
+      },
+      desglosePorUnidad: [],
+    };
+  }
+
+  const desgloseGrupos = await Promise.all(
+    [...porEstado.entries()].map(async ([estadoCve, cves]) => {
+      const elementos = tipoElemento === "municipios"
+        ? await resolverDesgloseMunicipiosEstado(indicadorId, estadoCve, cves)
+        : await resolverElementosDeEstado(indicadorId, estadoCve, tipoElemento, cves);
+      return (elementos ?? []).map((e): ElementoAgregacionPlural => ({ ...e, estado: estadoCve }));
+    })
+  );
+  const desglosePorUnidad = desgloseGrupos.flat();
+
+  let valorAgregado: CeldaFontana | null = null;
+  if (tipo === "aditivo") {
+    valorAgregado = await calcularAditivo(desglosePorUnidad, nivelCelda);
+  } else if (tipo === "tasa_ponderada") {
+    valorAgregado = await calcularTasaPonderada(indicadorId, tipoElemento, porEstado, nivelCelda);
+  }
+  // no_agregable: valorAgregado queda null — solo desglose.
+
+  return { valorAgregado, desglosePorUnidad };
 }

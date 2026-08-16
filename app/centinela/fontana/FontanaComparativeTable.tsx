@@ -20,8 +20,21 @@ import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaCo
 import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
-import FontanaMunicipiosModal, { type TipoElementoNacional, type TipoDistrito } from "./FontanaMunicipiosModal";
+import FontanaMunicipiosModal, { type TipoElementoNacional, type TipoDistrito, type ElementoAgregacionPluralUI } from "./FontanaMunicipiosModal";
 import type { NivelTerritorial } from "@/types/shared.types";
+
+// Fase 3 del rediseño de territorio (26-08-17) — "Ver X" según el nivel
+// REAL del territorio del proyecto (no de la celda, que puede ser
+// estatal/municipal/distrital según el caso) — mismo criterio ya usado
+// para los demás botones de desglose de este archivo.
+const ETIQUETA_VER_AGREGACION_PLURAL: Record<NivelTerritorial, string> = {
+  nacional: "Ver valores",
+  estatal: "Ver valores estatales",
+  municipal: "Ver valores municipales",
+  distrito: "Ver valores distritales",
+  distrito_federal: "Ver valores distritales",
+  distrito_local: "Ver valores distritales",
+};
 
 const UMBRAL_COBERTURA = 99;
 
@@ -39,9 +52,13 @@ const TIPO_ELEMENTO_A_TIPO_DISTRITO: Record<"distritos_fed" | "distritos_loc", T
 
 interface ModalConfig {
   indicadorId: string;
-  scope: "distrito" | "estado" | "municipio" | "nacional";
+  scope: "distrito" | "estado" | "municipio" | "nacional" | "seleccion";
   tipoElemento?: TipoElementoNacional;
   tipoDistrito?: TipoDistrito;
+  // Solo scope="seleccion" (Fase 3, 26-08-17) — el desglose ya viene
+  // RESUELTO desde el backend (resolverAgregacionPlural), a diferencia
+  // de los demás scopes, que hacen su propio fetch al abrir el modal.
+  desglosePorUnidad?: ElementoAgregacionPluralUI[];
 }
 
 export interface IndicadorFilaFontana {
@@ -92,6 +109,47 @@ function BotonesDesgloseEstado({
   );
 }
 
+// Fase 3 del rediseño de territorio (26-08-17) — bloque de valor
+// combinado + botón de desglose, agnóstico de si `celda.valor` existe o
+// no (aditivo/tasa_ponderada muestran un valor combinado; no_agregable
+// muestra solo el desglose, sin valor combinado — aprobado por Raúl).
+function BloqueAgregacionPlural({
+  agregacionPlural,
+  onVer,
+}: {
+  agregacionPlural: NonNullable<CeldaTablaFontana["agregacionPlural"]>;
+  onVer: () => void;
+}) {
+  const { valorAgregado, desglosePorUnidad } = agregacionPlural;
+  const tieneValor = valorAgregado && "valor" in valorAgregado;
+  return (
+    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-eske-30 dark:border-white/10">
+      <p className="text-[10px] uppercase tracking-wide text-bluegreen-eske dark:text-blue-eske-20">
+        Combinado ({desglosePorUnidad.length} unidades)
+      </p>
+      {tieneValor ? (
+        <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
+          {valorAgregado.valor.toLocaleString("es-MX")}
+          {valorAgregado.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{valorAgregado.unidad}</span> : null}
+        </p>
+      ) : (
+        <p className="text-xs italic text-black-eske-80 dark:text-[#9AAEBE]">
+          {valorAgregado?.motivo ?? "Sin valor combinado disponible para este indicador"}
+        </p>
+      )}
+      {desglosePorUnidad.length > 0 && (
+        <button
+          type="button"
+          onClick={onVer}
+          className="block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
+        >
+          Ver valores por unidad ({desglosePorUnidad.length})
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Celda({
   celda,
   territorioNivel,
@@ -99,6 +157,7 @@ function Celda({
   onVerDesgloseEstado,
   onVerDesgloseMunicipio,
   onVerDesgloseNacional,
+  onVerAgregacionPlural,
 }: {
   celda: CeldaTablaFontana;
   territorioNivel: NivelTerritorial;
@@ -106,6 +165,7 @@ function Celda({
   onVerDesgloseEstado: (tipoElemento: TipoElementoNacional) => void;
   onVerDesgloseMunicipio: (tipoDistrito: TipoDistrito) => void;
   onVerDesgloseNacional: (tipoElemento: TipoElementoNacional) => void;
+  onVerAgregacionPlural: () => void;
 }) {
   const mostrarBotonMunicipios =
     celda.nivel === "municipal" && (celda.municipiosEnDistrito ?? 0) > 1;
@@ -156,6 +216,9 @@ function Celda({
           </button>
         )}
         <BotonesDesgloseEstado celda={celda} onAbrir={onAbrirDesglose} />
+        {celda.agregacionPlural && (
+          <BloqueAgregacionPlural agregacionPlural={celda.agregacionPlural} onVer={onVerAgregacionPlural} />
+        )}
       </div>
     );
   }
@@ -179,6 +242,9 @@ function Celda({
         </button>
       )}
       <BotonesDesgloseEstado celda={celda} onAbrir={onAbrirDesglose} />
+      {celda.agregacionPlural && (
+        <BloqueAgregacionPlural agregacionPlural={celda.agregacionPlural} onVer={onVerAgregacionPlural} />
+      )}
     </div>
   );
 }
@@ -245,6 +311,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                       onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
                       onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                       onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
+                      onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad })}
                     />
                   </div>
                 );
@@ -296,6 +363,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                           onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
                           onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                           onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
+                          onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad })}
                         />
                       ) : null}
                     </td>
@@ -327,6 +395,8 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
           scope={modalConfig.scope}
           tipoElemento={modalConfig.tipoElemento}
           tipoDistrito={modalConfig.tipoDistrito}
+          desglosePorUnidad={modalConfig.desglosePorUnidad}
+          etiquetaSeleccion={ETIQUETA_VER_AGREGACION_PLURAL[territorioNivel]}
           onClose={() => setModalConfig(null)}
         />
       )}

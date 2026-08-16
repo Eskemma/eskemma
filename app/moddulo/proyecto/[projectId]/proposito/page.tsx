@@ -152,10 +152,18 @@ export default function PropositoPage() {
             cleanDictamen = obj.dictamen ?? null;
           }
         } else if (rawSavedReport && typeof rawSavedReport === "string") {
+          // fenceMatch se calcula UNA sola vez, fuera del try (.match() no
+          // lanza) — se reutiliza tanto para construir jsonToParse como
+          // para el criterio de "esto es JSON corrupto" en el catch, en
+          // vez de una segunda condición desincronizada de la regex real
+          // (bug real 26-08-17: un reportText que empieza con fence
+          // ```json pero con el JSON interno mal formado pasaba el
+          // criterio viejo de "no empieza con {" como si fuera markdown
+          // limpio, y se mostraba el blob crudo completo en pantalla).
+          const trimmedRaw = rawSavedReport.trim();
+          const fenceMatch = trimmedRaw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
           try {
-            let jsonToParse = rawSavedReport.trim();
-            const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-            if (fenceMatch) jsonToParse = fenceMatch[1].trim();
+            const jsonToParse = fenceMatch ? fenceMatch[1].trim() : trimmedRaw;
             const maybeJson = JSON.parse(jsonToParse) as { reportText?: string; dictamen?: Dictamen };
             if (maybeJson?.reportText && typeof maybeJson.reportText === "string") {
               // Caso B: JSON string con campo reportText extraíble
@@ -166,11 +174,15 @@ export default function PropositoPage() {
               cleanReport = rawSavedReport;
             }
           } catch {
-            // JSON.parse falló — solo mostrar si no parece JSON corrupto
-            if (!rawSavedReport.trim().startsWith("{")) {
+            // JSON.parse falló — solo mostrar si no parece JSON (ni "{"
+            // directo, ni envuelto en fence de markdown, que también es
+            // JSON aunque roto por dentro).
+            if (!trimmedRaw.startsWith("{") && !fenceMatch) {
               cleanReport = rawSavedReport; // Caso C: markdown limpio
             }
-            // Si empieza con "{" pero falla el parse: dato corrupto — dejar null para regenerar
+            // Si empieza con "{" o con fence: dato corrupto — dejar null
+            // para que PhaseReportView muestre "Reporte no disponible" en
+            // vez de un blob de JSON crudo.
           }
         }
 
@@ -537,6 +549,27 @@ export default function PropositoPage() {
           </div>
         </div>
 
+        {/* Fila 1.5 — territorio: chip + botón de edición (corrección
+            26-08-14 — antes solo vivía en F1LandingView, inalcanzable para
+            proyectos con la fase ya iniciada/completada, ver plan). Fila
+            propia con flex-wrap (mismo patrón que la fila de badges de
+            F1LandingView) para no competir por espacio con el título ni con
+            los badges de estado de la Fila 1, que no hacen wrap. */}
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          {projectTerritory?.nombre && (
+            <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+              {projectTerritory.nombre}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowEditTerritory(true)}
+            className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+          >
+            {projectTerritory?.nombre ? "Editar territorio" : "Definir territorio"}
+          </button>
+        </div>
+
         {/* Fila 2: 3 botones según estado del EPP */}
         {(() => {
           const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5";
@@ -547,7 +580,7 @@ export default function PropositoPage() {
             "en_progreso";
 
           return (
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2.5">
               {/* Botón 1: Reporte F1 / Cancelar */}
               {headerState === "editando" ? (
                 <button onClick={handleCancelEdit} className={btnBase}>Cancelar</button>

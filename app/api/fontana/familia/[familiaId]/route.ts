@@ -17,7 +17,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
-import { resolverIndicadorFontana, resolverDistritalDeMunicipioPonderado } from "@/lib/fontana/ingesta";
+import { resolverIndicadorFontana, resolverDistritalDeMunicipioPonderado, resolverAgregacionPlural } from "@/lib/fontana/ingesta";
+import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import {
   FONTANA_ECEG_CONFIG,
   resolverDistritalDeMunicipio,
@@ -281,6 +282,32 @@ export async function GET(
         tipoDistritoPropio,
         desglosesNacionalIndicador
       );
+
+      // Fase 3 del rediseño de territorio (26-08-17) — agregación
+      // territorial PLURAL peer-a-peer (2+ unidades seleccionadas por el
+      // usuario, ej. 3 municipios), dirección DISTINTA de las columnas
+      // inversas/desgloses ya existentes arriba (vertical
+      // municipio↔distrito, o "ver todo el estado/nación"). Solo se
+      // activa cuando el territorio de la sesión realmente es plural —
+      // cero llamadas nuevas, cero cambio de shape, para el caso
+      // mayoritario de hoy (territorio singular).
+      if (esTerritorioParcial(sesion.territorio)) {
+        const resultadoPlural = await resolverAgregacionPlural(id, sesion.territorio);
+        if (resultadoPlural) {
+          const nivelObjetivo =
+            sesion.territorio.nivel === "estatal" ? "estatal"
+            : sesion.territorio.nivel === "municipal" ? "municipal"
+            : "distrital";
+          const celdaObjetivo = celdas.find((c) => c.nivel === nivelObjetivo);
+          if (celdaObjetivo) {
+            celdaObjetivo.agregacionPlural = {
+              valorAgregado: resultadoPlural.valorAgregado,
+              desglosePorUnidad: resultadoPlural.desglosePorUnidad,
+            };
+          }
+        }
+      }
+
       return {
         id,
         nombre: registro?.nombre ?? nombresFamilia[id] ?? id,

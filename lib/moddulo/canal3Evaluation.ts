@@ -4,6 +4,7 @@
 // para no calcular la misma evaluación dos veces con lógica separada.
 
 import { checkTerritoryMatch, esTipoCompatible } from "@/lib/moddulo/linkCompatibility";
+import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import type { ModduloProject } from "@/types/moddulo.types";
 import type { Territorio, EvaluacionCompatibilidad } from "@/types/shared.types";
 import type { MetadatosFuenteExterna } from "@/types/f3.types";
@@ -56,7 +57,12 @@ function describirTerritoryMismatch(
   declarado: Territorio,
   proyecto: Territorio | undefined
 ): string {
-  return match === "approximate"
+  const base = match === "approximate"
     ? "Los territorios parecen coincidir pero no se pudo verificar con un identificador confiable. Revisa que sea el mismo territorio antes de vincular."
     : `La herramienta declara cubrir "${declarado.nombre}" pero el proyecto cubre "${proyecto?.nombre ?? "territorio no especificado"}".`;
+
+  if (esTerritorioParcial(proyecto)) {
+    return `${base} Además, este proyecto tiene más de una unidad territorial seleccionada — esta comparación solo consideró la primera; verifica manualmente que la fuente cubra también a las demás.`;
+  }
+  return base;
 }

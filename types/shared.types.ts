@@ -18,7 +18,53 @@ export type NivelTerritorial =
 export interface DistritoSeleccionado {
   cve: string;
   nombre: string;
+  // Aditivo (Fase 2 del rediseño de territorio, 26-08-13) — nombre del
+  // estado al que pertenece este distrito. Necesario porque `cve` (3
+  // dígitos) NO es único entre estados: un proyecto puede tener distritos
+  // de varios estados desde Fase 2 (ej. distrito 005 de Jalisco Y distrito
+  // 005 de otro estado). Opcional ÚNICAMENTE por la entrada legada única ya
+  // escrita en producción durante la verificación de Fase 1
+  // (nZvpYu4nnZrsw5hoGcVP) antes de que este campo existiera — nunca debe
+  // quedar sin poblar en una entrada nueva (ver TerritorySelector.tsx,
+  // agregarDistrito() exige `estado` no-opcional al construir). Un lector
+  // que encuentre `estado` ausente debe asumir que es esa entrada legada (o
+  // una migración manual equivalente) y usar `Territorio.estado` (el campo
+  // legado singular) como fallback — nunca dejarlo en blanco en la UI.
+  estado?: string;
 }
+
+// Municipio con estado por entrada (Decisión 2, Ronda 2/3 del rediseño de
+// territorio, 26-08-16) — mismo espíritu que DistritoSeleccionado.estado:
+// un proyecto puede declarar municipios de varios estados (ej. Guadalajara/
+// Jalisco + Tepic/Nayarit). Campo NUEVO, aditivo — Territorio.municipiosSeleccionados
+// (string[] plano, sin estado) NO se transforma ni se retira, porque ya
+// pudo usarse en producción real (confirmado: proyecto O2RBnCPiyGJ6u6kyk1rS,
+// ZMG, 10 municipios) antes de que este tipo existiera. `estado` no-opcional
+// aquí (a diferencia de DistritoSeleccionado.estado, que sí es opcional por
+// la única entrada legada que existía ANTES de que el campo existiera) —
+// este tipo nace ya con `estado` obligatorio porque no hay entradas
+// legadas de este tipo en Firestore todavía.
+export interface MunicipioSeleccionado {
+  nombre: string;
+  estado: string;
+}
+
+// Taxonomía compartida de agregación territorial (Fase 2, 26-08-13) — no
+// vive en Fontana ni en ningún módulo específico porque impacta a
+// cualquier app que necesite combinar valores entre varias unidades
+// territoriales seleccionadas por el usuario (Fontana, Sefix, Sefix-AI y
+// futuras apps del catálogo MMEE). Cada app construye su PROPIA estructura
+// de clasificación por indicador/campo (ver lib/fontana/indicatorRegistry.ts)
+// importando este tipo — sin registro central que tocar al agregar una app
+// nueva. Criterio de cada valor ya validado por Raúl para Fontana
+// (lib/fontana/ingesta/index.ts, comentario "CRITERIO GENERAL"), aplicado
+// aquí a la dirección peer-a-peer (varias unidades del mismo nivel elegidas
+// por el usuario), no solo a la agregación vertical ya existente.
+export type TipoAgregacionTerritorial =
+  | "aditivo"                  // suma válida entre unidades (conteos, magnitudes absolutas)
+  | "tasa_ponderada"           // reconstruir numerador/denominador y ponderar — nunca promediar el % ya calculado
+  | "no_agregable"             // sin fórmula de recombinación válida (rankings relativos, índices sin metodología)
+  | "narrativo_sintetizado";   // no es operación numérica — síntesis cualitativa entre unidades (PESTEL)
 
 export interface Territorio {
   nivel: NivelTerritorial;
@@ -36,6 +82,25 @@ export interface Territorio {
   // fallback seguro hacia los campos legados. Ver CLAUDE.md — Deuda Técnica
   // Conocida, entrada "Captura de distrito electoral sin estructura".
   distritosSeleccionados?: DistritoSeleccionado[];
+  // Campos aditivos (Fase 2, 26-08-13) — mismo criterio que
+  // distritosSeleccionados: uno o varios estados/municipios, sin reemplazar
+  // los campos legados singulares (estado/municipio), que siguen
+  // poblándose con el primer elemento vía
+  // lib/moddulo/territorioPlural.ts:resolverPrimerElemento(). No se unifica
+  // en una sola estructura genérica con distritosSeleccionados porque
+  // estado/municipio no tienen `cve` estructurado hoy (decisión ya
+  // documentada: catálogo de municipios descartado por inmanejable fuera
+  // de México).
+  estadosSeleccionados?: string[];
+  municipiosSeleccionados?: string[];
+  // Campo aditivo (Decisión 2, 26-08-16) — fuente de verdad para
+  // Municipal con multi-estado real. municipiosSeleccionados (arriba)
+  // se sigue poblando en cada escritura como
+  // municipiosPorEstado.map(m => m.nombre) para no romper lectores
+  // viejos — lectores nuevos prefieren este campo; si está ausente,
+  // caen a municipiosSeleccionados + estado (mismo patrón de fallback
+  // que distritosSeleccionados[i].estado ausente → territorio.estado).
+  municipiosPorEstado?: MunicipioSeleccionado[];
 }
 
 // ==========================================

@@ -34,7 +34,9 @@ import {
   getDistritosLocalesOptions,
   getDistritosFederalesOptionsNacional,
   getDistritosLocalesOptionsNacional,
+  type GeoOptionDistrito,
 } from "@/lib/geo/distritos";
+import { formatDistritoLabel } from "@/lib/geo/formatDistrito";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import {
@@ -442,18 +444,71 @@ export async function resolverElementosDeEstado(
 
   const opcionesFiltradas = soloCves ? opciones.filter((o) => soloCves.includes(o.cve)) : opciones;
 
-  return opcionesFiltradas.map(({ cve, nombre }) => ({
-    cve,
-    nombre,
-    celda: celdaDesdeRegistro(
-      nivelCelda,
-      config,
-      data[`${estadoCve}${cve}`],
-      NATURALEZA_PORCENTAJE_ELEMENTO[tipoElemento],
-      NATURALEZA_DIRECTO_ELEMENTO[tipoElemento],
-      FUENTE_ETIQUETA_ECEG
-    ),
-  }));
+  // Nomenclatura homologada a Sefix (26-08-16, ver CLAUDE.md) — solo
+  // aplica a distritos (municipios no tiene el problema de ambigüedad:
+  // no hay prefijo de estado/distrito que agregar). `cabecera` solo
+  // existe en GeoOptionDistrito, de ahí el cast — seguro porque
+  // getOpcionesElementoEstado("distritos_fed"|"distritos_loc", ...)
+  // siempre devuelve GeoOptionDistrito[], nunca el GeoOption base.
+  const nivelDistrito = tipoElemento === "distritos_fed" ? "distrito_federal" : "distrito_local";
+
+  return opcionesFiltradas.map((opcion) => {
+    const { cve, nombre } = opcion;
+    return {
+      cve,
+      nombre: tipoElemento === "municipios"
+        ? nombre
+        : formatDistritoLabel(
+            nivelDistrito,
+            estadoCve,
+            cve,
+            (opcion as GeoOptionDistrito).cabecera,
+            nombre
+          ),
+      celda: celdaDesdeRegistro(
+        nivelCelda,
+        config,
+        data[`${estadoCve}${cve}`],
+        NATURALEZA_PORCENTAJE_ELEMENTO[tipoElemento],
+        NATURALEZA_DIRECTO_ELEMENTO[tipoElemento],
+        FUENTE_ETIQUETA_ECEG
+      ),
+    };
+  });
+}
+
+// Fase 3 del rediseño de territorio (26-08-17) — numerador+denominador
+// CRUDOS por unidad (municipio o distrito) para indicadores ECEG tipo
+// "porcentaje", para reconstruir un % combinado entre varias unidades
+// PEER-A-PEER elegidas por el usuario (nunca promediar el % ya
+// calculado). Mismo criterio y misma forma que
+// coneval.ts:resolverNumeradorDenominadorMunicipios — aquí generalizado
+// a cualquier indicador de FONTANA_ECEG_CONFIG con tipo "porcentaje", y
+// a distritos además de municipios (ECEG sí publica por distrito
+// electoral, a diferencia de CONEVAL/CONAPO/Bienestar).
+export async function resolverNumeradorDenominadorElementos(
+  indicadorId: string,
+  estadoCve: string,
+  tipoElemento: TipoElementoEstado,
+  cves: string[]
+): Promise<Map<string, { numerador: number; denominador: number }> | null> {
+  const config = FONTANA_ECEG_CONFIG[indicadorId];
+  if (!config || config.tipo !== "porcentaje" || !config.denominadorKey) return null;
+
+  const nivelStorage = NIVEL_STORAGE_ELEMENTO[tipoElemento];
+  const path = buildEcegStoragePath(nivelStorage, estadoCve);
+  if (!path) return null;
+
+  const data = await fetchEcegFromStorage<Record<string, Record<string, number>>>(path);
+  const resultado = new Map<string, { numerador: number; denominador: number }>();
+  for (const cve of cves) {
+    const registro = data[`${estadoCve}${cve}`];
+    if (!registro) continue;
+    const numerador = registro[config.key];
+    const denominador = resolverDenominador(registro, config.denominadorKey);
+    if (numerador != null && denominador != null) resultado.set(cve, { numerador, denominador });
+  }
+  return resultado;
 }
 
 // Nacional — ni ECEG ni ITER publican un total país; Fontana agrega los
@@ -712,11 +767,20 @@ export async function resolverDistritosDeMunicipio(
     fetchEcegFromStorage(path),
     tipoDistrito === "federal" ? getDistritosFederalesOptions(estadoCve) : getDistritosLocalesOptions(estadoCve),
   ]);
-  const nombrePorCve = new Map(opciones.map((o) => [o.cve, o.nombre]));
+  // Mapa cve → opción completa (no solo nombre) — necesitamos `cabecera`
+  // para la nomenclatura homologada a Sefix (26-08-16, ver CLAUDE.md).
+  const opcionPorCve = new Map(opciones.map((o) => [o.cve, o]));
+  const nivelDistrito = tipoDistrito === "federal" ? "distrito_federal" : "distrito_local";
 
   return clasificacion.distritos.map(({ distritoCve, pctPobtot }) => ({
     distritoCve,
-    nombre: nombrePorCve.get(distritoCve) ?? `Distrito ${distritoCve}`,
+    nombre: formatDistritoLabel(
+      nivelDistrito,
+      estadoCve,
+      distritoCve,
+      opcionPorCve.get(distritoCve)?.cabecera,
+      opcionPorCve.get(distritoCve)?.nombre ?? `Distrito ${distritoCve}`
+    ),
     pctPobtot,
     celda: celdaDesdeRegistro(
       "distrital",

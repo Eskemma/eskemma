@@ -8,6 +8,9 @@ import { getStorage } from "firebase-admin/storage";
 import { adminApp } from "@/lib/firebase-admin";
 import type { GeoOption } from "@/types/geo.types";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+// Import estático (Fase 2 del rediseño de territorio, corrección
+// 26-08-14) — ver lib/geo/distritos.ts para el diagnóstico completo.
+import { feature } from "topojson-client";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE = "sefix/geo/ine";
@@ -75,8 +78,6 @@ async function getMunicipiosFeaturesNacional(): Promise<{ properties: Record<str
     const [buf] = await file.download();
     const topojson = JSON.parse(buf.toString("utf-8"));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { feature } = require("topojson-client") as typeof import("topojson-client");
     const obj = topojson.objects as Record<string, unknown>;
     const layerName = Object.keys(obj)[0];
     const fc = feature(topojson as unknown as Parameters<typeof feature>[0], obj[layerName] as Parameters<typeof feature>[1]) as {

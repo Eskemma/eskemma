@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import type { GeoOption } from "@/types/geo.types";
 
-type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades" | "agebs";
+export type OptionTipo = "municipios" | "distritos_fed" | "distritos_loc" | "secciones" | "localidades" | "agebs";
 
-interface UseGeoOptionsParams {
+export interface GeoOptionsParams {
   tipo: OptionTipo;
   estadoId: string;
   distrito_fed?: string;
@@ -21,8 +21,39 @@ interface UseGeoOptionsParams {
 // nunca comparten entrada de caché por accidente.
 const cache = new Map<string, GeoOption[]>();
 
-function buildKey(p: UseGeoOptionsParams): string {
+function buildKey(p: GeoOptionsParams): string {
   return `${p.tipo}:${p.estadoId}:${p.distrito_fed ?? ""}:${p.distrito_loc ?? ""}:${p.municipio ?? ""}:${p.cve_loc ?? ""}`;
+}
+
+// Fetch cache-aware, standalone (Ronda 3, 26-08-16) — extraído de
+// useGeoOptions para que useGeoOptionsMultiEstado.ts pueda disparar N
+// fetches en paralelo (uno por estado seleccionado) sin duplicar la
+// lógica de caché/URL-building ni violar las reglas de hooks (no se
+// puede llamar useGeoOptions() un número variable de veces).
+export async function fetchGeoOptions<T extends GeoOption = GeoOption>(
+  params: GeoOptionsParams,
+  signal?: AbortSignal
+): Promise<T[]> {
+  const key = buildKey(params);
+  const cached = cache.get(key);
+  if (cached) return cached as T[];
+
+  const url = new URL("/api/geo/options", window.location.origin);
+  url.searchParams.set("tipo", params.tipo);
+  url.searchParams.set("estado_id", params.estadoId);
+  if (params.distrito_fed) url.searchParams.set("distrito_fed", params.distrito_fed);
+  if (params.distrito_loc) url.searchParams.set("distrito_loc", params.distrito_loc);
+  if (params.municipio)    url.searchParams.set("municipio", params.municipio);
+  if (params.cve_loc)      url.searchParams.set("loc", params.cve_loc);
+
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const data: T[] = await res.json();
+  cache.set(key, data);
+  return data;
 }
 
 // T genérico (default GeoOption, sin cambio para los consumidores
@@ -38,7 +69,7 @@ export function useGeoOptions<T extends GeoOption = GeoOption>({
   distrito_loc,
   municipio,
   cve_loc,
-}: UseGeoOptionsParams): { options: T[]; isLoading: boolean; error: string | null } {
+}: GeoOptionsParams): { options: T[]; isLoading: boolean; error: string | null } {
   const [options, setOptions] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,31 +99,16 @@ export function useGeoOptions<T extends GeoOption = GeoOption>({
     setIsLoading(true);
     setError(null);
 
-    const url = new URL("/api/geo/options", window.location.origin);
-    url.searchParams.set("tipo", tipo);
-    url.searchParams.set("estado_id", estadoId);
-    if (distrito_fed) url.searchParams.set("distrito_fed", distrito_fed);
-    if (distrito_loc) url.searchParams.set("distrito_loc", distrito_loc);
-    if (municipio)    url.searchParams.set("municipio", municipio);
-    if (cve_loc)      url.searchParams.set("loc", cve_loc);
-
-    (async () => {
-      try {
-        const res = await fetch(url.toString(), { signal: controller.signal });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error ?? `HTTP ${res.status}`);
-        }
-        const data: T[] = await res.json();
-        cache.set(key, data);
+    fetchGeoOptions<T>({ tipo, estadoId, distrito_fed, distrito_loc, municipio, cve_loc }, controller.signal)
+      .then((data) => {
         setOptions(data);
         setIsLoading(false);
-      } catch (err: unknown) {
+      })
+      .catch((err: unknown) => {
         if ((err as Error).name === "AbortError") return;
         setError((err as Error).message ?? "Error loading options");
         setIsLoading(false);
-      }
-    })();
+      });
 
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps

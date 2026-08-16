@@ -6,6 +6,7 @@
 
 import type { ProjectType } from "@/types/moddulo.types";
 import type { NivelTerritorial } from "@/types/shared.types";
+import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
 // "distrital_federal"/"distrital_local" — columnas inversas (Encargo
 // "columnas inversas", cierre 2026-08-05): solo aparecen para proyectos
@@ -131,4 +132,16 @@ export interface CeldaTablaFontana {
   // incompleta). Evaluado ANTES que dominante/sin-dominante, misma
   // prioridad ya usada en el modal de fragmentación.
   municipioCoberturaPct?: number;
+  // Fase 3 del rediseño de territorio (26-08-17) — solo poblado cuando
+  // esTerritorioParcial(territorio) es true (2+ unidades seleccionadas
+  // peer-a-peer) y este `nivel` corresponde al nivel real del territorio
+  // del proyecto (estatal/municipal/distrital). Aditivo — nunca presente
+  // para la mayoría de proyectos hoy (territorio singular), cero cambio
+  // de shape ni de comportamiento para ese caso. `valorAgregado` es
+  // `null` para indicadores `no_agregable` (desglose sin combinar, ver
+  // CLAUDE.md/plan de Fase 3) — nunca se omite el desglose por eso.
+  agregacionPlural?: {
+    valorAgregado: CeldaFontana | null;
+    desglosePorUnidad: { cve: string; nombre: string; estado: string; celda: CeldaFontana }[];
+  };
 }

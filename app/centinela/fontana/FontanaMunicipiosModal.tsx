@@ -67,6 +67,7 @@ import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import { familiaDeIndicador } from "@/types/fontana.types";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
+import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
 interface MunicipioDesglose {
   municipioCve: string;
@@ -123,13 +124,29 @@ const TITULO_TIPO_DISTRITO: Record<TipoDistrito, string> = {
   local: "distritos electorales locales",
 };
 
+// Fase 3 del rediseño de territorio (26-08-17) — shape EXACTA de
+// desglosePorUnidad tal como lo produce resolverAgregacionPlural()
+// (lib/fontana/ingesta/index.ts) y lo serializa route.ts — import
+// type-only de lib/fontana/ingesta/types.ts, seguro para bundle de
+// cliente (sin runtime de firebase-admin, ver comentario en ese archivo).
+export interface ElementoAgregacionPluralUI {
+  cve: string;
+  nombre: string;
+  estado: string;
+  celda: CeldaFontana;
+}
+
 interface Props {
   sesionId: string;
   indicadorId: string;
   indicadorNombre: string;
-  scope?: "distrito" | "estado" | "municipio" | "nacional";
+  scope?: "distrito" | "estado" | "municipio" | "nacional" | "seleccion";
   tipoElemento?: TipoElementoNacional; // requerido cuando scope === "estado"|"nacional"
   tipoDistrito?: TipoDistrito; // requerido cuando scope === "municipio"
+  // Solo scope === "seleccion" — desglose YA RESUELTO por el backend, sin
+  // fetch propio del modal (a diferencia de los demás scopes).
+  desglosePorUnidad?: ElementoAgregacionPluralUI[];
+  etiquetaSeleccion?: string; // título del modal, ej. "Ver valores municipales"
   onClose: () => void;
 }
 
@@ -163,7 +180,134 @@ export default function FontanaMunicipiosModal(props: Props) {
     }
     return <ModalMunicipio {...props} tipoDistrito={props.tipoDistrito} />;
   }
+  if (props.scope === "seleccion") {
+    if (!props.desglosePorUnidad) {
+      throw new Error("FontanaMunicipiosModal: desglosePorUnidad es requerido cuando scope='seleccion'");
+    }
+    return <ModalSeleccion {...props} desglosePorUnidad={props.desglosePorUnidad} />;
+  }
   return <ModalDistrito {...props} />;
+}
+
+// Fase 3 del rediseño de territorio (26-08-17) — desglose de las
+// unidades territoriales PLURALES que el usuario seleccionó
+// explícitamente (2+ municipios/estados/distritos peer-a-peer), NO de
+// "todo el estado/nación" como los demás modos. Sin fetch propio: el
+// desglose ya llega resuelto (resolverAgregacionPlural, calculado por
+// route.ts junto con el resto de la celda) — evita pedirle al backend un
+// catálogo completo cuando solo hacen falta las N unidades ya elegidas.
+function ModalSeleccion({
+  indicadorNombre,
+  desglosePorUnidad,
+  etiquetaSeleccion,
+  onClose,
+}: Props & { desglosePorUnidad: ElementoAgregacionPluralUI[] }) {
+  const [busqueda, setBusqueda] = useState("");
+  const containerRef = useFocusTrap(true);
+  useEscapeKey(true, onClose);
+
+  const filtrados = desglosePorUnidad.filter(
+    (e) => normalizar(e.nombre).includes(normalizar(busqueda)) || normalizar(e.estado).includes(normalizar(busqueda))
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="seleccion-modal-title"
+    >
+      <div
+        className="absolute inset-0 bg-black-eske/40 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div
+        ref={containerRef as RefObject<HTMLDivElement>}
+        className="relative z-10 bg-white-eske dark:bg-[#18324A] rounded-xl shadow-lg
+          border border-gray-eske-20 dark:border-white/10 w-full max-w-lg max-h-[80vh] p-6 flex flex-col gap-4
+          motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 id="seleccion-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
+              {etiquetaSeleccion ?? "Ver valores por unidad"} — <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
+            </h2>
+            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+              Valor individual de cada unidad territorial que seleccionaste para este proyecto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+          >
+            ✕
+          </button>
+        </div>
+
+        {desglosePorUnidad.length > 5 && (
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar…"
+            autoFocus
+            className="w-full px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
+              text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
+              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+          />
+        )}
+
+        <div className="overflow-y-auto flex-1 -mx-1 px-1">
+          {filtrados.length === 0 && (
+            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+              {busqueda ? "Ninguna unidad coincide con la búsqueda." : "Sin unidades para mostrar."}
+            </p>
+          )}
+          {filtrados.length > 0 && (
+            <ul className="divide-y divide-gray-eske-20 dark:divide-white/10">
+              {filtrados.map((e) => (
+                <FilaSeleccion key={`${e.estado}-${e.cve}`} elemento={e} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilaSeleccion({ elemento }: { elemento: ElementoAgregacionPluralUI }) {
+  const { nombre, estado, celda } = elemento;
+  return (
+    <li className="py-2.5 flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm text-black-eske dark:text-[#EAF2F8]">{nombre}</p>
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">{estado}</p>
+      </div>
+      <div className="text-right shrink-0">
+        {"valor" in celda ? (
+          <>
+            <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
+              {celda.valor.toLocaleString("es-MX")}
+              {celda.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{celda.unidad}</span> : null}
+            </p>
+            {celda.naturaleza && (
+              <div className="mt-1 flex justify-end">
+                <NaturalezaBadge naturaleza={celda.naturaleza} />
+              </div>
+            )}
+            {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{celda.fuenteEtiqueta}</p>}
+          </>
+        ) : (
+          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{celda.motivo}</p>
+        )}
+      </div>
+    </li>
+  );
 }
 
 function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Props) {

@@ -21,6 +21,11 @@ import type { GeoOption } from "@/types/geo.types";
 import cabecerasFed from "@/lib/geo/cabeceras_fed.json";
 import cabecerasLoc from "@/lib/geo/cabeceras_loc.json";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+// Import estático (Fase 2 del rediseño de territorio, corrección
+// 26-08-14) — un require() dinámico dentro del cuerpo de la función
+// obligaba a Turbopack (dev) a resolver el módulo bajo demanda en el
+// primer request real, tardando varios minutos. Ver plan: Prioridad 2.
+import { feature } from "topojson-client";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE = "sefix/geo/ine";
@@ -67,8 +72,6 @@ async function getDistritosFeaturesNacional(tipo: TipoDistritoGeo): Promise<{ pr
     const [buf] = await file.download();
     const topojson = JSON.parse(buf.toString("utf-8"));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { feature } = require("topojson-client") as typeof import("topojson-client");
     const obj = topojson.objects as Record<string, unknown>;
     const layerName = Object.keys(obj)[0];
     const fc = feature(topojson as unknown as Parameters<typeof feature>[0], obj[layerName] as Parameters<typeof feature>[1]) as {

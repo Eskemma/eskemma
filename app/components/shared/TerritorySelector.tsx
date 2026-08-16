@@ -2,10 +2,14 @@
 
 import { useState, useEffect } from "react";
 import type { Territorio, NivelTerritorial } from "@/types/pestel.types";
+import type { DistritoSeleccionado, MunicipioSeleccionado } from "@/types/shared.types";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
-import { useGeoOptions } from "@/app/components/geo/hooks/useGeoOptions";
+import { useGeoOptionsMultiEstado, type EstadoConCve } from "@/app/components/geo/hooks/useGeoOptionsMultiEstado";
 import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import { getCveEntidad } from "@/lib/geo/estadoCve";
+import { formatDistritoLabel } from "@/lib/geo/formatDistrito";
+import { resolverPrimerElemento } from "@/lib/moddulo/territorioPlural";
+import PartidosMultiSelect, { type MultiSelectOption } from "@/app/sefix/components/elecciones/PartidosMultiSelect";
 
 // ==========================================
 // DATOS GEOGRÁFICOS
@@ -20,6 +24,19 @@ const ESTADOS_MEXICO = [
   "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán",
   "Zacatecas",
 ];
+
+const ESTADOS_MEXICO_OPTIONS: MultiSelectOption[] = ESTADOS_MEXICO.map((e) => ({ value: e, label: e }));
+
+// `todosLabel` de PartidosMultiSelect (Fase 2, 26-08-13) — el componente lo
+// usa como texto visible ("Ninguno (limpiar selección)" en el desplegable, y
+// como placeholder cuando no hay nada elegido), así que debe ser un texto
+// legible, no un sentinela técnico. Se filtra explícitamente en cada
+// onChange antes de escribir a estadosSeleccionados/distritosAcumulados — el
+// comportamiento propio del componente (selected vacío → onChange([todosLabel]))
+// es de Sefix (selección vacía = "todos los partidos"), semántica que no
+// aplica aquí (selección vacía = ningún territorio elegido todavía). Ningún
+// estado o distrito real se llama "Ninguno", así que no hay colisión posible.
+const SENTINELA_LIMPIAR = "Ninguno";
 
 // México primero (tratamiento especial), luego USA y España, resto alfabético
 const PAISES_IBEROAMERICA = [
@@ -47,6 +64,41 @@ const PAISES_IBEROAMERICA = [
   "Uruguay",
   "Venezuela",
 ];
+
+// ==========================================
+// HELPERS DE DEDUPLICACIÓN (Fase 2, 26-08-13 / Decisión 2, 26-08-16)
+// ==========================================
+
+function normalizarParaComparar(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+// Decisión 2 (26-08-16) — MunicipioSeleccionado[] con estado por entrada,
+// dedup por nombre+estado normalizado (mismo criterio que agregarDistrito,
+// cve+estado) — un mismo nombre de municipio es válido en 2 estados
+// distintos, solo se deduplica dentro del MISMO estado.
+function agregarMunicipio(
+  actual: MunicipioSeleccionado[],
+  estado: string,
+  nuevoNombre: string
+): MunicipioSeleccionado[] {
+  const nuevoNorm = normalizarParaComparar(nuevoNombre);
+  if (!nuevoNorm) return actual;
+  const yaExiste = actual.some(
+    (m) => m.estado === estado && normalizarParaComparar(m.nombre) === nuevoNorm
+  );
+  if (yaExiste) return actual;
+  return [...actual, { nombre: nuevoNombre.trim(), estado }];
+}
+
+function agregarDistrito(
+  actual: DistritoSeleccionado[],
+  nuevo: DistritoSeleccionado & { estado: string }
+): DistritoSeleccionado[] {
+  const yaExiste = actual.some((d) => d.cve === nuevo.cve && d.estado === nuevo.estado);
+  if (yaExiste) return actual;
+  return [...actual, nuevo];
+}
 
 // ==========================================
 // PROPS
@@ -80,17 +132,53 @@ export default function TerritorySelector({
 }: Props) {
   const [pais, setPais] = useState(territorio?.pais ?? "");
   const [nivel, setNivel] = useState<NivelTerritorial>(territorio?.nivel ?? "estatal");
-  // México: dropdown de estado
-  const [estado, setEstado] = useState(territorio?.estado ?? "");
-  // México nivel municipal: texto libre (sin catálogo de municipios en esta fase)
-  const [municipio, setMunicipio] = useState(territorio?.municipio ?? "");
-  // México nivel distrital: selector estructurado contra /api/geo/options
-  // (Fase 1 del rediseño de territorio, 26-08-13) — reemplaza el input de
-  // texto libre que dependía de que el usuario escribiera "con cabecera en
-  // X" para que Fontana pudiera resolver el municipio (nunca ocurría en la
-  // práctica: el placeholder anterior ni siquiera usaba esa frase).
-  const [distritoSeleccionado, setDistritoSeleccionado] = useState<GeoOptionDistrito | null>(null);
-  const [distritoFallbackTexto, setDistritoFallbackTexto] = useState(""); // solo si /api/geo/options falla
+
+  // Decisión 1 (Ronda 3, 26-08-16) — control de Estados UNIFICADO para los
+  // 3 niveles no-nacionales (antes: Estatal tenía su propio multi-select y
+  // Municipal/Distrito usaban un `estado` singular — "estado en edición"
+  // para distrito, dropdown simple para municipal). Mismo campo, mismo
+  // fallback ya validado contra proyectos reales (ZMG O2RBnCPiyGJ6u6kyk1rS,
+  // Iztapalapa nZvpYu4nnZrsw5hoGcVP): si el proyecto legado solo tiene
+  // `estado` singular, se resuelve a [estado] — sin cajas vacías.
+  const [estadosSeleccionados, setEstadosSeleccionados] = useState<string[]>(
+    territorio?.estadosSeleccionados ?? (territorio?.estado ? [territorio.estado] : [])
+  );
+
+  // Municipal (Decisión 2, 26-08-16) — MunicipioSeleccionado[] con estado
+  // por entrada. Migración: si municipiosPorEstado está ausente pero
+  // municipiosSeleccionados (legado, string[] plano) sí existe, reconstruye
+  // una entrada por cada nombre, todas atadas a territorio.estado (el único
+  // estado que un proyecto legado podía tener) — verificado contra
+  // O2RBnCPiyGJ6u6kyk1rS (ZMG, 10 municipios, sin estado por entrada).
+  const [municipiosPorEstado, setMunicipiosPorEstado] = useState<MunicipioSeleccionado[]>(() => {
+    if (territorio?.municipiosPorEstado) return territorio.municipiosPorEstado;
+    if (territorio?.municipiosSeleccionados && territorio.estado) {
+      return territorio.municipiosSeleccionados.map((nombre) => ({ nombre, estado: territorio.estado! }));
+    }
+    return [];
+  });
+  // Texto libre en curso, uno por estado (una caja de texto por estado
+  // seleccionado, cada una con su propia lista de chips debajo).
+  const [municipioInputPorEstado, setMunicipioInputPorEstado] = useState<Record<string, string>>({});
+
+  // Distrito: acumulador multi-estado (Fase 2, sin cambio de shape en esta
+  // ronda) — solo cambia CÓMO se llena: antes "estado en edición" + agregar
+  // uno a la vez; ahora selector fusionado con clave compuesta
+  // "{estado}::{cve}" que cubre TODOS los estados seleccionados a la vez.
+  // Entradas legadas de Fase 1 sin `estado` (el único caso real en
+  // producción: nZvpYu4nnZrsw5hoGcVP) se completan aquí con el `estado`
+  // legado singular del territorio — nunca se deja sin poblar en la UI.
+  const [distritosAcumulados, setDistritosAcumulados] = useState<DistritoSeleccionado[]>(() => {
+    if (territorio?.distritosSeleccionados) {
+      return territorio.distritosSeleccionados.map((d) => ({
+        ...d,
+        estado: d.estado ?? territorio.estado ?? "",
+      }));
+    }
+    return [];
+  });
+  const [distritoFallbackTexto, setDistritoFallbackTexto] = useState(""); // solo si TODOS los estados fallan
+
   // Países no-México: texto libre
   const [estadoTexto, setEstadoTexto] = useState(territorio?.estado ?? "");
   const [municipioTexto, setMunicipioTexto] = useState(territorio?.municipio ?? "");
@@ -100,37 +188,72 @@ export default function TerritorySelector({
   const esDistrito = nivel === "distrito_federal" || nivel === "distrito_local" || nivel === "distrito";
   const requiresMunicipio = nivel === "municipal" || esDistrito;
 
-  const estadoCveParaDistritos = esMexico && esDistrito && estado ? getCveEntidad(estado) : null;
+  // Estados con cve ya resuelto — para el catálogo multi-estado de
+  // distritos. getCveEntidad puede devolver null si el nombre no matchea
+  // (no debería pasar con ESTADOS_MEXICO, pero se filtra por seguridad,
+  // nunca se pasa null al hook).
+  const estadosConCve: EstadoConCve[] = esMexico
+    ? estadosSeleccionados
+        .map((nombre) => ({ nombre, cve: getCveEntidad(nombre) }))
+        .filter((e): e is EstadoConCve => e.cve !== null)
+    : [];
+
   const {
-    options: distritoOptions,
+    options: distritoOptionsMultiEstado,
     isLoading: loadingDistritos,
-    error: distritoError,
-  } = useGeoOptions<GeoOptionDistrito>({
+    erroresPorEstado: erroresDistritos,
+  } = useGeoOptionsMultiEstado<GeoOptionDistrito>({
     tipo: nivel === "distrito_federal" ? "distritos_fed" : "distritos_loc",
-    estadoId: estadoCveParaDistritos ?? "",
+    estados: esDistrito ? estadosConCve : [],
   });
 
-  // Pre-selecciona el distrito actual del proyecto (si ya tiene cve_distrito
-  // válido, ej. al editar un proyecto existente) una vez que el catálogo del
-  // estado correspondiente termina de cargar.
-  useEffect(() => {
-    if (distritoSeleccionado) return;
-    if (!territorio?.cve_distrito || distritoOptions.length === 0) return;
-    const match = distritoOptions.find((o) => o.cve === territorio.cve_distrito);
-    if (match) setDistritoSeleccionado(match);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [distritoOptions]);
+  const todosLosEstadosFallaron =
+    !loadingDistritos &&
+    estadosConCve.length > 0 &&
+    Object.keys(erroresDistritos).length === estadosConCve.length;
 
   // Construir nombre legible y emitir cambio
   useEffect(() => {
     if (!pais) return;
 
-    const estadoVal = esMexico ? estado : estadoTexto;
-    const municipioVal = esMexico
-      ? (esDistrito
-          ? (distritoSeleccionado ? (distritoSeleccionado.cabecera ?? distritoSeleccionado.nombre) : distritoFallbackTexto)
-          : municipio)
-      : municipioTexto;
+    let estadoVal: string | undefined;
+    let municipioVal: string | undefined;
+    let cveDistritoVal: string | undefined;
+    let distritosSeleccionadosVal: DistritoSeleccionado[] | undefined;
+    let estadosSeleccionadosVal: string[] | undefined;
+    let municipiosSeleccionadosVal: string[] | undefined;
+    let municipiosPorEstadoVal: MunicipioSeleccionado[] | undefined;
+
+    if (esMexico) {
+      if (nivel === "estatal") {
+        estadoVal = resolverPrimerElemento(estadosSeleccionados, undefined).valor;
+        estadosSeleccionadosVal = estadosSeleccionados.length > 0 ? estadosSeleccionados : undefined;
+      } else if (nivel === "municipal") {
+        const primero = municipiosPorEstado[0];
+        estadoVal = primero?.estado;
+        municipioVal = primero?.nombre;
+        estadosSeleccionadosVal = estadosSeleccionados.length > 0 ? estadosSeleccionados : undefined;
+        municipiosPorEstadoVal = municipiosPorEstado.length > 0 ? municipiosPorEstado : undefined;
+        municipiosSeleccionadosVal =
+          municipiosPorEstado.length > 0 ? municipiosPorEstado.map((m) => m.nombre) : undefined;
+      } else if (esDistrito) {
+        if (distritosAcumulados.length > 0) {
+          const primero = distritosAcumulados[0];
+          estadoVal = primero.estado;
+          municipioVal = primero.nombre;
+          cveDistritoVal = primero.cve;
+          distritosSeleccionadosVal = distritosAcumulados;
+        } else if (distritoFallbackTexto.trim()) {
+          // Camino de error del catálogo (todos los estados fallaron) —
+          // solo campos legados, sin entrada estructurada en el acumulador.
+          estadoVal = resolverPrimerElemento(estadosSeleccionados, undefined).valor;
+          municipioVal = distritoFallbackTexto;
+        }
+      }
+    } else {
+      estadoVal = estadoTexto || undefined;
+      municipioVal = municipioTexto || undefined;
+    }
 
     const parts: string[] = [];
     if (nivel === "nacional") {
@@ -147,29 +270,32 @@ export default function TerritorySelector({
       nivel,
       nombre,
       pais,
-      estado: nivel !== "nacional" && estadoVal ? estadoVal : undefined,
-      municipio: requiresMunicipio && municipioVal ? municipioVal : undefined,
-      cve_distrito: esMexico && esDistrito && distritoSeleccionado ? distritoSeleccionado.cve : undefined,
-      distritosSeleccionados:
-        esMexico && esDistrito && distritoSeleccionado
-          ? [{ cve: distritoSeleccionado.cve, nombre: distritoSeleccionado.cabecera ?? distritoSeleccionado.nombre }]
-          : undefined,
+      estado: nivel !== "nacional" ? estadoVal : undefined,
+      municipio: requiresMunicipio ? municipioVal : undefined,
+      cve_distrito: cveDistritoVal,
+      distritosSeleccionados: distritosSeleccionadosVal,
+      estadosSeleccionados: estadosSeleccionadosVal,
+      municipiosSeleccionados: municipiosSeleccionadosVal,
+      municipiosPorEstado: municipiosPorEstadoVal,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pais, nivel, estado, municipio, estadoTexto, municipioTexto, distritoSeleccionado, distritoFallbackTexto]);
+  }, [
+    pais, nivel, estadoTexto, municipioTexto,
+    estadosSeleccionados, municipiosPorEstado, distritosAcumulados, distritoFallbackTexto,
+  ]);
 
   const canContinue = (() => {
     if (!pais) return false;
     if (nivel === "nacional") return true;
-    const estadoVal = esMexico ? estado : estadoTexto.trim();
-    if (!estadoVal) return false;
-    if (requiresMunicipio) {
-      if (esMexico && esDistrito) {
-        return distritoSeleccionado !== null || distritoFallbackTexto.trim().length > 0;
-      }
-      const municipioVal = esMexico ? municipio.trim() : municipioTexto.trim();
-      return municipioVal.length > 0;
+    if (esMexico) {
+      if (nivel === "estatal") return estadosSeleccionados.length > 0;
+      if (nivel === "municipal") return estadosSeleccionados.length > 0 && municipiosPorEstado.length > 0;
+      if (esDistrito) return distritosAcumulados.length > 0 || distritoFallbackTexto.trim().length > 0;
+      return false;
     }
+    const estadoVal = estadoTexto.trim();
+    if (!estadoVal) return false;
+    if (requiresMunicipio) return municipioTexto.trim().length > 0;
     return true;
   })();
 
@@ -183,6 +309,50 @@ export default function TerritorySelector({
     "px-3 py-2.5 border border-gray-eske-30 dark:border-white/10 rounded-lg text-sm " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske " +
     "bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]";
+
+  const chipClass =
+    "inline-flex items-center gap-1 px-2 py-1 rounded text-xs " +
+    "bg-bluegreen-eske/10 text-bluegreen-eske border border-bluegreen-eske/30";
+
+  function handleDistritosFusionadoChange(vals: string[]) {
+    const claves = vals.filter((v) => v !== SENTINELA_LIMPIAR);
+    let resultado: DistritoSeleccionado[] = [];
+    for (const clave of claves) {
+      const separadorIdx = clave.indexOf("::");
+      const estadoNombre = clave.slice(0, separadorIdx);
+      const cve = clave.slice(separadorIdx + 2);
+      const opt = distritoOptionsMultiEstado.find((o) => o.estado === estadoNombre && o.cve === cve);
+      const entrada: DistritoSeleccionado & { estado: string } = {
+        cve,
+        nombre: opt?.cabecera ?? opt?.nombre ?? cve,
+        estado: estadoNombre,
+      };
+      resultado = agregarDistrito(resultado, entrada);
+    }
+    setDistritosAcumulados(resultado);
+  }
+
+  function quitarDistrito(cve: string, estadoDelDistrito: string) {
+    setDistritosAcumulados((prev) => prev.filter((d) => !(d.cve === cve && d.estado === estadoDelDistrito)));
+  }
+
+  function handleAgregarMunicipio(estado: string) {
+    const texto = municipioInputPorEstado[estado] ?? "";
+    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+    setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
+  }
+
+  function quitarMunicipio(estado: string, nombre: string) {
+    setMunicipiosPorEstado((prev) => prev.filter((m) => !(m.estado === estado && m.nombre === nombre)));
+  }
+
+  function resetCamposMexico() {
+    setEstadosSeleccionados([]);
+    setMunicipiosPorEstado([]);
+    setMunicipioInputPorEstado({});
+    setDistritosAcumulados([]);
+    setDistritoFallbackTexto("");
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -205,13 +375,9 @@ export default function TerritorySelector({
           value={pais}
           onChange={(e) => {
             setPais(e.target.value);
-            // Resetear campos de territorio al cambiar de país
-            setEstado("");
             setEstadoTexto("");
-            setMunicipio("");
             setMunicipioTexto("");
-            setDistritoSeleccionado(null);
-            setDistritoFallbackTexto("");
+            resetCamposMexico();
           }}
           className={selectClass}
         >
@@ -237,10 +403,7 @@ export default function TerritorySelector({
             value={nivel}
             onChange={(e) => {
               setNivel(e.target.value as NivelTerritorial);
-              setMunicipio("");
-              setMunicipioTexto("");
-              setDistritoSeleccionado(null);
-              setDistritoFallbackTexto("");
+              resetCamposMexico();
             }}
             className={selectClass}
           >
@@ -253,77 +416,126 @@ export default function TerritorySelector({
         </div>
       )}
 
-      {/* === RUTA MÉXICO: dropdowns con catálogo === */}
+      {/* === RUTA MÉXICO: control de Estados UNIFICADO (Decisión 1) ===
+          Mismo control para Estatal, Municipal y Distrito federal/local —
+          lo que cambia por nivel es lo que se renderiza DEBAJO. */}
       {esMexico && requiresEstado && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="estado-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
-            Estado
-            <InfoTooltip
-              content="Limita los datos electorales y el scraping de noticias al estado seleccionado."
-              example="Morelos"
-            />
-          </label>
-          <select
-            id="estado-mx"
-            value={estado}
-            onChange={(e) => {
-              setEstado(e.target.value);
-              // El catálogo de distritos es por estado — un distrito
-              // seleccionado del estado anterior ya no aplica.
-              setDistritoSeleccionado(null);
-              setDistritoFallbackTexto("");
-            }}
-            className={selectClass}
-          >
-            <option value="">Selecciona un estado</option>
-            {ESTADOS_MEXICO.map((e) => (
-              <option key={e} value={e}>{e}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {esMexico && requiresMunicipio && !esDistrito && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="municipio-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
-            Municipio
-            <InfoTooltip
-              content="Permite segmentar los datos al nivel más específico posible dentro del estado."
-              example="Jiutepec"
-            />
-          </label>
-          <input
-            id="municipio-mx"
-            type="text"
-            value={municipio}
-            onChange={(e) => setMunicipio(e.target.value)}
-            placeholder="ej. Atizapán de Zaragoza"
-            className={inputClass}
+        <div className="relative">
+          <PartidosMultiSelect
+            id="estados-mx"
+            label={
+              <span className="flex items-center gap-1.5">
+                Estados
+                <InfoTooltip
+                  content="Selecciona el estado donde tienes programado ejecutar tu proyecto. (Si lo amerita, puedes seleccionar más de un estado). Esto delimita el territorio para los procesos de la aplicación."
+                  example="Nayarit"
+                />
+              </span>
+            }
+            options={ESTADOS_MEXICO_OPTIONS}
+            selected={estadosSeleccionados}
+            onChange={(vals) => setEstadosSeleccionados(vals.filter((v) => v !== SENTINELA_LIMPIAR))}
+            placeholder="Buscar estado…"
+            todosLabel={SENTINELA_LIMPIAR}
           />
         </div>
       )}
 
-      {/* Distrito electoral (federal/local) — selector estructurado contra
-          el catálogo real del INE (lib/geo/distritos.ts vía
-          /api/geo/options), en vez del texto libre que dependía de que el
-          usuario escribiera un formato exacto que Fontana pudiera parsear. */}
-      {esMexico && requiresMunicipio && esDistrito && (
+      {/* Municipios — un bloque por estado seleccionado (Decisión 2) */}
+      {esMexico && nivel === "municipal" && (
+        estadosSeleccionados.length === 0 ? (
+          <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+            Selecciona primero uno o varios estados.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {estadosSeleccionados.map((estadoNombre) => (
+              <div
+                key={estadoNombre}
+                className="flex flex-col gap-1.5 border border-gray-eske-20 dark:border-white/10 rounded-lg p-3"
+              >
+                <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1.5">
+                  {estadoNombre}
+                  {estadoNombre === estadosSeleccionados[0] && (
+                    <InfoTooltip
+                      content="Selecciona el municipio donde tiene lugar tu proyecto. (Si lo amerita, puedes seleccionar más de un municipio). Escribe el nombre exacto."
+                      example="Jiutepec"
+                    />
+                  )}
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={municipioInputPorEstado[estadoNombre] ?? ""}
+                    onChange={(e) =>
+                      setMunicipioInputPorEstado((prev) => ({ ...prev, [estadoNombre]: e.target.value }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAgregarMunicipio(estadoNombre);
+                      }
+                    }}
+                    placeholder="ej. Atizapán de Zaragoza"
+                    className={`${inputClass} flex-1`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAgregarMunicipio(estadoNombre)}
+                    disabled={!(municipioInputPorEstado[estadoNombre] ?? "").trim()}
+                    className="px-4 py-2.5 bg-bluegreen-eske text-white rounded-lg text-sm font-medium
+                      hover:bg-bluegreen-eske-60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Agregar
+                  </button>
+                </div>
+                {municipiosPorEstado.filter((m) => m.estado === estadoNombre).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {municipiosPorEstado
+                      .filter((m) => m.estado === estadoNombre)
+                      .map((m) => (
+                        <span key={m.nombre} className={chipClass}>
+                          {m.nombre}
+                          <button
+                            type="button"
+                            aria-label={`Quitar ${m.nombre}`}
+                            onClick={() => quitarMunicipio(estadoNombre, m.nombre)}
+                            className="ml-0.5 hover:text-red-eske focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-bluegreen-eske rounded"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Distrito electoral (federal/local) — selector fusionado con clave
+          compuesta "{estado}::{cve}" (Decisión 1, 26-08-16) */}
+      {esMexico && esDistrito && (
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="distrito-mx" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
-            {nivel === "distrito_federal" ? "Distrito electoral federal" : "Distrito electoral local"}
+          <label className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] flex items-center gap-1.5">
+            {nivel === "distrito_federal" ? "Distritos electorales federales" : "Distritos electorales locales"}
             <InfoTooltip
-              content="Identifica el distrito exacto dentro del estado. El municipio/cabecera se resuelve automáticamente del catálogo del INE."
-              example="D.L. 027 – Iztapalapa"
+              content={
+                nivel === "distrito_federal"
+                  ? "Selecciona el Distrito Electoral Federal para tu proyecto. (Si lo amerita, puedes seleccionar más de un distrito). Esto delimita el territorio para los procesos de la aplicación."
+                  : "Selecciona el Distrito Electoral Local para tu proyecto. (Si lo amerita, puedes seleccionar más de un distrito local). Esto delimita el territorio para los procesos de la aplicación."
+              }
+              example={nivel === "distrito_federal" ? "D.F. 1405 PUERTO VALLARTA" : "D.L. 0927 IZTAPALAPA"}
             />
           </label>
-          {!estado ? (
+          {estadosSeleccionados.length === 0 ? (
             <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
-              Selecciona primero un estado.
+              Selecciona primero uno o varios estados.
             </p>
-          ) : distritoError ? (
+          ) : todosLosEstadosFallaron ? (
             <>
               <input
-                id="distrito-mx"
                 type="text"
                 value={distritoFallbackTexto}
                 onChange={(e) => setDistritoFallbackTexto(e.target.value)}
@@ -336,29 +548,70 @@ export default function TerritorySelector({
               </p>
             </>
           ) : (
-            <select
-              id="distrito-mx"
-              value={distritoSeleccionado?.cve ?? ""}
-              disabled={loadingDistritos}
-              onChange={(e) => {
-                const opt = distritoOptions.find((o) => o.cve === e.target.value) ?? null;
-                setDistritoSeleccionado(opt);
-              }}
-              className={selectClass}
-            >
-              <option value="">
-                {loadingDistritos ? "Cargando distritos…" : "Selecciona un distrito"}
-              </option>
-              {distritoOptions.map((o) => (
-                <option key={o.cve} value={o.cve}>{o.nombre}</option>
+            <>
+              {loadingDistritos && (
+                <p className="text-xs text-red-eske mb-1" role="status">
+                  Cargando distritos…
+                </p>
+              )}
+              {Object.entries(erroresDistritos).map(([estadoConError]) => (
+                <p key={estadoConError} className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
+                  No se pudo cargar el catálogo de {estadoConError} — los demás estados siguen
+                  disponibles.
+                </p>
               ))}
-            </select>
+              <div className="relative">
+                <PartidosMultiSelect
+                  label="Distritos"
+                  options={distritoOptionsMultiEstado.map((o) => ({
+                    value: `${o.estado}::${o.cve}`,
+                    label: formatDistritoLabel(
+                      nivel as "distrito_federal" | "distrito_local",
+                      getCveEntidad(o.estado),
+                      o.cve,
+                      o.cabecera,
+                      o.nombre
+                    ),
+                  }))}
+                  selected={distritosAcumulados.map((d) => `${d.estado}::${d.cve}`)}
+                  onChange={handleDistritosFusionadoChange}
+                  disabled={loadingDistritos}
+                  placeholder="Buscar distrito…"
+                  todosLabel={SENTINELA_LIMPIAR}
+                />
+              </div>
+            </>
           )}
-          {distritoSeleccionado && !distritoSeleccionado.cabecera && (
-            <p className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
-              Este distrito no tiene una cabecera registrada en el catálogo — se usará la descripción
-              genérica ({distritoSeleccionado.nombre}). Verifica que sea correcta.
-            </p>
+
+          {/* Lista de chips siempre visible — abarca TODOS los estados
+              acumulados, no solo los recién cargados. */}
+          {distritosAcumulados.length > 0 && (
+            <div className="flex flex-col gap-1 mt-2">
+              <p className="text-xs font-medium text-black-eske dark:text-[#C7D6E0] uppercase tracking-wide">
+                Distritos seleccionados
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {distritosAcumulados.map((d) => (
+                  <span key={`${d.estado}-${d.cve}`} className={chipClass}>
+                    {d.estado || "(estado no especificado)"} — {formatDistritoLabel(
+                      nivel as "distrito_federal" | "distrito_local",
+                      d.estado ? getCveEntidad(d.estado) : null,
+                      d.cve,
+                      d.nombre,
+                      d.nombre
+                    )}
+                    <button
+                      type="button"
+                      aria-label={`Quitar ${d.estado} — ${d.nombre}`}
+                      onClick={() => quitarDistrito(d.cve, d.estado ?? "")}
+                      className="ml-0.5 hover:text-red-eske focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-bluegreen-eske rounded"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

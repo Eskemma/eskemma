@@ -4,6 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import type { FeatureCollection } from "geojson";
 import type { LatLngBounds } from "leaflet";
 import type { GeoLayerTipo, GeoScopeElectoral } from "@/types/geo.types";
+// Import estático (Fase 2 del rediseño de territorio, corrección
+// 26-08-14, por consistencia con lib/geo/distritos.ts) — sin bug
+// confirmado aquí (código de cliente, ya resuelto en build-time), pero
+// mismo anti-patrón de require() dinámico dentro de una función.
+import { feature } from "topojson-client";
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — consistent with storage.ts CACHE_TTL
 
@@ -258,8 +263,6 @@ export function useGeoShapes(
         const topojsonData = await res.json();
 
         // Convert TopoJSON → GeoJSON using topojson-client
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { feature } = require("topojson-client") as typeof import("topojson-client");
         const layerName = Object.keys(topojsonData.objects)[0];
         const fc = feature(topojsonData, topojsonData.objects[layerName]) as unknown as FeatureCollection;
 

@@ -6,11 +6,38 @@ import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import cabecerasFed from "@/lib/geo/cabeceras_fed.json";
 import cabecerasLoc from "@/lib/geo/cabeceras_loc.json";
 import { normalizeGeoName } from "@/lib/geo/municipios";
+// Import estático (Fase 2 del rediseño de territorio, corrección
+// 26-08-14) — ver lib/geo/distritos.ts para el diagnóstico completo.
+import { feature } from "topojson-client";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE   = "sefix/geo/ine";
 const STORAGE_PREFIX_INEGI = "sefix/geo/inegi";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day — data changes once a year
+const DOWNLOAD_TIMEOUT_MS = 20000;
+
+// Diagnóstico de P2 (26-08-15) confirmó, con logging server-side temporal
+// (ya removido), que `file.download()` puede quedarse colgado
+// indefinidamente — sin éxito, sin excepción, sin timeout propio —
+// mientras que `file.exists()` (llamada de metadata, no de streaming) sí
+// completa con normalidad. Reproducido de forma consistente incluso tras
+// reiniciar el dev server desde cero, descartando un cliente de Storage en
+// mal estado por sesión larga. Confirmado en producción (Raúl, 26-08-15):
+// el timeout resuelve el cuelgue. Nunca bloquear indefinidamente — mismo
+// criterio ya aplicado en todo este workstream (cabecera desconocida,
+// catálogo caído → texto libre, esParcial): un timeout explícito convierte
+// un cuelgue silencioso en un error visible que el cliente ya sabe manejar
+// (useGeoOptions.ts trata cualquier respuesta no-OK como error →
+// TerritorySelector.tsx cae a su fallback de texto libre ya existente).
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout (${ms}ms) esperando ${label}`)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
 
 // normalizeGeoName reutilizado desde lib/geo/municipios.ts (extraído para
 // que Fontana pueda resolver municipio→CVE_MUN sin duplicar esta lógica).
@@ -54,8 +81,6 @@ function extractOptions(
   municipio?: string,
   loc?: string
 ): GeoOptionDistrito[] {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { feature } = require("topojson-client") as typeof import("topojson-client");
   const obj = topojson.objects as Record<string, unknown>;
   const layerName = Object.keys(obj)[0];
   const fc = feature(topojson as unknown as Parameters<typeof feature>[0], obj[layerName] as Parameters<typeof feature>[1]) as {
@@ -195,7 +220,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `File not found: ${storagePath}` }, { status: 404 });
     }
 
-    const [buf] = await file.download();
+    const [buf] = await withTimeout(file.download(), DOWNLOAD_TIMEOUT_MS, "file.download()");
     const topojson = JSON.parse(buf.toString("utf-8"));
 
     const options = extractOptions(topojson, tipo, estado_id, distrito_fed, distrito_loc, municipio, loc);

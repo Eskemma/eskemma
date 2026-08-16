@@ -58,11 +58,22 @@ export async function POST(
       let reportText = rawText;
       let dictamen: Dictamen | null = null;
 
+      // fenceMatch se calcula UNA sola vez, fuera del try — se reutiliza
+      // tanto para construir jsonToParse como para el criterio de "esto
+      // parecía JSON" en el catch (mismo patrón que
+      // proposito/page.tsx:154-183, cliente). Origen real del bug
+      // 26-08-17: cuando Claude devuelve un JSON envuelto en fence pero
+      // mal formado por dentro, JSON.parse fallaba y el catch original
+      // guardaba rawText (el blob completo, con fence) directo en
+      // Firestore como si fuera el reporte — causa raíz de que el
+      // cliente lo mostrara crudo en pantalla después.
+      const trimmedRaw = rawText.trim();
+      const fenceMatch = trimmedRaw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+
       try {
-        let jsonToParse = rawText.trim();
+        let jsonToParse = trimmedRaw;
 
         // Pass 1: strip anchored markdown fences
-        const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
         if (fenceMatch) {
           jsonToParse = fenceMatch[1].trim();
         } else {
@@ -80,7 +91,23 @@ export async function POST(
         }
         dictamen = parsed.dictamen ?? null;
       } catch {
-        reportText = rawText;
+        // Si el texto parecía JSON (fence o empieza con "{") y no se
+        // pudo parsear, es un dato corrupto — nunca se guarda ni se
+        // retorna tal cual (mismo criterio que el cliente: nunca
+        // degradar en silencio mostrando/persistiendo un blob roto).
+        // Se responde error explícito para que el caller reintente la
+        // generación, en vez de persistir un reporte roto en Firestore.
+        if (fenceMatch || trimmedRaw.startsWith("{")) {
+          logAnthropicError(
+            "generate-report",
+            new Error(`reportText de Claude no se pudo parsear como JSON válido (proyecto ${projectId})`)
+          );
+          return NextResponse.json(
+            { error: "El reporte generado no se pudo procesar. Intenta de nuevo." },
+            { status: 502 }
+          );
+        }
+        reportText = rawText; // Texto plano genuino (sin apariencia de JSON) — comportamiento previo intacto.
       }
 
       const firestoreUpdates: Record<string, unknown> = {
