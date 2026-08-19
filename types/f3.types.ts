@@ -152,6 +152,13 @@ export interface ResultadoFuenteExterna<TPayload = { archivoUrl: string; extract
   metadatosFuente: MetadatosFuenteExterna;
   // Evaluación que justificó el vínculo, conservada por trazabilidad.
   compatibilidad: EvaluacionCompatibilidad;
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio. Snapshot
+  // (JSON de TerritorioEscalar, lib/territorio/staleness.ts) del territorio
+  // del PROYECTO al momento de vincular — NO territorioDeclarado (ese es un
+  // dato fijo de la fuente, no lo que puede desactualizarse). Aditivo —
+  // fuentes vinculadas antes de esta ronda no lo tienen, el staleness
+  // simplemente no es evaluable para ellas (nunca un falso positivo).
+  proyectoTerritorioSnapshotAtVinculacion?: string;
 }
 
 // Títulos cortos de las 35 técnicas del MMEE (docs/specs/MMEE_v2_0.md,

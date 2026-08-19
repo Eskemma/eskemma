@@ -146,6 +146,19 @@ interface Props {
   // Solo scope === "seleccion" — desglose YA RESUELTO por el backend, sin
   // fetch propio del modal (a diferencia de los demás scopes).
   desglosePorUnidad?: ElementoAgregacionPluralUI[];
+  // Ronda 6 (26-08-17) — solo scope === "seleccion". Unidades que el
+  // usuario declaró pero no se pudieron resolver (nombre no reconocido o
+  // ambiguo) — nunca se omiten en silencio, se listan con su motivo real.
+  // `candidatos` (Fase 5, Ronda 8) — solo poblado en el caso de ambigüedad,
+  // nombres reales del catálogo INEGI para el enlace de resolución.
+  noResueltas?: { nombre: string; estado: string; motivo: string; candidatos?: string[] }[];
+  // Fase 5 (Ronda 8, 26-08-18) — para el enlace "Resolver en Moddulo".
+  // Ausente en escenarios (b)/(c) (fuera de alcance hoy) — el enlace no se
+  // muestra si no hay a dónde enlazar. Fontana sigue sin escribir nada.
+  modduloProjectId?: string;
+  // Ronda 9 (26-08-18) — a dónde volver tras guardar en Moddulo (evita que
+  // el usuario quede varado ahí después de resolver la ambigüedad).
+  retornoUrl?: string;
   etiquetaSeleccion?: string; // título del modal, ej. "Ver valores municipales"
   onClose: () => void;
 }
@@ -199,6 +212,9 @@ export default function FontanaMunicipiosModal(props: Props) {
 function ModalSeleccion({
   indicadorNombre,
   desglosePorUnidad,
+  noResueltas = [],
+  modduloProjectId,
+  retornoUrl,
   etiquetaSeleccion,
   onClose,
 }: Props & { desglosePorUnidad: ElementoAgregacionPluralUI[] }) {
@@ -206,9 +222,7 @@ function ModalSeleccion({
   const containerRef = useFocusTrap(true);
   useEscapeKey(true, onClose);
 
-  const filtrados = desglosePorUnidad.filter(
-    (e) => normalizar(e.nombre).includes(normalizar(busqueda)) || normalizar(e.estado).includes(normalizar(busqueda))
-  );
+  const filtrados = desglosePorUnidad.filter((e) => normalizar(e.nombre).includes(normalizar(busqueda)));
 
   return (
     <div
@@ -270,43 +284,54 @@ function ModalSeleccion({
           {filtrados.length > 0 && (
             <ul className="divide-y divide-gray-eske-20 dark:divide-white/10">
               {filtrados.map((e) => (
-                <FilaSeleccion key={`${e.estado}-${e.cve}`} elemento={e} />
+                <FilaElementoPrecarga
+                  key={`${e.estado}-${e.cve}`}
+                  elemento={{
+                    cve: e.cve,
+                    nombre: e.nombre,
+                    valor: "valor" in e.celda ? e.celda.valor : undefined,
+                    unidad: "valor" in e.celda ? e.celda.unidad : undefined,
+                    naturaleza: "valor" in e.celda ? e.celda.naturaleza : undefined,
+                    fuenteEtiqueta: "valor" in e.celda ? e.celda.fuenteEtiqueta : undefined,
+                    motivo: "valor" in e.celda ? undefined : e.celda.motivo,
+                  }}
+                />
               ))}
             </ul>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
 
-function FilaSeleccion({ elemento }: { elemento: ElementoAgregacionPluralUI }) {
-  const { nombre, estado, celda } = elemento;
-  return (
-    <li className="py-2.5 flex items-start justify-between gap-3">
-      <div>
-        <p className="text-sm text-black-eske dark:text-[#EAF2F8]">{nombre}</p>
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">{estado}</p>
-      </div>
-      <div className="text-right shrink-0">
-        {"valor" in celda ? (
-          <>
-            <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
-              {celda.valor.toLocaleString("es-MX")}
-              {celda.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{celda.unidad}</span> : null}
+        {noResueltas.length > 0 && (
+          <div className="pt-2 border-t border-gray-eske-20 dark:border-white/10">
+            <p className="text-[11px] font-medium text-red-eske">
+              {noResueltas.length} unidad{noResueltas.length === 1 ? "" : "es"} declarada{noResueltas.length === 1 ? "" : "s"} sin identificar
             </p>
-            {celda.naturaleza && (
-              <div className="mt-1 flex justify-end">
-                <NaturalezaBadge naturaleza={celda.naturaleza} />
-              </div>
+            <ul className="mt-1 space-y-1">
+              {noResueltas.map((n) => (
+                <li key={`${n.estado}-${n.nombre}`} className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">
+                  <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{n.nombre}</span> — {n.motivo}
+                </li>
+              ))}
+            </ul>
+            {/* Fase 5 (Ronda 8, 26-08-18) — Fontana es 100% solo-lectura de
+                territorio (deriva de moddulo_projects.territorio, ver
+                sesionTerritorio.ts); la resolución real (picker de
+                candidatos) vive en TerritorySelector.tsx, del lado de
+                Moddulo. Sin lógica de escritura nueva aquí. */}
+            {modduloProjectId && (
+              <a
+                href={`/moddulo/proyecto/${modduloProjectId}/proposito?editarTerritorio=1${
+                  retornoUrl ? `&retorno=${encodeURIComponent(retornoUrl)}` : ""
+                }`}
+                className="mt-2 inline-block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
+              >
+                Resolver en Moddulo →
+              </a>
             )}
-            {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{celda.fuenteEtiqueta}</p>}
-          </>
-        ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{celda.motivo}</p>
+          </div>
         )}
       </div>
-    </li>
+    </div>
   );
 }
 

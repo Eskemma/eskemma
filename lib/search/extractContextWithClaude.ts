@@ -55,9 +55,33 @@ Responde SOLO con un objeto JSON válido, sin narrativa ni explicaciones:
 Si los snippets no contienen información electoral relevante:
 { "disponible": false, "indicadores": [] }`;
 
+// Fase 5 del rediseño de territorio (Ronda 8, 26-08-18) — "asistente
+// puntual", Escenario A (Clase B, fuera de México, sin catálogo
+// estructurado). A diferencia de los 3 tipos anteriores (que extraen
+// indicadores económicos/legales/electorales), aquí "valor" es SIEMPRE
+// una descripción textual del territorio (nombre oficial, división
+// administrativa) — nunca una cifra. Mismo esqueleto anti-fabricación.
+const EXTRACTION_SYSTEM_GEOGRAPHIC = `Eres un extractor de contexto geográfico/administrativo para verificar un territorio descrito en texto libre por un usuario (fuera de México, sin catálogo estructurado disponible).
+Se te dan snippets de búsqueda web con título, URL y descripción.
+Basa tu respuesta ÚNICAMENTE en lo que dicen esos snippets — no inventes ni asumas una división administrativa que no aparezca explícitamente en el texto.
+Si un campo fecha no aparece en el snippet, usa fecha: null.
+"valor" es una descripción textual del territorio confirmado (nombre oficial de la división administrativa, su jerarquía — ej. "Comuna de Providencia, Región Metropolitana, Chile").
+Responde SOLO con un objeto JSON válido, sin narrativa ni explicaciones:
+
+{
+  "disponible": true,
+  "indicadores": [
+    { "nombre": "...", "valor": "...", "fuente": "...", "url": "...", "fecha": "..." }
+  ]
+}
+
+Si los snippets no confirman el territorio descrito con confianza suficiente:
+{ "disponible": false, "indicadores": [] }`;
+
 function getSystemPrompt(tipo: string): string {
   if (tipo === "legal") return EXTRACTION_SYSTEM_LEGAL;
   if (tipo === "electoral") return EXTRACTION_SYSTEM_ELECTORAL;
+  if (tipo === "geographic") return EXTRACTION_SYSTEM_GEOGRAPHIC;
   return EXTRACTION_SYSTEM_ECONOMIC;
 }
 

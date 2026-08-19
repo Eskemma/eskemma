@@ -251,6 +251,8 @@ export default function ConfigurarPage() {
             onChange={(territorio) => setData((d) => ({ ...d, territorio }))}
             onNext={() => setStep(2)}
             onBack={() => setStep(0)}
+            tipoProyecto={data.tipo ?? undefined}
+            nombreProyecto={data.nombre}
           />
         )}
         {step === 2 && data.tipo && (

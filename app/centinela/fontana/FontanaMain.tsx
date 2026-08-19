@@ -21,6 +21,9 @@ import Button from "@/app/components/Button";
 interface Props {
   sesion: FontanaSesion;
   onSesionActualizada: (sesion: FontanaSesion) => void;
+  // Ronda 9 (26-08-18) — para el enlace "Resolver en Moddulo" del modal de
+  // ambigüedad, que necesita saber a dónde traer de vuelta al usuario.
+  retornoUrl?: string;
 }
 
 interface FamiliaCatalogo {
@@ -52,7 +55,7 @@ const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> =
   },
 };
 
-export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
+export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
   const [familiaActiva, setFamiliaActiva] = useState<FamiliaFontanaId>("F1");
   const [indicadores, setIndicadores] = useState<IndicadorFilaFontana[] | null>(null);
   const [columnas, setColumnas] = useState<NivelTablaFontana[]>([]);
@@ -210,7 +213,7 @@ export default function FontanaMain({ sesion, onSesionActualizada }: Props) {
       {cargando ? (
         <p className="text-sm text-red-eske">Cargando indicadores…</p>
       ) : (
-        <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} />
+        <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} modduloProjectId={sesion.modduloProjectId} retornoUrl={retornoUrl} />
       )}
 
       <div className="mt-6 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] flex items-center gap-1">

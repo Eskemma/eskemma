@@ -115,7 +115,7 @@ import {
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
-import { resolveMunicipioCve } from "@/lib/geo/municipios";
+import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto } from "@/lib/geo/municipios";
 
 const MOTIVO_NIVEL_NO_CUBIERTO_ITER_COMPENDIO_ETC =
   "Nivel no cubierto — mecanismo de agregación no disponible para esta fuente";
@@ -725,9 +725,27 @@ export interface ElementoAgregacionPlural extends ElementoDeEstado {
   estado: string;
 }
 
+// Ronda 6 (26-08-17) — unidad declarada por el usuario que NO se pudo
+// resolver contra el catálogo (nombre no reconocido, o ambiguo — 2+
+// candidatos reales, nunca se adivina cuál). Nunca se omite en silencio:
+// se surface explícitamente en la UI (celda + modal), con el motivo real.
+export interface NoResueltaAgregacionPlural {
+  nombre: string;
+  estado: string;
+  motivo: string;
+  // Fase 5 (Ronda 8, 26-08-18) — mismo dato que ya calcula
+  // diagnosticarMunicipioNoResuelto(), expuesto estructurado (no solo
+  // embebido en `motivo`) para que la UI pueda ofrecer un picker real de
+  // ambigüedad. Solo poblado cuando el motivo es de ambigüedad (2+
+  // candidatos) — ausente para "no reconocido" (0 candidatos) o "estado no
+  // reconocido".
+  candidatos?: string[];
+}
+
 export interface ResultadoAgregacionPlural {
   valorAgregado: CeldaFontana | null;
   desglosePorUnidad: ElementoAgregacionPlural[];
+  noResueltas: NoResueltaAgregacionPlural[];
 }
 
 const SIN_CLASIFICAR_MOTIVO = "Este indicador aún no tiene definida su regla de agregación territorial";
@@ -743,23 +761,56 @@ function nivelCeldaParaTerritorio(nivel: Territorio["nivel"]): CeldaFontana["niv
 // INE), resolución nombre→cve para municipios (sin catálogo estructurado,
 // mismo criterio ya documentado — se resuelve vía resolveMunicipioCve,
 // mismo mecanismo que ya usa eceg.ts:resolverMunicipal). Municipios que no
-// se logran resolver se omiten del desglose (nunca se fabrica un cve) —
-// no es un error fatal, simplemente esa unidad no aparece.
+// se logran resolver se reportan en `noResueltas` con su motivo (Ronda 6,
+// 26-08-17) — nunca se fabrica un cve, pero tampoco se omiten en silencio.
 async function agruparUnidadesPorEstado(
   territorio: Territorio
-): Promise<{ tipoElemento: TipoElementoEstado | null; porEstado: Map<string, string[]> } | null> {
+): Promise<{
+  tipoElemento: TipoElementoEstado | null;
+  porEstado: Map<string, string[]>;
+  noResueltas: NoResueltaAgregacionPlural[];
+} | null> {
   const porEstado = new Map<string, string[]>();
+  const noResueltas: NoResueltaAgregacionPlural[] = [];
 
-  if (territorio.nivel === "municipal" && territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 0) {
-    for (const m of territorio.municipiosPorEstado) {
+  if (territorio.nivel === "municipal") {
+    // Fallback a municipiosSeleccionados (campo legado, Fase 2) +
+    // territorio.estado cuando municipiosPorEstado (Decisión 2) está
+    // ausente — MISMO patrón que resolverPrimerMunicipio()
+    // (lib/moddulo/territorioPlural.ts) y que el propio TerritorySelector.tsx
+    // usan para migrar territorios ya persistidos antes de Decisión 2 (ej.
+    // proyecto real O2RBnCPiyGJ6u6kyk1rS, ZMG, 10 municipios). Bug real
+    // 26-08-18: sin este fallback, esTerritorioParcial() detectaba
+    // pluralidad correctamente (sí tiene el fallback) pero
+    // resolverAgregacionPlural() no encontraba nada que agregar y
+    // devolvía null en silencio — el bloque "Combinado" nunca se armaba
+    // para ningún proyecto migrado.
+    const municipiosConEstado: { nombre: string; estado: string }[] =
+      territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 0
+        ? territorio.municipiosPorEstado
+        : territorio.municipiosSeleccionados && territorio.municipiosSeleccionados.length > 0 && territorio.estado
+          ? territorio.municipiosSeleccionados.map((nombre) => ({ nombre, estado: territorio.estado! }))
+          : [];
+
+    for (const m of municipiosConEstado) {
       const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(m.estado)];
-      if (!estadoCve) continue;
+      if (!estadoCve) {
+        noResueltas.push({ nombre: m.nombre, estado: m.estado, motivo: `Estado "${m.estado}" no reconocido en el catálogo INEGI` });
+        continue;
+      }
       const municipioCve = await resolveMunicipioCve(estadoCve, m.nombre).catch(() => null);
-      if (!municipioCve) continue;
+      if (!municipioCve) {
+        const candidatos = await diagnosticarMunicipioNoResuelto(estadoCve, m.nombre).catch(() => []);
+        const motivo = candidatos.length > 1
+          ? `Nombre ambiguo — coincide con ${candidatos.length} municipios reales de ${m.estado}: ${candidatos.join(", ")}`
+          : `Municipio "${m.nombre}" no reconocido en el catálogo INEGI`;
+        noResueltas.push({ nombre: m.nombre, estado: m.estado, motivo, candidatos: candidatos.length > 1 ? candidatos : undefined });
+        continue;
+      }
       if (!porEstado.has(estadoCve)) porEstado.set(estadoCve, []);
       porEstado.get(estadoCve)!.push(municipioCve);
     }
-    return porEstado.size > 0 ? { tipoElemento: "municipios", porEstado } : null;
+    return porEstado.size > 0 || noResueltas.length > 0 ? { tipoElemento: "municipios", porEstado, noResueltas } : null;
   }
 
   if (
@@ -769,13 +820,19 @@ async function agruparUnidadesPorEstado(
     const tipoElemento: TipoElementoEstado = territorio.nivel === "distrito_federal" ? "distritos_fed" : "distritos_loc";
     for (const d of territorio.distritosSeleccionados) {
       const estadoNombre = d.estado ?? territorio.estado;
-      if (!estadoNombre) continue;
+      if (!estadoNombre) {
+        noResueltas.push({ nombre: d.nombre, estado: estadoNombre ?? "", motivo: "El estado de este distrito no está definido" });
+        continue;
+      }
       const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)];
-      if (!estadoCve) continue;
+      if (!estadoCve) {
+        noResueltas.push({ nombre: d.nombre, estado: estadoNombre, motivo: `Estado "${estadoNombre}" no reconocido en el catálogo INEGI` });
+        continue;
+      }
       if (!porEstado.has(estadoCve)) porEstado.set(estadoCve, []);
       porEstado.get(estadoCve)!.push(d.cve);
     }
-    return porEstado.size > 0 ? { tipoElemento, porEstado } : null;
+    return porEstado.size > 0 || noResueltas.length > 0 ? { tipoElemento, porEstado, noResueltas } : null;
   }
 
   return null; // Estatal-plural se maneja aparte (no agrupa "por estado" — los estados SON las unidades)
@@ -881,13 +938,35 @@ export async function resolverAgregacionPlural(
   if (territorio.nivel === "estatal" && territorio.estadosSeleccionados && territorio.estadosSeleccionados.length > 1) {
     const registro = await getIndicadorRegistro(indicadorId);
     const tipo = registro?.agregacionPlural?.tipo;
-    if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [] };
+    if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [], noResueltas: [] };
 
     const todos = await resolverDesgloseEstadosNacional(indicadorId);
-    const seleccionados = new Set(territorio.estadosSeleccionados);
+    // Bug real 26-08-18: territorio.estadosSeleccionados guarda nombres
+    // "Jalisco" (formato de ESTADOS_MEXICO en TerritorySelector.tsx —
+    // fuente de verdad del formato persistido en Firestore), pero
+    // resolverEstadosNacional() etiqueta cada estado con
+    // CVE_ESTADO_NOMBRE[cve] (lib/geo/municipios.ts), que son las claves
+    // de ESTADO_CVE_MAP en MAYÚSCULAS ("JALISCO") — una comparación de
+    // strings crudos nunca coincidía, para NINGÚN estado. Normalizamos
+    // ambos lados con normalizeGeoName() (mismo helper ya usado en este
+    // archivo para esta clase de comparación, ver agruparUnidadesPorEstado
+    // arriba) solo para el MATCH — el nombre que se guarda en `estado`
+    // para mostrar en la UI sigue siendo el formato canónico persistido
+    // (territorio.estadosSeleccionados), nunca el de CVE_ESTADO_NOMBRE.
+    const normalizadoAOriginal = new Map(
+      territorio.estadosSeleccionados.map((n) => [normalizeGeoName(n), n])
+    );
     const desglose: ElementoAgregacionPlural[] = (todos ?? [])
-      .filter((e) => seleccionados.has(e.nombre))
-      .map((e) => ({ ...e, estado: e.nombre }));
+      .filter((e) => normalizadoAOriginal.has(normalizeGeoName(e.nombre)))
+      .map((e) => ({ ...e, estado: normalizadoAOriginal.get(normalizeGeoName(e.nombre))! }));
+
+    // Nombres declarados en el proyecto que no matchearon ningún estado
+    // real del desglose nacional — mismo criterio "nunca en silencio" que
+    // agruparUnidadesPorEstado (Ronda 6, 26-08-17).
+    const resueltosNombres = new Set(desglose.map((e) => normalizeGeoName(e.estado)));
+    const noResueltas: NoResueltaAgregacionPlural[] = territorio.estadosSeleccionados
+      .filter((n) => !resueltosNombres.has(normalizeGeoName(n)))
+      .map((n) => ({ nombre: n, estado: n, motivo: `Estado "${n}" no reconocido en el catálogo INEGI` }));
 
     let valorAgregado: CeldaFontana | null = null;
     if (tipo === "aditivo") valorAgregado = await calcularAditivo(desglose, nivelCelda);
@@ -895,18 +974,18 @@ export async function resolverAgregacionPlural(
       valorAgregado = { nivel: nivelCelda, motivo: "Reconstrucción de valor combinado no implementada a nivel Estatal en este incremento" };
     }
     // no_agregable: valorAgregado queda null — solo desglose (ver plan, pendiente confirmación de Raúl).
-    return { valorAgregado, desglosePorUnidad: desglose };
+    return { valorAgregado, desglosePorUnidad: desglose, noResueltas };
   }
 
   // Municipal/Distrital-plural
   const agrupado = await agruparUnidadesPorEstado(territorio);
   if (!agrupado) return null;
-  const { tipoElemento, porEstado } = agrupado;
-  if (!tipoElemento) return null;
+  const { tipoElemento, porEstado, noResueltas } = agrupado;
+  if (!tipoElemento) return { valorAgregado: null, desglosePorUnidad: [], noResueltas };
 
   const registro = await getIndicadorRegistro(indicadorId);
   const tipo = registro?.agregacionPlural?.tipo;
-  if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [] };
+  if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [], noResueltas };
 
   // Límite distrital real de la fuente (26-08-17) — CONEVAL/CONAPO
   // Marginación/Bienestar/ICMM/PNUD no publican por distrito electoral
@@ -923,6 +1002,7 @@ export async function resolverAgregacionPlural(
         motivo: "Este indicador no está disponible a nivel distrital — la fuente no publica datos por distrito electoral (solo estatal/municipal).",
       },
       desglosePorUnidad: [],
+      noResueltas,
     };
   }
 
@@ -944,5 +1024,5 @@ export async function resolverAgregacionPlural(
   }
   // no_agregable: valorAgregado queda null — solo desglose.
 
-  return { valorAgregado, desglosePorUnidad };
+  return { valorAgregado, desglosePorUnidad, noResueltas };
 }

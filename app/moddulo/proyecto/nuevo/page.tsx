@@ -320,6 +320,9 @@ function NuevoProyectoContent() {
               onNext={() => { if (canAdvanceStep2) setStep(3); }}
               onBack={() => setStep(1)}
               label="¿Cuál es el territorio de tu proyecto?"
+              tipoProyecto={type ?? undefined}
+              nombreProyecto={name}
+              descripcionProyecto={description}
             />
           </div>
         )}

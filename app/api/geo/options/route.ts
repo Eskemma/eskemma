@@ -9,6 +9,7 @@ import { normalizeGeoName } from "@/lib/geo/municipios";
 // Import estático (Fase 2 del rediseño de territorio, corrección
 // 26-08-14) — ver lib/geo/distritos.ts para el diagnóstico completo.
 import { feature } from "topojson-client";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 const STORAGE_PREFIX_INE   = "sefix/geo/ine";
@@ -29,16 +30,6 @@ const DOWNLOAD_TIMEOUT_MS = 20000;
 // un cuelgue silencioso en un error visible que el cliente ya sabe manejar
 // (useGeoOptions.ts trata cualquier respuesta no-OK como error →
 // TerritorySelector.tsx cae a su fallback de texto libre ya existente).
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timeout (${ms}ms) esperando ${label}`)), ms);
-    promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (err) => { clearTimeout(timer); reject(err); }
-    );
-  });
-}
-
 // normalizeGeoName reutilizado desde lib/geo/municipios.ts (extraído para
 // que Fontana pueda resolver municipio→CVE_MUN sin duplicar esta lógica).
 

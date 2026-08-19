@@ -127,12 +127,50 @@ export async function getMunicipiosOptions(estadoId: string): Promise<GeoOption[
 }
 
 // Resuelve un nombre de municipio (con o sin acentos, cualquier mayúscula)
-// contra el catálogo real de un estado. null si no hay match exacto —
-// nunca adivina por coincidencia parcial.
+// contra el catálogo real de un estado. Nivel 1: match exacto. Nivel 2
+// (fallback, 26-08-17): coincidencia de palabra completa (\bNOMBRE\b)
+// contra el nombre oficial — SOLO se acepta si resulta en exactamente 1
+// candidato; 0 o 2+ candidatos devuelven null (mismo tratamiento que "no
+// encontrado"), nunca se adivina entre nombres ambiguos (ej.
+// "Ixtlahuacán" tiene 2 candidatos reales en Jalisco: "IXTLAHUACAN DEL
+// RIO" e "IXTLAHUACAN DE LOS MEMBRILLOS"). Resuelve el caso real que
+// motivó esto: nombres informales de uso común ("Tlaquepaque",
+// "Tlajomulco", "Acatlán") que no coinciden con el nombre oficial del
+// catálogo INEGI ("SAN PEDRO TLAQUEPAQUE", etc.). Confirmado (26-08-17):
+// ninguno de los 9 consumidores reales de esta función usa `null` como
+// señal para activar una ruta de resolución alterna — todos lo tratan
+// simplemente como "sin dato para este municipio" — así que ampliar la
+// resolución aquí beneficia a todos sin alterar ningún flujo existente.
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function candidatosPorPalabraCompleta(estadoId: string, municipioNombre: string): Promise<GeoOption[]> {
+  const objetivo = normalizeGeoName(municipioNombre);
+  const options = await getMunicipiosOptions(estadoId);
+  const patronPalabraCompleta = new RegExp(`\\b${escapeRegExp(objetivo)}\\b`);
+  return options.filter((o) => patronPalabraCompleta.test(o.nombre));
+}
+
 export async function resolveMunicipioCve(estadoId: string, municipioNombre: string): Promise<string | null> {
   const objetivo = normalizeGeoName(municipioNombre);
   const options = await getMunicipiosOptions(estadoId);
-  return options.find((o) => o.nombre === objetivo)?.cve ?? null;
+
+  const exacto = options.find((o) => o.nombre === objetivo);
+  if (exacto) return exacto.cve;
+
+  const candidatos = await candidatosPorPalabraCompleta(estadoId, municipioNombre);
+  return candidatos.length === 1 ? candidatos[0].cve : null;
+}
+
+// Diagnóstico para cuando resolveMunicipioCve() devuelve null (26-08-17,
+// Ronda 6) — usado SOLO para construir un motivo legible al usuario (ej.
+// en el desglose de agregación plural), nunca para decidir un cve. 0
+// candidatos → nombre no reconocido; 2+ → nombre ambiguo, se listan los
+// candidatos reales (nunca se adivina cuál era el correcto).
+export async function diagnosticarMunicipioNoResuelto(estadoId: string, municipioNombre: string): Promise<string[]> {
+  const candidatos = await candidatosPorPalabraCompleta(estadoId, municipioNombre);
+  return candidatos.map((c) => c.nombre);
 }
 
 // Reverso de ESTADO_CVE_MAP (lib/sefix/eleccionesConstants.ts) — para

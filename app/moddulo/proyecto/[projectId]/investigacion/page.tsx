@@ -13,6 +13,7 @@ import F3Tablero from "./components/F3Tablero";
 import F3CoberturaSidebar from "./components/F3CoberturaSidebar";
 import F3ReporteDIE from "./components/F3ReporteDIE";
 import { detectPipStaleness, type PipCambio } from "@/lib/moddulo/pipPropagation";
+import { extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 import type {
   ProjectType, Territorio, PIPItem, IncertidumbreF2, HEIF2, ActorVetoF2,
   TareaPIP, SintesisF3, VeredictoHEI, DIE, RDAItem, ChatMessage,
@@ -25,6 +26,10 @@ interface ResultadoDoc {
   cobertura: { completa: boolean; detalle?: string };
   aprobado?: boolean;
   notasUsuario?: string;
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio. Solo
+  // presentes en resultados de Canal 3 (origen.sourceKind === "external").
+  metadatosFuente?: { nombreHerramienta: string };
+  proyectoTerritorioSnapshotAtVinculacion?: string;
 }
 
 export default function InvestigacionPage() {
@@ -219,6 +224,46 @@ export default function InvestigacionPage() {
     }
   }, [projectId]);
 
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio (Canal 3).
+  // Actualiza `resultados` in-place con el veredicto/snapshot frescos —
+  // la fuente sale de la lista de "stale" en cuanto el snapshot vuelve a
+  // coincidir, sin necesitar recargar toda la página. Nunca desvincula ni
+  // invalida nada — solo refresca el veredicto para que el analista decida.
+  const [revisandoTerritorioResultadoId, setRevisandoTerritorioResultadoId] = useState<string | null>(null);
+  const [ultimoVeredictoTerritorio, setUltimoVeredictoTerritorio] = useState<{ nombre: string; match: string } | null>(null);
+  const handleRevisarTerritorioFuente = useCallback(async (resultadoId: string) => {
+    setRevisandoTerritorioResultadoId(resultadoId);
+    try {
+      const r = await fetch("/api/moddulo/f3/canal3/revisar-territorio", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ projectId, resultadoId }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setResultados((prev) =>
+          prev.map((res) =>
+            res.resultadoId === resultadoId
+              ? {
+                  ...res,
+                  compatibilidad: d.compatibilidad,
+                  proyectoTerritorioSnapshotAtVinculacion: projectTerritory
+                    ? JSON.stringify(extraerTerritorioEscalar(projectTerritory))
+                    : undefined,
+                }
+              : res
+          ) as typeof prev
+        );
+        const fuente = resultados.find((res) => res.resultadoId === resultadoId);
+        setUltimoVeredictoTerritorio({
+          nombre: fuente?.metadatosFuente?.nombreHerramienta ?? resultadoId,
+          match: d.compatibilidad?.pertinencia?.territorioDetalle ?? "Territorio verificado — sin problema de compatibilidad.",
+        });
+      }
+    } finally {
+      setRevisandoTerritorioResultadoId(null);
+    }
+  }, [projectId, projectTerritory, resultados]);
+
   const handleGenerarSintesis = useCallback(async () => {
     setGenerandoSintesis(true);
     try {
@@ -280,6 +325,10 @@ export default function InvestigacionPage() {
     onGenerarVeredicto: handleGenerarVeredicto,
     onAprobarVeredicto: handleAprobarVeredicto,
     generandoTareas, generandoSintesis, generandoVeredicto, aprobandoVeredicto,
+    onRevisarTerritorioFuente: handleRevisarTerritorioFuente,
+    revisandoTerritorioResultadoId,
+    ultimoVeredictoTerritorio,
+    onCerrarVeredictoTerritorio: () => setUltimoVeredictoTerritorio(null),
   };
 
   return (

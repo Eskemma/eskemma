@@ -5,7 +5,7 @@
 // muestran dato real (nunca una columna vacía sin motivo explícito).
 
 import type { ProjectType } from "@/types/moddulo.types";
-import type { NivelTerritorial } from "@/types/shared.types";
+import type { NivelTerritorial, TipoAgregacionTerritorial } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
 // "distrital_federal"/"distrital_local" — columnas inversas (Encargo
@@ -143,5 +143,13 @@ export interface CeldaTablaFontana {
   agregacionPlural?: {
     valorAgregado: CeldaFontana | null;
     desglosePorUnidad: { cve: string; nombre: string; estado: string; celda: CeldaFontana }[];
+    // Ronda 6 (26-08-17) — unidades que el usuario declaró pero que no se
+    // pudieron resolver contra el catálogo (nombre no reconocido o
+    // ambiguo) — nunca se omiten en silencio, se listan con su motivo.
+    noResueltas: { nombre: string; estado: string; motivo: string; candidatos?: string[] }[];
+    // Ronda 6 (26-08-17) — tipo de cálculo real del valor combinado, para
+    // la etiqueta "Combinado · suma/ponderado" en la UI. Ausente cuando el
+    // indicador no está clasificado (el motivo ya lo deja explícito).
+    tipoCalculo?: TipoAgregacionTerritorial;
   };
 }

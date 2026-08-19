@@ -35,6 +35,7 @@ import {
 } from "@/lib/sefix/sefixContext";
 import { getCveEntidad } from "@/lib/geo/estadoCve";
 import type { Territorio } from "@/types/pestel.types";
+import { extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 import { fetchWithCache, CACHE_TTL } from "@/lib/centinela/pestel/cache/indicatorCache";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import {
@@ -298,6 +299,10 @@ export async function POST(request: NextRequest) {
     "phases.exploracion.linkedSource": linkedSource,
     "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
     "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+    // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
+    "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
+      extraerTerritorioEscalar(project.territorio as Territorio)
+    ),
     updatedAt: FieldValue.serverTimestamp(),
   });
 

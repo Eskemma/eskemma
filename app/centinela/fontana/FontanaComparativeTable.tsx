@@ -21,7 +21,7 @@ import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
 import FontanaMunicipiosModal, { type TipoElementoNacional, type TipoDistrito, type ElementoAgregacionPluralUI } from "./FontanaMunicipiosModal";
-import type { NivelTerritorial } from "@/types/shared.types";
+import type { NivelTerritorial, TipoAgregacionTerritorial } from "@/types/shared.types";
 
 // Fase 3 del rediseño de territorio (26-08-17) — "Ver X" según el nivel
 // REAL del territorio del proyecto (no de la celda, que puede ser
@@ -59,6 +59,8 @@ interface ModalConfig {
   // RESUELTO desde el backend (resolverAgregacionPlural), a diferencia
   // de los demás scopes, que hacen su propio fetch al abrir el modal.
   desglosePorUnidad?: ElementoAgregacionPluralUI[];
+  // Ronda 6 (26-08-17) — unidades declaradas que no se pudieron resolver.
+  noResueltas?: { nombre: string; estado: string; motivo: string }[];
 }
 
 export interface IndicadorFilaFontana {
@@ -83,6 +85,14 @@ interface Props {
   // distinguir por el contenido de la celda, hace falta el contexto
   // del proyecto (cierre 2026-08-06).
   territorioNivel: NivelTerritorial;
+  // Fase 5 (Ronda 8, 26-08-18) — solo escenario (a), proyecto con
+  // territorio originado en Moddulo (ver sesionTerritorio.ts). Ausente en
+  // escenarios (b)/(c) (fuera de alcance hoy) — el enlace "Resolver en
+  // Moddulo" simplemente no se muestra si no hay a dónde enlazar.
+  modduloProjectId?: string;
+  // Ronda 9 (26-08-18) — para que al guardar el territorio en Moddulo, el
+  // usuario vuelva aquí en vez de quedarse varado en Moddulo.
+  retornoUrl?: string;
 }
 
 function BotonesDesgloseEstado({
@@ -109,10 +119,23 @@ function BotonesDesgloseEstado({
   );
 }
 
-// Fase 3 del rediseño de territorio (26-08-17) — bloque de valor
-// combinado + botón de desglose, agnóstico de si `celda.valor` existe o
-// no (aditivo/tasa_ponderada muestran un valor combinado; no_agregable
-// muestra solo el desglose, sin valor combinado — aprobado por Raúl).
+// Ronda 6 (26-08-17) — texto corto permanente (aprobado por Raúl, no
+// tooltip) para que el usuario sepa que el valor mostrado es el resultado
+// de combinar varias unidades, y de qué forma. "no_agregable" y los casos
+// sin clasificar no traen tipoCalculo — el motivo ya es explícito ahí.
+const ETIQUETA_TIPO_CALCULO: Record<TipoAgregacionTerritorial, string> = {
+  aditivo: "suma",
+  tasa_ponderada: "ponderado",
+  no_agregable: "",
+  narrativo_sintetizado: "",
+};
+
+// Fase 3 del rediseño de territorio (26-08-17) — botón de desglose por
+// unidad. El valor combinado YA se muestra como valor PRINCIPAL de la
+// celda (route.ts sobrescribe valor/motivo con el agregado cuando el
+// territorio es plural, Ronda 5, 26-08-17) — este bloque agrega la
+// etiqueta del tipo de cálculo, la nota de unidades no identificadas
+// (Ronda 6, 26-08-17) y el botón de desglose.
 function BloqueAgregacionPlural({
   agregacionPlural,
   onVer,
@@ -120,21 +143,20 @@ function BloqueAgregacionPlural({
   agregacionPlural: NonNullable<CeldaTablaFontana["agregacionPlural"]>;
   onVer: () => void;
 }) {
-  const { valorAgregado, desglosePorUnidad } = agregacionPlural;
-  const tieneValor = valorAgregado && "valor" in valorAgregado;
+  const { desglosePorUnidad, noResueltas, tipoCalculo } = agregacionPlural;
+  const totalDeclaradas = desglosePorUnidad.length + noResueltas.length;
+  const etiquetaTipo = tipoCalculo ? ETIQUETA_TIPO_CALCULO[tipoCalculo] : "";
+
   return (
-    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-eske-30 dark:border-white/10">
-      <p className="text-[10px] uppercase tracking-wide text-bluegreen-eske dark:text-blue-eske-20">
-        Combinado ({desglosePorUnidad.length} unidades)
-      </p>
-      {tieneValor ? (
-        <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
-          {valorAgregado.valor.toLocaleString("es-MX")}
-          {valorAgregado.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{valorAgregado.unidad}</span> : null}
+    <div className="space-y-0.5">
+      {etiquetaTipo && (
+        <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">
+          Combinado · {etiquetaTipo} de {desglosePorUnidad.length} unidad{desglosePorUnidad.length === 1 ? "" : "es"}
         </p>
-      ) : (
-        <p className="text-xs italic text-black-eske-80 dark:text-[#9AAEBE]">
-          {valorAgregado?.motivo ?? "Sin valor combinado disponible para este indicador"}
+      )}
+      {noResueltas.length > 0 && (
+        <p className="text-[10px] text-red-eske">
+          {desglosePorUnidad.length} de {totalDeclaradas} unidades identificadas — {noResueltas.length} sin identificar
         </p>
       )}
       {desglosePorUnidad.length > 0 && (
@@ -249,7 +271,7 @@ function Celda({
   );
 }
 
-export default function FontanaComparativeTable({ sesionId, columnas, indicadores, onQuitar, quitando, territorioNivel }: Props) {
+export default function FontanaComparativeTable({ sesionId, columnas, indicadores, onQuitar, quitando, territorioNivel, modduloProjectId, retornoUrl }: Props) {
   // Configuración del modal de desglose abierto — un modal a la vez,
   // cada apertura es independiente (fetch propio, nunca comparte estado
   // entre indicadores). scope="distrito" (Ver datos municipales) o
@@ -311,7 +333,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                       onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
                       onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                       onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
-                      onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad })}
+                      onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad, noResueltas: celda.agregacionPlural!.noResueltas })}
                     />
                   </div>
                 );
@@ -363,7 +385,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                           onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
                           onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                           onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
-                          onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad })}
+                          onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad, noResueltas: celda.agregacionPlural!.noResueltas })}
                         />
                       ) : null}
                     </td>
@@ -396,7 +418,10 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
           tipoElemento={modalConfig.tipoElemento}
           tipoDistrito={modalConfig.tipoDistrito}
           desglosePorUnidad={modalConfig.desglosePorUnidad}
+          noResueltas={modalConfig.noResueltas}
           etiquetaSeleccion={ETIQUETA_VER_AGREGACION_PLURAL[territorioNivel]}
+          modduloProjectId={modduloProjectId}
+          retornoUrl={retornoUrl}
           onClose={() => setModalConfig(null)}
         />
       )}

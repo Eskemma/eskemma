@@ -303,7 +303,36 @@ export async function GET(
             celdaObjetivo.agregacionPlural = {
               valorAgregado: resultadoPlural.valorAgregado,
               desglosePorUnidad: resultadoPlural.desglosePorUnidad,
+              noResueltas: resultadoPlural.noResueltas,
+              // Ronda 6 (26-08-17) — para que la UI etiquete el tipo de
+              // cálculo ("suma"/"ponderado") sin re-derivarlo del shape del
+              // valor. `registro` ya está en scope (línea 193/194, fetch
+              // por indicador ya existente).
+              tipoCalculo: registro?.agregacionPlural?.tipo,
             };
+            // Corrección (26-08-17, Ronda 5): la celda debe mostrar el
+            // agregado como valor PRINCIPAL, nunca el de la "unidad
+            // principal" (primer municipio/estado/distrito) — sobrescribe
+            // valor/motivo en vez de solo anexar agregacionPlural aparte.
+            // Regla uniforme para los 4 casos que resolverAgregacionPlural
+            // ya produce (agregado real, gate sin mecanismo, indicador sin
+            // clasificar, no_agregable): la unidad principal nunca vuelve
+            // a ser el valor mostrado cuando el territorio es plural.
+            const agregado = resultadoPlural.valorAgregado;
+            celdaObjetivo.valor = undefined;
+            celdaObjetivo.unidad = undefined;
+            celdaObjetivo.naturaleza = undefined;
+            celdaObjetivo.fuenteEtiqueta = undefined;
+            celdaObjetivo.motivo = undefined;
+            if (agregado && "valor" in agregado) {
+              celdaObjetivo.valor = agregado.valor;
+              celdaObjetivo.unidad = agregado.unidad;
+              celdaObjetivo.naturaleza = agregado.naturaleza;
+              celdaObjetivo.fuenteEtiqueta = agregado.fuenteEtiqueta;
+            } else {
+              celdaObjetivo.motivo =
+                agregado?.motivo ?? "Sin valor combinado disponible para este indicador";
+            }
           }
         }
       }

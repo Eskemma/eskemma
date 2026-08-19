@@ -9,6 +9,8 @@ import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import { getCveEntidad } from "@/lib/geo/estadoCve";
 import { formatDistritoLabel } from "@/lib/geo/formatDistrito";
 import { resolverPrimerElemento } from "@/lib/moddulo/territorioPlural";
+import { detectarSenalesTexto } from "@/lib/moddulo/territorioHeuristicas";
+import type { WebContextResult } from "@/lib/search/SearchProvider";
 import PartidosMultiSelect, { type MultiSelectOption } from "@/app/sefix/components/elecciones/PartidosMultiSelect";
 
 // ==========================================
@@ -115,6 +117,16 @@ interface Props {
   nextLabel?: string;
   /** Texto del botón de retroceso. Default "← Atrás". */
   backLabel?: string;
+  // Fase 4 del rediseño de territorio (26-08-18) — "formulario
+  // inteligente". Props OPCIONALES y aditivas: ausentes (ej.
+  // F3TareasPIP.tsx, Canal 3 — declara el territorio de una fuente
+  // externa, semántica distinta a la del proyecto) → cero cambio de
+  // comportamiento. Presentes y `territorio` aún sin definir (creación
+  // nueva) → dispara la sugerencia de nivel; nunca sobrescribe un
+  // territorio ya persistido (edición de un proyecto existente).
+  tipoProyecto?: string;
+  nombreProyecto?: string;
+  descripcionProyecto?: string;
 }
 
 // ==========================================
@@ -129,9 +141,53 @@ export default function TerritorySelector({
   label = "¿Cuál es el territorio de este análisis?",
   nextLabel = "Continuar →",
   backLabel = "← Atrás",
+  tipoProyecto,
+  nombreProyecto,
+  descripcionProyecto,
 }: Props) {
   const [pais, setPais] = useState(territorio?.pais ?? "");
   const [nivel, setNivel] = useState<NivelTerritorial>(territorio?.nivel ?? "estatal");
+
+  // Fase 4 (26-08-18) — sugerencia de nivel territorial, solo para
+  // territorio NUEVO (nunca sobrescribe un proyecto ya persistido). Piso
+  // determinista (detectarSenalesTexto, sin red) primero; techo con
+  // modelo (/api/moddulo/sugerir-territorio) SOLO si el piso no dio
+  // señal — una sola vez al montar, nunca en cada tecla (el usuario ya
+  // terminó de escribir nombre/descripción en el Paso 1 del wizard).
+  const [nivelSugerido, setNivelSugerido] = useState(false);
+  useEffect(() => {
+    if (territorio) return; // territorio ya existente — nunca se sobreescribe
+    if (!nombreProyecto?.trim() && !descripcionProyecto?.trim()) return;
+
+    const senal = detectarSenalesTexto(nombreProyecto ?? "", descripcionProyecto ?? "");
+    if (senal?.nivel) {
+      setPais("México");
+      setNivel(senal.nivel);
+      setNivelSugerido(true);
+      return;
+    }
+
+    let cancelado = false;
+    fetch("/api/moddulo/sugerir-territorio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: nombreProyecto ?? "", descripcion: descripcionProyecto ?? "", tipo: tipoProyecto }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelado || !data) return;
+        if (data.confianza === "alta" && data.nivel) {
+          setPais("México");
+          setNivel(data.nivel);
+          setNivelSugerido(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Decisión 1 (Ronda 3, 26-08-16) — control de Estados UNIFICADO para los
   // 3 niveles no-nacionales (antes: Estatal tenía su propio multi-select y
@@ -160,6 +216,16 @@ export default function TerritorySelector({
   // Texto libre en curso, uno por estado (una caja de texto por estado
   // seleccionado, cada una con su propia lista de chips debajo).
   const [municipioInputPorEstado, setMunicipioInputPorEstado] = useState<Record<string, string>>({});
+  // Fase 5 (Ronda 8, 26-08-18) — validación asíncrona contra el catálogo
+  // INEGI al agregar un municipio. Estado aislado POR ESTADO (cada bloque
+  // es independiente, Decisión 2) — nunca bloquea el resto del formulario.
+  const [resolviendoPorEstado, setResolviendoPorEstado] = useState<Record<string, boolean>>({});
+  // Candidatos reales cuando el nombre escrito es ambiguo (2+ municipios
+  // coinciden) — el usuario elige uno, nunca se adivina.
+  const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, string[]>>({});
+  // Aviso transitorio (no reconocido / error de red) — nunca bloquea,
+  // solo informa (mismo criterio ya usado en todo el workstream).
+  const [avisoMunicipioPorEstado, setAvisoMunicipioPorEstado] = useState<Record<string, string>>({});
 
   // Distrito: acumulador multi-estado (Fase 2, sin cambio de shape en esta
   // ronda) — solo cambia CÓMO se llena: antes "estado en edición" + agregar
@@ -182,6 +248,31 @@ export default function TerritorySelector({
   // Países no-México: texto libre
   const [estadoTexto, setEstadoTexto] = useState(territorio?.estado ?? "");
   const [municipioTexto, setMunicipioTexto] = useState(territorio?.municipio ?? "");
+  // Fase 5 (Ronda 8, 26-08-18) — Escenario A, verificación puntual con
+  // fuentes reales para territorio fuera de México. Nunca sustituye
+  // estadoTexto/municipioTexto — solo confirma o degrada explícito.
+  const [verificandoAsistente, setVerificandoAsistente] = useState(false);
+  const [resultadoAsistente, setResultadoAsistente] = useState<WebContextResult | null>(null);
+
+  async function handleVerificarAsistente() {
+    setVerificandoAsistente(true);
+    setResultadoAsistente(null);
+    try {
+      const res = await fetch("/api/moddulo/verificar-territorio-libre", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pais, estado: estadoTexto, municipio: municipioTexto }),
+      });
+      const data: WebContextResult = res.ok
+        ? await res.json()
+        : { disponible: false, indicadores: [] };
+      setResultadoAsistente(data);
+    } catch {
+      setResultadoAsistente({ disponible: false, indicadores: [] });
+    } finally {
+      setVerificandoAsistente(false);
+    }
+  }
 
   const esMexico = pais === "México";
   const requiresEstado = nivel !== "nacional";
@@ -336,9 +427,78 @@ export default function TerritorySelector({
     setDistritosAcumulados((prev) => prev.filter((d) => !(d.cve === cve && d.estado === estadoDelDistrito)));
   }
 
-  function handleAgregarMunicipio(estado: string) {
-    const texto = municipioInputPorEstado[estado] ?? "";
-    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+  // Fase 5 (Ronda 8, 26-08-18) — valida contra el catálogo INEGI antes de
+  // agregar (vía /api/geo/resolver-municipio, server-only por depender de
+  // firebase-admin/storage — no se puede llamar resolveMunicipioCve()
+  // directo desde este client component). 3 caminos: exacto → agrega
+  // normal; ambiguo (2+ candidatos reales) → NO agrega todavía, muestra
+  // el picker; no encontrado o error de red/timeout → degrada agregando
+  // el texto tal cual con aviso visible, nunca bloquea al usuario (mismo
+  // criterio ya aplicado en todo este workstream, ver P2).
+  async function handleAgregarMunicipio(estado: string) {
+    const texto = (municipioInputPorEstado[estado] ?? "").trim();
+    if (!texto) return;
+
+    // Dedup síncrona ANTES de cualquier fetch — un duplicado exacto nunca
+    // dispara una llamada de red.
+    const yaExiste = municipiosPorEstado.some(
+      (m) => m.estado === estado && normalizarParaComparar(m.nombre) === normalizarParaComparar(texto)
+    );
+    if (yaExiste) {
+      setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
+      return;
+    }
+
+    setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
+    setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
+    setResolviendoPorEstado((prev) => ({ ...prev, [estado]: true }));
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const res = await fetch("/api/geo/resolver-municipio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado, nombre: texto }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data.ambiguo && Array.isArray(data.candidatos) && data.candidatos.length > 0) {
+        setCandidatosPorEstado((prev) => ({ ...prev, [estado]: data.candidatos }));
+        return; // no agrega — espera a que el usuario elija
+      }
+
+      if (data.noEncontrado) {
+        setAvisoMunicipioPorEstado((prev) => ({
+          ...prev,
+          [estado]: `"${texto}" no se reconoce en el catálogo INEGI — agregado tal cual, verifica el nombre.`,
+        }));
+      }
+
+      setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+      setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
+    } catch {
+      // Timeout/error de red — degrada, nunca bloquea.
+      setAvisoMunicipioPorEstado((prev) => ({
+        ...prev,
+        [estado]: "No se pudo verificar contra el catálogo — agregado tal cual, confírmalo manualmente.",
+      }));
+      setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+      setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
+    } finally {
+      clearTimeout(timeoutId);
+      setResolviendoPorEstado((prev) => ({ ...prev, [estado]: false }));
+    }
+  }
+
+  // Usuario elige uno de los candidatos reales del picker de ambigüedad —
+  // se agrega el nombre EXACTO elegido, nunca el texto ambiguo original.
+  function elegirCandidatoMunicipio(estado: string, candidato: string) {
+    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, candidato));
+    setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
     setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
   }
 
@@ -403,6 +563,7 @@ export default function TerritorySelector({
             value={nivel}
             onChange={(e) => {
               setNivel(e.target.value as NivelTerritorial);
+              setNivelSugerido(false);
               resetCamposMexico();
             }}
             className={selectClass}
@@ -413,6 +574,12 @@ export default function TerritorySelector({
             <option value="distrito_federal">Distrito electoral federal</option>
             <option value="distrito_local">Distrito electoral local</option>
           </select>
+          {nivelSugerido && (
+            <p className="text-xs text-bluegreen-eske dark:text-blue-eske-20">
+              Sugerido automáticamente a partir del nombre/descripción del proyecto — confírmalo o
+              cámbialo si no corresponde.
+            </p>
+          )}
         </div>
       )}
 
@@ -454,7 +621,7 @@ export default function TerritorySelector({
                 key={estadoNombre}
                 className="flex flex-col gap-1.5 border border-gray-eske-20 dark:border-white/10 rounded-lg p-3"
               >
-                <p className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1.5">
+                <div className="text-xs font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-1.5">
                   {estadoNombre}
                   {estadoNombre === estadosSeleccionados[0] && (
                     <InfoTooltip
@@ -462,14 +629,18 @@ export default function TerritorySelector({
                       example="Jiutepec"
                     />
                   )}
-                </p>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={municipioInputPorEstado[estadoNombre] ?? ""}
-                    onChange={(e) =>
-                      setMunicipioInputPorEstado((prev) => ({ ...prev, [estadoNombre]: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setMunicipioInputPorEstado((prev) => ({ ...prev, [estadoNombre]: e.target.value }));
+                      // Texto editado — cualquier picker/aviso de la
+                      // consulta anterior queda obsoleto.
+                      setCandidatosPorEstado((prev) => ({ ...prev, [estadoNombre]: [] }));
+                      setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estadoNombre]: "" }));
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -477,18 +648,47 @@ export default function TerritorySelector({
                       }
                     }}
                     placeholder="ej. Atizapán de Zaragoza"
-                    className={`${inputClass} flex-1`}
+                    disabled={resolviendoPorEstado[estadoNombre]}
+                    className={`${inputClass} flex-1 disabled:opacity-50`}
                   />
                   <button
                     type="button"
                     onClick={() => handleAgregarMunicipio(estadoNombre)}
-                    disabled={!(municipioInputPorEstado[estadoNombre] ?? "").trim()}
+                    disabled={!(municipioInputPorEstado[estadoNombre] ?? "").trim() || resolviendoPorEstado[estadoNombre]}
                     className="px-4 py-2.5 bg-bluegreen-eske text-white rounded-lg text-sm font-medium
                       hover:bg-bluegreen-eske-60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Agregar
                   </button>
                 </div>
+                {resolviendoPorEstado[estadoNombre] && (
+                  <p className="text-xs text-red-eske">Resolviendo…</p>
+                )}
+                {avisoMunicipioPorEstado[estadoNombre] && (
+                  <p className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
+                    {avisoMunicipioPorEstado[estadoNombre]}
+                  </p>
+                )}
+                {(candidatosPorEstado[estadoNombre]?.length ?? 0) > 0 && (
+                  <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-gray-eske-10/60 dark:bg-white/5">
+                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                      Nombre ambiguo — ¿cuál de estos quisiste decir?
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {candidatosPorEstado[estadoNombre].map((candidato) => (
+                        <button
+                          key={candidato}
+                          type="button"
+                          onClick={() => elegirCandidatoMunicipio(estadoNombre, candidato)}
+                          className="px-2.5 py-1 rounded-full text-xs font-medium border border-bluegreen-eske
+                            text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 transition-colors"
+                        >
+                          {candidato}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {municipiosPorEstado.filter((m) => m.estado === estadoNombre).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {municipiosPorEstado
@@ -644,10 +844,49 @@ export default function TerritorySelector({
             id="municipio-texto"
             type="text"
             value={municipioTexto}
-            onChange={(e) => setMunicipioTexto(e.target.value)}
+            onChange={(e) => { setMunicipioTexto(e.target.value); setResultadoAsistente(null); }}
             placeholder={esDistrito ? "ej. Circunscripción 3" : "ej. La Plata"}
             className={inputClass}
           />
+        </div>
+      )}
+
+      {/* Fase 5 (Ronda 8, 26-08-18) — Escenario A (Clase B, fuera de
+          México, sin catálogo estructurado). Acción explícita del
+          usuario — nunca automático. Solo VERIFICA con fuentes reales
+          citables, nunca sustituye el texto libre ya escrito. */}
+      {!esMexico && pais && (estadoTexto.trim() || municipioTexto.trim()) && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={handleVerificarAsistente}
+            disabled={verificandoAsistente}
+            className="self-start px-3 py-1.5 rounded-lg text-xs font-medium border border-bluegreen-eske
+              text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10
+              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {verificandoAsistente ? "Verificando…" : "Verificar con asistente"}
+          </button>
+          {verificandoAsistente && <p className="text-xs text-red-eske">Buscando fuentes reales…</p>}
+          {resultadoAsistente && (
+            resultadoAsistente.disponible && resultadoAsistente.indicadores.length > 0 ? (
+              <div className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-green-eske/5 border border-green-eske/20">
+                <p className="text-xs font-medium text-green-eske">✓ Verificado con fuentes reales</p>
+                {resultadoAsistente.indicadores.map((ind, i) => (
+                  <div key={i} className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                    <p>{ind.valor}</p>
+                    <a href={ind.url} target="_blank" rel="noopener noreferrer" className="text-bluegreen-eske dark:text-blue-eske-20 hover:underline">
+                      {ind.fuente}{ind.fecha ? ` — ${ind.fecha}` : ""}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+                No se pudo verificar con fuentes confiables — puedes continuar con el texto que ya escribiste.
+              </p>
+            )
+          )}
         </div>
       )}
 

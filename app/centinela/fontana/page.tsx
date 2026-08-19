@@ -144,6 +144,10 @@ export default function FontanaPage() {
       <FontanaMain
         sesion={estado.sesion}
         onSesionActualizada={(sesion) => setEstado({ tipo: "sesion", sesion })}
+        // Ronda 9 (26-08-18) — para que "Resolver en Moddulo" (ambigüedad
+        // de municipio) pueda traer de vuelta al usuario aquí después de
+        // guardar, en vez de dejarlo varado en Moddulo.
+        retornoUrl={`/centinela/fontana?moddulo_project_id=${modduloProjectId}&tarea_pip=${pipItemId}`}
       />
     </main>
   );

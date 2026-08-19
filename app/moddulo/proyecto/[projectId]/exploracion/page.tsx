@@ -28,6 +28,12 @@ import type {
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 import { detectForwardStaleness, type PropagationDiff } from "@/lib/moddulo/phasePropagation";
+import {
+  detectarTerritorioStale,
+  extraerTerritorioEscalar,
+  diffTerritorioEscalar,
+  type TerritorioFieldDiff,
+} from "@/lib/territorio/staleness";
 import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
 import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
@@ -226,6 +232,14 @@ export default function ExploracionPage() {
   const [regenKind, setRegenKind] = useState<"full" | "partial">("full");
   const [dvsChecklist, setDvsChecklist] = useState<CriterioDVS[]>([]);
   const [xpctoStaleChanges, setXpctoStaleChanges] = useState<PropagationDiff[]>([]);
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
+  // Independiente del staleness de XPCTO (banner separado) — mismo criterio
+  // desacoplado de lib/territorio/staleness.ts. Solo aplica al M1 Express
+  // (generate-m1-express.ts es el único punto real que consume territorio
+  // para generar contenido — el M1 importado de Centinela PESTEL nunca
+  // escribe este snapshot, así que este banner nunca aparece para esos
+  // proyectos, sin necesidad de un caso especial).
+  const [territorioStaleChanges, setTerritorioStaleChanges] = useState<TerritorioFieldDiff[]>([]);
 
   // Orphan recovery: Moddulo project was hard-deleted
   const [projectNotFound, setProjectNotFound] = useState(false);
@@ -369,6 +383,18 @@ export default function ExploracionPage() {
         const staleDiffs = detectForwardStaleness("exploracion", p);
         if (staleDiffs && staleDiffs.length > 0) setXpctoStaleChanges(staleDiffs);
 
+        // Ronda 13 (26-08-18) — propagación de cambios de territorio,
+        // independiente del staleness de XPCTO de arriba. Solo evaluable
+        // para M1 Express (único que escribe territorioSnapshotAtGeneration
+        // — ver comentario en el useState).
+        if (p.territorio) {
+          const territorioSnapshotRaw = p.phases?.exploracion?.territorioSnapshotAtGeneration as string | undefined;
+          const territorioStale = detectarTerritorioStale(territorioSnapshotRaw, p.territorio, extraerTerritorioEscalar);
+          if (territorioStale.evaluable && territorioStale.cambio && territorioStale.anterior) {
+            setTerritorioStaleChanges(diffTerritorioEscalar(territorioStale.anterior, territorioStale.actual));
+          }
+        }
+
         // Cargar referencia al proyecto PESTEL vinculado — kind "T22" es el
         // único que representa un vínculo real de Centinela (express también
         // puebla linkedSource, pero su sourceId es el propio proyecto Moddulo).
@@ -457,6 +483,7 @@ export default function ExploracionPage() {
         setRegenKind("full");
         setMotorAprobaciones({});
         setXpctoStaleChanges([]);
+        setTerritorioStaleChanges([]);
         setLastUnlinkedPestAnalysisId(null);
 
         // Limpia el query param — evita que el efecto C7 vuelva a disparar
@@ -866,6 +893,7 @@ export default function ExploracionPage() {
         setPestAnalysisId(null);
         setMapaPESTEL(null);
         setXpctoStaleChanges([]);
+        setTerritorioStaleChanges([]);
         setMotorAprobaciones({});
         // draftDVS NO se limpia: si el usuario restaura el vínculo o
         // regenera vía express, sigue teniendo su último estado válido
@@ -1502,6 +1530,49 @@ export default function ExploracionPage() {
                   </div>
                 );
               })()}
+              {/* Ronda 13 (26-08-18) — propagación de cambios de territorio.
+                  Banner separado del de XPCTO — siempre "regeneración
+                  completa" (el territorio cambia las queries de búsqueda de
+                  origen, no solo el contraste), sin camino "partial". */}
+              {territorioStaleChanges.length > 0 && (
+                <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+                        El territorio del proyecto cambió desde que se generó el Análisis PESTEL.
+                      </p>
+                      <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-0.5">
+                        {territorioStaleChanges.slice(0, 3).map((d) => (
+                          <li key={d.field}>
+                            <span className="font-medium">{d.field}:</span>{" "}
+                            <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
+                            {" → "}
+                            {d.to.slice(0, 40)}
+                          </li>
+                        ))}
+                        {territorioStaleChanges.length > 3 && (
+                          <li className="opacity-60">+{territorioStaleChanges.length - 3} campos más</li>
+                        )}
+                      </ul>
+                      <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
+                        Se regenerará el escaneo PESTEL completo (M1) con el territorio vigente.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setTerritorioStaleChanges([]);
+                        setMotorAprobaciones({});
+                        setRegenKind("full");
+                        setMapaPESTEL(null);
+                        handleGenerarDVSRef.current();
+                      }}
+                      className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
+                    >
+                      Regenerar análisis ↺
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 {mode === "completed" && dvs !== null && !showReporte ? (
                   <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">

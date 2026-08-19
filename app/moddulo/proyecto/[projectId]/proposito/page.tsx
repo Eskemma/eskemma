@@ -1,8 +1,8 @@
 // app/moddulo/proyecto/[projectId]/proposito/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
@@ -40,9 +40,14 @@ const emptyForm = (): XPCTOForm => ({
 // PÁGINA PRINCIPAL
 // ==========================================
 
-export default function PropositoPage() {
+// Fase 5 (Ronda 8, 26-08-18) — renombrado de PropositoPage a
+// PropositoPageContent + wrapper con Suspense (mismo patrón ya usado en
+// app/moddulo/proyecto/nuevo/page.tsx): useSearchParams() requiere un
+// límite de Suspense en Next.js App Router.
+function PropositoPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId as string;
 
   const [form, setForm] = useState<XPCTOForm>(emptyForm());
@@ -73,6 +78,25 @@ export default function PropositoPage() {
   // re-seleccionarse con el selector estructurado nuevo sin recrear el
   // proyecto desde cero.
   const [showEditTerritory, setShowEditTerritory] = useState(false);
+  // Fase 5 (Ronda 8, 26-08-18) — enlace "Resolver en Moddulo" desde
+  // Fontana (ambigüedad de nombre de municipio, ver FontanaMunicipiosModal.tsx)
+  // abre el modal de edición de territorio directo, sin que el usuario
+  // tenga que encontrar el botón manualmente.
+  //
+  // Fix (Ronda 9, 26-08-18) — bug real encontrado en verificación visual:
+  // este efecto corría síncrono al montar, ANTES de que el efecto de carga
+  // del proyecto (línea ~97, asíncrono) poblara `projectTerritory`.
+  // EditTerritoryModal/TerritorySelector seedean su estado UNA SOLA VEZ al
+  // montar (sin resincronizar si el prop cambia después) — abrir el modal
+  // antes de tiempo lo montaba con territorio=null (país vacío, como si el
+  // proyecto no tuviera territorio). Gateado en `isLoaded` (ya existe,
+  // línea 68 — su `.finally()` ya cubre tanto éxito como error/fallo de
+  // red del fetch del proyecto, así que este gate nunca se queda esperando
+  // indefinidamente algo que no llegará).
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (searchParams.get("editarTerritorio") === "1") setShowEditTerritory(true);
+  }, [searchParams, isLoaded]);
   const [isSavingTerritory, setIsSavingTerritory] = useState(false);
   const [territoryError, setTerritoryError] = useState<string | null>(null);
   const prevFormComplete = useRef(false);
@@ -437,6 +461,16 @@ export default function PropositoPage() {
       if (!res.ok) throw new Error("save territorio failed");
       setProjectTerritory(nuevoTerritorio);
       setShowEditTerritory(false);
+      // Ronda 9 (26-08-18) — si se llegó aquí desde "Resolver en Moddulo"
+      // (Fontana), volver ahí tras guardar en vez de dejar al usuario
+      // varado en Moddulo. Solo navega a una ruta interna propia (nunca a
+      // una URL externa) — mismo criterio de seguridad que cualquier
+      // redirect basado en query param.
+      const retorno = searchParams.get("retorno");
+      if (retorno && retorno.startsWith("/")) {
+        router.push(retorno);
+        return;
+      }
     } catch {
       // Nunca degradar en silencio (mismo criterio que esParcial/
       // granularidadReal ya establecido en el proyecto) — el modal
@@ -504,6 +538,8 @@ export default function PropositoPage() {
           error={territoryError}
           onSave={handleSaveTerritory}
           onClose={() => { setShowEditTerritory(false); setTerritoryError(null); }}
+          tipoProyecto={projectType}
+          nombreProyecto={projectName}
         />
       )}
 
@@ -1274,6 +1310,14 @@ function F1LandingView({
   );
 }
 
+export default function PropositoPage() {
+  return (
+    <Suspense>
+      <PropositoPageContent />
+    </Suspense>
+  );
+}
+
 // Modal de edición de territorio post-creación (Fase 1 del rediseño de
 // territorio, 26-08-13). Envuelve TerritorySelector (mismo componente que
 // el modal de creación de proyecto y el wizard de PESTEL — no una copia
@@ -1285,12 +1329,16 @@ function EditTerritoryModal({
   error,
   onSave,
   onClose,
+  tipoProyecto,
+  nombreProyecto,
 }: {
   territorio: Territorio | null;
   isSaving: boolean;
   error: string | null;
   onSave: (t: Territorio) => void;
   onClose: () => void;
+  tipoProyecto?: string;
+  nombreProyecto?: string;
 }) {
   const [pending, setPending] = useState<Territorio | null>(territorio);
 
@@ -1305,6 +1353,8 @@ function EditTerritoryModal({
           label="Editar territorio del proyecto"
           nextLabel={isSaving ? "Guardando…" : "Guardar"}
           backLabel="Cancelar"
+          tipoProyecto={tipoProyecto}
+          nombreProyecto={nombreProyecto}
         />
         {error && (
           <p className="text-xs text-red-eske mt-3" role="alert">{error}</p>

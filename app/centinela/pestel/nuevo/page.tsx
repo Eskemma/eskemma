@@ -230,6 +230,8 @@ export default function NuevoProyectoPage() {
             onChange={(territorio) => setData((d) => ({ ...d, territorio }))}
             onNext={goNext}
             onBack={goBack}
+            tipoProyecto={data.tipo ?? undefined}
+            nombreProyecto={data.nombre}
           />
         )}
         {step === 2 && data.tipo && (

@@ -12,6 +12,7 @@ import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
 import { evaluarCompatibilidad } from "@/lib/moddulo/canal3Evaluation";
+import { extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 import type { MetadatosFuenteExterna, ResultadoFuenteExterna } from "@/types/f3.types";
 import type { CoberturaDeclarada } from "@/types/shared.types";
 
@@ -110,6 +111,10 @@ export async function POST(request: NextRequest) {
     payload: { archivoUrl: storagePath, extractoTexto },
     metadatosFuente,
     compatibilidad,
+    // Ronda 13 (26-08-18) — propagación de cambios de territorio.
+    proyectoTerritorioSnapshotAtVinculacion: project.territorio
+      ? JSON.stringify(extraerTerritorioEscalar(project.territorio))
+      : undefined,
   };
 
   await adminDb

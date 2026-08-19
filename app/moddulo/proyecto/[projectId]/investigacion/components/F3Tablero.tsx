@@ -18,6 +18,7 @@ import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import type { PipCambio } from "@/lib/moddulo/pipPropagation";
 import PillButton from "@/app/moddulo/components/PillButton";
+import { detectarTerritorioStale, extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 
 // Override del ícono "i" default de InfoTooltip (bg-bluegreen-eske/10, poco
 // legible en modo oscuro sobre el fondo de F3) — solo para estos 4 usos en
@@ -72,6 +73,10 @@ interface ResultadoDoc {
   cobertura: { completa: boolean; detalle?: string };
   aprobado?: boolean;
   notasUsuario?: string;
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio. Solo
+  // presentes en resultados de Canal 3 (origen.sourceKind === "external").
+  metadatosFuente?: { nombreHerramienta: string };
+  proyectoTerritorioSnapshotAtVinculacion?: string;
 }
 
 interface Props {
@@ -104,6 +109,11 @@ interface Props {
   generandoSintesis: boolean;
   generandoVeredicto: boolean;
   aprobandoVeredicto: boolean;
+  // Ronda 13 (26-08-18) — propagación de cambios de territorio (Canal 3).
+  onRevisarTerritorioFuente: (resultadoId: string) => Promise<void>;
+  revisandoTerritorioResultadoId: string | null;
+  ultimoVeredictoTerritorio: { nombre: string; match: string } | null;
+  onCerrarVeredictoTerritorio: () => void;
 }
 
 export default function F3Tablero({
@@ -112,9 +122,27 @@ export default function F3Tablero({
   onGenerarTareas, conflictoRegenerar, onCancelarConflicto, pipStaleChanges, sincronizandoPip, onSincronizarTablero,
   onRefresh, onGenerarSintesis, onGenerarVeredicto, onAprobarVeredicto,
   generandoTareas, generandoSintesis, generandoVeredicto, aprobandoVeredicto,
+  onRevisarTerritorioFuente, revisandoTerritorioResultadoId,
+  ultimoVeredictoTerritorio, onCerrarVeredictoTerritorio,
 }: Props) {
   const [modalAbierto, setModalAbierto] = useState<"incertidumbres" | "semaforo" | null>(null);
   const incertidumbresF3 = incertidumbres.filter((i) => i.destino === "F3");
+
+  // Ronda 13 (26-08-18) — fuentes de Canal 3 cuyo territorio del proyecto
+  // cambió desde que se vincularon. Solo evaluable para resultados con
+  // snapshot (fuentes vinculadas antes de esta ronda no lo tienen —
+  // nunca un falso positivo, ver detectarTerritorioStale).
+  const fuentesTerritorioStale = projectTerritory
+    ? resultados.filter((r) => {
+        if (r.origen.sourceKind !== "external") return false;
+        const stale = detectarTerritorioStale(
+          r.proyectoTerritorioSnapshotAtVinculacion,
+          projectTerritory,
+          extraerTerritorioEscalar
+        );
+        return stale.evaluable && stale.cambio;
+      })
+    : [];
 
   return (
     <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-6">
@@ -155,6 +183,53 @@ export default function F3Tablero({
               {sincronizandoPip ? "Sincronizando…" : "Sincronizar tablero ↺"}
             </PillButton>
           </div>
+        </div>
+      )}
+
+      {/* Ronda 13 (26-08-18) — propagación de cambios de territorio,
+          Canal 3. Aviso pasivo (nunca recálculo automático) — "Revisar"
+          re-ejecuta checkTerritoryMatch en vivo, sin desvincular nada. */}
+      {!readOnly && fuentesTerritorioStale.length > 0 && (
+        <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3">
+          <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+            {fuentesTerritorioStale.length === 1
+              ? "1 fuente vinculada cuyo territorio del proyecto cambió desde que se vinculó — su compatibilidad podría ya no ser válida."
+              : `${fuentesTerritorioStale.length} fuentes vinculadas cuyo territorio del proyecto cambió desde que se vincularon — su compatibilidad podría ya no ser válida.`}
+          </p>
+          <ul className="text-xs text-black-eske dark:text-[#C7D6E0] space-y-1">
+            {fuentesTerritorioStale.map((r) => (
+              <li key={r.resultadoId} className="flex items-center justify-between gap-2">
+                <span>{r.metadatosFuente?.nombreHerramienta ?? r.resultadoId}</span>
+                <button
+                  type="button"
+                  onClick={() => onRevisarTerritorioFuente(r.resultadoId)}
+                  disabled={revisandoTerritorioResultadoId === r.resultadoId}
+                  className="shrink-0 text-xs font-medium text-orange-eske hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {revisandoTerritorioResultadoId === r.resultadoId ? "Revisando…" : "Revisar"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Veredicto fresco tras "Revisar" — se queda visible hasta que el
+          usuario lo cierra o navega; nunca alert()/confirm() nativo. */}
+      {ultimoVeredictoTerritorio && (
+        <div className="shrink-0 flex items-start justify-between gap-3 bg-bluegreen-eske/5 border border-bluegreen-eske/20 rounded-lg p-3">
+          <p className="text-xs text-black-eske dark:text-[#EAF2F8]">
+            <span className="font-medium">{ultimoVeredictoTerritorio.nombre}:</span>{" "}
+            {ultimoVeredictoTerritorio.match}
+          </p>
+          <button
+            type="button"
+            onClick={onCerrarVeredictoTerritorio}
+            aria-label="Cerrar"
+            className="shrink-0 text-black-eske-80 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white"
+          >
+            ✕
+          </button>
         </div>
       )}
 
