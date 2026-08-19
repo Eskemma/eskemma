@@ -66,13 +66,18 @@ import {
   resolverMunicipiosEstadoPobrezaExtrema,
   resolverMunicipiosEstadoRezagoSocial,
   resolverMunicipiosEstadoCarenciaSocial,
-  resolverEstadosPobreza,
-  resolverEstadosPobrezaExtrema,
-  resolverEstadosCarenciaSocial,
   resolverEstadosRezagoSocial,
   resolverNumeradorDenominadorMunicipios,
   FUENTE_ETIQUETA_CONEVAL_POBREZA,
 } from "@/lib/fontana/ingesta/coneval";
+import {
+  resolverPobrezaInegi,
+  resolverPobrezaExtremaInegi,
+  resolverCarenciaSocialInegi,
+  resolverEstadosPobrezaInegi,
+  resolverEstadosPobrezaExtremaInegi,
+  resolverEstadosCarenciaSocialInegi,
+} from "@/lib/fontana/ingesta/inegiPm";
 import {
   resolverIngresoCorrienteMunicipal,
   resolverMunicipiosEstadoIcmm,
@@ -146,6 +151,18 @@ function completarA4Celdas(celdas: CeldaFontana[]): CeldaFontana[] {
 // sin fórmula de recombinación válida) y F2-8 (Bienestar, diferido)
 // deliberadamente no pasan por aquí — mismo criterio que su propio
 // Nacional/Distrital-nacional.
+// Migración híbrida F2-1/F2-2/F2-14 a INEGI-PM 2024 (2026-08-18) — solo
+// Nacional/Estatal migran (INEGI-PM no publica Municipal en esta
+// edición); Municipal se conserva de CONEVAL 2020 tal cual, junto con
+// cualquier otra celda que `resolverPobreza`/etc. ya haya resuelto.
+function conNacionalEstatalInegiPm(
+  celdasConeval: CeldaFontana[],
+  nacionalInegi: CeldaFontana,
+  estatalInegi: CeldaFontana
+): CeldaFontana[] {
+  return [nacionalInegi, estatalInegi, ...celdasConeval.filter((c) => c.nivel !== "nacional" && c.nivel !== "estatal")];
+}
+
 async function conCeldaDistritalPropia(
   indicadorId: string,
   territorio: Territorio,
@@ -191,16 +208,28 @@ export async function resolverIndicadorFontana(
     return completarA4Celdas(await resolverBeneficiariosBecaBJ(territorio));
   }
   if (indicadorId === "F2-1") {
-    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverPobreza(territorio)));
+    const [celdasConeval, [nacional, estatal]] = await Promise.all([
+      resolverPobreza(territorio),
+      resolverPobrezaInegi(territorio),
+    ]);
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, conNacionalEstatalInegiPm(celdasConeval, nacional, estatal)));
   }
   if (indicadorId === "F2-2") {
-    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverPobrezaExtrema(territorio)));
+    const [celdasConeval, [nacional, estatal]] = await Promise.all([
+      resolverPobrezaExtrema(territorio),
+      resolverPobrezaExtremaInegi(territorio),
+    ]);
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, conNacionalEstatalInegiPm(celdasConeval, nacional, estatal)));
   }
   if (indicadorId === "F2-3") {
     return completarA4Celdas(await resolverRezagoSocial(territorio));
   }
   if (indicadorId === "F2-14") {
-    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverCarenciaSocial(territorio)));
+    const [celdasConeval, [nacional, estatal]] = await Promise.all([
+      resolverCarenciaSocial(territorio),
+      resolverCarenciaSocialInegi(territorio),
+    ]);
+    return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, conNacionalEstatalInegiPm(celdasConeval, nacional, estatal)));
   }
   if (indicadorId === "F2-18") {
     return completarA4Celdas(await conCeldaDistritalPropia(indicadorId, territorio, await resolverIngresoCorrienteMunicipal(territorio)));
@@ -331,16 +360,19 @@ export async function resolverDesgloseEstadosNacional(indicadorId: string): Prom
     return resolverEstadosProduccion();
   }
   if (indicadorId === "F2-1") {
-    return resolverEstadosPobreza();
+    // Migrado a INEGI-PM 2024 (2026-08-18) — igual que la celda Estatal
+    // principal, para que "Ver estados" no muestre 2020 mientras la
+    // celda que lo originó ya muestra 2024.
+    return resolverEstadosPobrezaInegi();
   }
   if (indicadorId === "F2-2") {
-    return resolverEstadosPobrezaExtrema();
+    return resolverEstadosPobrezaExtremaInegi();
   }
   if (indicadorId === "F2-3") {
     return resolverEstadosRezagoSocial();
   }
   if (indicadorId === "F2-14") {
-    return resolverEstadosCarenciaSocial();
+    return resolverEstadosCarenciaSocialInegi();
   }
   if (indicadorId === "F2-18") {
     return resolverEstadosIcmm();

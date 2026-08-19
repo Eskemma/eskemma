@@ -172,8 +172,17 @@ function BloqueAgregacionPlural({
   );
 }
 
+// F2-1/F2-2/F2-14 (2026-08-18) — migrados a INEGI-PM 2024 solo en
+// Nacional/Estatal (Municipal/Distrital se quedan en CONEVAL 2020) — ver
+// lib/fontana/ingesta/inegiPm.ts. El chip "fuente_mixta" avisa de esta
+// mezcla de años solo donde el valor mostrado es el más nuevo (2024);
+// Municipal/Distrital ya dicen 2020 en su propia fuenteEtiqueta, sin
+// necesidad del chip.
+const INDICADORES_FUENTE_MIXTA_INEGI_PM = new Set(["F2-1", "F2-2", "F2-14"]);
+
 function Celda({
   celda,
+  indicadorId,
   territorioNivel,
   onVerMunicipios,
   onVerDesgloseEstado,
@@ -182,6 +191,7 @@ function Celda({
   onVerAgregacionPlural,
 }: {
   celda: CeldaTablaFontana;
+  indicadorId: string;
   territorioNivel: NivelTerritorial;
   onVerMunicipios?: () => void;
   onVerDesgloseEstado: (tipoElemento: TipoElementoNacional) => void;
@@ -220,6 +230,9 @@ function Celda({
         </p>
         {celda.naturaleza && <NaturalezaBadge naturaleza={celda.naturaleza} />}
         {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">{celda.fuenteEtiqueta}</p>}
+        {(celda.nivel === "nacional" || celda.nivel === "estatal") && INDICADORES_FUENTE_MIXTA_INEGI_PM.has(indicadorId) && (
+          <CoberturaAdvertencia nivel="fuente_mixta" />
+        )}
         {celda.nivel === "distrital" && celda.coberturaPct !== undefined && celda.coberturaPct < UMBRAL_COBERTURA && celda.tipoDistritoPropio && (
           <CoberturaAdvertencia nivel="distrito" tipoDistrito={celda.tipoDistritoPropio} coberturaPct={celda.coberturaPct} />
         )}
@@ -328,6 +341,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                     </p>
                     <Celda
                       celda={celda}
+                      indicadorId={ind.id}
                       territorioNivel={territorioNivel}
                       onVerMunicipios={() => setModalConfig({ indicadorId: ind.id, scope: "distrito" })}
                       onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}
@@ -380,6 +394,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                       {celda ? (
                         <Celda
                           celda={celda}
+                          indicadorId={ind.id}
                           territorioNivel={territorioNivel}
                           onVerMunicipios={() => setModalConfig({ indicadorId: ind.id, scope: "distrito" })}
                           onVerDesgloseEstado={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "estado", tipoElemento })}

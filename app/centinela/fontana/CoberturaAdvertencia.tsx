@@ -42,7 +42,8 @@ import InfoTooltip from "@/app/components/ui/InfoTooltip";
 type Props =
   | { nivel: "distrito"; tipoDistrito: "federal" | "local"; coberturaPct: number }
   | { nivel: "municipio"; tipoDistrito: "federal" | "local" }
-  | { nivel: "municipio_propio"; tipoDistrito: "federal" | "local"; coberturaPct: number };
+  | { nivel: "municipio_propio"; tipoDistrito: "federal" | "local"; coberturaPct: number }
+  | { nivel: "fuente_mixta" };
 
 // 100 - pct, mismo decimal que pct (ej. 97.9 -> 2.1) — evita el error de
 // float directo (100 - 97.9 = 2.099999999999998 en JS).
@@ -55,14 +56,22 @@ const CHIP_CLASS =
   "text-[10px] text-black-eske-80 dark:text-[#9AAEBE] cursor-pointer";
 
 export default function CoberturaAdvertencia(props: Props) {
-  const etiqueta = props.nivel === "distrito" ? "Cobertura incompleta" : "Nota sobre cobertura";
+  const etiqueta =
+    props.nivel === "distrito" ? "Cobertura incompleta" : props.nivel === "fuente_mixta" ? "Nota sobre la fuente" : "Nota sobre cobertura";
   // Un proyecto Municipal puede tener ambas columnas (Federal y Local)
   // visibles a la vez (ej. Cuernavaca) — cada tooltip se identifica sin
-  // ambigüedad (cierre 2026-08-06).
-  const tipo = props.tipoDistrito;
+  // ambigüedad (cierre 2026-08-06). "fuente_mixta" no tiene distrito
+  // asociado (aplica a Nacional/Estatal), no necesita `tipo`.
+  const tipo = props.nivel === "fuente_mixta" ? null : props.tipoDistrito;
 
   const contenido =
-    props.nivel === "distrito" ? (
+    props.nivel === "fuente_mixta" ? (
+      <>
+        Este valor es de 2024 (INEGI). El desglose por municipio/distrito de este indicador usa datos de 2020
+        (CONEVAL) — INEGI todavía no publica pobreza multidimensional a nivel municipal en esta edición. Los 2
+        niveles no son directamente comparables entre sí.
+      </>
+    ) : props.nivel === "distrito" ? (
       <>
         El valor mostrado es la suma de las secciones censales 2020 que sí lograron vincularse a este distrito{" "}
         {tipo}. El <strong>{complemento(props.coberturaPct)}%</strong> restante no pudo asignarse porque la
