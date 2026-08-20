@@ -9,6 +9,7 @@
 // deshabilitadas (ver FontanaFamiliaTabs.tsx).
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { FamiliaFontanaId, FontanaSesion } from "@/types/fontana.types";
 import type { NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import FontanaComparativeTable, { type IndicadorFilaFontana } from "./FontanaComparativeTable";
@@ -17,6 +18,8 @@ import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/font
 import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import Button from "@/app/components/Button";
+import FontanaModduloButton from "./FontanaModduloButton";
+import FontanaCanal1Button from "./FontanaCanal1Button";
 
 interface Props {
   sesion: FontanaSesion;
@@ -56,6 +59,7 @@ const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> =
 };
 
 export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
+  const router = useRouter();
   const [familiaActiva, setFamiliaActiva] = useState<FamiliaFontanaId>("F1");
   const [indicadores, setIndicadores] = useState<IndicadorFilaFontana[] | null>(null);
   const [columnas, setColumnas] = useState<NivelTablaFontana[]>([]);
@@ -161,9 +165,19 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
             defecto (align-items:stretch de la fila en flex-col). Funciona
             igual con 1 o 2 botones (gap-2) cuando este bloque pase a
             "Vincular a proyecto" / "Iniciar nuevo proyecto". */}
-        <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start" title="Disponible próximamente">
-          <Button label="Regresar a Moddulo F3 con resultados" disabled className="px-5" />
-        </div>
+        {sesion.modduloProjectId && sesion.tareaPipIds.length > 0 ? (
+          <FontanaCanal1Button sesion={sesion} onSesionActualizada={onSesionActualizada} />
+        ) : sesion.modduloProjectId ? (
+          <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start">
+            <Button
+              label="Regresar a Moddulo F3"
+              onClick={() => router.push(`/moddulo/proyecto/${sesion.modduloProjectId}/investigacion`)}
+              className="px-5"
+            />
+          </div>
+        ) : (
+          <FontanaModduloButton sesion={sesion} />
+        )}
       </div>
 
       <FontanaFamiliaTabs
@@ -207,7 +221,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
         <p className="text-xs md:text-sm text-red-eske mb-3">{error}</p>
       )}
 
-      <h3 className="text-sm md:text-base font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
+      <h3 className="text-sm md:text-base font-semibold text-black-eske dark:text-[#EAF2F8] mb-2 max-sm:text-center">
         Tabla comparativa por nivel
       </h3>
       {cargando ? (

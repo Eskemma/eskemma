@@ -44,14 +44,29 @@
 // cifra ABSOLUTA en personas — no la usamos, Fontana siempre trabaja en
 // %; NoOfDecimals/Unit del JSON lo confirman por indicador).
 //
-// Concurrencia de "Ver estados" (32 llamadas HTTP, una por estado, sin
-// batch): medido en vivo 2026-08-18, 4 corridas de 32 en paralelo —
-// 128/128 exitosas (100%), latencia total 1.3s-7.4s por corrida (variable,
-// sin relación con volumen — mismo tipo de inestabilidad ya vista con un
-// 500 real de este servicio en la misma sesión). Promise.all sin límite
-// de concurrencia artificial, con manejo de error por estado individual
-// (uno que falle no tumba los otros 31) — mismo criterio que
-// resolverDesgloseMunicipiosNacional.
+// ⚠️ CRITERIO GENERAL — concurrencia de fuentes en vivo sin batch real
+// (fijado 2026-08-18, aplicar a cualquier fuente nueva de Familia 3+ con
+// el mismo perfil, sin tener que redescubrirlo): cuando una fuente
+// requiere N llamadas HTTP individuales para un desglose completo (no
+// trae los 32 estados/N unidades en una sola respuesta, como sí hacen
+// STPS/SIEL o los archivos Excel de ICMM/ENIGH), **no asumir que
+// `Promise.all` sin límite es seguro solo porque una primera medición
+// salió bien**. Primera medición aquí (`Promise.all` de 32, dentro del
+// mismo proceso node, con reuso de conexión TCP entre llamadas): 128/128
+// exitosas, 1.3s-7.4s — parecía seguro. Medición real bajo carga fría
+// (proceso NUEVO por corrida, sin reuso de conexión — la que de verdad
+// representa una petición de un usuario real): 2 de 3 corridas
+// superaron 10s, con hasta 6/32 fallos reales ("Error de conexión").
+// La medición optimista fue engañosa por el reuso de conexión, no por
+// el volumen de llamadas en sí.
+// Regla: medir SIEMPRE con proceso nuevo por corrida antes de dar por
+// bueno un diseño de concurrencia sin límite, y aplicar límite por
+// lotes (`TAMANO_LOTE_BISE` abajo, 8 aquí) si la evidencia real lo
+// amerita — no esperar a que el servicio real falle en producción para
+// descubrirlo. Con lotes de 8: 5/5 corridas bajo el mismo protocolo de
+// medición, 0.5s-2.7s, 0 fallos. Manejo de error por unidad individual
+// (uno que falle no tumba el resto) se mantiene sin importar el
+// límite de concurrencia — mismo criterio que resolverDesgloseMunicipiosNacional.
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";

@@ -27,6 +27,11 @@ interface VincularBody {
   cobertura?: CoberturaDeclarada;
   confirmarPeseATerritorio?: boolean;
   confirmarPeseAVigencia?: boolean;
+  // Pieza 2 del plan de escenarios (b)/(c) (2026-08-19) — presente solo
+  // cuando esta vinculación resuelve el banner de fontanaPendiente. Se
+  // limpia ese marcador aquí mismo, en la misma escritura, en vez de un
+  // 2° endpoint/llamada aparte desde el cliente.
+  fontanaSesionId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const {
     projectId, resultadoId, storagePath, nombre, tipo, metadatosFuente,
-    moduloPIP, cobertura, confirmarPeseATerritorio, confirmarPeseAVigencia,
+    moduloPIP, cobertura, confirmarPeseATerritorio, confirmarPeseAVigencia, fontanaSesionId,
   } = body;
   if (!projectId || !resultadoId || !storagePath || !nombre || !tipo || !metadatosFuente || !moduloPIP || !cobertura) {
     return NextResponse.json(
@@ -123,6 +128,13 @@ export async function POST(request: NextRequest) {
     .collection("f3Resultados")
     .doc(resultadoId)
     .set({ ...resultado, createdAt: FieldValue.serverTimestamp() });
+
+  if (fontanaSesionId && project.phases?.investigacion?.fontanaPendiente?.sesionId === fontanaSesionId) {
+    await adminDb.collection("moddulo_projects").doc(projectId).update({
+      "phases.investigacion.fontanaPendiente": FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
 
   return NextResponse.json({ resultadoId, resultado }, { status: 200 });
 }

@@ -151,8 +151,14 @@ export default function InfoTooltip({
           [
             "inline-flex items-center justify-center",
             "w-4 h-4 rounded-full text-[10px] font-bold leading-none",
-            "bg-bluegreen-eske/10 text-bluegreen-eske",
-            "hover:bg-bluegreen-eske/20 transition-colors",
+            // dark: agregado (2026-08-19) — sin variante propia, el ícono
+            // heredaba el mismo bluegreen-eske de modo claro y se perdía
+            // contra el fondo oscuro de las cards. Mismo par
+            // text-bluegreen-eske/dark:text-blue-eske-20 ya usado en todo
+            // Fontana (FontanaComparativeTable.tsx, FontanaOnboarding.tsx,
+            // TerritorySelector.tsx), no un color nuevo.
+            "bg-bluegreen-eske/10 text-bluegreen-eske dark:bg-blue-eske-20/10 dark:text-blue-eske-20",
+            "hover:bg-bluegreen-eske/20 dark:hover:bg-blue-eske-20/20 transition-colors",
             "focus:outline-none focus-visible:ring-2",
             "focus-visible:ring-bluegreen-eske focus-visible:ring-offset-1",
             "cursor-pointer shrink-0",
@@ -169,7 +175,14 @@ export default function InfoTooltip({
           role="tooltip"
           className={[
             "fixed z-50 w-64 sm:w-72",
-            "bg-white-eske dark:bg-[#18324A] border border-gray-eske-20 dark:border-white/10 rounded-lg shadow-lg",
+            // dark:bg-blue-eske-90 (2026-08-19, no #18324A) — ese tono es el
+            // mismo fondo de card/panel normal en dark mode en varios
+            // componentes de Fontana/PESTEL; el tooltip se confundía con
+            // "una sección más" en vez de leerse como mensaje emergente.
+            // blue-eske-90 (#004062) es un azul real del design system
+            // (app/globals.css), claramente distinto de los fondos oscuros
+            // ya usados — no un color inventado.
+            "bg-white-eske dark:bg-blue-eske-90 border border-gray-eske-20 dark:border-white/10 rounded-lg shadow-lg",
             "p-3 flex flex-col gap-1.5",
             "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95",
             "motion-safe:duration-100",

@@ -73,7 +73,11 @@ export async function extractTextPerFile(attachment: ChatAttachment): Promise<st
     return `[Archivo: ${attachment.nombre}]\n${result.value}`;
   }
 
-  if (mimeType.startsWith("text/") || mimeType === "text/csv") {
+  // application/json (2026-08-19) — bug real encontrado al diseñar Canal
+  // 1/3 de Fontana: sin esta rama, un .json subido caía directo a
+  // "[Archivo no soportado]" (mismo camino que un tipo genuinamente no
+  // soportado) — mismo tratamiento que text/*, el JSON ya es texto.
+  if (mimeType.startsWith("text/") || mimeType === "text/csv" || mimeType === "application/json") {
     return `[Archivo: ${attachment.nombre}]\n${buffer.toString("utf-8")}`;
   }
 

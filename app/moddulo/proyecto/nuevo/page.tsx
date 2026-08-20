@@ -18,6 +18,14 @@ function NuevoProyectoContent() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pieza 3 (2026-08-19) — Flujo 1 de Fontana ("Iniciar proyecto en
+  // Moddulo"): a diferencia de PESTEL, no hay type/name que prellenar (la
+  // sesión de Fontana no tiene noción de esos campos) — solo se necesita
+  // vincular el proyecto recién creado a la sesión, tras crearlo.
+  const [vinculandoFontana, setVinculandoFontana] = useState(false);
+  const [fontanaLinkError, setFontanaLinkError] = useState<string | null>(null);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<ProjectType | null>(null);
@@ -32,6 +40,10 @@ function NuevoProyectoContent() {
   const pestelProjectType = searchParams.get("pestelProjectType") as ProjectType | null;
   const pestAnalysisId = searchParams.get("pestAnalysisId");
   const fromPESTEL = searchParams.get("from") === "pestel" && !!pestelProjectId;
+
+  // Fontana integration (Pieza 3, Flujo 1) — query params
+  const fontanaSesionId = searchParams.get("fontanaSesionId");
+  const fromFontana = searchParams.get("from") === "fontana" && !!fontanaSesionId;
 
   // Pre-fill if coming from PESTEL
   useEffect(() => {
@@ -79,15 +91,54 @@ function NuevoProyectoContent() {
 
       if (fromPESTEL && pestAnalysisId) {
         router.push(`/moddulo/proyecto/${data.project.id}/exploracion?pest_analysis_id=${pestAnalysisId}`);
-      } else {
-        router.push(`/moddulo/proyecto/${data.project.id}/proposito`);
+        return;
       }
+
+      if (fromFontana) {
+        setCreatedProjectId(data.project.id);
+        await vincularFontana(data.project.id);
+        return;
+      }
+
+      router.push(`/moddulo/proyecto/${data.project.id}/proposito`);
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
       setIsCreating(false);
     }
   };
+
+  // Pieza 3 — el proyecto YA existe cuando esto se llama; un fallo aquí
+  // nunca lo pierde. Punto 2 (verificación en navegador, 2026-08-19) —
+  // corregido: un proyecto recién creado SIEMPRE nace en F1-Propósito
+  // (lib/moddulo/project.ts) — nunca se salta a F3 directo (eso dejaba
+  // el proyecto en un estado roto: "Sin HEI disponible", 0 tareas del
+  // PIP, porque F1/F2 nunca se completaron). El marcador fontanaPendiente
+  // ya quedó escrito en el proyecto por vincular-moddulo antes de
+  // redirigir — el banner de F3 lo detecta solo cuando el usuario
+  // complete F1/F2 y llegue ahí por el camino normal, sin depender de
+  // ningún query param en esta redirección.
+  async function vincularFontana(projectId: string) {
+    if (!fontanaSesionId) return;
+    setVinculandoFontana(true);
+    setFontanaLinkError(null);
+    try {
+      const res = await fetch(`/api/fontana/sesion/${fontanaSesionId}/vincular-moddulo`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ modduloProjectId: projectId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setFontanaLinkError(d.message ?? "El proyecto se creó, pero no se pudo vincular tu resultado de Fontana.");
+        return;
+      }
+      router.push(`/moddulo/proyecto/${projectId}/proposito`);
+    } catch {
+      setFontanaLinkError("El proyecto se creó, pero no se pudo vincular tu resultado de Fontana.");
+    } finally {
+      setVinculandoFontana(false);
+    }
+  }
 
   const STEP_LABELS = ["Nombre y tipo", "Territorio", "Confirmación"];
 
@@ -394,6 +445,29 @@ function NuevoProyectoContent() {
             {error && (
               <div className="mb-4 p-3 bg-red-eske/10 border border-red-eske/30 rounded-lg text-red-eske text-sm">
                 {error}
+              </div>
+            )}
+
+            {fontanaLinkError && createdProjectId && (
+              <div className="mb-4 p-3 bg-yellow-eske/10 border border-yellow-eske/30 rounded-lg text-sm text-black-eske dark:text-[#EAF2F8] space-y-2">
+                <p>{fontanaLinkError}</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => vincularFontana(createdProjectId)}
+                    disabled={vinculandoFontana}
+                    className="text-bluegreen-eske font-medium hover:underline disabled:opacity-50"
+                  >
+                    {vinculandoFontana ? "Reintentando…" : "Reintentar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/moddulo/proyecto/${createdProjectId}/proposito`)}
+                    className="text-gray-eske-60 dark:text-[#9AAEBE] hover:underline"
+                  >
+                    Continuar de todas formas
+                  </button>
+                </div>
               </div>
             )}
 

@@ -294,6 +294,17 @@ export interface PhaseState {
   // lib/moddulo/pipPropagation.ts (mismo patrón que xpctoSnapshotAtGeneration
   // para F1→F2, forma de dato distinta).
   pipSnapshotAtGeneration?: string;
+  // F3 — marcador ligero de un resultado de Fontana (sesión suelta, sin
+  // proyecto — Escenarios b/c) pendiente de vincular a Canal 3, escrito
+  // por POST /api/fontana/sesion/[sesionId]/vincular-moddulo (Flujo 1 al
+  // crear el proyecto, Flujo 2 al elegir uno existente — mismo endpoint,
+  // única fuente de escritura). Deliberadamente NO se reutiliza
+  // `linkedSource` (1-solo-valor por fase, pensado para F2/una sola
+  // fuente de exploración) — F3 es task-based, este marcador solo avisa
+  // "hay algo pendiente de vincular", el contenido real vive en
+  // fontana_sesiones/{sesionId} y se trae al abrir el formulario de
+  // vinculación (VincularFuenteForm), no aquí.
+  fontanaPendiente?: { sesionId: string; territorio: Territorio; fechaCreacion: string };
 }
 
 // ==========================================

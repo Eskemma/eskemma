@@ -8,6 +8,7 @@
 
 import type { Territorio } from "./shared.types";
 import type { ProjectType } from "./moddulo.types";
+import type { CeldaTablaFontana } from "@/lib/fontana/tablaColumnas";
 
 export type FamiliaFontanaId = "F1" | "F2" | "F3" | "F4" | "F5";
 
@@ -29,8 +30,18 @@ export interface SeleccionFamiliaFontana {
 export interface FontanaSesion {
   sesionId: string;
   uid: string;
-  modduloProjectId?: string; // presente solo en escenario (a)
-  tareaPipIds: string[];
+  // Presente en escenario (a) desde la creación; en Escenarios (b)/(c)
+  // se agrega DESPUÉS, vía vincular-moddulo (Flujo 1/2) — nunca implica
+  // por sí solo que haya un PIP de referencia (ver tareaPipIds, siempre
+  // vacío en b/c).
+  modduloProjectId?: string;
+  tareaPipIds: string[]; // vacío en Escenarios (b)/(c) — nunca hay PIP de origen
+  // Marca la última vez que esta sesión se entregó por Canal 1
+  // (Escenario a, tareaPipIds no vacío) — POST /api/moddulo/f3/canal1/entregar.
+  // Ligero a propósito, mismo criterio que fontanaPendiente en
+  // PhaseState (moddulo.types.ts): solo lo necesario para que la UI
+  // sepa "ya se entregó" sin leer la estructura interna de f3TareasPIP.
+  entregaCanal1?: { fecha: string; resultadoId: string };
   // Decide el set de columnas de la tabla comparativa (Documentación
   // Técnica §5.2): "electoral" → Nacional/Estatal/Distrital/Municipal;
   // los otros 3 tipos → Nacional/Estatal/Municipal/AGEB.
@@ -46,4 +57,19 @@ export interface FontanaSesion {
 
 export function familiaVacia(): SeleccionFamiliaFontana {
   return { minimos: [], seleccionUsuario: [] };
+}
+
+// Contenido del archivo .json que Fontana entrega a F3 — usado por AMBOS
+// Canal 1 (canal1/entregar) y Canal 3 (VincularFuenteForm, "Vincular
+// resultado externo") — un solo tipo, un solo criterio de qué incluye
+// (todo lo seleccionado en la sesión, CeldaTablaFontana completo sin
+// aplanar, ver Piezas 2/5 del plan de escenarios b/c). Nombre reservado
+// por el contrato de Canal 1 (types/f3.types.ts, APP_TO_F3_CONTRACTS.T10.payloadSchema).
+// Va SIEMPRE por Storage (nunca embebido en el documento de Firestore
+// de f3Resultados) — medido en vivo: un territorio plural amplio +
+// varios indicadores puede superar el límite de 1 MB por documento de
+// Firestore.
+export interface FontanaContextoTerritorial {
+  territorio: Territorio;
+  indicadores: { id: string; nombre: string; celdas: CeldaTablaFontana[] }[];
 }

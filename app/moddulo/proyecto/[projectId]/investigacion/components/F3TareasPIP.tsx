@@ -3,16 +3,16 @@
 // canal/estado/acción.
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { uploadMedia } from "@/firebase/storageUtils";
 import type { TareaPIP, AsignacionCanal, PIPItem, ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FamiliaMetodologica } from "@/types/f3.types";
-import type { EvaluacionCompatibilidad } from "@/types/shared.types";
 import { sugerirFamiliaMetodologica } from "@/lib/moddulo/sugerirFamiliaMetodologica";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import PillButton from "@/app/moddulo/components/PillButton";
-import TerritorySelector from "@/app/components/shared/TerritorySelector";
+import VincularFuenteForm from "./VincularFuenteForm";
+import { FieldLabel, FileSelectButton, inputClass } from "./F3FormHelpers";
 
 const ESTADO_LABELS: Record<AsignacionCanal["estado"], string> = {
   pendiente: "Pendiente",
@@ -47,16 +47,71 @@ interface Props {
   onCancelarConflicto: () => void;
   onRefresh: () => void;
   generando: boolean;
+  // Piezas 1/2 del plan de escenarios (b)/(c) (2026-08-19) — resultado de
+  // Fontana pendiente de vincular (escrito por vincular-moddulo). El
+  // banner solo se muestra si el proyecto lo trae; se limpia al confirmar
+  // la vinculación (PATCH de fontanaPendiente:null vía onDismissFontanaPendiente).
+  fontanaPendiente?: { sesionId: string; territorio: Territorio; fechaCreacion: string } | null;
+  onDismissFontanaPendiente?: () => void;
 }
 
 export default function F3TareasPIP({
   projectId, pip, tareas, projectType, projectTerritory, readOnly, onGenerar, conflictoRegenerar, onCancelarConflicto, onRefresh, generando,
+  fontanaPendiente, onDismissFontanaPendiente,
 }: Props) {
   const [expandedAsignacionId, setExpandedAsignacionId] = useState<string | null>(null);
+  // "externo" — id sintético reservado para el formulario fuera del loop de
+  // tareas (botón "Vincular resultado externo" y el banner de Fontana
+  // pendiente comparten este mismo slot, nunca 2 formularios abiertos a la
+  // vez con el resto de las asignaciones).
+  const externoAbierto = expandedAsignacionId === "externo";
+
+  // Pieza 2 (2026-08-19) — cabecera compartida por ambos returns: banner de
+  // Fontana pendiente (si lo hay) + botón "Vincular resultado externo",
+  // siempre visible/independiente de si M1 ya generó tareas o no — el
+  // backend de Canal 3 nunca exigió una asignación M1 para funcionar.
+  const cabeceraExterna = !readOnly && (
+    <div className="space-y-2">
+      {fontanaPendiente && !externoAbierto && (
+        <div className="flex items-center justify-between gap-2 bg-bluegreen-eske/5 dark:bg-blue-eske-20/10 border border-bluegreen-eske/20 dark:border-blue-eske-20/30 rounded-lg p-2.5">
+          <p className="text-xs lg:text-sm text-black-eske dark:text-[#EAF2F8]">
+            Tienes un resultado de Fontana pendiente de vincular a este proyecto
+            {fontanaPendiente.territorio.nombre ? ` (${fontanaPendiente.territorio.nombre})` : ""}.
+          </p>
+          <PillButton variant="solid" onClick={() => setExpandedAsignacionId("externo")} className="shrink-0 whitespace-nowrap">
+            Vincular ahora
+          </PillButton>
+        </div>
+      )}
+      {!externoAbierto ? (
+        <PillButton onClick={() => setExpandedAsignacionId("externo")} className="dark:border-blue-eske-20 dark:text-blue-eske-20">
+          Vincular resultado externo
+        </PillButton>
+      ) : (
+        <div className="rounded-md border border-gray-eske-20 dark:border-white/10 p-2">
+          <VincularFuenteForm
+            projectId={projectId}
+            moduloPIP={fontanaPendiente ? `Resultado de Fontana${fontanaPendiente.territorio.nombre ? ` — ${fontanaPendiente.territorio.nombre}` : ""}` : "Resultado externo"}
+            projectType={projectType}
+            projectTerritory={fontanaPendiente?.territorio ?? projectTerritory}
+            fontanaSesionId={fontanaPendiente?.sesionId}
+            onDone={() => {
+              setExpandedAsignacionId(null);
+              if (fontanaPendiente) onDismissFontanaPendiente?.();
+              onRefresh();
+            }}
+            onCancel={() => setExpandedAsignacionId(null)}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   if (tareas.length === 0) {
     return (
-      <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
+      <div className="space-y-3">
+        {cabeceraExterna}
+        <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
         {conflictoRegenerar ? (
           <div className="text-left bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3">
             <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-2">
@@ -93,12 +148,14 @@ export default function F3TareasPIP({
             )}
           </>
         )}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {cabeceraExterna}
       {tareas.map((tarea) => {
         const item = pip.find((p) => p.numero === tarea.numero);
         // Defensivo: proyectos con datos del esquema anterior a asignaciones[]
@@ -131,15 +188,56 @@ export default function F3TareasPIP({
                         columna deja libre para la derecha. */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-xs lg:text-sm bg-gray-eske-10 dark:bg-white/10 ${
+                        {/* La etiqueta ES el botón de acción (2026-08-19) —
+                            antes había un PillButton "Activar app"/"Cargar
+                            archivo"/"Vincular fuente externa" aparte, debajo.
+                            Mismo destino/acción que tenía ese botón, mismo
+                            gate de disponibilidad (!readOnly && no recibido)
+                            — sin ese gate, se queda como <span> plano (sin
+                            estilo de botón, nada que activar). */}
+                        {(() => {
+                          const clicable = !readOnly && asig.estado !== "recibido";
+                          const esLinkDirecto = asig.canal === "canal1" && asig.tecnicaId === "T10" && disponible;
+                          const baseClass = "px-2 py-0.5 rounded text-xs lg:text-sm bg-gray-eske-10 dark:bg-white/10";
                           // Nombres de app en negritas en modo claro (destacan
                           // sobre "Acción a realizar..."); en modo oscuro
                           // mismo peso y mismo color de texto que "Acción a
-                          // realizar" — no un tono de acento aparte.
-                          asig.canal === "canal1" && asig.tecnicaId ? "font-bold text-bluegreen-eske dark:font-medium dark:text-[#C5D8E8]" : "font-medium text-black-eske-80 dark:text-[#C5D8E8]"
-                        }`}>
-                          {asignacionEtiquetaCompleta(asig)}
-                        </span>
+                          // realizar" — no un tono de acento aparte. Cuando es
+                          // clicable, mismo azul ya usado por el PillButton
+                          // que reemplaza (bluegreen-eske-60/blue-eske-20),
+                          // sin importar el canal.
+                          const colorClass = clicable
+                            ? "font-bold text-bluegreen-eske-60 dark:text-blue-eske-20 cursor-pointer hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske focus-visible:ring-offset-1"
+                            : asig.canal === "canal1" && asig.tecnicaId
+                              ? "font-bold text-bluegreen-eske dark:font-medium dark:text-[#C5D8E8]"
+                              : "font-medium text-black-eske-80 dark:text-[#C5D8E8]";
+                          const etiqueta = asignacionEtiquetaCompleta(asig);
+                          if (!clicable) {
+                            return <span className={`${baseClass} ${colorClass}`}>{etiqueta}</span>;
+                          }
+                          if (esLinkDirecto) {
+                            // Único destino real de Canal 1 hoy — navega
+                            // directo, no alterna el panel expandido (no hay
+                            // nada que expandir: la acción ES la navegación).
+                            return (
+                              <Link
+                                href={`/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tarea.pipItemId}`}
+                                className={`${baseClass} ${colorClass}`}
+                              >
+                                {etiqueta}
+                              </Link>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedAsignacionId(expandedAsignacionId === asig.asignacionId ? null : asig.asignacionId)}
+                              className={`${baseClass} ${colorClass}`}
+                            >
+                              {etiqueta}
+                            </button>
+                          );
+                        })()}
                       </div>
                       {/* Responsivo en una sola estructura: en sm: y superior
                           el select queda a la izquierda del badge en la
@@ -185,28 +283,6 @@ export default function F3TareasPIP({
                     )}
                     <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1">{asig.justificacion}</p>
 
-                    {!readOnly && asig.estado !== "recibido" && (
-                      <div className="mt-2">
-                        {asig.canal === "canal1" && asig.tecnicaId === "T10" && disponible ? (
-                          // Único destino real de Canal 1 hoy — navega directo,
-                          // no alterna el panel expandido (no hay nada que
-                          // expandir: la acción ES la navegación).
-                          <Link href={`/centinela/fontana?moddulo_project_id=${projectId}&tarea_pip=${tarea.pipItemId}`}>
-                            <PillButton className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20">
-                              Activar app
-                            </PillButton>
-                          </Link>
-                        ) : (
-                          <PillButton
-                            onClick={() => setExpandedAsignacionId(expandedAsignacionId === asig.asignacionId ? null : asig.asignacionId)}
-                            className="text-[11px] lg:text-xs dark:border-blue-eske-20 dark:text-blue-eske-20"
-                          >
-                            {asig.canal === "canal1" ? "Activar app" : asig.canal === "canal2" ? "Cargar archivo" : "Vincular fuente externa"}
-                          </PillButton>
-                        )}
-                      </div>
-                    )}
-
                     {expandedAsignacionId === asig.asignacionId && !readOnly && (
                       <div className="mt-3 pt-3 border-t border-gray-eske-20 dark:border-white/10">
                         {asig.canal === "canal2" && (
@@ -245,31 +321,6 @@ export default function F3TareasPIP({
     </div>
   );
 }
-
-// Botón real de "Seleccionar archivo" — input oculto + botón estilizado que
-// lo dispara, muestra el nombre elegido. Mismo patrón que el clip de ModduloChat.
-function FileSelectButton({ file, onChange, label = "Seleccionar archivo" }: {
-  file: File | null; onChange: (f: File | null) => void; label?: string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div className="flex items-center gap-2">
-      <input ref={inputRef} type="file" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
-      <PillButton type="button" variant="solid" onClick={() => inputRef.current?.click()} className="text-xs lg:text-sm shrink-0">
-        {label}
-      </PillButton>
-      <span className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] truncate">
-        {file ? file.name : "Ningún archivo seleccionado"}
-      </span>
-    </div>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs lg:text-sm font-semibold text-black-eske-80 dark:text-[#C5D8E8] mb-1">{children}</label>;
-}
-
-const inputClass = "w-full text-xs lg:text-sm px-2 py-1.5 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230]";
 
 function CargaManualForm({ projectId, moduloPIP, onDone, onCancel }: {
   projectId: string; moduloPIP: string; onDone: () => void; onCancel: () => void;
@@ -394,221 +445,3 @@ function CargaManualForm({ projectId, moduloPIP, onDone, onCancel }: {
   );
 }
 
-// Canal 3 — mini-flujo de 2 pasos: paso 1 reutiliza TerritorySelector tal
-// cual fue diseñado (con su propia navegación Atrás/Continuar — no se
-// construye un selector nuevo), paso 2 trae el resto de los campos y el
-// flujo evaluar→confirmar advertencias→vincular contra /canal3/evaluar y
-// /canal3/vincular.
-function VincularFuenteForm({ projectId, moduloPIP, projectType, projectTerritory, onDone, onCancel }: {
-  projectId: string; moduloPIP: string; projectType: ProjectType; projectTerritory: Territorio | null; onDone: () => void; onCancel: () => void;
-}) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [territorio, setTerritorio] = useState<Territorio | null>(projectTerritory);
-
-  const [file, setFile] = useState<File | null>(null);
-  const [nombreHerramienta, setNombreHerramienta] = useState("");
-  const [fechaObtencion, setFechaObtencion] = useState("");
-  const [tipoProyectoDeclarado, setTipoProyectoDeclarado] = useState<ProjectType>(projectType);
-  const [metodoDeclarado, setMetodoDeclarado] = useState("");
-  const [familiaMetodologica, setFamiliaMetodologica] = useState<FamiliaMetodologica>("mixta");
-  const [familiaTocadaManualmente, setFamiliaTocadaManualmente] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [evaluando, setEvaluando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [compatibilidad, setCompatibilidad] = useState<EvaluacionCompatibilidad | null>(null);
-  const [confirmarTerritorio, setConfirmarTerritorio] = useState(false);
-  const [confirmarVigencia, setConfirmarVigencia] = useState(false);
-  const [archivoVinculado, setArchivoVinculado] = useState<string | null>(null);
-
-  function handleMetodoChange(value: string) {
-    setMetodoDeclarado(value);
-    if (!familiaTocadaManualmente) setFamiliaMetodologica(sugerirFamiliaMetodologica(value));
-  }
-
-  const metadatosFuente = territorio
-    ? { nombreHerramienta, territorioDeclarado: territorio, fechaObtencion, tipoProyectoDeclarado, metodoDeclarado, familiaMetodologica }
-    : null;
-
-  async function handleEvaluar() {
-    if (!metadatosFuente || !nombreHerramienta || !fechaObtencion || !metodoDeclarado) return;
-    setEvaluando(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/moddulo/f3/canal3/evaluar", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, metadatosFuente }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "No se pudo evaluar la compatibilidad");
-      setCompatibilidad(data.compatibilidad);
-      setConfirmarTerritorio(false);
-      setConfirmarVigencia(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
-    } finally {
-      setEvaluando(false);
-    }
-  }
-
-  const puedeVincular = !!compatibilidad
-    && compatibilidad.pertinencia.cumple
-    && (!compatibilidad.pertinencia.territorioRequiereConfirmacion || confirmarTerritorio)
-    && (compatibilidad.vigencia.cumple || confirmarVigencia);
-
-  async function handleVincular() {
-    if (!file || !metadatosFuente || !puedeVincular) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const ru = await fetch("/api/moddulo/f3/request-upload", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, formato: "documento", filename: file.name }),
-      });
-      const { resultadoId, storagePath } = await ru.json();
-      if (!ru.ok) throw new Error("No se pudo reservar la subida");
-
-      await uploadMedia(file, storagePath);
-
-      const res = await fetch("/api/moddulo/f3/canal3/vincular", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId, resultadoId, storagePath, nombre: file.name, tipo: file.type || "application/octet-stream",
-          metadatosFuente, moduloPIP, cobertura: { completa: true },
-          confirmarPeseATerritorio: confirmarTerritorio, confirmarPeseAVigencia: confirmarVigencia,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "No se pudo vincular la fuente");
-      setArchivoVinculado(file.name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (archivoVinculado) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs lg:text-sm text-green-eske font-medium">
-          ✓ Fuente vinculada: {archivoVinculado} — apruébala en M2 (Resultados Recibidos) para vincularla a esta tarea.
-        </p>
-        <PillButton variant="solid" onClick={onDone}>Cerrar</PillButton>
-      </div>
-    );
-  }
-
-  if (step === 1) {
-    return (
-      <TerritorySelector
-        territorio={territorio}
-        onChange={setTerritorio}
-        onNext={() => setStep(2)}
-        onBack={onCancel}
-        label="¿Qué territorio declara cubrir esta fuente/herramienta?"
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div>
-        <FieldLabel>Archivo</FieldLabel>
-        <FileSelectButton file={file} onChange={setFile} />
-      </div>
-      <div>
-        <FieldLabel>Nombre de la herramienta/estudio</FieldLabel>
-        <input value={nombreHerramienta} onChange={(e) => setNombreHerramienta(e.target.value)} className={inputClass} />
-      </div>
-      <div>
-        <FieldLabel>Fecha de obtención</FieldLabel>
-        <input type="date" onChange={(e) => setFechaObtencion(e.target.value ? new Date(e.target.value).toISOString() : "")} className={inputClass} />
-      </div>
-      <div>
-        <FieldLabel>Tipo de proyecto declarado</FieldLabel>
-        <select value={tipoProyectoDeclarado} onChange={(e) => setTipoProyectoDeclarado(e.target.value as ProjectType)} className={inputClass}>
-          <option value="electoral">Electoral</option>
-          <option value="gubernamental">Gubernamental</option>
-          <option value="legislativo">Legislativo</option>
-          <option value="ciudadano">Ciudadano</option>
-        </select>
-      </div>
-      <div>
-        <FieldLabel>Método declarado</FieldLabel>
-        <input
-          placeholder="Ej. Encuesta cara a cara, contratada con terceros"
-          value={metodoDeclarado}
-          onChange={(e) => handleMetodoChange(e.target.value)}
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <FieldLabel>Familia metodológica (sugerida, editable)</FieldLabel>
-        <select
-          value={familiaMetodologica}
-          onChange={(e) => { setFamiliaMetodologica(e.target.value as FamiliaMetodologica); setFamiliaTocadaManualmente(true); }}
-          className={inputClass}
-        >
-          <option value="cuantitativa">Cuantitativa</option>
-          <option value="cualitativa">Cualitativa</option>
-          <option value="documental">Documental</option>
-          <option value="mixta">Mixta</option>
-        </select>
-      </div>
-
-      {error && <p className="text-xs lg:text-sm text-yellow-eske-70">{error}</p>}
-
-      {!compatibilidad && (
-        <div className="flex gap-2">
-          <PillButton
-            variant="solid"
-            onClick={handleEvaluar}
-            disabled={evaluando || !nombreHerramienta || !fechaObtencion || !metodoDeclarado}
-          >
-            {evaluando ? "Evaluando…" : "Evaluar compatibilidad"}
-          </PillButton>
-          <PillButton onClick={onCancel} disabled={evaluando} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
-        </div>
-      )}
-
-      {compatibilidad && !compatibilidad.pertinencia.cumple && (
-        <div className="space-y-2">
-          <p className="text-xs lg:text-sm text-red-eske">{compatibilidad.pertinencia.detalle}</p>
-          <div className="flex gap-2">
-            <PillButton onClick={() => setCompatibilidad(null)} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Editar y reintentar</PillButton>
-            <PillButton onClick={onCancel} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
-          </div>
-        </div>
-      )}
-
-      {compatibilidad && compatibilidad.pertinencia.cumple && (
-        <div className="space-y-2 rounded-md border border-gray-eske-20 dark:border-white/10 p-2">
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.pertinencia.detalle}</p>
-          {compatibilidad.pertinencia.territorioRequiereConfirmacion && (
-            <label className="flex items-start gap-2 text-xs lg:text-sm text-yellow-eske-70">
-              <input type="checkbox" checked={confirmarTerritorio} onChange={(e) => setConfirmarTerritorio(e.target.checked)} className="mt-0.5" />
-              <span>{compatibilidad.pertinencia.territorioDetalle} Confirmo que es el mismo territorio pese a la diferencia.</span>
-            </label>
-          )}
-          {!compatibilidad.vigencia.cumple && (
-            <label className="flex items-start gap-2 text-xs lg:text-sm text-yellow-eske-70">
-              <input type="checkbox" checked={confirmarVigencia} onChange={(e) => setConfirmarVigencia(e.target.checked)} className="mt-0.5" />
-              <span>{compatibilidad.vigencia.detalle} Confirmo que quiero usar este dato pese a la fecha.</span>
-            </label>
-          )}
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.compatibilidadMetodologica.detalle}</p>
-
-          <div className="flex gap-2">
-            <PillButton variant="solid" onClick={handleVincular} disabled={loading || !file || !puedeVincular}>
-              {loading ? "Vinculando…" : "Vincular fuente"}
-            </PillButton>
-            <PillButton onClick={() => setCompatibilidad(null)} disabled={loading} className="dark:border-blue-eske-20 dark:text-blue-eske-20">
-              Volver a evaluar
-            </PillButton>
-            <PillButton onClick={onCancel} disabled={loading} className="dark:border-blue-eske-20 dark:text-blue-eske-20">Cancelar</PillButton>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

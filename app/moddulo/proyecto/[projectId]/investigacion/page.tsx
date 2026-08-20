@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PillButton from "@/app/moddulo/components/PillButton";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -34,6 +34,7 @@ interface ResultadoDoc {
 
 export default function InvestigacionPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const searchParams = useSearchParams();
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -71,6 +72,12 @@ export default function InvestigacionPage() {
   // igual momento y patrón visual que detectForwardStaleness en
   // exploracion/page.tsx (banner + confirmación explícita del usuario).
   const [pipStaleChanges, setPipStaleChanges] = useState<PipCambio[]>([]);
+  // Piezas 1/3 del plan de escenarios (b)/(c) (2026-08-19) — resultado de
+  // Fontana pendiente de vincular a este proyecto.
+  const [fontanaPendiente, setFontanaPendiente] = useState<
+    { sesionId: string; territorio: Territorio; fechaCreacion: string } | null
+  >(null);
+  const fontanaRetryDoneRef = useRef(false);
   const [sincronizandoPip, setSincronizandoPip] = useState(false);
   const [generandoSintesis, setGenerandoSintesis] = useState(false);
   const [generandoVeredicto, setGenerandoVeredicto] = useState(false);
@@ -114,6 +121,7 @@ export default function InvestigacionPage() {
 
       const f3 = p.phases?.investigacion;
       setTareas(f3?.f3TareasPIP ?? []);
+      setFontanaPendiente(f3?.fontanaPendiente ?? null);
       const staleDiffs = detectPipStaleness(p);
       setPipStaleChanges(staleDiffs ?? []);
       setSintesis(f3?.f3Sintesis);
@@ -129,6 +137,29 @@ export default function InvestigacionPage() {
 
   useEffect(() => { loadProject(); }, [loadProject]);
   useEffect(() => { if (!showLanding) loadResultados(); }, [showLanding, loadResultados]);
+
+  // Pieza 3 (2026-08-19) — red de seguridad: si el wizard de creación
+  // (Flujo 1) no logró confirmar vincular-moddulo antes de redirigir aquí,
+  // reintenta una sola vez en silencio con el sesionId que sí viaja en la
+  // URL — antes de decidir si mostrar el banner de fontanaPendiente.
+  useEffect(() => {
+    const fontanaSesionId = searchParams.get("fontana_sesion_id");
+    if (!isLoaded || !fontanaSesionId || fontanaPendiente || fontanaRetryDoneRef.current) return;
+    fontanaRetryDoneRef.current = true;
+    fetch(`/api/fontana/sesion/${fontanaSesionId}/vincular-moddulo`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ modduloProjectId: projectId }),
+    })
+      .then((r) => { if (r.ok) loadProject(); })
+      .catch(() => {});
+  }, [isLoaded, searchParams, fontanaPendiente, projectId, loadProject]);
+
+  // canal3/vincular ya limpia fontanaPendiente server-side (mismo write que
+  // crea el resultado) cuando recibe el fontanaSesionId correspondiente —
+  // esto solo refleja ese estado en la UI sin una 2ª llamada de red.
+  const handleDismissFontanaPendiente = useCallback(() => {
+    setFontanaPendiente(null);
+  }, []);
 
   // Controla el montaje de <ModduloChat> — su initialMessages solo se lee
   // UNA vez al montar (useState interno, no se resincroniza con props
@@ -329,6 +360,8 @@ export default function InvestigacionPage() {
     revisandoTerritorioResultadoId,
     ultimoVeredictoTerritorio,
     onCerrarVeredictoTerritorio: () => setUltimoVeredictoTerritorio(null),
+    fontanaPendiente,
+    onDismissFontanaPendiente: handleDismissFontanaPendiente,
   };
 
   return (

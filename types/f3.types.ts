@@ -98,7 +98,12 @@ export interface MetadatosCargaManual {
   // Sugerida por lib/moddulo/sugerirFamiliaMetodologica() a partir de
   // tecnicaDescrita, editable por el usuario — declarativa, no verificada.
   familiaMetodologica: FamiliaMetodologica;
-  formato: "documento" | "audio" | "video" | "imagen" | "texto";
+  // "datos" agregado 2026-08-19 — Canal 1/3 de Fontana suben un .json
+  // estructurado (FontanaContextoTerritorial), no un documento/texto en
+  // el sentido de "documento" (informe humano) o "texto" (transcripción
+  // libre) — aditivo, no cambia ningún caso existente (grep confirmado:
+  // ningún switch/if exhaustivo sobre este campo en el código).
+  formato: "documento" | "audio" | "video" | "imagen" | "texto" | "datos";
   viaAcademy?: boolean;
 }
 
@@ -125,6 +130,23 @@ export const FAMILIA_METODOLOGICA_POR_TECNICA: Record<TecnicaId, FamiliaMetodolo
   T29: "mixta", T30: "mixta", T31: "mixta", T32: "mixta",
   T33: "mixta", T34: "cuantitativa", T35: "mixta",
 };
+
+// ==========================================
+// CANAL 1 — ENTREGA DIRECTA DE APP (api-push)
+// ==========================================
+
+// Primera implementación real de Canal 1 (2026-08-19) — T10/Fontana es
+// la única técnica con APP_TO_F3_CONTRACTS poblado hoy. deliveryMechanism
+// "api-push": sin formulario de metadata (a diferencia de Canal 2/3, que
+// sí declaran fuente/método porque vienen de fuera del ecosistema) — la
+// propia app entrega lo que ya calculó. La aprobación M2 (`aprobado`,
+// heredado de ResultadoF3) SIGUE siendo un paso humano explícito, no se
+// salta por ser api-push — mismo principio de human-in-the-loop que el
+// resto del proyecto.
+export interface ResultadoCanal1<TPayload = { archivoUrl: string; extractoTexto?: string }>
+  extends ResultadoF3<TPayload> {
+  origen: OrigenTrazabilidad & { sourceKind: "T10"; componente: "centinela" };
+}
 
 // ==========================================
 // CANAL 3 — VINCULACIÓN DE FUENTE EXTERNA

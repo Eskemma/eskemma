@@ -274,7 +274,7 @@ function ProjectCard({
 
           {/* Meta row */}
           <div className="flex items-center gap-3 text-xs text-gray-eske-50 dark:text-[#9AAEBE] flex-wrap">
-            <span className="font-medium text-bluegreen-eske/80">
+            <span className="font-medium text-bluegreen-eske/80 dark:text-[#6BA4C6]">
               {PROJECT_TYPE_LABELS[project.type]}
             </span>
             <span aria-hidden="true">·</span>

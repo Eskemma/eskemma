@@ -114,6 +114,9 @@ interface Props {
   revisandoTerritorioResultadoId: string | null;
   ultimoVeredictoTerritorio: { nombre: string; match: string } | null;
   onCerrarVeredictoTerritorio: () => void;
+  // Piezas 1/2 del plan de escenarios (b)/(c) (2026-08-19).
+  fontanaPendiente?: { sesionId: string; territorio: Territorio; fechaCreacion: string } | null;
+  onDismissFontanaPendiente?: () => void;
 }
 
 export default function F3Tablero({
@@ -124,6 +127,7 @@ export default function F3Tablero({
   generandoTareas, generandoSintesis, generandoVeredicto, aprobandoVeredicto,
   onRevisarTerritorioFuente, revisandoTerritorioResultadoId,
   ultimoVeredictoTerritorio, onCerrarVeredictoTerritorio,
+  fontanaPendiente, onDismissFontanaPendiente,
 }: Props) {
   const [modalAbierto, setModalAbierto] = useState<"incertidumbres" | "semaforo" | null>(null);
   const incertidumbresF3 = incertidumbres.filter((i) => i.destino === "F3");
@@ -284,6 +288,8 @@ export default function F3Tablero({
           onCancelarConflicto={onCancelarConflicto}
           onRefresh={onRefresh}
           generando={generandoTareas}
+          fontanaPendiente={fontanaPendiente}
+          onDismissFontanaPendiente={onDismissFontanaPendiente}
         />
       </section>
 
