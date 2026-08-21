@@ -84,10 +84,14 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
     }
   }
 
+  // 2026-08-21 — antes, un match exacto de territorio vinculaba de
+  // inmediato con un solo clic, sin confirmación (causa real de una
+  // sesión vinculada por accidente). Ahora TODO caso pasa por el mismo
+  // paso de confirmación explícita, sin excepción — solo cambia el
+  // texto (match exacto: sin advertencia de territorio).
   function handleSelect(target: PickerProject) {
     setLinkError(null);
-    if (target.territoryMatch === "exact") doLink(target);
-    else setConfirmTarget(target);
+    setConfirmTarget(target);
   }
 
   return (
@@ -97,7 +101,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
     >
       <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between p-5 border-b border-gray-eske-20 dark:border-white/10 shrink-0">
-          <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] text-base">Vincular a proyecto existente</h3>
+          <h3 className="font-semibold text-bluegreen-eske dark:text-blue-eske-20 text-base">Vincular a proyecto existente</h3>
           <button
             type="button"
             onClick={onClose}
@@ -110,18 +114,31 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
           </button>
         </div>
 
+        {!confirmTarget && (
+          <p className="px-5 pt-4 text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            Elige el proyecto de Moddulo al que quieres vincular este resultado de Fontana.
+          </p>
+        )}
+
         {confirmTarget && (
           <div className="p-5 flex flex-col gap-4">
-            <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-yellow-eske-80 dark:text-yellow-eske/90">
-              <svg className="shrink-0 mt-0.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>
-                {confirmTarget.territoryMatch === "approximate"
-                  ? `El territorio de Fontana y "${confirmTarget.territorio?.nombre ?? "este proyecto"}" parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
-                  : `Fontana está explorando "${sesion.territorio.nombre}", pero el proyecto cubre "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}".`}
-              </span>
-            </div>
+            {confirmTarget.territoryMatch === "exact" ? (
+              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+                Vas a vincular esta exploración de Fontana al proyecto
+                {" "}<span className="font-semibold text-black-eske dark:text-[#EAF2F8]">"{confirmTarget.name}"</span>.
+              </p>
+            ) : (
+              <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-[#816000] dark:text-yellow-eske/90">
+                <svg className="shrink-0 mt-0.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <span>
+                  {confirmTarget.territoryMatch === "approximate"
+                    ? `El territorio de Fontana y "${confirmTarget.territorio?.nombre ?? "este proyecto"}" parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
+                    : `Fontana está explorando "${sesion.territorio.nombre}", pero el proyecto cubre "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}".`}
+                </span>
+              </div>
+            )}
             {linkError && <p className="text-sm text-red-eske">{linkError}</p>}
             <div className="flex items-center justify-end gap-3">
               <button
@@ -139,7 +156,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
                 className="px-4 py-2 text-sm font-medium bg-bluegreen-eske text-white rounded-lg hover:bg-bluegreen-eske-60 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {linking && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                Vincular de todas formas
+                {confirmTarget.territoryMatch === "exact" ? "Vincular" : "Vincular de todas formas"}
               </button>
             </div>
           </div>
@@ -154,13 +171,12 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
             )}
             {fetchError && <p className="text-sm text-red-eske text-center py-8">{fetchError}</p>}
             {!loading && !fetchError && projects.length === 0 && (
-              <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] text-center py-8">No tienes proyectos en Moddulo todavía.</p>
+              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] text-center py-8">No tienes proyectos en Moddulo todavía.</p>
             )}
             {linkError && (
               <div className="mx-2 mb-2 p-3 rounded-lg bg-red-eske/10 border border-red-eske/20 text-sm text-red-eske">{linkError}</div>
             )}
             {projects.map((p) => {
-              const showWarning = p.territoryMatch !== "exact";
               return (
                 <button
                   key={p.id}
@@ -170,11 +186,8 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
                   className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-start gap-3 ${linking ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-eske-10 dark:hover:bg-white/5 cursor-pointer"}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <span className="font-medium text-sm text-gray-eske-80 dark:text-[#C7D6E0] truncate">{p.name}</span>
-                      {showWarning && <span className="shrink-0 text-yellow-eske text-xs" aria-label="Diferencia de territorio">⚠</span>}
-                    </div>
-                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5 truncate">
+                    <span className="block font-medium text-sm text-black-eske dark:text-[#EAF2F8] truncate">{p.name}</span>
+                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 truncate">
                       {TIPO_LABELS[p.type] ?? p.type}
                       {p.territorio?.nombre ? ` · ${p.territorio.nombre}` : ""}
                     </p>
@@ -204,14 +217,14 @@ export default function FontanaModduloButton({ sesion }: { sesion: FontanaSesion
         <button
           type="button"
           onClick={() => router.push(`/moddulo/proyecto/nuevo?from=fontana&fontanaSesionId=${sesion.sesionId}`)}
-          className="px-5 py-2.5 bg-bluegreen-eske text-white rounded-lg text-sm font-semibold hover:bg-bluegreen-eske-60 transition-colors shadow-sm"
+          className="px-5 py-2.5 bg-white text-bluegreen-eske rounded-lg text-sm font-semibold hover:bg-white/90 transition-colors shadow-sm"
         >
           Iniciar proyecto en Moddulo
         </button>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="text-xs text-bluegreen-eske/70 hover:text-bluegreen-eske transition-colors underline underline-offset-2"
+          className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2"
         >
           Vincular a proyecto existente
         </button>

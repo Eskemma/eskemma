@@ -170,14 +170,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { modduloProjectId?: string; pipItemId?: string; territorio?: Territorio; tipoProyecto?: ProjectType };
+  let body: { modduloProjectId?: string; pipItemId?: string; territorio?: Territorio; tipoProyecto?: ProjectType; nombre?: string; color?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { modduloProjectId, pipItemId, territorio, tipoProyecto } = body;
+  const { modduloProjectId, pipItemId, territorio, tipoProyecto, nombre, color } = body;
 
   // Sesión suelta (Escenarios b/c) — sin modduloProjectId, territorio +
   // tipoProyecto elegidos por el usuario en TerritorySelector. Siempre
@@ -195,6 +195,11 @@ export async function POST(request: NextRequest) {
     const nuevaSesion: Omit<FontanaSesion, "sesionId"> = {
       uid: session.uid,
       tareaPipIds: [],
+      // nombre/color vienen del paso final del wizard (después de
+      // TerritorySelector) — el fallback server-side solo cubre un
+      // llamador directo a la API sin pasar por ese paso.
+      nombre: nombre?.trim() || (territorio.nombre ? `Exploración — ${territorio.nombre}` : "Exploración desde Fontana"),
+      color: color || "#248CC1",
       tipoProyecto,
       territorio,
       indicadoresPorFamilia: {

@@ -42,6 +42,21 @@ export interface FontanaSesion {
   // PhaseState (moddulo.types.ts): solo lo necesario para que la UI
   // sepa "ya se entregó" sin leer la estructura interna de f3TareasPIP.
   entregaCanal1?: { fecha: string; resultadoId: string };
+  // Solo relevante para sesiones sueltas (hub, Escenarios b/c) — sin esto,
+  // 2 sesiones del mismo territorio se verían idénticas en el hub salvo
+  // por fecha. Sugerido al crear ("Exploración — {territorio.nombre}"),
+  // 100% editable. Escenario (a) no lo necesita (nunca aparece en el
+  // hub) pero el campo es opcional, sin costo si queda sin usar ahí.
+  nombre?: string;
+  // Acento visual de la card en el hub (mismo patrón que
+  // ModduloProject.color / PESTELProject.color) — respaldo #248CC1
+  // (mismo acento ya usado para Fontana en el hub de Centinela) para
+  // sesiones creadas antes de este campo.
+  color?: string;
+  // Sesión suelta archivada — oculta por default de la lista principal
+  // del hub, mismo patrón que ModduloProject.status/PESTELProject.status
+  // (activo vs. archivado, nunca borrado). Solo aplica a sueltas.
+  archivada?: boolean;
   // Decide el set de columnas de la tabla comparativa (Documentación
   // Técnica §5.2): "electoral" → Nacional/Estatal/Distrital/Municipal;
   // los otros 3 tipos → Nacional/Estatal/Municipal/AGEB.

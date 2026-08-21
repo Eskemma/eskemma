@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import type { FontanaSesion } from "@/types/fontana.types";
 import { subirContextoTerritorial } from "@/lib/fontana/exportarContextoTerritorial";
 import type { FontanaContextoTerritorial } from "@/types/fontana.types";
-import Button from "@/app/components/Button";
 
 export default function FontanaCanal1Button({
   sesion, onSesionActualizada,
@@ -65,7 +64,14 @@ export default function FontanaCanal1Button({
   if (!sesion.entregaCanal1) {
     return (
       <div className="w-full flex flex-col items-center gap-1.5 sm:w-fit sm:items-end">
-        <Button label={entregando ? "Entregando…" : "Entregar a Moddulo F3"} onClick={handleEntregar} disabled={entregando} className="px-5" />
+        <button
+          type="button"
+          onClick={handleEntregar}
+          disabled={entregando}
+          className="px-5 py-2.5 bg-white text-bluegreen-eske rounded-lg text-sm font-semibold hover:bg-white/90 transition-colors shadow-sm disabled:opacity-60"
+        >
+          {entregando ? "Entregando…" : "Entregar a Moddulo F3"}
+        </button>
         {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
       </div>
     );
@@ -73,7 +79,7 @@ export default function FontanaCanal1Button({
 
   return (
     <div className="w-full flex flex-col items-center gap-1.5 sm:w-fit sm:items-end">
-      <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+      <p className="text-xs text-white/80">
         Entregado el {new Date(sesion.entregaCanal1.fecha).toLocaleDateString("es-MX")}
       </p>
       <div className="flex items-center gap-3">
@@ -81,15 +87,17 @@ export default function FontanaCanal1Button({
           type="button"
           onClick={handleEntregar}
           disabled={entregando}
-          className="text-xs text-bluegreen-eske/70 hover:text-bluegreen-eske transition-colors underline underline-offset-2 disabled:opacity-50"
+          className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2 disabled:opacity-50"
         >
           {entregando ? "Actualizando…" : "Actualizar entrega"}
         </button>
-        <Button
-          label="Regresar a Moddulo F3"
+        <button
+          type="button"
           onClick={() => router.push(`/moddulo/proyecto/${projectId}/investigacion`)}
-          className="px-4 py-2 text-xs"
-        />
+          className="px-4 py-2 border border-white/30 text-white text-xs rounded-lg hover:bg-white/10 transition-colors"
+        >
+          Regresar a Moddulo F3
+        </button>
       </div>
       {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
     </div>

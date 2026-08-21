@@ -7,6 +7,7 @@ import Link from "next/link";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
 import { PROJECT_TYPE_LABELS, PROJECT_TYPE_DESCRIPTIONS } from "@/types/moddulo.types";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
+import type { FontanaSesion } from "@/types/fontana.types";
 
 type Step = 1 | 2 | 3;
 
@@ -19,9 +20,11 @@ function NuevoProyectoContent() {
   const [error, setError] = useState<string | null>(null);
 
   // Pieza 3 (2026-08-19) — Flujo 1 de Fontana ("Iniciar proyecto en
-  // Moddulo"): a diferencia de PESTEL, no hay type/name que prellenar (la
-  // sesión de Fontana no tiene noción de esos campos) — solo se necesita
-  // vincular el proyecto recién creado a la sesión, tras crearlo.
+  // Moddulo"): vincula el proyecto recién creado a la sesión, tras
+  // crearlo. Punto 2b (2ª pasada, 2026-08-19) — a diferencia de la nota
+  // original de este comentario, SÍ se prellena name/type/territory
+  // (ver useEffect de fromFontana más abajo), leídos de la sesión real
+  // vía fetch — no de query params, a diferencia de fromPESTEL.
   const [vinculandoFontana, setVinculandoFontana] = useState(false);
   const [fontanaLinkError, setFontanaLinkError] = useState<string | null>(null);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
@@ -55,6 +58,32 @@ function NuevoProyectoContent() {
       }
     }
   }, [fromPESTEL, pestelProjectName, pestelProjectType]);
+
+  // Pre-fill si viene de Fontana (Flujo 1, Punto 2b — 2ª pasada,
+  // 2026-08-19) — a diferencia de PESTEL, la URL solo trae
+  // `fontanaSesionId` (sin territorio/tipo en query params, seria
+  // ensuciar la URL con un objeto Territorio completo) — se hace un
+  // fetch directo al endpoint YA EXISTENTE que ya usa la propia página
+  // de Fontana para cargar por sesion_id. Todo lo prellenado (nombre
+  // sugerido, tipo, territorio) queda 100% editable — nunca de solo
+  // lectura. Si el fetch falla, el wizard se ve exactamente como hoy
+  // (sin prellenar), sin mensaje de error intrusivo — no es crítico.
+  useEffect(() => {
+    if (!fromFontana || !fontanaSesionId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/fontana/sesion?sesion_id=${fontanaSesionId}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { sesion: FontanaSesion };
+        const sesion = data.sesion;
+        setName(sesion.territorio.nombre ? `Exploración — ${sesion.territorio.nombre}` : "Exploración desde Fontana");
+        setType(sesion.tipoProyecto);
+        setTerritory(sesion.territorio);
+      } catch {
+        // No bloquea el wizard — se ve vacío como hoy, sin prellenar.
+      }
+    })();
+  }, [fromFontana, fontanaSesionId]);
 
   const projectTypes: ProjectType[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];
   const canAdvanceStep1 = name.trim().length >= 3 && type !== null;

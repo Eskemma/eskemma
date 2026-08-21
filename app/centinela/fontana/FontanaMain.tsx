@@ -17,7 +17,6 @@ import FontanaFamiliaTabs from "./FontanaFamiliaTabs";
 import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
-import Button from "@/app/components/Button";
 import FontanaModduloButton from "./FontanaModduloButton";
 import FontanaCanal1Button from "./FontanaCanal1Button";
 
@@ -151,35 +150,53 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 md:py-10">
-      {/* Banda de contexto */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-lg md:text-xl font-semibold text-black-eske dark:text-[#EAF2F8]">Fontana</h1>
-          <p className="text-xs md:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
-            {sesion.territorio.nombre || [sesion.territorio.estado, sesion.territorio.municipio].filter(Boolean).join(" › ")}
-          </p>
-        </div>
-        {/* w-full flex justify-center en mobile: centra el/los botón(es) de
-            cierre de la fila en vez de dejarlos alineados a la izquierda por
-            defecto (align-items:stretch de la fila en flex-col). Funciona
-            igual con 1 o 2 botones (gap-2) cuando este bloque pase a
-            "Vincular a proyecto" / "Iniciar nuevo proyecto". */}
-        {sesion.modduloProjectId && sesion.tareaPipIds.length > 0 ? (
-          <FontanaCanal1Button sesion={sesion} onSesionActualizada={onSesionActualizada} />
-        ) : sesion.modduloProjectId ? (
-          <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start">
-            <Button
-              label="Regresar a Moddulo F3"
-              onClick={() => router.push(`/moddulo/proyecto/${sesion.modduloProjectId}/investigacion`)}
-              className="px-5"
-            />
+    <div>
+      {/* Header, mismo patrón visual que las páginas internas de PESTEL
+          (app/centinela/pestel/[projectId]/informes/page.tsx, etc.):
+          banner bg-bluegreen-eske de ancho completo, breadcrumb de
+          regreso al hub arriba a la izquierda, título + subtitilo,
+          acción(es) a la derecha. */}
+      <div className="bg-bluegreen-eske text-white px-6 py-5">
+        <div className="max-w-5xl mx-auto">
+          <button
+            type="button"
+            onClick={() => router.push("/centinela/fontana")}
+            className="text-sm text-white/70 hover:text-white mb-2 flex items-center gap-1 transition-colors"
+            aria-label="Volver a Fontana"
+          >
+            ← Fontana
+          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold">{sesion.nombre || "Fontana"}</h1>
+              <p className="text-white/80 text-sm mt-0.5">
+                {sesion.territorio.nombre || [sesion.territorio.estado, sesion.territorio.municipio].filter(Boolean).join(" › ")}
+              </p>
+            </div>
+            {/* w-full flex justify-center en mobile: centra el/los botón(es)
+                de cierre de la fila en vez de dejarlos alineados a la
+                izquierda por defecto (align-items:stretch de la fila en
+                flex-col). */}
+            {sesion.modduloProjectId && sesion.tareaPipIds.length > 0 ? (
+              <FontanaCanal1Button sesion={sesion} onSesionActualizada={onSesionActualizada} />
+            ) : sesion.modduloProjectId ? (
+              <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/moddulo/proyecto/${sesion.modduloProjectId}/investigacion`)}
+                  className="px-4 py-2 border border-white/30 text-white text-sm rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  Regresar a Moddulo F3
+                </button>
+              </div>
+            ) : (
+              <FontanaModduloButton sesion={sesion} />
+            )}
           </div>
-        ) : (
-          <FontanaModduloButton sesion={sesion} />
-        )}
+        </div>
       </div>
 
+      <div className="max-w-5xl mx-auto px-4 py-6 md:py-10">
       <FontanaFamiliaTabs
         familiaActiva={familiaActiva}
         conteos={conteosPorFamilia}
@@ -233,6 +250,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
       <div className="mt-6 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] flex items-center gap-1">
         <span>Los indicadores con candado son requeridos por el Programa de Investigación Profunda de tu proyecto.</span>
         <InfoTooltip content="Los indicadores mínimos no pueden eliminarse de la sesión — Fontana los identifica a partir de la pregunta de investigación asignada en tu proyecto." />
+      </div>
       </div>
     </div>
   );

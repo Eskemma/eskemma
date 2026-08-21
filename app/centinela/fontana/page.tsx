@@ -16,14 +16,15 @@ import { useSearchParams, useRouter } from "next/navigation";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FontanaSesion } from "@/types/fontana.types";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
+import { COLOR_SWATCHES } from "@/lib/fontana/colorSwatches";
 import FontanaOnboarding from "./FontanaOnboarding";
 import FontanaMain from "./FontanaMain";
-import FontanaSesionesHub from "./FontanaSesionesHub";
+import FontanaSesionesHub, { type SesionConProyecto } from "./FontanaSesionesHub";
 
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "standalone_inicio" }
-  | { tipo: "hub"; sesiones: FontanaSesion[] }
+  | { tipo: "hub"; sesiones: SesionConProyecto[] }
   | { tipo: "error"; mensaje: string }
   | {
       tipo: "wizard";
@@ -58,6 +59,11 @@ export default function FontanaPage() {
   const [territorioStandalone, setTerritorioStandalone] = useState<Territorio | null>(null);
   const [creandoStandalone, setCreandoStandalone] = useState(false);
   const [errorStandalone, setErrorStandalone] = useState<string | null>(null);
+  // Paso final (nombre + color), después de terminar el TerritorySelector
+  // — el nombre depende del territorio elegido, no puede ir antes.
+  const [territorioListo, setTerritorioListo] = useState(false);
+  const [nombreStandalone, setNombreStandalone] = useState("");
+  const [colorStandalone, setColorStandalone] = useState(COLOR_SWATCHES[1]);
 
   const cargar = useCallback(async () => {
     if (sesionIdParam) {
@@ -78,22 +84,22 @@ export default function FontanaPage() {
     }
 
     if (!modduloProjectId || !pipItemId) {
-      // Punto 1 (verificación en navegador, 2026-08-19) — antes de caer al
-      // formulario de arranque, revisa si el usuario ya tiene sesiones
-      // sueltas guardadas. Si no tiene ninguna, NUNCA se muestra una
-      // pantalla de lista vacía como paso intermedio — cae directo al
-      // formulario, comportamiento idéntico al de antes de esta pieza.
+      // Punto de entrada sin params: el hub SIEMPRE es el punto de
+      // llegada (mismo criterio que PESTEL/Moddulo — su propio hub
+      // siempre se muestra, con un empty-state cuando no hay nada que
+      // listar, nunca saltando directo al formulario de creación).
+      // Revisión tras verificación en navegador (2026-08-19, 4ª pasada):
+      // corrige la decisión anterior de saltar standalone_inicio cuando
+      // la lista viene vacía.
       try {
         const res = await fetch("/api/fontana/sesion/mias");
         if (res.ok) {
-          const data = (await res.json()) as { sesiones: FontanaSesion[] };
-          if (data.sesiones.length > 0) {
-            setEstado({ tipo: "hub", sesiones: data.sesiones });
-            return;
-          }
+          const data = (await res.json()) as { sesiones: SesionConProyecto[] };
+          setEstado({ tipo: "hub", sesiones: data.sesiones ?? [] });
+          return;
         }
       } catch {
-        // No bloquea el flujo — si falla la lista, se cae al formulario.
+        // Si falla la lista, se cae al formulario como red de seguridad.
       }
       setEstado({ tipo: "standalone_inicio" });
       return;
@@ -151,6 +157,16 @@ export default function FontanaPage() {
     }
   }
 
+  // Al llegar al paso de nombre/color, sugiere el nombre según el
+  // territorio elegido — solo una vez, no pisa lo que el usuario edite.
+  useEffect(() => {
+    if (territorioListo && territorioStandalone && !nombreStandalone) {
+      setNombreStandalone(
+        territorioStandalone.nombre ? `Exploración — ${territorioStandalone.nombre}` : "Exploración desde Fontana"
+      );
+    }
+  }, [territorioListo, territorioStandalone, nombreStandalone]);
+
   async function handleCrearStandalone() {
     if (!tipoStandalone || !territorioStandalone) return;
     setCreandoStandalone(true);
@@ -159,7 +175,10 @@ export default function FontanaPage() {
       const res = await fetch("/api/fontana/sesion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ territorio: territorioStandalone, tipoProyecto: tipoStandalone }),
+        body: JSON.stringify({
+          territorio: territorioStandalone, tipoProyecto: tipoStandalone,
+          nombre: nombreStandalone, color: colorStandalone,
+        }),
       });
       if (!res.ok) {
         const err = (await res.json()) as { error?: string };
@@ -218,19 +237,70 @@ export default function FontanaPage() {
               ))}
             </select>
           </div>
-          <TerritorySelector
-            territorio={territorioStandalone}
-            onChange={setTerritorioStandalone}
-            onBack={() => router.push("/centinela")}
-            onNext={handleCrearStandalone}
-            label="¿Cuál es el territorio a explorar?"
-          />
-          {!tipoStandalone && territorioStandalone && (
-            <p className="text-xs text-red-eske">Selecciona un tipo de proyecto para continuar.</p>
-          )}
-          {errorStandalone && <p className="text-sm text-red-eske">{errorStandalone}</p>}
-          {creandoStandalone && (
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Creando sesión…</p>
+          {!territorioListo ? (
+            <>
+              <TerritorySelector
+                territorio={territorioStandalone}
+                onChange={setTerritorioStandalone}
+                onBack={() => router.push("/centinela")}
+                onNext={() => setTerritorioListo(true)}
+                label="¿Cuál es el territorio a explorar?"
+              />
+              {!tipoStandalone && territorioStandalone && (
+                <p className="text-xs text-red-eske">Selecciona un tipo de proyecto para continuar.</p>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nombre-standalone" className="text-sm font-medium text-black-eske dark:text-[#C7D6E0]">
+                  Nombre de la exploración
+                </label>
+                <input
+                  id="nombre-standalone"
+                  type="text"
+                  value={nombreStandalone}
+                  onChange={(e) => setNombreStandalone(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-eske-30 dark:border-white/10 rounded-lg text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-medium text-black-eske dark:text-[#C7D6E0]">Color</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {COLOR_SWATCHES.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setColorStandalone(hex)}
+                      aria-label={`Color ${hex}`}
+                      className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                        colorStandalone === hex ? "border-black-eske dark:border-white-eske scale-110" : "border-transparent"
+                      }`}
+                      style={{ backgroundColor: hex }}
+                    />
+                  ))}
+                </div>
+              </div>
+              {errorStandalone && <p className="text-sm text-red-eske">{errorStandalone}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTerritorioListo(false)}
+                  disabled={creandoStandalone}
+                  className="px-4 py-2.5 border border-gray-eske-20 dark:border-white/10 text-black-eske-80 dark:text-[#C7D6E0] rounded-lg text-sm font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  ← Atrás
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCrearStandalone}
+                  disabled={creandoStandalone || !nombreStandalone.trim()}
+                  className="flex-1 px-4 py-2.5 bg-bluegreen-eske text-white rounded-lg text-sm font-medium hover:bg-bluegreen-eske-60 transition-colors disabled:opacity-50"
+                >
+                  {creandoStandalone ? "Creando…" : "Crear exploración"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </main>

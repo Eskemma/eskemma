@@ -89,7 +89,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  await sesionRef.update({ modduloProjectId });
+  // fechaUltimoGuardado se bumpea aquí también (Fix 3, hub — 2026-08-21)
+  // para que la card "Vinculadas" muestre la fecha real de vinculación,
+  // no la última vez que se guardó exploración libre.
+  await sesionRef.update({ modduloProjectId, fechaUltimoGuardado: new Date().toISOString() });
 
   return NextResponse.json({ modduloProjectId, currentPhase }, { status: 200 });
 }
