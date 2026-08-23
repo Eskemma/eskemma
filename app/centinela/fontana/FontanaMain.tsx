@@ -13,9 +13,12 @@ import { useRouter } from "next/navigation";
 import type { FamiliaFontanaId, FontanaSesion } from "@/types/fontana.types";
 import type { NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import FontanaComparativeTable, { type IndicadorFilaFontana } from "./FontanaComparativeTable";
+import FontanaF4Panel, { type IndicadorFilaF4 } from "./FontanaF4Panel";
 import FontanaFamiliaTabs from "./FontanaFamiliaTabs";
 import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA4_ORDEN, FAMILIA4_NOMBRES, FAMILIA4_DIFERIDOS, PAISES_REFERENCIA_F4, MEXICO_ISO3 } from "@/lib/fontana/familia4Catalogo";
+import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import FontanaModduloButton from "./FontanaModduloButton";
 import FontanaCanal1Button from "./FontanaCanal1Button";
@@ -55,6 +58,14 @@ const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> =
     descripcion: "Indicadores de pobreza, marginación, bienestar y acceso a servicios — fuentes oficiales (CONAPO, Bienestar, INEGI).",
     color: "#DB6015",
   },
+  F4: {
+    orden: FAMILIA4_ORDEN,
+    nombres: FAMILIA4_NOMBRES,
+    diferidos: FAMILIA4_DIFERIDOS,
+    titulo: "Familia 4 — Comparación internacional",
+    descripcion: "México frente a un set fijo de países de referencia de América Latina — Banco Mundial, CEPALSTAT, PNUD, RSF y Transparencia Internacional.",
+    color: "#248CC1",
+  },
 };
 
 export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
@@ -62,6 +73,11 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
   const [familiaActiva, setFamiliaActiva] = useState<FamiliaFontanaId>("F1");
   const [indicadores, setIndicadores] = useState<IndicadorFilaFontana[] | null>(null);
   const [columnas, setColumnas] = useState<NivelTablaFontana[]>([]);
+  // Familia 4 — shape de respuesta distinto (fila por país, no celdas por
+  // nivel geográfico), estado separado en vez de forzarlo en `indicadores`.
+  const [indicadoresF4, setIndicadoresF4] = useState<IndicadorFilaF4[] | null>(null);
+  const [paisesReferenciaF4, setPaisesReferenciaF4] = useState<{ iso3: string; nombre: string }[]>(PAISES_REFERENCIA_F4);
+  const [paisPrincipalF4, setPaisPrincipalF4] = useState<{ iso3: string; nombre: string }>({ iso3: MEXICO_ISO3, nombre: "México" });
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quitando, setQuitando] = useState<string | null>(null);
@@ -76,9 +92,20 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
     try {
       const res = await fetch(`/api/fontana/familia/${familiaActiva}?sesionId=${sesion.sesionId}`);
       if (!res.ok) throw new Error(`No se pudieron cargar los indicadores de ${catalogo.titulo}`);
-      const data = (await res.json()) as { indicadores: IndicadorFilaFontana[]; columnas: NivelTablaFontana[] };
-      setIndicadores(data.indicadores);
-      setColumnas(data.columnas);
+      if (familiaActiva === "F4") {
+        const data = (await res.json()) as {
+          indicadores: IndicadorFilaF4[];
+          paisPrincipal: { iso3: string; nombre: string };
+          paisesReferencia: { iso3: string; nombre: string }[];
+        };
+        setIndicadoresF4(data.indicadores);
+        setPaisPrincipalF4(data.paisPrincipal);
+        setPaisesReferenciaF4(data.paisesReferencia);
+      } else {
+        const data = (await res.json()) as { indicadores: IndicadorFilaFontana[]; columnas: NivelTablaFontana[] };
+        setIndicadores(data.indicadores);
+        setColumnas(data.columnas);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
     } finally {
@@ -141,6 +168,23 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
   // que FAMILIA1_DIFERIDOS nunca tuvo consumidor en este repo).
   const disponiblesParaAgregar = catalogo.orden.filter((id) => !idsEnSesion.has(id) && !catalogo.diferidos.has(id));
 
+  // Punto D, Ronda 6 (2026-08-22) — F1/F2/F3/F5 dependen exclusivamente
+  // de fuentes de México (INEGI/CONEVAL/CONAPO/SESNSP/SHCP/etc., 73 de 84
+  // indicadores del catálogo completo) — ninguna tiene cobertura de otro
+  // país. F4 nunca se deshabilita por país (es la familia comparativa,
+  // siempre disponible). Reusa isMexico() (lib/centinela/pestel/utils/country.ts),
+  // mismo criterio de respaldo ya establecido en el ecosistema para
+  // territorio.pais ausente — no se inventa un fallback distinto aquí.
+  const proyectoEsMexico = isMexico(sesion.territorio.pais);
+  const motivoDeshabilitadaPorFamilia: Partial<Record<FamiliaFontanaId, string>> = proyectoEsMexico
+    ? {}
+    : {
+        F1: "Esta familia solo cubre México — el proyecto está definido para otro país.",
+        F2: "Esta familia solo cubre México — el proyecto está definido para otro país.",
+        F3: "Esta familia solo cubre México — el proyecto está definido para otro país.",
+        F5: "Esta familia solo cubre México — el proyecto está definido para otro país.",
+      };
+
   const conteosPorFamilia: Record<FamiliaFontanaId, number> = {
     F1: new Set([...sesion.indicadoresPorFamilia.F1.minimos, ...sesion.indicadoresPorFamilia.F1.seleccionUsuario]).size,
     F2: new Set([...sesion.indicadoresPorFamilia.F2.minimos, ...sesion.indicadoresPorFamilia.F2.seleccionUsuario]).size,
@@ -200,6 +244,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
       <FontanaFamiliaTabs
         familiaActiva={familiaActiva}
         conteos={conteosPorFamilia}
+        motivoDeshabilitadaPorFamilia={motivoDeshabilitadaPorFamilia}
         onCambiar={setFamiliaActiva}
       />
 
@@ -239,10 +284,12 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
       )}
 
       <h3 className="text-sm md:text-base font-semibold text-black-eske dark:text-[#EAF2F8] mb-2 max-sm:text-center">
-        Tabla comparativa por nivel
+        {familiaActiva === "F4" ? "Comparación por país" : "Tabla comparativa por nivel"}
       </h3>
       {cargando ? (
         <p className="text-sm text-red-eske">Cargando indicadores…</p>
+      ) : familiaActiva === "F4" ? (
+        <FontanaF4Panel sesionId={sesion.sesionId} indicadores={indicadoresF4 ?? []} paisPrincipal={paisPrincipalF4} paisesReferencia={paisesReferenciaF4} onQuitar={handleQuitar} quitando={quitando} />
       ) : (
         <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} modduloProjectId={sesion.modduloProjectId} retornoUrl={retornoUrl} />
       )}

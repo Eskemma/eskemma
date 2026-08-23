@@ -49,6 +49,16 @@ export interface IndicadorRegistro {
   pestel: Array<"P" | "E" | "S" | "T" | "Ec" | "L">;
   fuenteSlug: string;
   fuenteEtiqueta?: string;
+  // Texto visible para el usuario final (tooltip (i) de la tabla y del
+  // modal "Ver resto de países") — convención de redacción fijada en
+  // Ronda 7 de Familia 4 (2026-08-22), auditada en las 52 entradas
+  // existentes en ese momento: punto y seguido en vez de guión largo
+  // (—), mayúscula al iniciar la siguiente oración, NUNCA jerga de
+  // implementación (sin referencias cruzadas a otros IDs de indicador
+  // tipo "F2-13" ni notas dirigidas al equipo tipo "ver notas"/"mismo
+  // criterio que..."/"polaridad invertida respecto a..."). Aplicar esta
+  // convención desde el primer borrador al escribir `definicion` de
+  // Familia 3/5, no como corrección posterior.
   definicion?: string;
   mecanismoAcceso:
     | "api_token"

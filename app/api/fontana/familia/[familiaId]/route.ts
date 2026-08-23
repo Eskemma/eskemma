@@ -27,6 +27,8 @@ import {
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { FAMILIA1_NOMBRES, FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_NOMBRES, FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA4_NOMBRES, FAMILIA4_ORDEN, PAISES_REFERENCIA_F4, resolverPaisPrincipal } from "@/lib/fontana/familia4Catalogo";
+import { resolverIndicadorComparativoF4 } from "@/lib/fontana/ingesta/familia4";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, getMunicipiosOptions, resolveMunicipioCve, getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
@@ -146,6 +148,37 @@ export async function GET(
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
   const { sesion } = cargada;
+
+  // Familia 4 (comparación internacional) — rama separada, ANTES del
+  // resto del handler: esa lógica (columnas, desgloses, columnas
+  // inversas, agregación plural) asume territorio mexicano de punta a
+  // punta (confirmado en la investigación de esta ronda) y Familia 4
+  // compara países, nunca niveles geográficos — forzarla ahí habría
+  // requerido reinterpretar cada pieza sin necesidad real. Shape de
+  // respuesta distinto a propósito (`fila` en vez de `celdas`), consumido
+  // por FontanaF4Panel.tsx, no por FontanaComparativeTable.tsx.
+  if (familiaId === "F4") {
+    const familiaF4 = sesion.indicadoresPorFamilia.F4;
+    const idsEnSesionF4 = new Set([...familiaF4.minimos, ...familiaF4.seleccionUsuario]);
+    const idsOrdenadosF4 = FAMILIA4_ORDEN.filter((id) => idsEnSesionF4.has(id));
+    const paisPrincipal = resolverPaisPrincipal(sesion.territorio);
+    const indicadoresF4 = await Promise.all(
+      idsOrdenadosF4.map(async (id) => {
+        const [registro, fila] = await Promise.all([
+          getIndicadorRegistro(id),
+          resolverIndicadorComparativoF4(id, paisPrincipal.iso3),
+        ]);
+        return {
+          id,
+          nombre: FAMILIA4_NOMBRES[id] ?? id,
+          definicion: registro?.definicion,
+          esMinimo: familiaF4.minimos.includes(id),
+          fila,
+        };
+      })
+    );
+    return NextResponse.json({ indicadores: indicadoresF4, paisPrincipal, paisesReferencia: PAISES_REFERENCIA_F4 });
+  }
 
   if (familiaId !== "F1" && familiaId !== "F2") {
     return NextResponse.json(

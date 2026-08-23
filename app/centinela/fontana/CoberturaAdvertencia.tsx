@@ -43,7 +43,13 @@ type Props =
   | { nivel: "distrito"; tipoDistrito: "federal" | "local"; coberturaPct: number }
   | { nivel: "municipio"; tipoDistrito: "federal" | "local" }
   | { nivel: "municipio_propio"; tipoDistrito: "federal" | "local"; coberturaPct: number }
-  | { nivel: "fuente_mixta" };
+  | { nivel: "fuente_mixta" }
+  // Familia 4 (F4-1/F4-5) — el FMI está bloqueado a nivel de
+  // infraestructura de red (Akamai "Access Denied", verificado
+  // 2026-08-21) — solo Banco Mundial disponible. Mismo patrón que
+  // "fuente_mixta" (chip + tooltip), condicionado por indicador en
+  // FontanaF4Panel.tsx.
+  | { nivel: "fmi_no_disponible" };
 
 // 100 - pct, mismo decimal que pct (ej. 97.9 -> 2.1) — evita el error de
 // float directo (100 - 97.9 = 2.099999999999998 en JS).
@@ -57,15 +63,24 @@ const CHIP_CLASS =
 
 export default function CoberturaAdvertencia(props: Props) {
   const etiqueta =
-    props.nivel === "distrito" ? "Cobertura incompleta" : props.nivel === "fuente_mixta" ? "Nota sobre la fuente" : "Nota sobre cobertura";
+    props.nivel === "distrito" ? "Cobertura incompleta"
+    : props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? "Nota sobre la fuente"
+    : "Nota sobre cobertura";
   // Un proyecto Municipal puede tener ambas columnas (Federal y Local)
   // visibles a la vez (ej. Cuernavaca) — cada tooltip se identifica sin
-  // ambigüedad (cierre 2026-08-06). "fuente_mixta" no tiene distrito
-  // asociado (aplica a Nacional/Estatal), no necesita `tipo`.
-  const tipo = props.nivel === "fuente_mixta" ? null : props.tipoDistrito;
+  // ambigüedad (cierre 2026-08-06). "fuente_mixta"/"fmi_no_disponible" no
+  // tienen distrito asociado (aplican a Nacional/Estatal o a Familia 4),
+  // no necesitan `tipo`.
+  const tipo = props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? null : props.tipoDistrito;
 
   const contenido =
-    props.nivel === "fuente_mixta" ? (
+    props.nivel === "fmi_no_disponible" ? (
+      <>
+        Solo Banco Mundial disponible — el FMI, fuente secundaria de este indicador, está bloqueado a nivel de
+        infraestructura de red desde el 26-08-21. Se pierde la comparación entre ambas fuentes y la distinción entre
+        datos históricos y proyecciones.
+      </>
+    ) : props.nivel === "fuente_mixta" ? (
       <>
         Este valor es de 2024 (INEGI). El desglose por municipio/distrito de este indicador usa datos de 2020
         (CONEVAL) — INEGI todavía no publica pobreza multidimensional a nivel municipal en esta edición. Los 2
