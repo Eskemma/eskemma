@@ -35,6 +35,7 @@ import { esValorDisponible } from "@/lib/fontana/ingesta/types";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
+import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import { resolverIndicadorIter } from "@/lib/fontana/ingesta/iter";
 import { resolverDensidad } from "@/lib/fontana/ingesta/compendio";
 import { resolverRazonDependencia } from "@/lib/fontana/ingesta/conapo";
@@ -44,6 +45,38 @@ import {
   resolverMunicipiosEstadoMarginacion,
   resolverEstadosMarginacion,
 } from "@/lib/fontana/ingesta/conapoMarginacion";
+// Familia 5 (Características territoriales) — Paso 3 de la
+// implementación consolidada, 2026-08-23.
+import { resolverClima } from "@/lib/fontana/ingesta/conagua";
+import { resolverActividadEconomica, resolverMunicipiosEstadoActividadEconomica } from "@/lib/fontana/ingesta/denue";
+import { resolverGacp, resolverMunicipiosEstadoGacp, resolverNumeradorDenominadorGacp } from "@/lib/fontana/ingesta/gacp";
+import { resolverZonasSun, detectarZonaMetropolitanaExacta } from "@/lib/fontana/ingesta/sun";
+import { detectarMetropolisFederalExacta } from "@/lib/fontana/ingesta/metropolisFederal";
+import {
+  resolverIncendiosForestales,
+  resolverSuperficieIncendiada,
+  resolverDeclaratoriasDesastre,
+  resolverAreaNaturalProtegida,
+  resolverPibMunicipal,
+  resolverPibTuristico,
+  resolverRezagoVivienda,
+  resolverCveOficialMunicipio,
+  resolverMunicipiosEstadoIncendios,
+  resolverMunicipiosEstadoSuperficieIncendiada,
+  resolverMunicipiosEstadoDeclaratorias,
+  resolverMunicipiosEstadoPib,
+  resolverMunicipiosEstadoPibTuristico,
+  resolverMunicipiosEstadoRezagoVivienda,
+} from "@/lib/fontana/ingesta/anvcc";
+import {
+  resolverHistoriaTerritorio,
+  resolverPersonajesCelebres,
+  resolverAtractivosTuristicos,
+  resolverProblematicasEcologicas,
+  resolverFactoresGeograficos,
+  resolverTradicionesCuradas,
+  resolverClimaCurado,
+} from "@/lib/fontana/ingesta/contenidoCurado";
 import {
   resolverBeneficiariosProduccion,
   resolverBeneficiariosBecaBJ,
@@ -124,6 +157,36 @@ import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto } from "@/lib/geo/
 
 const MOTIVO_NIVEL_NO_CUBIERTO_ITER_COMPENDIO_ETC =
   "Nivel no cubierto — mecanismo de agregación no disponible para esta fuente";
+
+// F5-7 (sun.ts) — a diferencia del resto de adaptadores, resolverZonasSun
+// recibe estadoCve+municipioCve OFICIAL (INEGI, vía CVE_LOC), no un
+// Territorio. Wrapper: resuelve estado/municipio del territorio y
+// traduce el nombre a cve oficial vía ANVCC (resolverCveOficialMunicipio,
+// mismo join por nombre — nunca por cve de Sefix/INE, mismo criterio del
+// Incidente 1/2). El prorateo por población multi-estado ya vive dentro
+// de resolverZonasSun.
+async function resolverIndicadorSun(territorio: Territorio): Promise<CeldaFontana[]> {
+  if (!territorio.estado) {
+    const motivo = "El proyecto no tiene un estado definido en su territorio";
+    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+  }
+  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  if (!estadoCve) {
+    const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
+    return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
+  }
+  const municipioNombre = territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local"
+    ? extraerCiudadCabecera(territorio.municipio ?? territorio.nombre) ?? undefined
+    : territorio.municipio;
+  if (!municipioNombre) {
+    return [{ nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" }];
+  }
+  const municipioCve = await resolverCveOficialMunicipio(estadoCve, municipioNombre);
+  if (!municipioCve) {
+    return [{ nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo del Sistema Urbano Nacional` }];
+  }
+  return resolverZonasSun(estadoCve, municipioCve);
+}
 
 // Los adaptadores fuera de ECEG (ITER, Compendio, Banxico, CONAPO) solo
 // resuelven estatal/municipal — Nacional/Distrital no tienen mecanismo
@@ -270,6 +333,65 @@ export async function resolverIndicadorFontana(
   if (indicadorId === "F2-9") {
     return completarA4Celdas(await resolverInformalidadLaboral(territorio));
   }
+  if (indicadorId === "F5-1") {
+    return completarA4Celdas(await resolverFactoresGeograficos(territorio));
+  }
+  if (indicadorId === "F5-2") {
+    // Cascada de 2 pasos (2026-08-24): CONAGUA (Opción A, dato real) tiene
+    // prioridad siempre — el curado solo se consulta cuando CONAGUA no
+    // tiene estación climatológica para el municipio (o el territorio es
+    // Estatal, donde resolverClima ni siquiera aplica).
+    const desdeConagua = await resolverClima(territorio);
+    if (desdeConagua.some(esValorDisponible)) {
+      return completarA4Celdas(desdeConagua);
+    }
+    return completarA4Celdas(await resolverClimaCurado(territorio));
+  }
+  if (indicadorId === "F5-3") {
+    return completarA4Celdas(await resolverHistoriaTerritorio(territorio));
+  }
+  if (indicadorId === "F5-4") {
+    return completarA4Celdas(await resolverPersonajesCelebres(territorio));
+  }
+  if (indicadorId === "F5-5") {
+    return completarA4Celdas(await resolverTradicionesCuradas(territorio));
+  }
+  if (indicadorId === "F5-9") {
+    return completarA4Celdas(await resolverAtractivosTuristicos(territorio));
+  }
+  if (indicadorId === "F5-10") {
+    return completarA4Celdas(await resolverProblematicasEcologicas(territorio));
+  }
+  if (indicadorId === "F5-6") {
+    return completarA4Celdas(await resolverActividadEconomica(territorio));
+  }
+  if (indicadorId === "F5-7") {
+    return completarA4Celdas(await resolverIndicadorSun(territorio));
+  }
+  if (indicadorId === "F5-8") {
+    return completarA4Celdas(await resolverGacp(territorio));
+  }
+  if (indicadorId === "F5-11") {
+    return completarA4Celdas(await resolverIncendiosForestales(territorio));
+  }
+  if (indicadorId === "F5-12") {
+    return completarA4Celdas(await resolverSuperficieIncendiada(territorio));
+  }
+  if (indicadorId === "F5-13") {
+    return completarA4Celdas(await resolverDeclaratoriasDesastre(territorio));
+  }
+  if (indicadorId === "F5-14") {
+    return completarA4Celdas(await resolverAreaNaturalProtegida(territorio));
+  }
+  if (indicadorId === "F5-15") {
+    return completarA4Celdas(await resolverPibMunicipal(territorio));
+  }
+  if (indicadorId === "F5-16") {
+    return completarA4Celdas(await resolverPibTuristico(territorio));
+  }
+  if (indicadorId === "F5-17") {
+    return completarA4Celdas(await resolverRezagoVivienda(territorio));
+  }
 
   // Ningún indicador real (F1 o F2 con conector) llega aquí hoy — esta
   // rama solo la ejercitan los 17 indicadores diferidos de Familia 2
@@ -339,6 +461,35 @@ export async function resolverDesgloseMunicipiosEstado(
   }
   if (indicadorId === "F2-19") {
     return resolverMunicipiosEstadoIdg(estadoCve, soloCves);
+  }
+  // Familia 5, Capa 2 (2026-08-24, F5-6 agregado 2026-08-25 — omisión
+  // real corregida, ver claves-geograficas-no-confiables.md/plan de
+  // Fontana) — los 7 indicadores "aditivo" de Modo A (F5-7 tiene su
+  // propio resolver especializado, no pasa por aquí; F5-14 es
+  // tasa_ponderada, F5-8 también, ambos con su propio mecanismo).
+  if (indicadorId === "F5-6") {
+    return resolverMunicipiosEstadoActividadEconomica(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-8") {
+    return resolverMunicipiosEstadoGacp(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-11") {
+    return resolverMunicipiosEstadoIncendios(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-12") {
+    return resolverMunicipiosEstadoSuperficieIncendiada(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-13") {
+    return resolverMunicipiosEstadoDeclaratorias(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-15") {
+    return resolverMunicipiosEstadoPib(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-16") {
+    return resolverMunicipiosEstadoPibTuristico(estadoCve, soloCves);
+  }
+  if (indicadorId === "F5-17") {
+    return resolverMunicipiosEstadoRezagoVivienda(estadoCve, soloCves);
   }
   return null;
 }
@@ -541,10 +692,10 @@ export async function resolverDesgloseMunicipiosNacional(
 // municipio. Limitación estructural ya reconocida en el resto del
 // sistema (mismo tipo de nota que buildDistritosMunicipiosData) —
 // documentada también en INDICATOR_REGISTRY.json.
-const INDICADORES_DISTRITAL_NACIONAL_PORCENTAJE: Record<string, "porMunicipioPobreza" | "porMunicipioPobrezaExtrema" | "porMunicipioCarencia"> = {
-  "F2-1": "porMunicipioPobreza",
-  "F2-2": "porMunicipioPobrezaExtrema",
-  "F2-14": "porMunicipioCarencia",
+const INDICADORES_DISTRITAL_NACIONAL_PORCENTAJE: Record<string, "porMunicipioPobrezaPorNombre" | "porMunicipioPobrezaExtremaPorNombre" | "porMunicipioCarenciaPorNombre"> = {
+  "F2-1": "porMunicipioPobrezaPorNombre",
+  "F2-2": "porMunicipioPobrezaExtremaPorNombre",
+  "F2-14": "porMunicipioCarenciaPorNombre",
 };
 
 async function calcularValorDistritoPonderado(
@@ -778,6 +929,14 @@ export interface ResultadoAgregacionPlural {
   valorAgregado: CeldaFontana | null;
   desglosePorUnidad: ElementoAgregacionPlural[];
   noResueltas: NoResueltaAgregacionPlural[];
+  // 2026-08-25 — chip de contexto para el mecanismo GENÉRICO de
+  // agregacionPlural (F5-6/F5-8/F5-11/12/13/15/16/17), solo poblado
+  // cuando la selección coincide EXACTAMENTE con una Ciudad/ZM real del
+  // catálogo SUN (mismo criterio que F5-7, ver detectarZonaMetropolitanaExacta
+  // en sun.ts). Ausente (no `null` explícito, simplemente no se agrega la
+  // clave) en cualquier otro caso — coincidencia parcial, superconjunto,
+  // o territorio sin ninguna Ciudad/ZM real.
+  zonaMetropolitanaDetectada?: { nombre: string; numMunicipios: number };
 }
 
 const SIN_CLASIFICAR_MOTIVO = "Este indicador aún no tiene definida su regla de agregación territorial";
@@ -833,10 +992,11 @@ async function agruparUnidadesPorEstado(
       const municipioCve = await resolveMunicipioCve(estadoCve, m.nombre).catch(() => null);
       if (!municipioCve) {
         const candidatos = await diagnosticarMunicipioNoResuelto(estadoCve, m.nombre).catch(() => []);
+        const nombresCandidatos = candidatos.map((c) => c.nombre);
         const motivo = candidatos.length > 1
-          ? `Nombre ambiguo — coincide con ${candidatos.length} municipios reales de ${m.estado}: ${candidatos.join(", ")}`
+          ? `Nombre ambiguo — coincide con ${candidatos.length} municipios reales de ${m.estado}: ${nombresCandidatos.join(", ")}`
           : `Municipio "${m.nombre}" no reconocido en el catálogo INEGI`;
-        noResueltas.push({ nombre: m.nombre, estado: m.estado, motivo, candidatos: candidatos.length > 1 ? candidatos : undefined });
+        noResueltas.push({ nombre: m.nombre, estado: m.estado, motivo, candidatos: candidatos.length > 1 ? nombresCandidatos : undefined });
         continue;
       }
       if (!porEstado.has(estadoCve)) porEstado.set(estadoCve, []);
@@ -953,6 +1113,35 @@ async function calcularTasaPonderada(
     };
   }
 
+  // F5-8 (GACP, 2026-08-25) — tercera rama, mismo patrón exacto que las 2
+  // anteriores. Reclasificado de `no_agregable` (nota mal copiada de
+  // F5-7) a `tasa_ponderada` real — CONEVAL publica numerador
+  // (población con GACP bajo/muy bajo) y denominador (población total
+  // 2020) por municipio en la misma hoja "Municipios" ya usada.
+  if (indicadorId === "F5-8" && tipoElemento === "municipios") {
+    let numerador = 0;
+    let denominador = 0;
+    let huboDatos = false;
+    for (const [estadoCve, cves] of porEstado) {
+      const datos = await resolverNumeradorDenominadorGacp(estadoCve, cves);
+      for (const d of datos.values()) {
+        numerador += d.numerador;
+        denominador += d.denominador;
+        huboDatos = true;
+      }
+    }
+    if (!huboDatos || denominador === 0) {
+      return { nivel: nivelCelda, motivo: "Sin datos suficientes para reconstruir el % combinado" };
+    }
+    return {
+      nivel: nivelCelda,
+      valor: Math.round((numerador / denominador) * 10000) / 100,
+      unidad: "% población con accesibilidad carretera baja o muy baja",
+      naturaleza: "estimacion_agregada",
+      fuenteEtiqueta: "CONEVAL, Grado de Accesibilidad a Carretera Pavimentada (GACP) 2020",
+    };
+  }
+
   return {
     nivel: nivelCelda,
     motivo: "Reconstrucción de valor combinado no disponible todavía para este indicador — la fuente no tiene un mecanismo de numerador/denominador confirmado en este incremento",
@@ -1056,5 +1245,25 @@ export async function resolverAgregacionPlural(
   }
   // no_agregable: valorAgregado queda null — solo desglose.
 
-  return { valorAgregado, desglosePorUnidad, noResueltas };
+  // Chip de contexto ZM (2026-08-25) — solo tiene sentido cuando hay un
+  // valor combinado real que etiquetar, y solo para municipios (el
+  // concepto de Ciudad/ZM no aplica a distritos electorales). Nunca
+  // rompe el cálculo si no hay match — es puramente informativo.
+  // 2 catálogos NACIONALES reconocidos (decisión de Raúl, 2026-08-25 —
+  // no se construye un catálogo de decretos estatales, 32 fuentes
+  // distintas, esfuerzo desproporcionado): SUN (Ciudades,
+  // detectarZonaMetropolitanaExacta, sun.ts) y el catálogo federal
+  // SEDATU/CONAPO/INEGI "Metrópolis de México 2020"
+  // (detectarMetropolisFederalExacta, metropolisFederal.ts). Prioridad
+  // acordada: si ambos coinciden con la misma selección, se muestra el
+  // federal (estándar censal más reconocible en el uso común de "zona
+  // metropolitana"); si solo uno coincide, ese se muestra.
+  let zonaMetropolitanaDetectada: { nombre: string; numMunicipios: number } | undefined;
+  if (tipoElemento === "municipios" && valorAgregado && esValorDisponible(valorAgregado)) {
+    const unidades = desglosePorUnidad.map((e) => ({ estadoCve: e.estado, nombre: e.nombre }));
+    const federal = await detectarMetropolisFederalExacta(unidades);
+    zonaMetropolitanaDetectada = federal ?? (await detectarZonaMetropolitanaExacta(unidades)) ?? undefined;
+  }
+
+  return { valorAgregado, desglosePorUnidad, noResueltas, zonaMetropolitanaDetectada };
 }

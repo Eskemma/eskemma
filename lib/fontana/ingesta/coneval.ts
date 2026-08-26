@@ -56,7 +56,7 @@
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { resolveMunicipioCve, normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -97,24 +97,44 @@ type ParPorcentajePersonas = { porcentaje: number; personas: number };
 
 interface CachePobreza {
   porEstadoPobreza: Map<string, ParPorcentajePersonas>;
-  porMunicipioPobreza: Map<string, ParPorcentajePersonas>;
   porEstadoPobrezaExtrema: Map<string, ParPorcentajePersonas>;
-  porMunicipioPobrezaExtrema: Map<string, ParPorcentajePersonas>;
   porEstadoCarencia: Map<string, ParPorcentajePersonas>;
-  porMunicipioCarencia: Map<string, ParPorcentajePersonas>;
   poblacionPorEstado: Map<string, number>; // Población 2020 (CONEVAL, MCS-ENIGH) — solo para agregar Nacional
-  // Población 2020 por municipio (CONEVAL, MCS-ENIGH) — agregada
-  // 2026-08-09 para reconstruir numerador/denominador real al calcular
-  // Distrital Federal/Local a escala Nacional (nunca promediar el %
-  // ya calculado entre municipios, mismo criterio que Nacional).
-  poblacionPorMunicipio: Map<string, number>;
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE, no por
+  // CVE_MUN, mismo patrón ya aprobado y en producción en icmm.ts (ver
+  // nota de cabecera de ese archivo). resolveMunicipioCve() (numeración
+  // INE de lib/geo/municipios.ts) diverge del CVE_MUN oficial de CONEVAL
+  // en ~55-63% de los municipios — cruzar por CVE producía el valor de
+  // OTRO municipio sin ningún error visible (confirmado con evidencia
+  // real, Guadalajara/El Grullo). Clave: `${cveEnt}|${normalizeGeoName(nombreConevalPropio)}`.
+  porMunicipioPobrezaPorNombre: Map<string, ParPorcentajePersonas>;
+  porMunicipioPobrezaExtremaPorNombre: Map<string, ParPorcentajePersonas>;
+  porMunicipioCarenciaPorNombre: Map<string, ParPorcentajePersonas>;
+  // Población 2020 por municipio (CONEVAL, MCS-ENIGH), por nombre — para
+  // reconstruir numerador/denominador real al calcular Distrital
+  // Federal/Local a escala Nacional (nunca promediar el % ya calculado
+  // entre municipios, mismo criterio que Nacional).
+  poblacionPorMunicipioPorNombre: Map<string, number>;
   ts: number;
 }
 
 interface CacheRezagoSocial {
   porEstado: Map<string, number>;
-  porMunicipio: Map<string, number>;
+  // FIX DE FONDO (Paso 4, 2026-08-23) — mismo criterio de join por
+  // nombre que CachePobreza arriba.
+  porMunicipioPorNombre: Map<string, number>;
   ts: number;
+}
+
+// Clave compartida por los 2 loaders de este archivo (Pobreza/IRS) — cada
+// uno usa el nombre de municipio TAL COMO lo publica CONEVAL en su propio
+// archivo, nunca el nombre/cve de un catálogo externo.
+// FIX DE FONDO (Incidente 2, 2026-08-23) — claveCanonicaMunicipio()
+// aplica la tabla de alias central (lib/geo/municipios.ts) antes de
+// normalizar, en vez de normalizeGeoName() a secas — ver nota de
+// cabecera de ese archivo.
+function claveMunicipioPorNombre(estadoCve: string, nombre: string): string {
+  return `${estadoCve}|${claveCanonicaMunicipio(estadoCve, nombre)}`;
 }
 
 let cachePobreza: CachePobreza | null = null;
@@ -163,30 +183,39 @@ async function cargarPobreza(): Promise<CachePobreza> {
       if (carencia) porEstadoCarencia.set(cveEnt, carencia);
     }
 
-    const porMunicipioPobreza = new Map<string, ParPorcentajePersonas>();
-    const porMunicipioPobrezaExtrema = new Map<string, ParPorcentajePersonas>();
-    const porMunicipioCarencia = new Map<string, ParPorcentajePersonas>();
-    const poblacionPorMunicipio = new Map<string, number>();
+    // Join por NOMBRE (Paso 4, ver nota de cabecera de CachePobreza) — el
+    // nombre de municipio (fila[4]) es el propio de CONEVAL, "Concentrado
+    // municipal", columnas confirmadas en vivo 2026-08-23:
+    // [1]=cve_ent, [2]=nom_ent, [3]=cve_mun(5díg, solo para validar la
+    // fila), [4]=nombre_municipio.
+    const porMunicipioPobrezaPorNombre = new Map<string, ParPorcentajePersonas>();
+    const porMunicipioPobrezaExtremaPorNombre = new Map<string, ParPorcentajePersonas>();
+    const porMunicipioCarenciaPorNombre = new Map<string, ParPorcentajePersonas>();
+    const poblacionPorMunicipioPorNombre = new Map<string, number>();
     const wsMunicipal = wb.Sheets["Concentrado municipal"];
     const filasMunicipal = XLSX.utils.sheet_to_json<unknown[]>(wsMunicipal, { header: 1, defval: null });
     for (const fila of filasMunicipal) {
       const cveMun = fila[3];
+      const cveEnt = fila[1];
+      const nombreMun = fila[4];
       if (typeof cveMun !== "string" || !/^\d{5}$/.test(cveMun)) continue;
+      if (typeof cveEnt !== "string" || typeof nombreMun !== "string") continue;
+      const clave = claveMunicipioPorNombre(cveEnt, nombreMun);
       const poblacion2020 = fila[7];
-      if (typeof poblacion2020 === "number") poblacionPorMunicipio.set(cveMun, poblacion2020);
+      if (typeof poblacion2020 === "number") poblacionPorMunicipioPorNombre.set(clave, poblacion2020);
       const pobreza = extraerParGrupo(fila, GRUPOS_MUNICIPAL.pobreza);
-      if (pobreza) porMunicipioPobreza.set(cveMun, pobreza);
+      if (pobreza) porMunicipioPobrezaPorNombre.set(clave, pobreza);
       const pobrezaExtrema = extraerParGrupo(fila, GRUPOS_MUNICIPAL.pobrezaExtrema);
-      if (pobrezaExtrema) porMunicipioPobrezaExtrema.set(cveMun, pobrezaExtrema);
+      if (pobrezaExtrema) porMunicipioPobrezaExtremaPorNombre.set(clave, pobrezaExtrema);
       const carencia = extraerParGrupo(fila, GRUPOS_MUNICIPAL.carencia);
-      if (carencia) porMunicipioCarencia.set(cveMun, carencia);
+      if (carencia) porMunicipioCarenciaPorNombre.set(clave, carencia);
     }
 
     const resultado: CachePobreza = {
-      porEstadoPobreza, porMunicipioPobreza,
-      porEstadoPobrezaExtrema, porMunicipioPobrezaExtrema,
-      porEstadoCarencia, porMunicipioCarencia,
-      poblacionPorEstado, poblacionPorMunicipio,
+      porEstadoPobreza, porEstadoPobrezaExtrema, porEstadoCarencia,
+      poblacionPorEstado,
+      porMunicipioPobrezaPorNombre, porMunicipioPobrezaExtremaPorNombre, porMunicipioCarenciaPorNombre,
+      poblacionPorMunicipioPorNombre,
       ts: Date.now(),
     };
     cachePobreza = resultado;
@@ -217,17 +246,23 @@ async function cargarRezagoSocial(): Promise<CacheRezagoSocial> {
       if (typeof indice === "number") porEstado.set(cveEnt, indice);
     }
 
-    const porMunicipio = new Map<string, number>();
+    // Join por NOMBRE (Paso 4) — hoja "Municipios" del IRS, columnas
+    // confirmadas en vivo 2026-08-23: [0]=cve_ent, [1]=nom_ent,
+    // [2]=cve_mun(5díg, solo para validar la fila), [3]=nombre_municipio.
+    const porMunicipioPorNombre = new Map<string, number>();
     const wsMunicipios = wb.Sheets["Municipios"];
     const filasMunicipios = XLSX.utils.sheet_to_json<unknown[]>(wsMunicipios, { header: 1, defval: null });
     for (const fila of filasMunicipios) {
       const cveMun = fila[2];
+      const cveEnt = fila[0];
+      const nombreMun = fila[3];
       if (typeof cveMun !== "string" || !/^\d{5}$/.test(cveMun)) continue;
+      if (typeof cveEnt !== "string" || typeof nombreMun !== "string") continue;
       const indice = fila[16]; // "Índice de rezago social"
-      if (typeof indice === "number") porMunicipio.set(cveMun, indice);
+      if (typeof indice === "number") porMunicipioPorNombre.set(claveMunicipioPorNombre(cveEnt, nombreMun), indice);
     }
 
-    const resultado: CacheRezagoSocial = { porEstado, porMunicipio, ts: Date.now() };
+    const resultado: CacheRezagoSocial = { porEstado, porMunicipioPorNombre, ts: Date.now() };
     cacheRezagoSocial = resultado;
     return resultado;
   })();
@@ -276,7 +311,7 @@ function calcularNacionalPobreza(
 async function resolverCeldasPobreza(
   territorio: Territorio,
   campo: "porEstadoPobreza" | "porEstadoPobrezaExtrema" | "porEstadoCarencia",
-  campoMunicipal: "porMunicipioPobreza" | "porMunicipioPobrezaExtrema" | "porMunicipioCarencia"
+  campoMunicipal: "porMunicipioPobrezaPorNombre" | "porMunicipioPobrezaExtremaPorNombre" | "porMunicipioCarenciaPorNombre"
 ): Promise<CeldaFontana[]> {
   let datos: CachePobreza;
   try {
@@ -309,35 +344,33 @@ async function resolverCeldasPobreza(
     ? { nivel: "estatal", valor: Math.round(parEstado.porcentaje * 100) / 100, unidad: "%", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_POBREZA }
     : { nivel: "estatal", motivo: "CONEVAL no reportó este indicador para este territorio" };
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE, no
+  // por CVE_MUN (ver nota de cabecera de CachePobreza). resolveMunicipioCve
+  // ya no se usa como mecanismo de cruce contra este archivo.
   const municipioNombre = resolverNombreMunicipio(territorio);
   let municipal: CeldaFontana;
   if (!municipioNombre) {
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" };
   } else {
-    const municipioCve = await resolveMunicipioCve(estadoCve, municipioNombre);
-    if (!municipioCve) {
-      municipal = { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo INEGI` };
-    } else {
-      const parMunicipio = datos[campoMunicipal].get(`${estadoCve}${municipioCve}`);
-      municipal = parMunicipio
-        ? { nivel: "municipal", valor: Math.round(parMunicipio.porcentaje * 100) / 100, unidad: "%", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_POBREZA }
-        : { nivel: "municipal", motivo: "CONEVAL no reportó este indicador para este territorio" };
-    }
+    const par = datos[campoMunicipal].get(claveMunicipioPorNombre(estadoCve, municipioNombre));
+    municipal = par
+      ? { nivel: "municipal", valor: Math.round(par.porcentaje * 100) / 100, unidad: "%", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_POBREZA }
+      : { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo de CONEVAL` };
   }
 
   return [nacional, estatal, municipal];
 }
 
 export async function resolverPobreza(territorio: Territorio): Promise<CeldaFontana[]> {
-  return resolverCeldasPobreza(territorio, "porEstadoPobreza", "porMunicipioPobreza");
+  return resolverCeldasPobreza(territorio, "porEstadoPobreza", "porMunicipioPobrezaPorNombre");
 }
 
 export async function resolverPobrezaExtrema(territorio: Territorio): Promise<CeldaFontana[]> {
-  return resolverCeldasPobreza(territorio, "porEstadoPobrezaExtrema", "porMunicipioPobrezaExtrema");
+  return resolverCeldasPobreza(territorio, "porEstadoPobrezaExtrema", "porMunicipioPobrezaExtremaPorNombre");
 }
 
 export async function resolverCarenciaSocial(territorio: Territorio): Promise<CeldaFontana[]> {
-  return resolverCeldasPobreza(territorio, "porEstadoCarencia", "porMunicipioCarencia");
+  return resolverCeldasPobreza(territorio, "porEstadoCarencia", "porMunicipioCarenciaPorNombre");
 }
 
 // F2-3 — nacional NUNCA se calcula (ver nota de cabecera): la propia
@@ -384,20 +417,19 @@ export async function resolverRezagoSocial(territorio: Territorio): Promise<Celd
     ? { nivel: "estatal", valor: indiceEstado, unidad: "índice", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_IRS }
     : { nivel: "estatal", motivo: "CONEVAL no reportó el Índice de Rezago Social para este territorio" };
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE (ver
+  // nota de cabecera de CacheRezagoSocial). F2-3 usaba el mismo join
+  // vulnerable que F2-1/F2-2/F2-14 — se encontró y mitigó junto con esos
+  // en el Paso 1, y se corrige de fondo aquí en el mismo Paso 4.
   const municipioNombre = resolverNombreMunicipio(territorio);
   let municipal: CeldaFontana;
   if (!municipioNombre) {
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" };
   } else {
-    const municipioCve = await resolveMunicipioCve(estadoCve, municipioNombre);
-    if (!municipioCve) {
-      municipal = { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo INEGI` };
-    } else {
-      const indiceMun = datos.porMunicipio.get(`${estadoCve}${municipioCve}`);
-      municipal = indiceMun != null
-        ? { nivel: "municipal", valor: indiceMun, unidad: "índice", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_IRS }
-        : { nivel: "municipal", motivo: "CONEVAL no reportó el Índice de Rezago Social para este territorio" };
-    }
+    const indiceMunicipio = datos.porMunicipioPorNombre.get(claveMunicipioPorNombre(estadoCve, municipioNombre));
+    municipal = indiceMunicipio != null
+      ? { nivel: "municipal", valor: indiceMunicipio, unidad: "índice", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_IRS }
+      : { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo de CONEVAL` };
   }
 
   return [nacional, estatal, distrital, municipal];
@@ -410,14 +442,18 @@ export async function resolverRezagoSocial(territorio: Territorio): Promise<Celd
 // no publica por distrito electoral.
 async function resolverMunicipiosEstadoPobrezaGenerico(
   estadoCve: string,
-  campoMunicipal: "porMunicipioPobreza" | "porMunicipioPobrezaExtrema" | "porMunicipioCarencia",
+  campoMunicipal: "porMunicipioPobrezaPorNombre" | "porMunicipioPobrezaExtremaPorNombre" | "porMunicipioCarenciaPorNombre",
   soloCves?: string[]
 ): Promise<ElementoDeEstado[]> {
   const [datos, opciones] = await Promise.all([cargarPobreza(), getMunicipiosOptions(estadoCve)]);
   const opcionesFiltradas = soloCves ? opciones.filter((o) => soloCves.includes(o.cve)) : opciones;
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — `cve` viene de getMunicipiosOptions()
+  // (catálogo INE de Sefix), solo se usa para identificar la fila en el
+  // picker; el valor se resuelve por `nombre` contra el archivo propio
+  // de CONEVAL, mismo patrón que resolverMunicipiosEstadoIcmm (icmm.ts).
   return opcionesFiltradas.map(({ cve, nombre }): ElementoDeEstado => {
-    const par = datos[campoMunicipal].get(`${estadoCve}${cve}`);
+    const par = datos[campoMunicipal].get(claveMunicipioPorNombre(estadoCve, nombre));
     return {
       cve,
       nombre,
@@ -429,23 +465,24 @@ async function resolverMunicipiosEstadoPobrezaGenerico(
 }
 
 export async function resolverMunicipiosEstadoPobreza(estadoCve: string, soloCves?: string[]): Promise<ElementoDeEstado[]> {
-  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioPobreza", soloCves);
+  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioPobrezaPorNombre", soloCves);
 }
 
 export async function resolverMunicipiosEstadoPobrezaExtrema(estadoCve: string, soloCves?: string[]): Promise<ElementoDeEstado[]> {
-  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioPobrezaExtrema", soloCves);
+  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioPobrezaExtremaPorNombre", soloCves);
 }
 
 export async function resolverMunicipiosEstadoCarenciaSocial(estadoCve: string, soloCves?: string[]): Promise<ElementoDeEstado[]> {
-  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioCarencia", soloCves);
+  return resolverMunicipiosEstadoPobrezaGenerico(estadoCve, "porMunicipioCarenciaPorNombre", soloCves);
 }
 
 export async function resolverMunicipiosEstadoRezagoSocial(estadoCve: string, soloCves?: string[]): Promise<ElementoDeEstado[]> {
   const [datos, opciones] = await Promise.all([cargarRezagoSocial(), getMunicipiosOptions(estadoCve)]);
   const opcionesFiltradas = soloCves ? opciones.filter((o) => soloCves.includes(o.cve)) : opciones;
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — mismo patrón por nombre.
   return opcionesFiltradas.map(({ cve, nombre }): ElementoDeEstado => {
-    const indice = datos.porMunicipio.get(`${estadoCve}${cve}`);
+    const indice = datos.porMunicipioPorNombre.get(claveMunicipioPorNombre(estadoCve, nombre));
     return {
       cve,
       nombre,
@@ -500,17 +537,31 @@ export async function resolverEstadosRezagoSocial(): Promise<ElementoDeEstado[]>
 // calculado (mismo criterio que Nacional, aprobado 2026-08-09).
 // Denominador exclusivamente de CONEVAL — nunca se mezcla con
 // población de ECEG/ITER.
+//
+// FIX DE FONDO (Paso 4, 2026-08-23) — `cves` llega desde la composición
+// municipio↔distrito de ECEG (numeración INE, ver Paso 2 del incidente),
+// NO del CVE_MUN oficial de CONEVAL — el mismo bug de join por CVE que
+// afectaba a resolverCeldasPobreza también afectaba aquí (encontrado en
+// esta misma ronda, no estaba en la lista original). Se resuelve
+// traduciendo cada cve INE a su nombre (getMunicipiosOptions, catálogo
+// de Sefix — mismo lado "nombre" que usa el resto de este archivo) y
+// cruzando por nombre contra los datos propios de CONEVAL; el resultado
+// se sigue devolviendo keyed por el cve INE original porque el caller
+// (calcularValorDistritoPonderado) pondera con esa misma numeración.
 export async function resolverNumeradorDenominadorMunicipios(
   estadoCve: string,
-  campoMunicipal: "porMunicipioPobreza" | "porMunicipioPobrezaExtrema" | "porMunicipioCarencia",
+  campoMunicipal: "porMunicipioPobrezaPorNombre" | "porMunicipioPobrezaExtremaPorNombre" | "porMunicipioCarenciaPorNombre",
   cves: string[]
 ): Promise<Map<string, { personas: number; poblacion: number }>> {
-  const datos = await cargarPobreza();
+  const [datos, opciones] = await Promise.all([cargarPobreza(), getMunicipiosOptions(estadoCve)]);
+  const nombrePorCve = new Map(opciones.map((o) => [o.cve, o.nombre]));
   const resultado = new Map<string, { personas: number; poblacion: number }>();
   for (const cve of cves) {
-    const clave = `${estadoCve}${cve}`;
+    const nombre = nombrePorCve.get(cve);
+    if (!nombre) continue;
+    const clave = claveMunicipioPorNombre(estadoCve, nombre);
     const par = datos[campoMunicipal].get(clave);
-    const poblacion = datos.poblacionPorMunicipio.get(clave);
+    const poblacion = datos.poblacionPorMunicipioPorNombre.get(clave);
     if (par && poblacion != null) resultado.set(cve, { personas: par.personas, poblacion });
   }
   return resultado;

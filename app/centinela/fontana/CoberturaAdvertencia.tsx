@@ -49,7 +49,14 @@ type Props =
   // 2026-08-21) — solo Banco Mundial disponible. Mismo patrón que
   // "fuente_mixta" (chip + tooltip), condicionado por indicador en
   // FontanaF4Panel.tsx.
-  | { nivel: "fmi_no_disponible" };
+  | { nivel: "fmi_no_disponible" }
+  // Familia 5, F5-7 (SUN) — el valor mostrado no es exclusivo del
+  // municipio: es el de la Ciudad/Zona Metropolitana completa a la que
+  // pertenece (SEDATU/CONAPO no publica por municipio individual).
+  // `prorrateo` solo aplica en la celda Estatal de las 15 de 218 ZM que
+  // cruzan más de un estado (Grupo F, Ronda 11) — cuando está ausente,
+  // el valor es el total completo de la ZM sin prorratear.
+  | { nivel: "zona_metropolitana"; nombreZona: string; numMunicipios: number; prorrateo?: { pctEstado: number; numEstados: number } };
 
 // 100 - pct, mismo decimal que pct (ej. 97.9 -> 2.1) — evita el error de
 // float directo (100 - 97.9 = 2.099999999999998 en JS).
@@ -65,16 +72,31 @@ export default function CoberturaAdvertencia(props: Props) {
   const etiqueta =
     props.nivel === "distrito" ? "Cobertura incompleta"
     : props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? "Nota sobre la fuente"
+    : props.nivel === "zona_metropolitana" ? "Valor de zona metropolitana"
     : "Nota sobre cobertura";
   // Un proyecto Municipal puede tener ambas columnas (Federal y Local)
   // visibles a la vez (ej. Cuernavaca) — cada tooltip se identifica sin
-  // ambigüedad (cierre 2026-08-06). "fuente_mixta"/"fmi_no_disponible" no
-  // tienen distrito asociado (aplican a Nacional/Estatal o a Familia 4),
-  // no necesitan `tipo`.
-  const tipo = props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? null : props.tipoDistrito;
+  // ambigüedad (cierre 2026-08-06). "fuente_mixta"/"fmi_no_disponible"/
+  // "zona_metropolitana" no tienen distrito asociado, no necesitan `tipo`.
+  const tipo =
+    props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" || props.nivel === "zona_metropolitana"
+      ? null
+      : props.tipoDistrito;
 
   const contenido =
-    props.nivel === "fmi_no_disponible" ? (
+    props.nivel === "zona_metropolitana" ? (
+      <>
+        Este valor corresponde a la Zona Metropolitana de <strong>{props.nombreZona}</strong>, que incluye{" "}
+        {props.numMunicipios} municipios — no es un dato exclusivo de este municipio.
+        {props.prorrateo && (
+          <>
+            {" "}Esta zona cruza {props.prorrateo.numEstados} estados; el valor mostrado es solo la porción real
+            correspondiente a este estado (<strong>{props.prorrateo.pctEstado}%</strong> del total de la zona),
+            prorrateada por población de sus localidades.
+          </>
+        )}
+      </>
+    ) : props.nivel === "fmi_no_disponible" ? (
       <>
         Solo Banco Mundial disponible — el FMI, fuente secundaria de este indicador, está bloqueado a nivel de
         infraestructura de red desde el 26-08-21. Se pierde la comparación entre ambas fuentes y la distinción entre

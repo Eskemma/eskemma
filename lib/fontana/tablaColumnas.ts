@@ -112,6 +112,14 @@ export interface CeldaTablaFontana {
   // "local" en su texto (cierre 2026-08-06, un proyecto Municipal puede
   // tener Distrito Federal Y Local visibles a la vez, sin ambigüedad).
   tipoDistritoPropio?: "federal" | "local";
+  // Solo F5-7 (SUN) — ver ValorIndicadorFontana.zonaMetropolitana
+  // (lib/fontana/ingesta/types.ts). Dispara el chip "zona_metropolitana"
+  // de CoberturaAdvertencia.
+  zonaMetropolitana?: {
+    nombre: string;
+    numMunicipios: number;
+    prorrateo?: { pctEstado: number; numEstados: number };
+  };
   // Solo celdas "municipal" (tipo "municipios") y "distrital" (tipos
   // "distritos_fed"/"distritos_loc") de proyectos a nivel Estatal — ver
   // DesgloseEstatal arriba. También reutilizado por "distrital_federal"/

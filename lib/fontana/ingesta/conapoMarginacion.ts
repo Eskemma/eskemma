@@ -28,7 +28,7 @@
 import https from "https";
 import * as XLSX from "xlsx";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { resolveMunicipioCve, normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -62,8 +62,20 @@ function descargarBinario(url: string): Promise<Buffer> {
 
 interface CacheMarginacion {
   porEstado: Map<string, number>; // estadoCve (2 díg.) -> IMN_2020
-  porMunicipio: Map<string, number>; // estadoCve+municipioCve (5 díg.) -> IMN_2020
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE, no
+  // por CVE_MUN, mismo patrón ya aprobado y en producción en icmm.ts.
+  // resolveMunicipioCve() (numeración INE de lib/geo/municipios.ts)
+  // diverge del CVE_MUN oficial de CONAPO en ~55-63% de los municipios
+  // (incidente 2026-08-23) — cruzar por CVE producía el valor de OTRO
+  // municipio sin ningún error visible. Clave: `${estadoCve}|${normalizeGeoName(nombreConapoPropio)}`.
+  porMunicipioPorNombre: Map<string, number>;
   ts: number;
+}
+
+// FIX DE FONDO (Incidente 2, 2026-08-23) — ver nota en coneval.ts /
+// lib/geo/municipios.ts.
+function claveMunicipioPorNombre(estadoCve: string, nombre: string): string {
+  return `${estadoCve}|${claveCanonicaMunicipio(estadoCve, nombre)}`;
 }
 let cache: CacheMarginacion | null = null;
 let enVuelo: Promise<CacheMarginacion> | null = null; // single-flight, mismo fix ya aplicado en lib/geo (Fase 1, Nacional)
@@ -90,18 +102,27 @@ async function cargarMarginacion(): Promise<CacheMarginacion> {
       }
     }
 
-    const porMunicipio = new Map<string, number>();
+    // Join por NOMBRE (Paso 4) — columnas confirmadas en vivo 2026-08-23:
+    // [0]=CVE_ENT, [1]=NOM_ENT, [2]=CVE_MUN(5díg, solo para validar la
+    // fila), [3]=NOM_MUN.
+    const porMunicipioPorNombre = new Map<string, number>();
     const wsMunicipio = wbMunicipioSheet(bufMunicipio);
     const filasMunicipio = XLSX.utils.sheet_to_json<unknown[]>(wsMunicipio, { header: 1, defval: null });
     for (const fila of filasMunicipio) {
-      const cveMun5 = fila[2]; // "CVE_MUN" combinado, ej. "14120"
+      const cveMun5 = fila[2]; // "CVE_MUN" combinado, ej. "14120" — solo valida la fila
+      const cveEnt = fila[0];
+      const nomMun = fila[3];
       const imn = fila[fila.length - 1];
-      if (typeof cveMun5 === "string" && /^\d{5}$/.test(cveMun5) && typeof imn === "number") {
-        porMunicipio.set(cveMun5, imn);
+      if (
+        typeof cveMun5 === "string" && /^\d{5}$/.test(cveMun5) &&
+        typeof cveEnt === "string" && typeof nomMun === "string" &&
+        typeof imn === "number"
+      ) {
+        porMunicipioPorNombre.set(claveMunicipioPorNombre(cveEnt, nomMun), imn);
       }
     }
 
-    const resultado: CacheMarginacion = { porEstado, porMunicipio, ts: Date.now() };
+    const resultado: CacheMarginacion = { porEstado, porMunicipioPorNombre, ts: Date.now() };
     cache = resultado;
     return resultado;
   })();
@@ -180,20 +201,17 @@ export async function resolverIndiceMarginacion(territorio: Territorio): Promise
     ? { nivel: "estatal", valor: imnEstado, unidad: "índice normalizado (0-1)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO_MARGINACION }
     : { nivel: "estatal", motivo: "CONAPO no reportó índice de marginación para este territorio" };
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE, no por
+  // CVE_MUN (ver nota de cabecera de CacheMarginacion).
   const municipioNombre = resolverNombreMunicipio(territorio);
   let municipal: CeldaFontana;
   if (!municipioNombre) {
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" };
   } else {
-    const municipioCve = await resolveMunicipioCve(estadoCve, municipioNombre);
-    if (!municipioCve) {
-      municipal = { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo INEGI` };
-    } else {
-      const imnMun = datos.porMunicipio.get(`${estadoCve}${municipioCve}`);
-      municipal = imnMun != null
-        ? { nivel: "municipal", valor: imnMun, unidad: "índice normalizado (0-1)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO_MARGINACION }
-        : { nivel: "municipal", motivo: "CONAPO no reportó índice de marginación para este territorio" };
-    }
+    const imnMunicipio = datos.porMunicipioPorNombre.get(claveMunicipioPorNombre(estadoCve, municipioNombre));
+    municipal = imnMunicipio != null
+      ? { nivel: "municipal", valor: imnMunicipio, unidad: "índice normalizado (0-1)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO_MARGINACION }
+      : { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo de CONAPO` };
   }
 
   return [nacional, estatal, distrital, municipal];
@@ -207,19 +225,18 @@ export async function resolverIndiceMarginacion(territorio: Territorio): Promise
 // distritos_fed/distritos_loc — CONAPO no publica por distrito
 // electoral, ese caso se queda fuera (400 "sin mecanismo" ya existente).
 export async function resolverMunicipiosEstadoMarginacion(estadoCve: string, soloCves?: string[]): Promise<ElementoDeEstado[]> {
-  const [datos, opciones] = await Promise.all([
-    cargarMarginacion(),
-    getMunicipiosOptions(estadoCve),
-  ]);
+  const [datos, opciones] = await Promise.all([cargarMarginacion(), getMunicipiosOptions(estadoCve)]);
   const opcionesFiltradas = soloCves ? opciones.filter((o) => soloCves.includes(o.cve)) : opciones;
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join por nombre, mismo patrón
+  // que resolverMunicipiosEstadoIcmm (icmm.ts).
   return opcionesFiltradas.map(({ cve, nombre }): ElementoDeEstado => {
-    const valor = datos.porMunicipio.get(`${estadoCve}${cve}`);
+    const imn = datos.porMunicipioPorNombre.get(claveMunicipioPorNombre(estadoCve, nombre));
     return {
       cve,
       nombre,
-      celda: valor != null
-        ? { nivel: "municipal", valor, unidad: "índice normalizado (0-1)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO_MARGINACION }
+      celda: imn != null
+        ? { nivel: "municipal", valor: imn, unidad: "índice normalizado (0-1)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_CONAPO_MARGINACION }
         : { nivel: "municipal", motivo: "CONAPO no reportó índice de marginación para este municipio" },
     };
   });

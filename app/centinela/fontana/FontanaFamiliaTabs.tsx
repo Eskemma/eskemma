@@ -38,7 +38,7 @@ const FAMILIAS: FamiliaTabInfo[] = [
   { id: "F5", nombre: "Características territoriales", color: "#FFD14A" },
 ];
 
-const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1", "F2", "F4"];
+const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1", "F2", "F4", "F5"];
 const MOTIVO_CONECTOR_PENDIENTE = "Conector pendiente — esta familia todavía no tiene indicadores con fuente real conectada.";
 
 interface Props {

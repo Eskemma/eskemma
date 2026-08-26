@@ -40,6 +40,32 @@ export interface AgregacionPlural {
   // promediar el % ya calculado).
   ponderador?: string;
   notas?: string;
+  // Mecanismo general (2026-08-24, hallazgo real F5-7) — algunos
+  // indicadores YA resuelven territorio plural correctamente dentro de
+  // su propio resolver (ej. F5-7/sun.ts: una Ciudad/Zona Metropolitana
+  // vale lo mismo sin importar cuál de sus municipios miembro se
+  // consulte, así que sumar/promediar entre los municipios
+  // seleccionados sería incorrecto — el propio resolver ya da la
+  // respuesta correcta). Cuando `resolverPropio: true`, el overwrite
+  // genérico de territorio plural en route.ts se OMITE por completo
+  // para este indicador — se conserva el valor que `resolverIndicadorFontana`
+  // ya calculó, en vez de reemplazarlo por el agregado genérico o por
+  // "sin valor combinado". Siempre junto con `tipo: "no_agregable"`
+  // (nunca tiene sentido combinarlo con aditivo/tasa_ponderada, que sí
+  // dependen del overwrite para mostrar el agregado).
+  //
+  // ⚠️ Limitación conocida, no resuelta: esto asume que TODAS las
+  // unidades plurales seleccionadas comparten la misma respuesta bajo
+  // el resolver propio (cierto hoy para F5-7 solo cuando los municipios
+  // seleccionados pertenecen a la MISMA Ciudad/ZM — ej. el caso real
+  // Tlaquepaque/ZMG). Si un proyecto plural mezclara municipios de 2
+  // Ciudades/ZM distintas, el resolver seguiría devolviendo solo la del
+  // municipio "principal" (`territorio.municipio`), ignorando en
+  // silencio las demás — el mismo tipo de "unidad principal disfrazada
+  // de respuesta completa" que el overwrite genérico existe para
+  // evitar. No se resolvió en esta ronda (fuera de alcance); documentar
+  // aquí para no perder el hallazgo.
+  resolverPropio?: boolean;
 }
 
 export interface IndicadorRegistro {

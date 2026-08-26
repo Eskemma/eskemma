@@ -7,6 +7,7 @@ import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import { useGeoOptionsMultiEstado, type EstadoConCve } from "@/app/components/geo/hooks/useGeoOptionsMultiEstado";
 import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import { getCveEntidad } from "@/lib/geo/estadoCve";
+import { etiquetaDesambiguacionMunicipio } from "@/lib/geo/etiquetasDesambiguacionMunicipio";
 import { formatDistritoLabel } from "@/lib/geo/formatDistrito";
 import { resolverPrimerElemento } from "@/lib/moddulo/territorioPlural";
 import { detectarSenalesTexto } from "@/lib/moddulo/territorioHeuristicas";
@@ -222,7 +223,12 @@ export default function TerritorySelector({
   const [resolviendoPorEstado, setResolviendoPorEstado] = useState<Record<string, boolean>>({});
   // Candidatos reales cuando el nombre escrito es ambiguo (2+ municipios
   // coinciden) — el usuario elige uno, nunca se adivina.
-  const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, string[]>>({});
+  // Incidente 2, Verificación 1 (2026-08-23) — candidatos ahora incluyen
+  // `cve` (antes solo `nombre`), necesario para (a) una key de React que
+  // no colisione cuando 2 candidatos comparten nombre literal (San Juan/
+  // San Pedro Mixtepec, Oaxaca) y (b) mostrar la etiqueta de
+  // desambiguación de esos casos.
+  const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, { cve: string; nombre: string }[]>>({});
   // Aviso transitorio (no reconocido / error de red) — nunca bloquea,
   // solo informa (mismo criterio ya usado en todo el workstream).
   const [avisoMunicipioPorEstado, setAvisoMunicipioPorEstado] = useState<Record<string, string>>({});
@@ -496,8 +502,11 @@ export default function TerritorySelector({
 
   // Usuario elige uno de los candidatos reales del picker de ambigüedad —
   // se agrega el nombre EXACTO elegido, nunca el texto ambiguo original.
-  function elegirCandidatoMunicipio(estado: string, candidato: string) {
-    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, candidato));
+  // El `cve` solo se usó para distinguir la opción en el picker (ver
+  // etiquetaDesambiguacionMunicipio) — el territorio persistido sigue
+  // guardando el nombre, mismo formato que siempre.
+  function elegirCandidatoMunicipio(estado: string, candidato: { cve: string; nombre: string }) {
+    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, candidato.nombre));
     setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
     setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
   }
@@ -675,17 +684,27 @@ export default function TerritorySelector({
                       Nombre ambiguo — ¿cuál de estos quisiste decir?
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {candidatosPorEstado[estadoNombre].map((candidato) => (
-                        <button
-                          key={candidato}
-                          type="button"
-                          onClick={() => elegirCandidatoMunicipio(estadoNombre, candidato)}
-                          className="px-2.5 py-1 rounded-full text-xs font-medium border border-bluegreen-eske
-                            text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 transition-colors"
-                        >
-                          {candidato}
-                        </button>
-                      ))}
+                      {candidatosPorEstado[estadoNombre].map((candidato) => {
+                        // Incidente 2, Verificación 1 — key por cve (nunca
+                        // por nombre: 2 candidatos pueden compartir el
+                        // mismo nombre literal, ver San Juan/San Pedro
+                        // Mixtepec). Etiqueta solo de presentación cuando
+                        // aplica; el texto agregado sigue siendo el
+                        // nombre tal cual (elegirCandidatoMunicipio).
+                        const estadoCve = getCveEntidad(estadoNombre);
+                        const etiqueta = estadoCve ? etiquetaDesambiguacionMunicipio(estadoCve, candidato.cve) : null;
+                        return (
+                          <button
+                            key={candidato.cve}
+                            type="button"
+                            onClick={() => elegirCandidatoMunicipio(estadoNombre, candidato)}
+                            className="px-2.5 py-1 rounded-full text-xs font-medium border border-bluegreen-eske
+                              text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 transition-colors"
+                          >
+                            {candidato.nombre}{etiqueta ? ` (${etiqueta})` : ""}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

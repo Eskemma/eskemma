@@ -27,6 +27,7 @@ import {
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { FAMILIA1_NOMBRES, FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_NOMBRES, FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA5_NOMBRES, FAMILIA5_ORDEN } from "@/lib/fontana/familia5Catalogo";
 import { FAMILIA4_NOMBRES, FAMILIA4_ORDEN, PAISES_REFERENCIA_F4, resolverPaisPrincipal } from "@/lib/fontana/familia4Catalogo";
 import { resolverIndicadorComparativoF4 } from "@/lib/fontana/ingesta/familia4";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
@@ -180,14 +181,24 @@ export async function GET(
     return NextResponse.json({ indicadores: indicadoresF4, paisPrincipal, paisesReferencia: PAISES_REFERENCIA_F4 });
   }
 
-  if (familiaId !== "F1" && familiaId !== "F2") {
+  if (familiaId !== "F1" && familiaId !== "F2" && familiaId !== "F5") {
     return NextResponse.json(
       { error: "familia_no_disponible", mensaje: `Familia ${familiaId} aún no está disponible en Fontana.` },
       { status: 400 }
     );
   }
+  // F5 (Características territoriales) — Paso 4 de la implementación
+  // consolidada, 2026-08-23: mismo contrato geográfico que F1/F2
+  // (nacional/estatal/distrital/municipal), a diferencia de F4
+  // (comparación internacional, rama propia arriba) — se reutiliza el
+  // mismo flujo, ningún gate de desglose (municipal/distrital/nacional)
+  // reconoce IDs de F5 todavía, así que caen a "sin mecanismo" de forma
+  // segura (mismo comportamiento que cualquier indicador F1/F2 sin
+  // desglose construido).
   const [ordenFamilia, nombresFamilia] =
-    familiaId === "F2" ? [FAMILIA2_ORDEN, FAMILIA2_NOMBRES] : [FAMILIA1_ORDEN, FAMILIA1_NOMBRES];
+    familiaId === "F2" ? [FAMILIA2_ORDEN, FAMILIA2_NOMBRES]
+    : familiaId === "F5" ? [FAMILIA5_ORDEN, FAMILIA5_NOMBRES]
+    : [FAMILIA1_ORDEN, FAMILIA1_NOMBRES];
 
   const columnas = columnasParaTipoProyecto(sesion.tipoProyecto, sesion.territorio.nivel);
   const familia = sesion.indicadoresPorFamilia[familiaId as FamiliaFontanaId];
@@ -324,7 +335,17 @@ export async function GET(
       // activa cuando el territorio de la sesión realmente es plural —
       // cero llamadas nuevas, cero cambio de shape, para el caso
       // mayoritario de hoy (territorio singular).
-      if (esTerritorioParcial(sesion.territorio)) {
+      // Mecanismo general (2026-08-24, hallazgo real F5-7, ver
+      // AgregacionPlural.resolverPropio en lib/fontana/indicatorRegistry.ts)
+      // — un indicador puede resolver territorio plural correctamente
+      // DENTRO de su propio resolver (`resolverIndicadorFontana`, ya
+      // ejecutado arriba → `celdasReales`), en vez de necesitar el
+      // agregado genérico de abajo. Cuando el registry lo marca así, se
+      // omite el bloque completo — la celda ya calculada por
+      // `resolverIndicadorFontana` se deja tal cual, nunca se sobrescribe
+      // con el agregado genérico ni con "sin valor combinado".
+      const usaResolverPropio = registro?.agregacionPlural?.resolverPropio === true;
+      if (esTerritorioParcial(sesion.territorio) && !usaResolverPropio) {
         const resultadoPlural = await resolverAgregacionPlural(id, sesion.territorio);
         if (resultadoPlural) {
           const nivelObjetivo =
@@ -362,6 +383,17 @@ export async function GET(
               celdaObjetivo.unidad = agregado.unidad;
               celdaObjetivo.naturaleza = agregado.naturaleza;
               celdaObjetivo.fuenteEtiqueta = agregado.fuenteEtiqueta;
+              // Chip de contexto ZM (2026-08-25) — mismo componente/estilo
+              // que ya usa F5-7 (celda.zonaMetropolitana), reutilizado aquí
+              // para el mecanismo genérico. Solo se agrega con coincidencia
+              // EXACTA contra el catálogo SUN (ver
+              // detectarZonaMetropolitanaExacta, sun.ts) — nunca con
+              // coincidencia parcial ni superconjunto. Si no hay match, el
+              // valor combinado ya asignado arriba se muestra igual, solo
+              // sin la etiqueta.
+              if (resultadoPlural.zonaMetropolitanaDetectada) {
+                celdaObjetivo.zonaMetropolitana = resultadoPlural.zonaMetropolitanaDetectada;
+              }
             } else {
               celdaObjetivo.motivo =
                 agregado?.motivo ?? "Sin valor combinado disponible para este indicador";
@@ -589,6 +621,7 @@ function construirCeldasTabla(
         naturaleza: real.naturaleza,
         fuenteEtiqueta: real.fuenteEtiqueta,
         ...(real.coberturaPct != null ? { coberturaPct: real.coberturaPct } : {}),
+        ...(real.zonaMetropolitana ? { zonaMetropolitana: real.zonaMetropolitana } : {}),
         ...municipiosEnDistritoField,
         ...desglosesEstadoField,
         ...tipoDistritoPropioField,

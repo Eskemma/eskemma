@@ -54,7 +54,7 @@
 import https from "https";
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { resolveMunicipioCve, normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -115,10 +115,21 @@ function ckanDatastoreSearch(resourceId: string, fields: string[], offset: numbe
         res.resume();
         return;
       }
-      let body = "";
-      res.on("data", (chunk) => (body += chunk));
+      // FIX DE FONDO (Incidente 2, 2026-08-23) — BUG REAL encontrado y
+      // corregido: `body += chunk` fuerza cada Buffer a string
+      // individualmente (utf8 por defecto de Buffer.toString()) ANTES de
+      // concatenar — si un carácter multibyte (ej. Ñ, 2 bytes en UTF-8)
+      // queda partido entre dos chunks de red, cada mitad se decodifica
+      // por separado y produce el carácter de reemplazo "�" (mojibake),
+      // irrecuperable después. Confirmado en vivo: "MATIAS ROMERO
+      // AVENDA��O" (Oaxaca, dataset de Producción). Fix: acumular los
+      // Buffers crudos y decodificar UNA sola vez al final, cuando ya
+      // está completo el payload.
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
         try {
+          const body = Buffer.concat(chunks).toString("utf8");
           const data = JSON.parse(body) as { success: boolean; result?: { records: unknown[]; total: number } };
           if (!data.success || !data.result) {
             reject(new Error("CKAN respondió success:false"));
@@ -154,8 +165,16 @@ type ConteoPorMunicipio = Record<string, number>;
 // mismo estado cuando varios indicadores/territorios lo piden a la vez.
 const enVuelo = new Map<string, Promise<ConteoPorMunicipio>>();
 
+// FIX DE FONDO (Paso 4, 2026-08-23) — ambas funciones de abajo agregan
+// por NOMBRE de municipio (campo propio de cada dataset de Bienestar:
+// "nombre_del_municipio" en Producción, "NOM_MUN" en Beca BJ), no por su
+// CVE_MUN de 3 dígitos — ese CVE_MUN no está verificado contra el
+// catálogo oficial INEGI y el resto de Fontana solo puede cruzarlo de
+// forma segura por nombre (mismo patrón ya aprobado en icmm.ts). Rutas
+// de bodega renombradas con sufijo `_v2` para no leer caché vieja
+// (keyed por CVE_MUN, incompatible con este esquema).
 async function agregarProduccionEstado(estadoCve: string): Promise<ConteoPorMunicipio> {
-  const path = `bienestar_produccion/${estadoCve}.json`;
+  const path = `bienestar_produccion_v2/${estadoCve}.json`;
   const cached = await readFromBodega<ConteoPorMunicipio>(path);
   if (cached) return cached;
 
@@ -166,12 +185,14 @@ async function agregarProduccionEstado(estadoCve: string): Promise<ConteoPorMuni
   const promesa = (async () => {
     const resourceId = RESOURCE_PRODUCCION[estadoCve];
     if (!resourceId) return {};
-    const registros = (await paginarCompleto(resourceId, ["municipio", "id_suri"])) as Array<{ municipio?: string; id_suri?: string }>;
+    const registros = (await paginarCompleto(resourceId, ["nombre_del_municipio", "id_suri"])) as Array<{ nombre_del_municipio?: string; id_suri?: string }>;
     const idsPorMunicipio = new Map<string, Set<string>>();
     for (const r of registros) {
-      if (!r.municipio || !r.id_suri) continue;
-      if (!idsPorMunicipio.has(r.municipio)) idsPorMunicipio.set(r.municipio, new Set());
-      idsPorMunicipio.get(r.municipio)!.add(r.id_suri);
+      if (!r.nombre_del_municipio || !r.id_suri) continue;
+      // FIX DE FONDO (Incidente 2, 2026-08-23) — ver nota en coneval.ts.
+      const clave = claveCanonicaMunicipio(estadoCve, r.nombre_del_municipio);
+      if (!idsPorMunicipio.has(clave)) idsPorMunicipio.set(clave, new Set());
+      idsPorMunicipio.get(clave)!.add(r.id_suri);
     }
     const resultado: ConteoPorMunicipio = {};
     for (const [mun, ids] of idsPorMunicipio) resultado[mun] = ids.size;
@@ -188,7 +209,7 @@ async function agregarProduccionEstado(estadoCve: string): Promise<ConteoPorMuni
 }
 
 async function agregarBecaBJEstado(estadoCve: string): Promise<ConteoPorMunicipio> {
-  const path = `bienestar_becabj_2025q4/${estadoCve}.json`;
+  const path = `bienestar_becabj_2025q4_v2/${estadoCve}.json`;
   const cached = await readFromBodega<ConteoPorMunicipio>(path);
   if (cached) return cached;
 
@@ -199,11 +220,12 @@ async function agregarBecaBJEstado(estadoCve: string): Promise<ConteoPorMunicipi
   const promesa = (async () => {
     const resourceId = RESOURCE_BECA_BJ[estadoCve];
     if (!resourceId) return {};
-    const registros = (await paginarCompleto(resourceId, ["CVE_MUN"])) as Array<{ CVE_MUN?: string }>;
+    const registros = (await paginarCompleto(resourceId, ["NOM_MUN"])) as Array<{ NOM_MUN?: string }>;
     const resultado: ConteoPorMunicipio = {};
     for (const r of registros) {
-      if (!r.CVE_MUN) continue;
-      resultado[r.CVE_MUN] = (resultado[r.CVE_MUN] ?? 0) + 1;
+      if (!r.NOM_MUN) continue;
+      const clave = claveCanonicaMunicipio(estadoCve, r.NOM_MUN);
+      resultado[clave] = (resultado[clave] ?? 0) + 1;
     }
     await writeToBodega(path, resultado);
     return resultado;
@@ -292,20 +314,19 @@ async function resolverCeldas(
     ? { nivel: "estatal", valor: totalEstado, unidad: "beneficiarios", naturaleza: "estimacion_agregada", fuenteEtiqueta }
     : { nivel: "estatal", motivo: "Bienestar no reportó beneficiarios para este estado" };
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join municipal por NOMBRE, no
+  // por CVE_MUN (ver nota junto a agregarProduccionEstado/agregarBecaBJEstado).
+  // claveCanonicaMunicipio() (Incidente 2, ver coneval.ts) aplica la
+  // tabla de alias antes de comparar.
   const municipioNombre = resolverNombreMunicipio(territorio);
   let municipal: CeldaFontana;
   if (!municipioNombre) {
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" };
   } else {
-    const municipioCve = await resolveMunicipioCve(estadoCve, municipioNombre);
-    if (!municipioCve) {
-      municipal = { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo INEGI` };
-    } else {
-      const valor = conteos[municipioCve];
-      municipal = valor != null
-        ? { nivel: "municipal", valor, unidad: "beneficiarios", naturaleza: "dato_directo", fuenteEtiqueta }
-        : { nivel: "municipal", motivo: "Bienestar no reportó beneficiarios para este municipio" };
-    }
+    const valor = conteos[claveCanonicaMunicipio(estadoCve, municipioNombre)];
+    municipal = valor != null
+      ? { nivel: "municipal", valor, unidad: "beneficiarios", naturaleza: "dato_directo", fuenteEtiqueta }
+      : { nivel: "municipal", motivo: "Bienestar no reportó beneficiarios para este municipio" };
   }
 
   return [await nacionalPromise, estatal, municipal];
@@ -343,8 +364,10 @@ async function resolverMunicipiosEstadoBienestar(
   ]);
   const opcionesFiltradas = soloCves ? opciones.filter((o) => soloCves.includes(o.cve)) : opciones;
 
+  // FIX DE FONDO (Paso 4, 2026-08-23) — join por nombre, mismo patrón
+  // que resolverMunicipiosEstadoIcmm (icmm.ts).
   return opcionesFiltradas.map(({ cve, nombre }): ElementoDeEstado => {
-    const valor = conteos[cve];
+    const valor = conteos[claveCanonicaMunicipio(estadoCve, nombre)];
     return {
       cve,
       nombre,

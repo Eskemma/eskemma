@@ -35,6 +35,16 @@ export interface ValorIndicadorFontana {
   // No se expone visualmente todavía (2026-08-09) — se carga para tenerla
   // disponible si se decide usarla como señal de calidad por territorio.
   coeficienteVariacionPct?: number;
+  // Solo F5-7 (sun.ts) — el valor es de la Ciudad/Zona Metropolitana
+  // completa a la que pertenece el municipio, no exclusivo de él.
+  // `prorrateo` presente solo en la celda Estatal de las ZM que cruzan
+  // más de un estado (Grupo F, Ronda 11, 2026-08-23) — ver
+  // CoberturaAdvertencia.tsx variante "zona_metropolitana".
+  zonaMetropolitana?: {
+    nombre: string;
+    numMunicipios: number;
+    prorrateo?: { pctEstado: number; numEstados: number };
+  };
 }
 
 export interface CeldaNoDisponible {
@@ -47,3 +57,19 @@ export type CeldaFontana = ValorIndicadorFontana | CeldaNoDisponible;
 export function esValorDisponible(celda: CeldaFontana): celda is ValorIndicadorFontana {
   return "valor" in celda;
 }
+
+// MITIGACIÓN DE EMERGENCIA (2026-08-23) — incidente de integridad de
+// datos: resolveMunicipioCve()/getMunicipiosOptions() (lib/geo/municipios.ts)
+// usa el topojson de cartografía electoral de INE, cuyo CVE_MUN diverge
+// del oficial INEGI en ~55-63% de los municipios (confirmado con 2
+// fuentes independientes — ver docs/ecosistema/T10-fontana/claves-geograficas-no-confiables.md).
+// El nivel Municipal de coneval.ts (F2-1/F2-2/F2-3/F2-14, incluyendo
+// desgloses "Ver municipios"), conapoMarginacion.ts (F2-4) y
+// bienestar.ts (F2-7/F2-8) queda deshabilitado con este motivo hasta
+// completar el Paso 4 (eliminar resolveMunicipioCve como mecanismo de
+// join, reemplazarlo por join-por-nombre ya usado en icmm.ts/pnud.ts) y
+// verificarlo con muestra amplia. NUNCA remover este mensaje sin haber
+// corrido esa verificación primero — un dato incorrecto sin señal
+// visual es peor que un dato ausente con explicación.
+export const MOTIVO_MUNICIPAL_EN_VALIDACION =
+  "En validación — se detectó un problema de datos en este nivel, corrigiendo.";

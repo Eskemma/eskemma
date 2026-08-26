@@ -21,7 +21,33 @@ import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
 import FontanaMunicipiosModal, { type TipoElementoNacional, type TipoDistrito, type ElementoAgregacionPluralUI } from "./FontanaMunicipiosModal";
-import type { NivelTerritorial, TipoAgregacionTerritorial } from "@/types/shared.types";
+import FontanaDetalleModal, { type MunicipioDetalleOption } from "./FontanaDetalleModal";
+import type { NivelTerritorial, TipoAgregacionTerritorial, Territorio } from "@/types/shared.types";
+
+// Modo B (2026-08-24) — indicadores con detalle real (no solo el
+// número) accesible vía FontanaDetalleModal. Solo aplica a la celda
+// "municipal" con valor real — ver ese componente para el diseño
+// completo (paginación server-side, selector de municipio plural).
+const INDICADORES_CON_DETALLE = new Set(["F5-6", "F5-8"]);
+
+// Deriva la lista de municipios del territorio del proyecto (para el
+// selector del modal de detalle) — mismo criterio de fallback ya
+// establecido para Territorio.municipiosPorEstado (Decisión 2,
+// 26-08-16): preferir municipiosPorEstado; si está ausente, caer a
+// municipiosSeleccionados + estado; si tampoco, el único municipio
+// singular del territorio.
+function derivarMunicipiosDetalle(territorio: Territorio): MunicipioDetalleOption[] {
+  if (territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 0) {
+    return territorio.municipiosPorEstado.map((m) => ({ estado: m.estado, municipio: m.nombre }));
+  }
+  if (territorio.municipiosSeleccionados && territorio.municipiosSeleccionados.length > 0 && territorio.estado) {
+    return territorio.municipiosSeleccionados.map((nombre) => ({ estado: territorio.estado!, municipio: nombre }));
+  }
+  if (territorio.estado && territorio.municipio) {
+    return [{ estado: territorio.estado, municipio: territorio.municipio }];
+  }
+  return [];
+}
 
 // Fase 3 del rediseño de territorio (26-08-17) — "Ver X" según el nivel
 // REAL del territorio del proyecto (no de la celda, que puede ser
@@ -93,6 +119,9 @@ interface Props {
   // Ronda 9 (26-08-18) — para que al guardar el territorio en Moddulo, el
   // usuario vuelva aquí en vez de quedarse varado en Moddulo.
   retornoUrl?: string;
+  // Modo B (2026-08-24) — territorio completo del proyecto, para derivar
+  // la lista de municipios del selector de FontanaDetalleModal (F5-6/F5-8).
+  territorio: Territorio;
 }
 
 function BotonesDesgloseEstado({
@@ -189,6 +218,7 @@ function Celda({
   onVerDesgloseMunicipio,
   onVerDesgloseNacional,
   onVerAgregacionPlural,
+  onVerDetalle,
 }: {
   celda: CeldaTablaFontana;
   indicadorId: string;
@@ -198,7 +228,9 @@ function Celda({
   onVerDesgloseMunicipio: (tipoDistrito: TipoDistrito) => void;
   onVerDesgloseNacional: (tipoElemento: TipoElementoNacional) => void;
   onVerAgregacionPlural: () => void;
+  onVerDetalle?: () => void;
 }) {
+  const mostrarBotonDetalle = celda.nivel === "municipal" && INDICADORES_CON_DETALLE.has(indicadorId);
   const mostrarBotonMunicipios =
     celda.nivel === "municipal" && (celda.municipiosEnDistrito ?? 0) > 1;
   // Bug real (2026-08-06, encontrado en verificación visual): "estatal"/
@@ -236,6 +268,14 @@ function Celda({
         {celda.nivel === "distrital" && celda.coberturaPct !== undefined && celda.coberturaPct < UMBRAL_COBERTURA && celda.tipoDistritoPropio && (
           <CoberturaAdvertencia nivel="distrito" tipoDistrito={celda.tipoDistritoPropio} coberturaPct={celda.coberturaPct} />
         )}
+        {celda.zonaMetropolitana && (
+          <CoberturaAdvertencia
+            nivel="zona_metropolitana"
+            nombreZona={celda.zonaMetropolitana.nombre}
+            numMunicipios={celda.zonaMetropolitana.numMunicipios}
+            prorrateo={celda.zonaMetropolitana.prorrateo}
+          />
+        )}
         {esColumnaDistritalInvertida && celda.municipioEnDistritoPct !== undefined && celda.municipioEnDistritoPct < 99.95 && (
           <p className="text-[10px] italic text-gray-eske-60 dark:text-[#6D8294]">
             {celda.municipioEnDistritoPct}% de este municipio pertenece a este distrito.
@@ -253,6 +293,15 @@ function Celda({
         <BotonesDesgloseEstado celda={celda} onAbrir={onAbrirDesglose} />
         {celda.agregacionPlural && (
           <BloqueAgregacionPlural agregacionPlural={celda.agregacionPlural} onVer={onVerAgregacionPlural} />
+        )}
+        {mostrarBotonDetalle && (
+          <button
+            type="button"
+            onClick={onVerDetalle}
+            className="block text-[11px] text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
+          >
+            Ver detalle
+          </button>
         )}
       </div>
     );
@@ -284,13 +333,21 @@ function Celda({
   );
 }
 
-export default function FontanaComparativeTable({ sesionId, columnas, indicadores, onQuitar, quitando, territorioNivel, modduloProjectId, retornoUrl }: Props) {
+export default function FontanaComparativeTable({ sesionId, columnas, indicadores, onQuitar, quitando, territorioNivel, territorio, modduloProjectId, retornoUrl }: Props) {
   // Configuración del modal de desglose abierto — un modal a la vez,
   // cada apertura es independiente (fetch propio, nunca comparte estado
   // entre indicadores). scope="distrito" (Ver datos municipales) o
   // scope="estado" (Ver municipios/distritos del estado, Encargo 2).
   const [modalConfig, setModalConfig] = useState<ModalConfig | null>(null);
   const indicadorModal = indicadores.find((i) => i.id === modalConfig?.indicadorId);
+  // Modo B (2026-08-24) — modal de detalle (F5-6/F5-8), estado separado
+  // de `modalConfig` (shape/fetch totalmente distinto, nunca comparten
+  // componente). La lista de municipios y el principal (primero del
+  // array, mismo criterio que resolverPrimerMunicipio()) se derivan una
+  // sola vez del territorio, no por indicador.
+  const [indicadorDetalle, setIndicadorDetalle] = useState<"F5-6" | "F5-8" | null>(null);
+  const municipiosDetalle = derivarMunicipiosDetalle(territorio);
+  const municipioInicialDetalle = municipiosDetalle[0];
   if (indicadores.length === 0) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
@@ -348,6 +405,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                       onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                       onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
                       onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad, noResueltas: celda.agregacionPlural!.noResueltas })}
+                      onVerDetalle={() => setIndicadorDetalle(ind.id as "F5-6" | "F5-8")}
                     />
                   </div>
                 );
@@ -401,6 +459,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                           onVerDesgloseMunicipio={(tipoDistrito) => setModalConfig({ indicadorId: ind.id, scope: "municipio", tipoDistrito })}
                           onVerDesgloseNacional={(tipoElemento) => setModalConfig({ indicadorId: ind.id, scope: "nacional", tipoElemento })}
                           onVerAgregacionPlural={() => setModalConfig({ indicadorId: ind.id, scope: "seleccion", desglosePorUnidad: celda.agregacionPlural!.desglosePorUnidad, noResueltas: celda.agregacionPlural!.noResueltas })}
+                          onVerDetalle={() => setIndicadorDetalle(ind.id as "F5-6" | "F5-8")}
                         />
                       ) : null}
                     </td>
@@ -438,6 +497,16 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
           modduloProjectId={modduloProjectId}
           retornoUrl={retornoUrl}
           onClose={() => setModalConfig(null)}
+        />
+      )}
+      {indicadorDetalle && municipioInicialDetalle && (
+        <FontanaDetalleModal
+          sesionId={sesionId}
+          indicadorId={indicadorDetalle}
+          indicadorNombre={indicadores.find((i) => i.id === indicadorDetalle)?.nombre ?? indicadorDetalle}
+          municipios={municipiosDetalle}
+          municipioInicial={municipioInicialDetalle}
+          onClose={() => setIndicadorDetalle(null)}
         />
       )}
     </>

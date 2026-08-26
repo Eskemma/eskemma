@@ -18,6 +18,7 @@ import FontanaFamiliaTabs from "./FontanaFamiliaTabs";
 import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
 import { FAMILIA4_ORDEN, FAMILIA4_NOMBRES, FAMILIA4_DIFERIDOS, PAISES_REFERENCIA_F4, MEXICO_ISO3 } from "@/lib/fontana/familia4Catalogo";
+import { FAMILIA5_ORDEN, FAMILIA5_NOMBRES, FAMILIA5_DIFERIDOS } from "@/lib/fontana/familia5Catalogo";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import FontanaModduloButton from "./FontanaModduloButton";
@@ -38,6 +39,13 @@ interface FamiliaCatalogo {
   titulo: string;
   descripcion: string;
   color: string;
+  // Solo F5 (amarillo #FFD14A) — en modo claro ese amarillo no tiene
+  // suficiente contraste sobre fondo blanco (mismo problema ya resuelto
+  // en otras partes del sitio, ej. DimensionStatusGrid.tsx,
+  // PESTLPanelV2.tsx: texto café/`brown-eske-60` en claro, amarillo en
+  // oscuro). Cuando está presente, sustituye el `style={{color}}` en
+  // línea (que no puede expresar `dark:`) por estas clases de Tailwind.
+  tituloClassName?: string;
 }
 
 // Mismos colores ya aprobados en FontanaFamiliaTabs.tsx (Fontana_T10_Cierre_Paso4.md §5).
@@ -66,6 +74,15 @@ const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> =
     descripcion: "México frente a un set fijo de países de referencia de América Latina — Banco Mundial, CEPALSTAT, PNUD, RSF y Transparencia Internacional.",
     color: "#248CC1",
   },
+  F5: {
+    orden: FAMILIA5_ORDEN,
+    nombres: FAMILIA5_NOMBRES,
+    diferidos: FAMILIA5_DIFERIDOS,
+    titulo: "Familia 5 — Características territoriales",
+    descripcion: "Clima, tradiciones, actividad económica, zonas urbanas y riesgos ambientales del municipio — CONAGUA, INEGI/DENUE, SEDATU/CONAPO, CONEVAL e INECC.",
+    color: "#FFD14A",
+    tituloClassName: "text-brown-eske-60 dark:text-yellow-eske",
+  },
 };
 
 export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
@@ -84,7 +101,21 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
   const [agregando, setAgregando] = useState(false);
   const [seleccionAgregar, setSeleccionAgregar] = useState("");
 
-  const catalogo = CATALOGO_POR_FAMILIA[familiaActiva] ?? CATALOGO_POR_FAMILIA.F1!;
+  // BUG REAL corregido (2026-08-23): el fallback anterior (?? CATALOGO_POR_FAMILIA.F1!)
+  // reutilizaba en SILENCIO el catálogo completo de F1 (título,
+  // descripción, orden de indicadores) para cualquier familia sin
+  // entrada — pasó desapercibido cuando F5 se habilitó en
+  // FontanaFamiliaTabs.tsx antes de que esta tabla se completara.
+  // Nunca reutilizar datos de OTRA familia real como fallback — un
+  // catálogo faltante debe fallar de forma visible, no disfrazarse.
+  const catalogo: FamiliaCatalogo = CATALOGO_POR_FAMILIA[familiaActiva] ?? {
+    orden: [],
+    nombres: {},
+    diferidos: new Set(),
+    titulo: `Familia ${familiaActiva} — catálogo no configurado`,
+    descripcion: "Esta familia todavía no tiene un catálogo de indicadores configurado en la UI.",
+    color: "#6D8294",
+  };
 
   const cargarIndicadores = useCallback(async () => {
     setCargando(true);
@@ -248,7 +279,10 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
         onCambiar={setFamiliaActiva}
       />
 
-      <h2 className="text-base md:text-lg font-semibold mt-4 mb-1" style={{ color: catalogo.color }}>
+      <h2
+        className={`text-base md:text-lg font-semibold mt-4 mb-1 ${catalogo.tituloClassName ?? ""}`}
+        style={catalogo.tituloClassName ? undefined : { color: catalogo.color }}
+      >
         {catalogo.titulo}
       </h2>
       <p className="text-xs md:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-4">
@@ -291,7 +325,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
       ) : familiaActiva === "F4" ? (
         <FontanaF4Panel sesionId={sesion.sesionId} indicadores={indicadoresF4 ?? []} paisPrincipal={paisPrincipalF4} paisesReferencia={paisesReferenciaF4} onQuitar={handleQuitar} quitando={quitando} />
       ) : (
-        <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} modduloProjectId={sesion.modduloProjectId} retornoUrl={retornoUrl} />
+        <FontanaComparativeTable sesionId={sesion.sesionId} columnas={columnas} indicadores={indicadores ?? []} onQuitar={handleQuitar} quitando={quitando} territorioNivel={sesion.territorio.nivel} territorio={sesion.territorio} modduloProjectId={sesion.modduloProjectId} retornoUrl={retornoUrl} />
       )}
 
       <div className="mt-6 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] flex items-center gap-1">

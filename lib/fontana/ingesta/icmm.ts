@@ -148,7 +148,7 @@
 
 import JSZip from "jszip";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -176,8 +176,10 @@ interface CacheIcmm {
 let cache: CacheIcmm | null = null;
 let enVuelo: Promise<CacheIcmm> | null = null; // single-flight, mismo patrón que conapoMarginacion.ts/coneval.ts
 
+// FIX DE FONDO (Incidente 2, 2026-08-23) — ver nota en coneval.ts /
+// lib/geo/municipios.ts.
 function claveMunicipioPorNombre(estadoCve: string, nombre: string): string {
-  return `${estadoCve}|${normalizeGeoName(nombre)}`;
+  return `${estadoCve}|${claveCanonicaMunicipio(estadoCve, nombre)}`;
 }
 
 async function descargarYParsearIcmm(): Promise<CacheIcmm> {
@@ -205,7 +207,14 @@ async function descargarYParsearIcmm(): Promise<CacheIcmm> {
     const f = fila.trim();
     if (!f) continue;
     const [entStr, munStr, ...resto] = f.split(",");
-    const nombre = resto.join(",").trim();
+    // BUG REAL encontrado y corregido (Incidente 2, 2026-08-23): cuando
+    // el nombre de municipio trae una coma propia (ej. "Heroica Villa
+    // Tezoatlán de Segura y Luna, Cuna de la Independencia de Oaxaca"),
+    // el CSV lo envuelve en comillas dobles — el split(",") naive de
+    // arriba no las respeta y las deja como caracteres literales al
+    // reconstruir con resto.join(","), rompiendo la comparación por
+    // nombre para cualquier municipio con coma en su nombre oficial.
+    const nombre = resto.join(",").trim().replace(/^"+|"+$/g, "");
     if (!entStr || !munStr || !nombre) continue;
     nombrePorClaveIcmm.set(`${entStr.padStart(2, "0")}${munStr.padStart(3, "0")}`, nombre);
   }

@@ -24,7 +24,7 @@
 
 import { readFromBodega } from "@/lib/fontana/bodegaStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
+import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import { sumarConteo } from "@/lib/fontana/ingesta/nacionalAgregado";
 import type { Territorio } from "@/types/shared.types";
@@ -66,7 +66,15 @@ function resolverNombreMunicipio(territorio: Territorio): string | undefined {
 async function resolverMunicipioCveIter(estadoCve: string, municipioNombre: string): Promise<string | null> {
   const catalogo = await readFromBodega<Record<string, string>>(`iter_2020/catalogo_municipios/${estadoCve}.json`);
   if (!catalogo) return null;
-  return catalogo[normalizeGeoName(municipioNombre)] ?? null;
+  // FIX DE FONDO (Incidente 2, 2026-08-23) — el catálogo de este archivo
+  // se construye con el NOM_MUN propio de ITER (normalizeGeoName() sin
+  // alias, ver scripts/fontana-iter-pipeline.ts), no reconstruido con
+  // este fix. Se prueba primero la clave con alias (cubre los casos
+  // donde ITER usa la misma forma "canónica" que Sefix/INE) y, si no
+  // hay match, la clave sin alias (comportamiento previo, para no perder
+  // ningún match que ya funcionaba). Nunca se reescribe la bodega aquí.
+  const claveConAlias = claveCanonicaMunicipio(estadoCve, municipioNombre);
+  return catalogo[claveConAlias] ?? catalogo[normalizeGeoName(municipioNombre)] ?? null;
 }
 
 export async function resolverIndicadorIter(

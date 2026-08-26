@@ -56,7 +56,7 @@
 
 import * as XLSX from "xlsx";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -80,8 +80,13 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MOTIVO_OAXACA = "PNUD no publica IDH/Salud individual por municipio en Oaxaca en esta edición — solo agregados regionales";
 
+// Migrado a claveCanonicaMunicipio() (Incidente 2, alias table) — mismo
+// patrón ya usado en coneval.ts/conapoMarginacion.ts/bienestar.ts/
+// icmm.ts/iter.ts. Centralizado en esta única función: los 7 puntos de
+// join de este archivo (IDH/Salud/Educación/Ingreso/IDG) quedan
+// corregidos con este único cambio.
 function claveNombre(estadoCve: string, nombre: string): string {
-  return `${estadoCve}|${normalizeGeoName(nombre)}`;
+  return `${estadoCve}|${claveCanonicaMunicipio(estadoCve, nombre)}`;
 }
 
 interface CachePnud {
