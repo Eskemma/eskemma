@@ -45,6 +45,22 @@ export interface ValorIndicadorFontana {
     numMunicipios: number;
     prorrateo?: { pctEstado: number; numEstados: number };
   };
+  // Solo F3-4 (ensu.ts) — el valor es del Área Urbana de Interés de la
+  // ENSU completa a la que pertenece el municipio/distrito, no exclusivo
+  // de él. Campo DISTINTO de zonaMetropolitana a propósito (2026-08-27,
+  // decisión explícita): las áreas ENSU son el marco muestral propio de
+  // la encuesta INEGI, no necesariamente la misma definición SEDATU/
+  // CONAPO de Zona Metropolitana que usa F5-7 — no se verificó que
+  // coincidan exactamente en los 24 casos multi-municipio reales, así que
+  // el chip de UI (CoberturaAdvertencia, variante "area_ensu") nunca
+  // menciona "Zona Metropolitana" ni SEDATU/CONAPO. `prorrateo` presente
+  // solo en las 2 áreas que cruzan estado (La Laguna, Tampico — únicos
+  // casos reales confirmados en 2026-T2).
+  areaEnsu?: {
+    nombre: string;
+    numMunicipios: number;
+    prorrateo?: { pctEstado: number; numEstados: number };
+  };
 }
 
 export interface CeldaNoDisponible {
@@ -73,3 +89,47 @@ export function esValorDisponible(celda: CeldaFontana): celda is ValorIndicadorF
 // visual es peor que un dato ausente con explicación.
 export const MOTIVO_MUNICIPAL_EN_VALIDACION =
   "En validación — se detectó un problema de datos en este nivel, corrigiendo.";
+
+// Familia 3, Bloque 2 (2026-08-26) — 8 indicadores (F3-5/6/9-14) dependen
+// de Sefix-AI (T06, Investigación del electorado), app del ecosistema
+// Eskemma en pausa de desarrollo — NO del dashboard Sefix, que sí existe y
+// sí se consume hoy (ver ECEG). Motivo propio y distinto de
+// MOTIVO_CONECTOR_PENDIENTE (eceg.ts) a propósito: ese texto implica "en
+// el siguiente incremento de Fontana", que sería engañoso aquí — la
+// disponibilidad depende de que otra app retome desarrollo, sin fecha.
+export const MOTIVO_PENDIENTE_SEFIX_AI =
+  "Pendiente — se habilitará cuando Sefix-AI esté disponible";
+
+// F3-15 (Presencia de organizaciones sociales, RFOSC/CLUNI) — verificado
+// en vivo 2026-08-26: corresponsabilidad.gob.mx (connection refused) y
+// sii.bienestar.gob.mx/portal (HTTP 500) siguen caídos. Motivo propio,
+// visualmente distinto de MOTIVO_PENDIENTE_SEFIX_AI — aquí SÍ es la fuente
+// externa correcta y definitiva (no depende de otra app del ecosistema),
+// solo que su infraestructura está caída; reintentar en una próxima ronda.
+export const MOTIVO_RFOSC_CAIDO =
+  "Fuente no disponible — infraestructura de RFOSC/CLUNI caída, reintentar en una próxima ronda";
+
+// F3-4 (ENSU) — nivel Distrital: cuando los municipios que componen el
+// distrito pertenecen a MÁS de un área urbana de interés de la ENSU (o
+// mezclan municipios dentro y fuera de alguna), no hay un único valor
+// asignable sin mezclar territorios distintos. Motivo propio y explícito
+// — nunca "sin dato" silencioso ni el motivo genérico de nivel no
+// cubierto (aquí SÍ hay mecanismo, solo que este distrito en particular
+// no cae limpio dentro de una sola área).
+export const MOTIVO_ENSU_CRUZA_AREAS =
+  "Este distrito cruza más de un área de cobertura de la ENSU — no se puede asignar un único valor sin mezclar territorios distintos";
+
+// F3-4 (ENSU) — variante para conjuntos plurales de municipios (ZMG y
+// similares), mismo espíritu que MOTIVO_ENSU_CRUZA_AREAS pero con
+// redacción propia de "conjunto de municipios" en vez de "distrito".
+export const MOTIVO_ENSU_CRUZA_AREAS_PLURAL =
+  "Este conjunto de municipios cruza más de un área de cobertura de la ENSU — no se puede asignar un único valor sin mezclar territorios distintos";
+
+// F3-4 — caso DISTINTO del anterior (2026-08-27, gap autodetectado):
+// ningún municipio del conjunto/distrito está cubierto por ninguna de las
+// 90 áreas de la ENSU — no es que "crucen" varias áreas, es que ninguno
+// tiene cobertura. Mismo criterio ya aplicado a nivel Distrital
+// (lib/fontana/ingesta/ensu.ts) — se replica aquí para plural, en vez de
+// reutilizar el motivo de cruce para una causa distinta.
+export const MOTIVO_ENSU_SIN_COBERTURA_PLURAL =
+  "Ninguno de los municipios de este conjunto está dentro de las 90 áreas urbanas de interés de la ENSU";

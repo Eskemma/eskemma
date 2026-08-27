@@ -9,6 +9,27 @@
 // Familia 1, solo lo parecía porque era la única familia con indicadores
 // reales hasta ahora.
 
+import { resolverPresenciaOrganizacionesSociales } from "@/lib/fontana/ingesta/rfoscCluni";
+import { resolverHuelgasStps } from "@/lib/fontana/ingesta/stpsHuelgas";
+import { resolverGastoFederalizadoPerCapita } from "@/lib/fontana/ingesta/shcpGasto";
+import { resolverZonaAtencionPrioritaria } from "@/lib/fontana/ingesta/zap";
+import { resolverIndicePazMexico } from "@/lib/fontana/ingesta/iep";
+import {
+  resolverTasaHomicidiosDolosos,
+  resolverIncidenciaDelictiva,
+  resolverMunicipiosEstadoHomicidios,
+  resolverMunicipiosEstadoIncidencia,
+  resolverNumeradorDenominadorHomicidios,
+  FUENTE_ETIQUETA_SESNSP_TASA,
+} from "@/lib/fontana/ingesta/sesnsp";
+import { resolverVictimizacionEnvipe } from "@/lib/fontana/ingesta/envipe";
+import { resolverPercepcionInseguridadEnsu, resolverMunicipiosEstadoEnsu, celdaDesdeArea } from "@/lib/fontana/ingesta/ensu";
+import { resolverMunicipiosEstadoZap } from "@/lib/fontana/ingesta/zap";
+import { resolverMunicipiosEstadoRfosc } from "@/lib/fontana/ingesta/rfoscCluni";
+import { resolverAreaDeMunicipio } from "@/lib/fontana/ensuCatalogo";
+import { MOTIVO_ENSU_CRUZA_AREAS_PLURAL, MOTIVO_ENSU_SIN_COBERTURA_PLURAL, MOTIVO_RFOSC_CAIDO } from "@/lib/fontana/ingesta/types";
+import { MOTIVO_PENDIENTE_SEFIX_AI } from "@/lib/fontana/ingesta/types";
+import { FAMILIA3_PENDIENTES_SEFIX_AI } from "@/lib/fontana/familia3Catalogo";
 import {
   resolverIndicadorECEG as resolverIndicadorF1Eceg,
   FONTANA_ECEG_CONFIG,
@@ -153,7 +174,7 @@ import {
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
-import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto } from "@/lib/geo/municipios";
+import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto, getMunicipiosOptions } from "@/lib/geo/municipios";
 
 const MOTIVO_NIVEL_NO_CUBIERTO_ITER_COMPENDIO_ETC =
   "Nivel no cubierto — mecanismo de agregación no disponible para esta fuente";
@@ -392,6 +413,46 @@ export async function resolverIndicadorFontana(
   if (indicadorId === "F5-17") {
     return completarA4Celdas(await resolverRezagoVivienda(territorio));
   }
+  if (indicadorId === "F3-15") {
+    return completarA4Celdas(await resolverPresenciaOrganizacionesSociales(territorio));
+  }
+  if (indicadorId === "F3-16") {
+    return completarA4Celdas(await resolverHuelgasStps(territorio));
+  }
+  if (indicadorId === "F3-7") {
+    return completarA4Celdas(await resolverGastoFederalizadoPerCapita(territorio));
+  }
+  if (indicadorId === "F3-8") {
+    return completarA4Celdas(await resolverZonaAtencionPrioritaria(territorio));
+  }
+  if (indicadorId === "F3-17") {
+    return completarA4Celdas(await resolverIndicePazMexico(territorio));
+  }
+  if (indicadorId === "F3-1") {
+    return completarA4Celdas(await resolverTasaHomicidiosDolosos(territorio));
+  }
+  if (indicadorId === "F3-2") {
+    return completarA4Celdas(await resolverIncidenciaDelictiva(territorio));
+  }
+  if (indicadorId === "F3-3") {
+    return completarA4Celdas(await resolverVictimizacionEnvipe(territorio));
+  }
+  if (indicadorId === "F3-4") {
+    return completarA4Celdas(await resolverPercepcionInseguridadEnsu(territorio));
+  }
+  // Familia 3, Bloque 2 (2026-08-26) — F3-5/6/9-14 dependen de Sefix-AI
+  // (T06), app del ecosistema Eskemma en pausa de desarrollo. Bloque
+  // dedicado, NUNCA el fallback genérico de abajo: ese motivo
+  // ("Conector pendiente — disponible en el siguiente incremento de
+  // Fontana") sería engañoso aquí — la disponibilidad depende de que otra
+  // app retome desarrollo, sin fecha ni relación con el ciclo de releases
+  // de Fontana. Cero lógica de cálculo/conector para estos 8 IDs, por
+  // decisión explícita — ver docs/ecosistema/T10-fontana/ (plan de F3).
+  if (FAMILIA3_PENDIENTES_SEFIX_AI.has(indicadorId)) {
+    return (["nacional", "estatal", "distrital", "municipal"] as const).map(
+      (nivel) => ({ nivel, motivo: MOTIVO_PENDIENTE_SEFIX_AI })
+    );
+  }
 
   // Ningún indicador real (F1 o F2 con conector) llega aquí hoy — esta
   // rama solo la ejercitan los 17 indicadores diferidos de Familia 2
@@ -490,6 +551,25 @@ export async function resolverDesgloseMunicipiosEstado(
   }
   if (indicadorId === "F5-17") {
     return resolverMunicipiosEstadoRezagoVivienda(estadoCve, soloCves);
+  }
+  // Familia 3, Gap B (2026-08-27) — ninguno de estos 4 IDs tenía rama
+  // aquí, causa (junto con el registry no subido a Storage, Gap A) de que
+  // la agregación plural mostrara el motivo genérico "sin regla de
+  // agregación" para todo el Bloque 1 (hallazgo real, proyecto ZMG).
+  if (indicadorId === "F3-1") {
+    return resolverMunicipiosEstadoHomicidios(estadoCve, soloCves);
+  }
+  if (indicadorId === "F3-2") {
+    return resolverMunicipiosEstadoIncidencia(estadoCve, soloCves);
+  }
+  if (indicadorId === "F3-8") {
+    return resolverMunicipiosEstadoZap(estadoCve, soloCves);
+  }
+  if (indicadorId === "F3-4") {
+    return resolverMunicipiosEstadoEnsu(estadoCve, soloCves);
+  }
+  if (indicadorId === "F3-15") {
+    return resolverMunicipiosEstadoRfosc(estadoCve, soloCves);
   }
   return null;
 }
@@ -941,6 +1021,15 @@ export interface ResultadoAgregacionPlural {
 
 const SIN_CLASIFICAR_MOTIVO = "Este indicador aún no tiene definida su regla de agregación territorial";
 
+// Familia 3 (2026-08-27) — fuentes confirmadas de nivel ESTATAL
+// únicamente, sin mecanismo municipal en absoluto (verificado en la
+// construcción original de cada adaptador, no una limitación temporal):
+// SHCP (F3-7), STPS (F3-16), ENVIPE (F3-3), IEP (F3-17). Un conjunto
+// plural de municipios no puede combinar un dato que la fuente nunca
+// publicó por municipio — motivo específico en vez de intentar (y fallar
+// en silencio hacia) el mecanismo genérico.
+const INDICADORES_SOLO_ESTATAL_SIN_MUNICIPAL = new Set(["F3-3", "F3-7", "F3-16", "F3-17"]);
+
 function nivelCeldaParaTerritorio(nivel: Territorio["nivel"]): CeldaFontana["nivel"] {
   if (nivel === "estatal") return "estatal";
   if (nivel === "distrito_federal" || nivel === "distrito_local" || nivel === "distrito") return "distrital";
@@ -1088,6 +1177,34 @@ async function calcularTasaPonderada(
     };
   }
 
+  // F3-1 (SESNSP, homicidios dolosos por 100k) — Gap B (2026-08-27).
+  // numerador = carpetas de homicidio doloso, denominador = población
+  // municipal CONAPO del mismo año — sumados por separado y divididos UNA
+  // sola vez, mismo criterio que las 2 ramas de arriba. Unidad "por cada
+  // 100,000 habitantes" (×100,000), NO "%" — distinto multiplicador que
+  // el resto de las ramas de esta función.
+  if (indicadorId === "F3-1" && tipoElemento === "municipios") {
+    let numerador = 0;
+    let denominador = 0;
+    for (const [estadoCve, cves] of porEstado) {
+      const datos = await resolverNumeradorDenominadorHomicidios(estadoCve, cves);
+      for (const d of datos.values()) {
+        numerador += d.personas;
+        denominador += d.poblacion;
+      }
+    }
+    if (denominador === 0) {
+      return { nivel: nivelCelda, motivo: "Sin datos suficientes para reconstruir la tasa combinada" };
+    }
+    return {
+      nivel: nivelCelda,
+      valor: Math.round((numerador / denominador) * 100000 * 100) / 100,
+      unidad: "por cada 100,000 habitantes",
+      naturaleza: "estimacion_agregada",
+      fuenteEtiqueta: FUENTE_ETIQUETA_SESNSP_TASA,
+    };
+  }
+
   if (indicadorId in FONTANA_ECEG_CONFIG) {
     let numerador = 0;
     let denominador = 0;
@@ -1226,6 +1343,79 @@ export async function resolverAgregacionPlural(
       noResueltas,
     };
   }
+  // Familia 3 (2026-08-27) — mismo criterio que el corte de arriba, pero
+  // para fuentes que son de nivel ESTATAL únicamente (SHCP/F3-7, STPS/
+  // F3-16, ENVIPE/F3-3, IEP/F3-17 — ninguna publica por municipio,
+  // confirmado en la construcción original de cada adaptador). Motivo
+  // específico, nunca el genérico "Sin valor combinado disponible" que
+  // saldría si se dejara caer al mecanismo genérico sin bulk resolver.
+  if (tipoElemento === "municipios" && INDICADORES_SOLO_ESTATAL_SIN_MUNICIPAL.has(indicadorId)) {
+    return {
+      valorAgregado: {
+        nivel: nivelCelda,
+        motivo: "Esta fuente es de nivel estatal — no publica datos por municipio, no aplica a un conjunto de municipios.",
+      },
+      desglosePorUnidad: [],
+      noResueltas,
+    };
+  }
+  // F3-15 (RFOSC, gap autodetectado 2026-08-27) — `no_agregable` genérico
+  // deja `valorAgregado` en `null`, y el overwrite de route.ts cae al
+  // motivo GENÉRICO ("Sin valor combinado disponible para este
+  // indicador") en vez del motivo específico de fuente caída — que sí
+  // llega correctamente al desglose por unidad (resolverMunicipiosEstadoRfosc),
+  // pero nunca a la celda combinada sin este corte explícito.
+  if (indicadorId === "F3-15") {
+    return {
+      valorAgregado: { nivel: nivelCelda, motivo: MOTIVO_RFOSC_CAIDO },
+      desglosePorUnidad: [],
+      noResueltas,
+    };
+  }
+  // F3-4 (ENSU, 2026-08-27) — `no_agregable` genérico no alcanza aquí: SÍ
+  // hay un valor combinado válido cuando todos los municipios del
+  // conjunto caen en la MISMA área urbana de interés (decisión de Raúl).
+  // Se resuelve aparte del switch genérico de abajo (tipo="no_agregable"
+  // no dispara ninguna rama ahí) — consulta directa a ensuCatalogo.ts,
+  // barata (JSON local, sin red), independiente del bulk resolver que sí
+  // se usa para el desglose por unidad más abajo.
+  if (indicadorId === "F3-4" && tipoElemento === "municipios") {
+    const municipiosPlanos: { estadoCve: string; nombre: string }[] = [];
+    for (const [estadoCve, cves] of porEstado) {
+      const opciones = await getMunicipiosOptions(estadoCve);
+      for (const cve of cves) {
+        const nombre = opciones.find((o) => o.cve === cve)?.nombre;
+        if (nombre) municipiosPlanos.push({ estadoCve, nombre });
+      }
+    }
+    const areas = municipiosPlanos.map((m) => resolverAreaDeMunicipio(m.estadoCve, m.nombre));
+    let valorEnsuPlural: CeldaFontana;
+    // 2 causas distintas (gap autodetectado 2026-08-27, mismo criterio ya
+    // aplicado a nivel Distrital en ensu.ts): "ninguno cubierto" (motivo
+    // propio) vs. "cubiertos, pero en más de un área o mezcla dentro/
+    // fuera" (motivo de cruce) — nunca el mismo texto para ambas causas.
+    if (areas.length === 0 || areas.every((a) => a === null)) {
+      valorEnsuPlural = { nivel: nivelCelda, motivo: MOTIVO_ENSU_SIN_COBERTURA_PLURAL };
+    } else if (areas.some((a) => a === null)) {
+      valorEnsuPlural = { nivel: nivelCelda, motivo: MOTIVO_ENSU_CRUZA_AREAS_PLURAL };
+    } else {
+      const cds = new Set(areas.map((a) => a!.cd));
+      if (cds.size > 1) {
+        valorEnsuPlural = { nivel: nivelCelda, motivo: MOTIVO_ENSU_CRUZA_AREAS_PLURAL };
+      } else {
+        const area = areas[0]!;
+        const estadoCveRepresentativo = municipiosPlanos[0].estadoCve;
+        valorEnsuPlural = { ...celdaDesdeArea(nivelCelda, area, estadoCveRepresentativo) };
+      }
+    }
+    const desglose = (
+      await Promise.all([...porEstado.entries()].map(async ([estadoCve, cves]) => {
+        const elementos = await resolverMunicipiosEstadoEnsu(estadoCve, cves);
+        return elementos.map((e): ElementoAgregacionPlural => ({ ...e, estado: estadoCve }));
+      }))
+    ).flat();
+    return { valorAgregado: valorEnsuPlural, desglosePorUnidad: desglose, noResueltas };
+  }
 
   const desgloseGrupos = await Promise.all(
     [...porEstado.entries()].map(async ([estadoCve, cves]) => {
@@ -1240,6 +1430,16 @@ export async function resolverAgregacionPlural(
   let valorAgregado: CeldaFontana | null = null;
   if (tipo === "aditivo") {
     valorAgregado = await calcularAditivo(desglosePorUnidad, nivelCelda);
+    // F3-8 (ZAP, 2026-08-27) — calcularAditivo es genérico: suma
+    // celda.valor (1/0 por municipio) correctamente, pero el `unidad` que
+    // hereda es el de la ÚLTIMA celda disponible ("Sí — ..."/"No está...",
+    // pensado para lectura individual, no para el total). Se sobrescribe
+    // aquí con un texto propio del AGREGADO ("N de M municipios..."),
+    // decisión de Raúl 2026-08-27 — el desglose por unidad conserva el
+    // texto Sí/No original sin cambios.
+    if (indicadorId === "F3-8" && valorAgregado && esValorDisponible(valorAgregado)) {
+      valorAgregado = { ...valorAgregado, unidad: `de ${desglosePorUnidad.length} municipios en ZAP rural` };
+    }
   } else if (tipo === "tasa_ponderada") {
     valorAgregado = await calcularTasaPonderada(indicadorId, tipoElemento, porEstado, nivelCelda);
   }

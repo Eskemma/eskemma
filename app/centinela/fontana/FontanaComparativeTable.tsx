@@ -174,7 +174,17 @@ function BloqueAgregacionPlural({
 }) {
   const { desglosePorUnidad, noResueltas, tipoCalculo } = agregacionPlural;
   const totalDeclaradas = desglosePorUnidad.length + noResueltas.length;
-  const etiquetaTipo = tipoCalculo ? ETIQUETA_TIPO_CALCULO[tipoCalculo] : "";
+  // FIX DE FONDO (2026-08-27, hallazgo real de Raúl — F3-7/F3-16 en
+  // proyecto plural mostraban "Combinado · ponderado/suma de 0 unidades"
+  // debajo de un motivo específico de "esta fuente es de nivel estatal,
+  // no aplica"): `tipoCalculo` viene de la clasificación del REGISTRY
+  // (agregacionPlural.tipo), independiente de si realmente se combinó
+  // algo — un early-exit de resolverAgregacionPlural (index.ts) puede
+  // devolver un motivo específico con `desglosePorUnidad: []` sin que eso
+  // cambie `tipoCalculo`. Gatear también por `desglosePorUnidad.length >
+  // 0`: sin unidades reales que combinar, no hay nada que decir aquí — el
+  // motivo específico ya es la explicación completa.
+  const etiquetaTipo = tipoCalculo && desglosePorUnidad.length > 0 ? ETIQUETA_TIPO_CALCULO[tipoCalculo] : "";
 
   return (
     <div className="space-y-0.5">
@@ -274,6 +284,14 @@ function Celda({
             nombreZona={celda.zonaMetropolitana.nombre}
             numMunicipios={celda.zonaMetropolitana.numMunicipios}
             prorrateo={celda.zonaMetropolitana.prorrateo}
+          />
+        )}
+        {celda.areaEnsu && (
+          <CoberturaAdvertencia
+            nivel="area_ensu"
+            nombreArea={celda.areaEnsu.nombre}
+            numMunicipios={celda.areaEnsu.numMunicipios}
+            prorrateo={celda.areaEnsu.prorrateo}
           />
         )}
         {esColumnaDistritalInvertida && celda.municipioEnDistritoPct !== undefined && celda.municipioEnDistritoPct < 99.95 && (

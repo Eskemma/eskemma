@@ -120,6 +120,15 @@ export interface CeldaTablaFontana {
     numMunicipios: number;
     prorrateo?: { pctEstado: number; numEstados: number };
   };
+  // Solo F3-4 (ENSU) — ver ValorIndicadorFontana.areaEnsu
+  // (lib/fontana/ingesta/types.ts). Dispara el chip "area_ensu" de
+  // CoberturaAdvertencia — NUNCA el mismo campo/chip que zonaMetropolitana
+  // (decisión explícita 2026-08-27, ver comentario ahí).
+  areaEnsu?: {
+    nombre: string;
+    numMunicipios: number;
+    prorrateo?: { pctEstado: number; numEstados: number };
+  };
   // Solo celdas "municipal" (tipo "municipios") y "distrital" (tipos
   // "distritos_fed"/"distritos_loc") de proyectos a nivel Estatal — ver
   // DesgloseEstatal arriba. También reutilizado por "distrital_federal"/

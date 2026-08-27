@@ -17,6 +17,7 @@ import FontanaF4Panel, { type IndicadorFilaF4 } from "./FontanaF4Panel";
 import FontanaFamiliaTabs from "./FontanaFamiliaTabs";
 import { FAMILIA1_ORDEN, FAMILIA1_NOMBRES, FAMILIA1_DIFERIDOS } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_ORDEN, FAMILIA2_NOMBRES, FAMILIA2_DIFERIDOS } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA3_ORDEN, FAMILIA3_NOMBRES, FAMILIA3_DIFERIDOS } from "@/lib/fontana/familia3Catalogo";
 import { FAMILIA4_ORDEN, FAMILIA4_NOMBRES, FAMILIA4_DIFERIDOS, PAISES_REFERENCIA_F4, MEXICO_ISO3 } from "@/lib/fontana/familia4Catalogo";
 import { FAMILIA5_ORDEN, FAMILIA5_NOMBRES, FAMILIA5_DIFERIDOS } from "@/lib/fontana/familia5Catalogo";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
@@ -65,6 +66,14 @@ const CATALOGO_POR_FAMILIA: Partial<Record<FamiliaFontanaId, FamiliaCatalogo>> =
     titulo: "Familia 2 — Socioeconómicos",
     descripcion: "Indicadores de pobreza, marginación, bienestar y acceso a servicios — fuentes oficiales (CONAPO, Bienestar, INEGI).",
     color: "#DB6015",
+  },
+  F3: {
+    orden: FAMILIA3_ORDEN,
+    nombres: FAMILIA3_NOMBRES,
+    diferidos: FAMILIA3_DIFERIDOS,
+    titulo: "Familia 3 — Geopolíticos",
+    descripcion: "Seguridad pública, gasto federalizado y organizaciones sociales — SESNSP, INEGI, SHCP, DOF y RFOSC. 8 indicadores electorales quedan reservados hasta que Sefix-AI esté disponible.",
+    color: "#D10F3F",
   },
   F4: {
     orden: FAMILIA4_ORDEN,

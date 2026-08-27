@@ -27,6 +27,7 @@ import {
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { FAMILIA1_NOMBRES, FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_NOMBRES, FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA3_NOMBRES, FAMILIA3_ORDEN } from "@/lib/fontana/familia3Catalogo";
 import { FAMILIA5_NOMBRES, FAMILIA5_ORDEN } from "@/lib/fontana/familia5Catalogo";
 import { FAMILIA4_NOMBRES, FAMILIA4_ORDEN, PAISES_REFERENCIA_F4, resolverPaisPrincipal } from "@/lib/fontana/familia4Catalogo";
 import { resolverIndicadorComparativoF4 } from "@/lib/fontana/ingesta/familia4";
@@ -181,22 +182,22 @@ export async function GET(
     return NextResponse.json({ indicadores: indicadoresF4, paisPrincipal, paisesReferencia: PAISES_REFERENCIA_F4 });
   }
 
-  if (familiaId !== "F1" && familiaId !== "F2" && familiaId !== "F5") {
+  if (familiaId !== "F1" && familiaId !== "F2" && familiaId !== "F3" && familiaId !== "F5") {
     return NextResponse.json(
       { error: "familia_no_disponible", mensaje: `Familia ${familiaId} aún no está disponible en Fontana.` },
       { status: 400 }
     );
   }
-  // F5 (Características territoriales) — Paso 4 de la implementación
-  // consolidada, 2026-08-23: mismo contrato geográfico que F1/F2
-  // (nacional/estatal/distrital/municipal), a diferencia de F4
-  // (comparación internacional, rama propia arriba) — se reutiliza el
-  // mismo flujo, ningún gate de desglose (municipal/distrital/nacional)
-  // reconoce IDs de F5 todavía, así que caen a "sin mecanismo" de forma
-  // segura (mismo comportamiento que cualquier indicador F1/F2 sin
-  // desglose construido).
+  // F3 (Geopolíticos) y F5 (Características territoriales) — mismo
+  // contrato geográfico que F1/F2 (nacional/estatal/distrital/municipal),
+  // a diferencia de F4 (comparación internacional, rama propia arriba) —
+  // se reutiliza el mismo flujo, ningún gate de desglose (municipal/
+  // distrital/nacional) reconoce IDs de F3/F5 todavía, así que caen a "sin
+  // mecanismo" de forma segura (mismo comportamiento que cualquier
+  // indicador F1/F2 sin desglose construido). F3 agregada 2026-08-26.
   const [ordenFamilia, nombresFamilia] =
     familiaId === "F2" ? [FAMILIA2_ORDEN, FAMILIA2_NOMBRES]
+    : familiaId === "F3" ? [FAMILIA3_ORDEN, FAMILIA3_NOMBRES]
     : familiaId === "F5" ? [FAMILIA5_ORDEN, FAMILIA5_NOMBRES]
     : [FAMILIA1_ORDEN, FAMILIA1_NOMBRES];
 
@@ -622,6 +623,7 @@ function construirCeldasTabla(
         fuenteEtiqueta: real.fuenteEtiqueta,
         ...(real.coberturaPct != null ? { coberturaPct: real.coberturaPct } : {}),
         ...(real.zonaMetropolitana ? { zonaMetropolitana: real.zonaMetropolitana } : {}),
+        ...(real.areaEnsu ? { areaEnsu: real.areaEnsu } : {}),
         ...municipiosEnDistritoField,
         ...desglosesEstadoField,
         ...tipoDistritoPropioField,

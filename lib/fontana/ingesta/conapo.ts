@@ -150,6 +150,52 @@ async function resolverRazDepMunicipal(estadoCve: string, municipioCve: string):
   return result;
 }
 
+// Población estatal a mitad de año (POB_MIT_ANIO) — mismo RESOURCE_ESTATAL
+// que resolverRazDepEstatal, agregado 2026-08-26 para F3-7 (Gasto
+// federalizado per cápita, SHCP) y reutilizable para F3-1 (Tasa de
+// homicidios per cápita, SESNSP) cuando se construya — ambos necesitan
+// población estatal por año, y esta es la fuente CONAPO ya verificada e
+// integrada en el proyecto (no una fuente nueva). `anio` opcional, default
+// ANO_VIGENTE — permite pedir un año histórico específico (ej. el mismo
+// ciclo del dato de SHCP/SESNSP que se está dividiendo), a diferencia de
+// resolverRazDepEstatal que siempre usa el año vigente del proyecto.
+export async function resolverPoblacionEstatal(estadoCve: string, anio: string = ANO_VIGENTE): Promise<number | null> {
+  const path = `conapo_poblacion_estatal/${estadoCve}_${anio}.json`;
+  const cached = await readFromBodega<{ poblacion: number }>(path);
+  if (cached) return cached.poblacion;
+
+  const cveGeo = parseInt(estadoCve, 10);
+  const records = (await ckanDatastoreSearch(RESOURCE_ESTATAL, { CVE_GEO: cveGeo, ANIO: parseInt(anio, 10) })) as Array<{ POB_MIT_ANIO?: number }>;
+  const rec = records[0];
+  if (!rec || typeof rec.POB_MIT_ANIO !== "number") return null;
+
+  await writeToBodega(path, { poblacion: rec.POB_MIT_ANIO });
+  return rec.POB_MIT_ANIO;
+}
+
+// Población municipal a mitad de año — mismo RESOURCE_MUNICIPAL que
+// resolverRazDepMunicipal, agregado 2026-08-26 para F3-1 (Tasa de
+// homicidios per cápita, SESNSP). Campo real confirmado en vivo:
+// `POB_MIT_MUN` (NO "POB_MIT_ANIO", ese nombre es solo del recurso
+// ESTATAL — verificado con Guadalajara 2025: POB_MIT_MUN=1,383,955,
+// POB_MIT_ENT=8,903,326, coincide exacto con resolverPoblacionEstatal("14",
+// "2025") — mismo dato de fondo, dos nombres de campo distintos según el
+// recurso). `anio` opcional, default ANO_VIGENTE, mismo criterio que
+// resolverPoblacionEstatal (alinear con el año del dato que se divide).
+export async function resolverPoblacionMunicipal(estadoCve: string, municipioCve: string, anio: string = ANO_VIGENTE): Promise<number | null> {
+  const claveConapo = `${parseInt(estadoCve, 10)}${municipioCve}`;
+  const path = `conapo_poblacion_municipal/${claveConapo}_${anio}.json`;
+  const cached = await readFromBodega<{ poblacion: number }>(path);
+  if (cached) return cached.poblacion;
+
+  const records = (await ckanDatastoreSearch(RESOURCE_MUNICIPAL, { CLAVE: claveConapo, ANO: anio })) as Array<{ POB_MIT_MUN?: number }>;
+  const rec = records[0];
+  if (!rec || typeof rec.POB_MIT_MUN !== "number") return null;
+
+  await writeToBodega(path, { poblacion: rec.POB_MIT_MUN });
+  return rec.POB_MIT_MUN;
+}
+
 export async function resolverRazonDependencia(territorio: Territorio): Promise<CeldaFontana[]> {
   const nacional = await resolverNacionalCelda();
 

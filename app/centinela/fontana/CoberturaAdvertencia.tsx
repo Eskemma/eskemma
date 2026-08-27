@@ -56,7 +56,14 @@ type Props =
   // `prorrateo` solo aplica en la celda Estatal de las 15 de 218 ZM que
   // cruzan más de un estado (Grupo F, Ronda 11) — cuando está ausente,
   // el valor es el total completo de la ZM sin prorratear.
-  | { nivel: "zona_metropolitana"; nombreZona: string; numMunicipios: number; prorrateo?: { pctEstado: number; numEstados: number } };
+  | { nivel: "zona_metropolitana"; nombreZona: string; numMunicipios: number; prorrateo?: { pctEstado: number; numEstados: number } }
+  // Familia 3, F3-4 (ENSU) — el valor mostrado es del Área Urbana de
+  // Interés de la ENSU completa (marco muestral propio de INEGI), NUNCA
+  // llamado "Zona Metropolitana" ni atribuido a SEDATU/CONAPO — no se
+  // verificó que la definición coincida exactamente en los 24 casos
+  // multi-municipio reales (2026-08-27). `prorrateo` solo en las 2 áreas
+  // que cruzan estado (La Laguna, Tampico, confirmadas en 2026-T2).
+  | { nivel: "area_ensu"; nombreArea: string; numMunicipios: number; prorrateo?: { pctEstado: number; numEstados: number } };
 
 // 100 - pct, mismo decimal que pct (ej. 97.9 -> 2.1) — evita el error de
 // float directo (100 - 97.9 = 2.099999999999998 en JS).
@@ -73,13 +80,15 @@ export default function CoberturaAdvertencia(props: Props) {
     props.nivel === "distrito" ? "Cobertura incompleta"
     : props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? "Nota sobre la fuente"
     : props.nivel === "zona_metropolitana" ? "Valor de zona metropolitana"
+    : props.nivel === "area_ensu" ? "Valor de área urbana ENSU"
     : "Nota sobre cobertura";
   // Un proyecto Municipal puede tener ambas columnas (Federal y Local)
   // visibles a la vez (ej. Cuernavaca) — cada tooltip se identifica sin
   // ambigüedad (cierre 2026-08-06). "fuente_mixta"/"fmi_no_disponible"/
-  // "zona_metropolitana" no tienen distrito asociado, no necesitan `tipo`.
+  // "zona_metropolitana"/"area_ensu" no tienen distrito asociado, no
+  // necesitan `tipo`.
   const tipo =
-    props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" || props.nivel === "zona_metropolitana"
+    props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" || props.nivel === "zona_metropolitana" || props.nivel === "area_ensu"
       ? null
       : props.tipoDistrito;
 
@@ -93,6 +102,18 @@ export default function CoberturaAdvertencia(props: Props) {
             {" "}Esta zona cruza {props.prorrateo.numEstados} estados; el valor mostrado es solo la porción real
             correspondiente a este estado (<strong>{props.prorrateo.pctEstado}%</strong> del total de la zona),
             prorrateada por población de sus localidades.
+          </>
+        )}
+      </>
+    ) : props.nivel === "area_ensu" ? (
+      <>
+        Este valor corresponde al área urbana de interés de la ENSU: <strong>{props.nombreArea}</strong>, que incluye{" "}
+        {props.numMunicipios} municipios — no es un dato exclusivo de este municipio.
+        {props.prorrateo && (
+          <>
+            {" "}Esta área cruza {props.prorrateo.numEstados} estados; el valor de población mostrado en el reparto es
+            solo la porción correspondiente a este estado (<strong>{props.prorrateo.pctEstado}%</strong> del total del
+            área), prorrateada por población de sus municipios.
           </>
         )}
       </>

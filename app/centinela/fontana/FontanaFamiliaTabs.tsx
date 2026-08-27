@@ -8,8 +8,7 @@
 // el Paso 2/4 — Fontana_T10_Cierre_Paso4.md §5), no la de PESTEL (que usa
 // un solo color para las 6 dimensiones).
 //
-// Familia 1, 2 y 4 están construidas — F3/F5 se muestran con su color y
-// contador (siempre 0) pero deshabilitadas, sin onClick real.
+// Familia 1, 2, 3, 4 y 5 están construidas (F3 agregada 2026-08-26).
 //
 // Ronda 6 (2026-08-22) — 2 motivos de pestaña deshabilitada, cada uno con
 // su propio tooltip visible (requisito de esta ronda, no opcional — antes
@@ -38,7 +37,7 @@ const FAMILIAS: FamiliaTabInfo[] = [
   { id: "F5", nombre: "Características territoriales", color: "#FFD14A" },
 ];
 
-const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1", "F2", "F4", "F5"];
+const FAMILIAS_DISPONIBLES: FamiliaFontanaId[] = ["F1", "F2", "F3", "F4", "F5"];
 const MOTIVO_CONECTOR_PENDIENTE = "Conector pendiente — esta familia todavía no tiene indicadores con fuente real conectada.";
 
 interface Props {

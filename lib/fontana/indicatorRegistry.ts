@@ -88,10 +88,36 @@ export interface IndicadorRegistro {
   definicion?: string;
   mecanismoAcceso:
     | "api_token"
+    // Inventario completo de valores ya en uso en el JSON del registry
+    // pero ausentes del tipo, encontrado 2026-08-26 al agregar
+    // "pendiente_app_ecosistema" (Familia 3, Bloque 2) — loadIndicatorRegistry
+    // castea el JSON sin validar en runtime, así que estos desajustes
+    // nunca fallaban, pero tampoco eran correctos:
+    //   - "api_ckan" (F2-7, F2-8) — API CKAN pública de datos.gob.mx, sin
+    //     token (distinto de "api_token").
+    //   - "api_en_vivo" (F2-1, F2-2, F2-14) — llamada en vivo a INEGI-PM
+    //     2024 en cada request, sin bodega intermedia.
+    //   - "descarga_directa_con_fallback_curado" (F5-2) — descarga directa
+    //     (CONAGUA) con contenido curado como respaldo cuando la fuente
+    //     falla.
+    // Los 3 se agregan aquí. No se investigó si hay más huecos de tipo en
+    // ningún otro campo del registry (`naturaleza`, `estado`, etc.) — solo
+    // se auditó `mecanismoAcceso`, que es el campo tocado en esta ronda.
+    | "api_ckan"
+    | "api_en_vivo"
     | "descarga_directa"
+    | "descarga_directa_con_fallback_curado"
     | "descarga_navegador_headless"
     | "curacion_manual"
-    | "consumo_interno_sefix";
+    | "consumo_interno_sefix"
+    // Familia 3, Bloque 2 (2026-08-26) — indicador que depende de OTRA app
+    // del ecosistema Eskemma sin conector construido todavía (ej.
+    // Sefix-AI/T06, en pausa de desarrollo) — distinto de
+    // "consumo_interno_sefix", que ya identifica el consumo REAL y vigente
+    // de otro módulo (ECEG vía el dashboard Sefix). Genérico a propósito:
+    // sirve como patrón para cualquier futura dependencia de otra app del
+    // ecosistema en el mismo estado (definido, sin conector aún).
+    | "pendiente_app_ecosistema";
   niveles: NivelIndicador[];
   frecuenciaActualizacion: string;
   ultimaVerificacion: string;
