@@ -95,6 +95,20 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Dictado de voz del chat de Fontana (Web Speech API): necesita el
+        // micrófono. Solo esta ruta lo habilita; el resto del sitio mantiene
+        // el `microphone=()` global de arriba. Va DESPUÉS del bloque global
+        // para que gane esta entrada (Next.js: última coincidencia con la
+        // misma `key` prevalece).
+        source: '/centinela/fontana',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(self), geolocation=()',
+          },
+        ],
+      },
     ];
   },
 

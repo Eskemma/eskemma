@@ -374,6 +374,7 @@ firebase functions:secrets:set BANXICO_TOKEN
 | `pestel_jobs` | Estado de jobs (`pending/running/completed/failed`) |
 | `pestel_raw_articles` | Artículos crudos del scraper |
 | `pestel_alerts` | Alertas por umbral de riesgo |
+| `fontana_sesiones` | Sesiones de Fontana (T10) — selección de indicadores por familia, `canvasItems[]`. Subcolecciones append-only: `mensajes` (chat del agente), `adjuntos` (texto extraído de archivos del usuario — nunca el binario; purga a 90 días) |
 | `notifications` | Notificaciones in-app |
 | `newsletter_subscribers` | Suscriptores |
 | `resources` | Recursos descargables |
@@ -506,6 +507,90 @@ son negociables y aplican a todas las etapas, incluyendo las futuras E6-E8.
 
 ---
 
+## Fontana (T10) — Capa conversacional
+
+Detalle completo: `docs/ecosistema/T10-fontana/` y `_docs/fontana-t10-contexto-desarrollo.md`.
+
+**UI (`app/centinela/fontana/`)** — `FontanaMain` (header) → `FontanaWorkspace`
+con 2 pestañas:
+- **Indicadores** (`FontanaIndicadoresAccordion`): acordeón horizontal de las 5
+  familias, una abierta a la vez. Carga perezosa por familia con caché en
+  estado local; mutar la selección (añadir/quitar) invalida esa caché.
+  F1/F2/F3/F5 → `FontanaComparativeTable`; F4 → `FontanaF4Panel` (shape propio).
+- **Fontana** (`FontanaCanvasTab`): lienzo de `FontanaSesion.canvasItems[]`
+  (`FontanaCanvasItemCard` — resumen / grafica / tabla / desglose).
+
+**Agente "Fontana"** (`FontanaAgentBubble` + `app/components/shared/chat/*`):
+burbuja persistente + panel en `ResponsivePanel` (sidebar derecho desktop, con
+auto-open; bottom sheet mobile, sin auto-open). SSE en `POST /api/fontana/chat`
+con **tool use real** del SDK Anthropic (`lib/fontana/agente/`):
+- `consultar_indicador` — valor de un indicador en el territorio de la sesión;
+  `compararNiveles: true` (default recomendado) devuelve `nivelesComparados`.
+  Narrativos F5 (F5-1/3/4/5/9/10) van a `GET .../sesion/[id]/narrativa`.
+- `consultar_indicador_territorio_externo` — indicador en un estado/municipio
+  DISTINTO al del proyecto, solo cuando el usuario lo nombra explícitamente.
+  `GET .../consulta-territorio` — resuelve el nombre vía `claveCanonicaMunicipio`;
+  `ambiguo` si el municipio se repite entre estados (el agente pregunta). Fase 1:
+  solo lectura, sin Canvas.
+- `consultar_detalle_indicador` — lista de entidades detrás de un
+  conteo/clasificación; solo F3-8 (municipios ZAP), F5-6 (giros DENUE), F5-8
+  (localidades GACP), vía `GET .../familia/[familiaId]/detalle`.
+- `listar_indicadores_familia` — indicadores activos + `catalogoCompleto` de
+  UNA familia; el agente NUNCA enumera de memoria.
+- `listar_indicadores_activos_todas_familias` — las 5 familias en 1 llamada
+  (evita encadenar 5).
+- `generar_visualizacion` — crea un `canvasItem` (`resumen` / `grafica` /
+  `tabla` / `desglose` / `distribucion`). `distribucion` (F1-2, F1-11, F1-12,
+  F2-12) = desglose de categorías dentro de un nivel; distinto de `grafica`
+  (mismo indicador entre niveles). Rechaza F4. Todos los tipos llevan
+  `fuenteEtiqueta`. El agente NUNCA anuncia el resultado en el mismo turno.
+- `navegar_pestana` — cambia de pestaña / abre familia.
+
+Las líneas de trazabilidad de herramientas (`toolCalls`) se persisten con el
+mensaje pero **no se renderizan al usuario** — el chat muestra un indicador
+genérico "Consultando datos…". Los IDs de indicador (`F<n>-<n>`) NUNCA
+aparecen en la prosa dirigida al usuario. Ver `app/components/shared/chat/`.
+
+**Metadata de las 5 familias** (nombre, descripción, color): fuente única en
+`lib/fontana/familias.ts` (`FAMILIAS_FONTANA` / `FAMILIA_META`) — la consumen el
+acordeón, las cards del Canvas, `tools.ts` y el system prompt del agente. Nunca
+re-hardcodear en otro sitio. La LISTA de indicadores por familia sale del
+registry vía `/api/fontana/familia/[familiaId]`, nunca hardcodeada.
+
+**Regla no negociable**: el agente SOLO responde con datos devueltos por una
+herramienta — nunca con conocimiento propio. Los datos salen de los endpoints
+ya existentes (`familia/[familiaId]`, `narrativa`), nunca de `resolverIndicadorFontana`
+importado directo ni de una fuente paralela.
+
+**Persistencia**: `FontanaSesion.canvasItems[]` (campo, aditivo) + subcolección
+append-only `fontana_sesiones/{sesionId}/mensajes` (`GET .../mensajes` para
+rehidratar). Sin store cliente nuevo — `useState` + endpoints.
+
+**Adjuntar archivo (2026-09-01)**: el composer sube archivos a
+`POST /api/fontana/sesion/[id]/adjunto` (multipart). Se extrae SOLO el texto
+(extractor compartido `lib/moddulo/attachments.ts` — PDF/DOCX/XLSX/TXT/CSV,
+XLSX vía `exceljs`), **nunca el binario** (ni en Storage ni temporalmente).
+Validación de tipo real en servidor (magic bytes), límite 10 MB, texto
+truncado a 50 000 chars. Se guarda en la subcolección append-only
+`fontana_sesiones/{id}/adjuntos` (`{ id, nombreArchivo, textoExtraido,
+tipoMime, cargadoEn: Timestamp }`). El chat antepone ese texto al turno como
+**contexto** (`lib/fontana/agente/adjuntosContexto.ts`, presupuesto 60 000
+chars), nunca como fuente de datos. Borrado en cascada con la sesión
+(`recursiveDelete`) + purga automática a los 90 días
+(`functions/src/fontana/purgeAdjuntos.ts`, `onSchedule` cada 24 h — requiere
+`firebase deploy --only functions`).
+
+**Dictado de voz (2026-09-01)**: botón de micrófono en el composer sobre la
+Web Speech API nativa (`useSpeechDictation`, `es-MX`). Texto editable, sin
+auto-envío. Estado explícito de navegador no soportado. `next.config.ts`
+relaja `Permissions-Policy: microphone=(self)` **solo** para
+`/centinela/fontana` (el resto del sitio mantiene `microphone=()`).
+
+**Patrón reutilizable**: `docs/ecosistema/patrones-compartidos/agente-conversacional.md`
+(referencia para Sefix-AI T06 y apps futuras).
+
+---
+
 ## Moddulo — Arquitectura
 
 9 fases secuenciales por proyecto:
@@ -621,7 +706,12 @@ firebase functions:log
 |------|---------|-----------|
 | Drift `capacidades` XPCTO (3 vs. 4 subcampos) | El FAT 2.0 (Fase 1, variable C) define 4 dimensiones: Financiero, Humano, Organizacional, Material. `types/moddulo.types.ts` (`XPCTO.capacidades`) solo tiene 3 campos: `financiero`, `humano` (comentario: "Equipo y estructura organizacional" — fusiona Humano+Organizacional), `logistico` (comentario: "Infraestructura y medios operativos" ≈ Material). No bloquea funcionalidad actual; evaluar si separar en 4 campos al tocar el wizard de F1 o el tipo `XPCTO`. | 26-07-16, auditoría snapshot XPCTO/Centinela |
 | Captura de distrito electoral sin estructura en `TerritorySelector.tsx` | TerritorySelector.tsx (compartido por Moddulo y PESTEL) captura el número de distrito electoral y la descripción de su cabecera en un único campo de texto libre, sin separación estructurada entre ambos. Fontana depende de parsear ese texto (vía `extraerCiudadCabecera()`, regex sobre la frase "con cabecera en X") para resolver la alcaldía/municipio dominante en proyectos de nivel distrito_federal/distrito_local — si el texto no sigue ese formato exacto (como el proyecto de prueba de CDMX, Distrito Local 27), Fontana no puede determinar el municipio y muestra el texto de "sin municipio definido" aunque el dato geográfico real sí exista en el catálogo de Fontana (`cabeceras_loc.json`). Recomendación evaluada y descartada: un selector/catálogo de distritos por país (mala UX fuera de México, catálogos inmanejables). Recomendación pendiente de evaluar en el chat de Moddulo: separar el campo actual en dos inputs de texto libre — (a) identificador del distrito, (b) descripción/cabecera — sin necesidad de catálogo por país, solo para que Fontana pueda cruzar por estado + identificador de distrito en vez de depender del parseo de una frase completa. Proyecto de prueba `nZvpYu4nnZrsw5hoGcVP` (CDMX, Distrito Local 27) se deja sin modificar deliberadamente, como caso de verificación para cuando se implemente el fix real. **Resuelto 26-08-16/17** por el rediseño de territorio (selector estructurado + `TipoAgregacionTerritorial`) — se deja la fila como registro histórico. | 26-08-12, revisión de consistencia Fontana T10 (Incremento 4) |
-| Clasificación `agregacionPlural` de F3/F4/F5 pendiente de poblar en el registry | `data/fontana/INDICATOR_REGISTRY.json` solo tiene 41 entradas (Familia 1+2) — Familia 3/4/5 (43 indicadores) no tienen pipeline de ingesta implementado en Fontana todavía (`app/api/fontana/familia/[familiaId]/route.ts` responde 400 explícito para esas familias), así que sus entradas no existen en el registry y no se puebla `agregacionPlural` para ellas (mismo criterio que `lib/sefix/agregacionElectoral.ts` en Fase 2 del rediseño de territorio: no construir datos especulativos sin consumidor real). La clasificación de los 84 indicadores completos (incluye F3/F4/F5) ya está evaluada por Raúl y documentada en `_docs/fontana-clasificacion-agregacion-plural.md` — cuando esas familias tengan pipeline real, poblar `agregacionPlural` de sus indicadores a partir de ese archivo directamente, sin re-derivar el criterio. | 26-08-17, Fase 3 del rediseño de territorio |
+| ~~Clasificación `agregacionPlural` de F3/F4/F5 pendiente de poblar~~ **RESUELTO** | Al cerrar Familias 3/4/5 (commits 26-08-22/25/27), el registry pasó de 41 a **86 entradas** con `agregacionPlural.tipo` clasificado en las 5 familias (verificado 26-08-27: `scripts/verify-fontana-agregacion-plural-cobertura.ts` → 86/86, 0 sin clasificar; `scripts/diff-fontana-registry.ts` → local == Storage, 0 diffs). `app/api/fontana/familia/[familiaId]/route.ts` ya NO responde 400 para F3/F4/F5 — soporta F1/F2/F3/F5 por el flujo geográfico común y F4 por su rama propia; el 400 solo aplica a un `familiaId` que no sea una de las 5. Se deja la fila como registro histórico. | 26-08-17, Fase 3 del rediseño de territorio |
+| Duplicación del primitivo de chat (shared/chat vs. ModduloChat/AdvisorPanel) | La capa conversacional de Fontana (T10) introdujo `app/components/shared/chat/` (`useChatStream`, `ChatBubble`, `ChatPanel`, `MarkdownContent`) — nuevos, inspirados en el patrón de `app/moddulo/components/ModduloChat.tsx` pero sin modificarlo. El loop de lectura SSE y el renderer markdown quedan duplicados entre `shared/chat/` y `ModduloChat.tsx` + `app/moddulo/proyecto/[projectId]/exploracion/components/AdvisorPanel.tsx`. Esos dos NO se tocaron esta ronda; migrarlos a los primitivos compartidos queda para un chat dedicado. | 26-08-27, capa conversacional de Fontana (T10) |
+| ~~Subcolección `mensajes` huérfana al borrar una sesión de Fontana~~ **RESUELTO** | El `DELETE` de `app/api/fontana/sesion/[sesionId]/route.ts` hacía solo `ref.delete()`, que en Firestore NO borra subcolecciones — cada sesión eliminada dejaba su `mensajes` huérfano. Detectado en la auditoría de adjuntos (2026-09-01). Corregido en la misma ronda al cambiar a `adminDb.recursiveDelete(ref)` (necesario de todos modos para la nueva subcolección `adjuntos`): arrastra `mensajes` y `adjuntos`. Se deja como registro. | 26-09-01, ronda de adjuntar archivo + dictado de voz |
+| Rate limiting del fallback de visión (PDF sin texto nativo → Claude) | Todo PDF cuyo texto nativo sea < 120 chars dispara una llamada a `claude-sonnet-4-6` como visión, sin límite por sesión ni usuario. Aplica a `lib/moddulo/attachments.ts` (chat de Moddulo, import PESTEL, adjuntos de Fontana) y a `app/api/centinela/pestel/project/[projectId]/upload-source/route.ts`. No se implementó un límite básico esta ronda (no era trivial de añadir limpio al reusar el extractor). Vector de coste, no de seguridad. | 26-09-01, ronda de adjuntar archivo + dictado de voz |
+| Purga de adjuntos de Fontana: sin `collectionGroup`, deploy manual | `functions/src/fontana/purgeAdjuntos.ts` (`onSchedule` cada 24 h, primera función programada del repo que fija `timeoutSeconds`/`memory`) **itera sesión por sesión** en vez de una query `collectionGroup("adjuntos")` — decisión explícita para no introducir el primer índice `COLLECTION_GROUP` del repo. Migrar solo si el conteo de sesiones lo hace lento. La purga no corre hasta `firebase deploy --only functions`. `next.config.ts` ahora tiene un override de `Permissions-Policy` por ruta (`/centinela/fontana`, `microphone=(self)`). | 26-09-01, ronda de adjuntar archivo + dictado de voz |
+| Functions emulator + `firebase-functions` desactualizado: `admin.firestore.Timestamp` sale `undefined` | Al probar `purgeAdjuntos` en el Functions emulator (firebase-tools 15, `firebase-functions ^6.0.1`), `admin.firestore.Timestamp.fromMillis(...)` dentro del handler tira `Cannot read properties of undefined (reading 'fromMillis')` — el runtime parcheado del emulador no expone el estático `Timestamp` en el namespace `firestore`. **No es un bug del código de producción** (en GCF real funciona); es del emulador con esta versión de `firebase-functions` (el propio emulador avisa "outdated version"). Mitigación aplicada en `purgeAdjuntos.ts`: el `cutoff` se construye como `Date` (`new Date(...)`), que Firestore convierte a `Timestamp` en la query de forma transparente. Si alguien prueba otra función programada en el emulador y necesita un `Timestamp`, construirlo desde una instancia (`admin.firestore().Timestamp` no; usar `Date` o `admin.firestore.Timestamp` importado de `firebase-admin/firestore`) o actualizar `firebase-functions`. Nota adicional: el emulador de Firestore exige **Java ≥ 21** (firebase-tools 15). | 26-09-01, verificación en desarrollo de `purgeAdjuntos` |
 | Sin vista previa de contenido en M2 (F3-Investigación) | M2 no tiene ningún mecanismo de vista previa del contenido de un resultado antes de que el usuario lo apruebe — aplica a Canal 2, Canal 3 y Canal 1 (Fontana) por igual, ninguno está resuelto. Hoy la aprobación se basa solo en metadatos (pregunta, origen, cobertura), sin que el usuario vea el contenido real. Pendiente de diseño, fuera del alcance de Fontana — afecta a F3 en general. Suspendido deliberadamente: se aborda en un chat dedicado a M2, no en el de Fontana/Canal 1. | 26-08-19, verificación en navegador de Fontana T10 (Escenarios b/c + Canal 1) |
 | Incidente CVE_MUN INE-vs-INEGI (Fontana F1/F2) — **RESUELTO** | `resolveMunicipioCve()`/`getMunicipiosOptions()` (`lib/geo/municipios.ts`, numeración INE) divergía del CVE_MUN oficial en ~55-63% de los municipios (1,573/2,848 reverificado). Usado como join externo en `coneval.ts` (F2-1/F2-2/F2-3/F2-14), `conapoMarginacion.ts` (F2-4) y `bienestar.ts` (F2-7/F2-8) — producía el valor de OTRO municipio, sin error visible. Paso 1: mitigación de emergencia (aviso "En validación..."), verificada en navegador. Paso 2: `eceg.ts` verificado NO expuesto (32/32 estados, 0 divergencias — join internamente consistente, INE contra INE). Paso 3: auditoría de producción — 1 entrega afectada encontrada (proyecto `fvpuanYx7EYhdV3WLqBr`), confirmada como cuenta de pruebas interna, no cliente real, sin necesidad de notificación; datos marcados para reprocesar tras el fix. Paso 4: fix de fondo — los 3 adaptadores migrados a join por NOMBRE (mismo patrón ya aprobado en `icmm.ts`), incluyendo el path de agregación distrital ponderada (`resolverNumeradorDenominadorMunicipios`, vulnerable por la misma causa, no estaba en la lista original) — verificado con 18 municipios reales de 8 estados, valores correctos por municipio (no más "El Grullo" al pedir Guadalajara). Paso 5: documento central `docs/ecosistema/T10-fontana/claves-geograficas-no-confiables.md`. | 26-08-23, verificación en vivo de `gacp.ts` (Familia 5) |
 | Discrepancia menor F1-1 (ECEG) en Tuxtla Gutiérrez, Chiapas | Spot-check del incidente CVE_MUN (arriba) comparó valores reales de F1-1 (Población Total) contra la cifra oficial INEGI (Censo 2020, Comunicado 37/21): Tuxtla Gutiérrez muestra 604,089 en Fontana vs. 604,147 oficial — diferencia real de 58 habitantes (0.0096%). Causa distinta al incidente de CVE_MUN: `eceg-data-pipeline.ts` (`buildMunicipiosData`) calcula el nivel municipal sumando secciones electorales reasignadas a municipio vía `SECCION.shp`, no leyendo el total censal oficial por municipio directamente — artefacto de reconciliación sección↔municipio en el borde entre municipios. Otros 4 territorios verificados en el mismo spot-check (Nacional, Chiapas estatal, Aldama, Benemérito de las Américas) coincidieron exactamente. Diferido deliberadamente — prioridad del incidente de CVE_MUN era mayor. Pendiente: muestrear más municipios para confirmar si es un caso aislado o un patrón sistemático en el borde sección/municipio. | 26-08-23, verificación Paso 2 del incidente CVE_MUN |
@@ -638,3 +728,5 @@ firebase functions:log
 | 26-03-27 | PESTEL F3 cont. | Hub multi-territorio + página análisis individual |
 | 26-03-27 | PESTEL rediseño E1-E5 | Rediseño completo alineado con specs: wizard E1-E3, semáforo E4, análisis por dimensión E5, tipos V2, nuevas colecciones Firestore |
 | 26-03-28 | PESTEL correcciones post-E5 | Persistencia análisis (latest-analysis endpoint), fix economicData INEGI/Banxico→Claude, contexto legal LGIPE/INE, citación fuentes, integración Sefix (datos electorales dim-P), semáforo amarillo texto negro, principios de diseño en CLAUDE.md |
+| 26-08-27 | Fontana T10 — capa conversacional | Estructura de 2 pestañas (Indicadores / Fontana-Canvas) que reemplaza la vista única de tabla; acordeón de 5 familias con carga perezosa + caché. Agente "Fontana" con tool use real del SDK Anthropic (`consultar_indicador`, `generar_visualizacion`, `navegar_pestana`) — solo responde con datos de una llamada a herramienta. Endpoints nuevos: `POST /api/fontana/chat` (SSE), `GET .../sesion/[id]/mensajes`, `GET .../sesion/[id]/narrativa`. Persistencia: `FontanaSesion.canvasItems[]` + subcolección `fontana_sesiones/{id}/mensajes`. Primitivos compartidos nuevos: `app/components/shared/{Tabs,ResponsivePanel,chat/*}`. |
+| 26-09-01 | Fontana T10 — adjuntar archivo + dictado de voz | Composer con adjuntar archivo (PDF/DOCX/XLSX/TXT/CSV; extrae SOLO texto vía `lib/moddulo/attachments.ts` + `exceljs`, nunca el binario; validación de tipo real server-side; endpoint `POST .../sesion/[id]/adjunto`; subcolección append-only `adjuntos`; contexto por turno con presupuesto de 60 000 chars) y dictado de voz (Web Speech API nativa, `useSpeechDictation`, `es-MX`, sin auto-envío, estado de navegador no soportado; `Permissions-Policy: microphone=(self)` solo en `/centinela/fontana`). Retención: `recursiveDelete` en cascada (también cierra el hallazgo de `mensajes` huérfano) + purga a 90 días (`functions/src/fontana/purgeAdjuntos.ts`, `onSchedule` cada 24 h; lógica en `purgarAdjuntosVencidos()` separada del wrapper, verificada en el emulador 26-09-01 — deploy a producción pendiente, ver `docs/ecosistema/T10-fontana/purga-adjuntos-runbook.md`). Doc de patrón reutilizable: `docs/ecosistema/patrones-compartidos/agente-conversacional.md`. `lib/moddulo/attachments.ts` pasa de 5 a 6 consumidores. |

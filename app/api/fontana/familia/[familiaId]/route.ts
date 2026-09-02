@@ -1,9 +1,12 @@
 // app/api/fontana/familia/[familiaId]/route.ts
 // GET ?sesionId=  — indicadores de una familia (mínimos + selección del
 // usuario) con su valor por nivel geográfico. Un endpoint por familia
-// (Arquitectura Paso3 v2, §5.1) — F1 y F2 implementadas (Incremento 1 de
-// Familia 2, 2026-08-07); F3-F5 responden 400 explícito, no un array
-// vacío silencioso.
+// (Arquitectura Paso3 v2, §5.1). F1/F2/F3/F5 pasan por el flujo geográfico
+// común (nacional/estatal/distrital/municipal); F4 tiene rama propia al
+// inicio del handler (shape `fila` de países). El 400 explícito solo
+// aplica a un familiaId que no sea una de las 5 — nunca un array vacío
+// silencioso. (Las 5 familias del registry están pobladas y clasificadas,
+// 86 indicadores — verificado 2026-08-27.)
 //
 // Columnas por nivel: el tipo de proyecto decide el patrón ofrecido
 // (§5.2) — electoral → Nacional/Estatal/Distrital/Municipal; el resto →
@@ -624,6 +627,9 @@ function construirCeldasTabla(
         ...(real.coberturaPct != null ? { coberturaPct: real.coberturaPct } : {}),
         ...(real.zonaMetropolitana ? { zonaMetropolitana: real.zonaMetropolitana } : {}),
         ...(real.areaEnsu ? { areaEnsu: real.areaEnsu } : {}),
+        // Desglose de categorías (F1-2/F1-11/F1-12/F2-12) — la tabla no lo
+        // usa; el Canvas "distribucion" del agente sí.
+        ...(real.distribucion ? { distribucion: real.distribucion } : {}),
         ...municipiosEnDistritoField,
         ...desglosesEstadoField,
         ...tipoDistritoPropioField,

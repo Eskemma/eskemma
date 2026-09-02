@@ -98,6 +98,11 @@ export interface CeldaTablaFontana {
   naturaleza?: "dato_directo" | "calculo_directo" | "estimacion_modelada" | "estimacion_agregada" | "proxy_conceptual";
   fuenteEtiqueta?: string;
   motivo?: string;
+  // Desglose de categorías dentro de este nivel (grupos de edad, deciles,
+  // estado civil, urbano/rural) — `Record<clave cruda, número>`. La tabla
+  // comparativa NO lo consume; se propaga solo para el Canvas "distribucion"
+  // del agente (T10). Solo lo traen F1-2 / F1-11 / F1-12 / F2-12.
+  distribucion?: Record<string, number>;
   // Solo la celda "municipal" en proyectos distrito_federal, cuando el
   // indicador tiene mecanismo distrital de ECEG — cuántos municipios
   // componen el distrito del proyecto. > 1 habilita el botón "Ver datos
@@ -169,4 +174,18 @@ export interface CeldaTablaFontana {
     // indicador no está clasificado (el motivo ya lo deja explícito).
     tipoCalculo?: TipoAgregacionTerritorial;
   };
+}
+
+// Fila de indicador que consume FontanaComparativeTable.tsx — movida aquí
+// (T10 capa conversacional, 2026-08-27) desde ese componente cliente para
+// que types/fontana.types.ts y lib/fontana/agente/* la importen sin
+// arrastrar la directiva "use client". FontanaComparativeTable.tsx la
+// re-exporta para no romper importadores existentes.
+export interface IndicadorFilaFontana {
+  id: string;
+  nombre: string;
+  definicion?: string;
+  fuenteEtiqueta?: string;
+  esMinimo: boolean;
+  celdas: CeldaTablaFontana[];
 }

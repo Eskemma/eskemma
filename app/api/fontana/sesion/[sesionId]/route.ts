@@ -188,6 +188,10 @@ export async function DELETE(
     );
   }
 
-  await ref.delete();
+  // recursiveDelete arrastra las subcolecciones `mensajes` y `adjuntos` —
+  // antes `ref.delete()` las dejaba huérfanas en Firestore (hallazgo de la
+  // auditoría de adjuntos, 2026-09-01). El texto de los adjuntos es dato
+  // político sensible: no puede sobrevivir a la sesión.
+  await adminDb.recursiveDelete(ref);
   return NextResponse.json({ ok: true }, { status: 200 });
 }

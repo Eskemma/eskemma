@@ -5,6 +5,9 @@ export {scrapeAndAnalyze} from "./pestel/scrapeAndAnalyze";
 export {scheduledMonitor} from "./pestel/scheduledMonitor";
 export {feedSync} from "./pestel/feedSync";
 
+// ── Fontana (T10) ──────────────────────────────────────────────────────────
+export {purgeAdjuntos} from "./fontana/purgeAdjuntos";
+
 // ── Core ───────────────────────────────────────────────────────────────────
 import {
   onDocumentCreated,

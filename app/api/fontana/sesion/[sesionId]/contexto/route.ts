@@ -45,7 +45,11 @@ export async function GET(
 
   const indicadores: FontanaContextoTerritorial["indicadores"] = [];
   for (const familiaId of Object.keys(idsPorFamilia)) {
-    if (familiaId !== "F1" && familiaId !== "F2") continue; // únicas familias con pipeline real hoy
+    // F1/F2/F3/F5 comparten el shape de celdas geográficas. F4 (comparación
+    // internacional) se EXCLUYE del contexto inicial del agente (T10): su
+    // respuesta es una `fila` de países, no `celdas` — el agente la consulta
+    // bajo demanda vía consultar_indicador cuando el usuario pregunte por ella.
+    if (familiaId !== "F1" && familiaId !== "F2" && familiaId !== "F3" && familiaId !== "F5") continue;
     const res = await fetch(`${baseUrl}/api/fontana/familia/${familiaId}?sesionId=${sesionId}`, {
       headers: { cookie },
     });

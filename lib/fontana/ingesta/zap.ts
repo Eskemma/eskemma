@@ -160,3 +160,37 @@ export async function resolverMunicipiosEstadoZap(estadoCve: string, soloCves?: 
     };
   });
 }
+
+// --- Detalle "Modo B" (2026-08-31) — lista de municipios ZAP del estado ---
+// Reusa resolverMunicipiosEstadoZap() y filtra valor === 1 (los designados).
+// Mismo shape { items, total, offset, hasMore } que denue/gacp para el
+// endpoint .../detalle y la tool consultar_detalle_indicador del agente.
+export const PAGE_SIZE_ZAP = 25;
+
+export interface DetalleZapResultado {
+  items: { nombre: string }[];
+  total: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export async function resolverDetalleZapMunicipios(
+  estado: string,
+  offset = 0,
+  limit = PAGE_SIZE_ZAP
+): Promise<DetalleZapResultado> {
+  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(estado)];
+  if (!estadoCve) return { items: [], total: 0, offset, hasMore: false };
+  const todos = await resolverMunicipiosEstadoZap(estadoCve);
+  const designados = todos
+    .filter((e) => "valor" in e.celda && e.celda.valor === 1)
+    .map((e) => e.nombre)
+    .sort((a, b) => a.localeCompare(b, "es"));
+  const pagina = designados.slice(offset, offset + limit);
+  return {
+    items: pagina.map((nombre) => ({ nombre })),
+    total: designados.length,
+    offset,
+    hasMore: offset + limit < designados.length,
+  };
+}

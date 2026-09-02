@@ -124,6 +124,23 @@ export interface IndicadorRegistro {
   confiabilidadPorCampo?: Record<string, "alta" | "media" | "baja">;
   notas?: string;
   agregacionPlural?: AgregacionPlural;
+  // Disponibilidad de serie temporal (2026-08-31) — clasificación de la
+  // auditoría docs/ecosistema/T10-fontana/auditoria-series-temporales.md
+  // (tras el addendum de decisiones de producto). NO es el mecanismo de
+  // captura de series (eso es la Tarea 2): solo describe, por indicador,
+  // por qué Fontana hoy no muestra evolución temporal. El agente narra
+  // `nota` tal cual ante preguntas de "¿cómo ha cambiado X?".
+  //   a = la fuente tiene historia; capturarla es función pendiente.
+  //   b = no hay serie (fuente de corte único, o no comparable, o el
+  //       conector actual no la expone).
+  //   c = ya versionado en Storage pero no expuesto (mismo efecto que "a"
+  //       para el usuario).
+  //   d = indicador sin conector (mismo motivo de "no disponible" ya
+  //       existente para ese indicador).
+  disponibilidadTemporal: {
+    categoria: "a" | "b" | "c" | "d";
+    nota: string;
+  };
 }
 
 interface CacheEntry { data: IndicadorRegistro[]; expiresAt: number }

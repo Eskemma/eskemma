@@ -1,28 +1,28 @@
 // app/api/fontana/familia/[familiaId]/detalle/route.ts
 // GET ?sesionId=&indicadorId=&estado=&municipio=&offset= — detalle
-// paginado "Modo B" para F5-6 (top de giros DENUE) y F5-8 (localidades
-// GACP en accesibilidad Bajo/Muy bajo), 2026-08-24. Lazy: se consulta
-// solo al abrir el modal, nunca en la carga inicial de la tabla.
+// paginado "Modo B". Lazy: se consulta solo al abrir el modal / cuando el
+// agente lo pide, nunca en la carga inicial de la tabla.
 //
-// Paginación SIEMPRE del lado del servidor — nunca se manda la lista
-// completa al cliente para truncarla ahí (medido en vivo: DENUE hasta
-// 730 giros distintos por municipio; GACP hasta 1,039 localidades en
-// el caso nacional más grande, Guadalupe y Calvo, Chihuahua). `estado`/
-// `municipio` viajan explícitos en vez de re-derivarse de
-// `sesion.territorio` porque el territorio del proyecto puede ser
-// plural (varios municipios seleccionados) — el cliente decide cuál
-// municipio ver, mismo criterio que el resto de los desgloses "Ver
-// municipios" de Fontana, que también reciben la unidad específica
-// como parámetro.
+// Indicadores con detalle:
+//   F5-6 (top de giros DENUE por municipio)  — requiere estado + municipio
+//   F5-8 (localidades GACP accesibilidad baja) — requiere estado + municipio
+//   F3-8 (municipios en Zona de Atención Prioritaria rural, del estado)
+//        — requiere estado (NO municipio: el desglose es a nivel estado)
+//
+// Paginación SIEMPRE del lado del servidor.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
-import type { FamiliaFontanaId } from "@/types/fontana.types";
+import { familiaDeIndicador, type FamiliaFontanaId } from "@/types/fontana.types";
 import { resolverDetalleGiros } from "@/lib/fontana/ingesta/denue";
 import { resolverDetalleLocalidades } from "@/lib/fontana/ingesta/gacp";
+import { resolverDetalleZapMunicipios } from "@/lib/fontana/ingesta/zap";
 
-const INDICADORES_CON_DETALLE = new Set(["F5-6", "F5-8"]);
+// Espejo del set del agente (lib/fontana/agente/tools.ts) y del de la UI
+// (FontanaComparativeTable.tsx). Mantener en sync al agregar indicadores.
+const INDICADORES_CON_DETALLE = new Set(["F5-6", "F5-8", "F3-8"]);
+const REQUIERE_MUNICIPIO = new Set(["F5-6", "F5-8"]); // F3-8 solo necesita estado
 
 export async function GET(
   request: NextRequest,
@@ -33,12 +33,6 @@ export async function GET(
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (familiaId !== "F5") {
-    return NextResponse.json(
-      { error: "familia_no_disponible", mensaje: `El detalle de Modo B no aplica a la familia ${familiaId}.` },
-      { status: 400 }
-    );
-  }
 
   const { searchParams } = new URL(request.url);
   const sesionId = searchParams.get("sesionId");
@@ -47,11 +41,17 @@ export async function GET(
   const municipio = searchParams.get("municipio");
   const offset = Number(searchParams.get("offset") ?? "0");
 
-  if (!sesionId || !indicadorId || !estado || !municipio) {
-    return NextResponse.json({ error: "sesionId, indicadorId, estado y municipio son requeridos" }, { status: 400 });
+  if (!sesionId || !indicadorId || !estado) {
+    return NextResponse.json({ error: "sesionId, indicadorId y estado son requeridos" }, { status: 400 });
   }
   if (!INDICADORES_CON_DETALLE.has(indicadorId)) {
     return NextResponse.json({ error: "Este indicador no tiene detalle de Modo B" }, { status: 400 });
+  }
+  if (familiaDeIndicador(indicadorId) !== familiaId) {
+    return NextResponse.json({ error: "familiaId no corresponde al indicadorId" }, { status: 400 });
+  }
+  if (REQUIERE_MUNICIPIO.has(indicadorId) && !municipio) {
+    return NextResponse.json({ error: `El detalle de ${indicadorId} requiere 'municipio'` }, { status: 400 });
   }
   if (!Number.isFinite(offset) || offset < 0) {
     return NextResponse.json({ error: "'offset' debe ser un número >= 0" }, { status: 400 });
@@ -62,14 +62,21 @@ export async function GET(
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
   const { sesion } = cargada;
-  const familia = sesion.indicadoresPorFamilia["F5" as FamiliaFontanaId];
+  const familia = sesion.indicadoresPorFamilia[familiaId as FamiliaFontanaId];
   const idsEnSesion = new Set([...familia.minimos, ...familia.seleccionUsuario]);
   if (!idsEnSesion.has(indicadorId)) {
-    return NextResponse.json({ error: "indicador_no_en_sesion", mensaje: "No se pudo cargar el detalle para este indicador." }, { status: 404 });
+    return NextResponse.json(
+      { error: "indicador_no_en_sesion", mensaje: "No se pudo cargar el detalle para este indicador." },
+      { status: 404 }
+    );
   }
 
-  const territorio = { nivel: "municipal" as const, nombre: municipio, estado, municipio };
+  if (indicadorId === "F3-8") {
+    const resultado = await resolverDetalleZapMunicipios(estado, offset);
+    return NextResponse.json(resultado, { status: 200 });
+  }
 
+  const territorio = { nivel: "municipal" as const, nombre: municipio!, estado, municipio: municipio! };
   if (indicadorId === "F5-6") {
     const resultado = await resolverDetalleGiros(territorio, offset);
     return NextResponse.json(resultado, { status: 200 });

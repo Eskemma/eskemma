@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
-import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
+import type { CeldaTablaFontana, NivelTablaFontana, IndicadorFilaFontana } from "@/lib/fontana/tablaColumnas";
 import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import NaturalezaBadge from "./NaturalezaBadge";
 import CoberturaAdvertencia from "./CoberturaAdvertencia";
@@ -89,14 +89,9 @@ interface ModalConfig {
   noResueltas?: { nombre: string; estado: string; motivo: string }[];
 }
 
-export interface IndicadorFilaFontana {
-  id: string;
-  nombre: string;
-  definicion?: string;
-  fuenteEtiqueta?: string;
-  esMinimo: boolean;
-  celdas: CeldaTablaFontana[];
-}
+// Movida a lib/fontana/tablaColumnas.ts (T10 capa conversacional) — se
+// re-exporta aquí para no romper importadores existentes.
+export type { IndicadorFilaFontana };
 
 interface Props {
   sesionId: string;

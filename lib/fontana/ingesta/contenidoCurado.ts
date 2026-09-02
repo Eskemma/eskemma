@@ -352,3 +352,96 @@ export async function resolverEntradaCompleta(territorio: Territorio): Promise<E
   const { entrada } = await resolverEntrada(territorio);
   return entrada;
 }
+
+// T10 capa conversacional (2026-08-27) — el agente "Fontana" necesita el
+// TEXTO narrativo real de los 6 indicadores narrativos de Familia 5
+// (F5-1/3/4/5/9/10), no la celda numérica (valor:1 "texto") que expone la
+// tabla comparativa. Endpoint dedicado GET /api/fontana/sesion/[id]/narrativa
+// (decisión de Raúl, opción 2: no se toca familia/[familiaId]/route.ts ni
+// tablaColumnas.ts, F5 ya está cerrada). Este helper reutiliza
+// resolverEntrada() tal cual — misma resolución de territorio vía
+// claveCanonicaMunicipio(), mismo almacén, cero recálculo.
+const NARRATIVA_CAMPO_POR_INDICADOR: Record<string, keyof EntradaContenidoCurado> = {
+  "F5-1": "factoresGeograficos",
+  "F5-3": "historia",
+  "F5-4": "personajesCelebres",
+  "F5-5": "tradicionesFiestas",
+  "F5-9": "atractivosTuristicos",
+  "F5-10": "problematicasEcologicas",
+};
+
+const NARRATIVA_ETIQUETA_INDICADOR: Record<string, string> = {
+  "F5-1": "los factores geográficos",
+  "F5-3": "la reseña histórica",
+  "F5-4": "los personajes célebres",
+  "F5-5": "las tradiciones y fiestas",
+  "F5-9": "los atractivos turísticos",
+  "F5-10": "las problemáticas ecológicas",
+};
+
+export function esIndicadorNarrativoCurado(indicadorId: string): boolean {
+  return indicadorId in NARRATIVA_CAMPO_POR_INDICADOR;
+}
+
+function personajesAtexto(personajes: PersonajeCelebreCurado[]): string {
+  return personajes
+    .map((p) => {
+      const partes = [p.reseña, p.legado ? `Legado: ${p.legado}` : null].filter(Boolean);
+      return partes.length > 0 ? `${p.nombre} — ${partes.join(". ")}` : p.nombre;
+    })
+    .join("\n\n");
+}
+
+export interface TextoNarrativoResuelto {
+  nivel: "estatal" | "municipal";
+  texto: string | null;
+  motivo: string | null; // presente sii texto === null
+  fuenteEtiqueta: string | null;
+}
+
+export async function resolverTextoNarrativo(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<TextoNarrativoResuelto> {
+  const campo = NARRATIVA_CAMPO_POR_INDICADOR[indicadorId];
+  if (!campo) {
+    return { nivel: "municipal", texto: null, motivo: `«${indicadorId}» no es un indicador narrativo curado.`, fuenteEtiqueta: null };
+  }
+
+  const { entrada, nivel, motivo } = await resolverEntrada(territorio);
+  if (!entrada) {
+    return { nivel, texto: null, motivo, fuenteEtiqueta: null };
+  }
+
+  const bruto = entrada[campo];
+  const texto =
+    campo === "personajesCelebres"
+      ? Array.isArray(bruto) && bruto.length > 0
+        ? personajesAtexto(bruto as PersonajeCelebreCurado[])
+        : ""
+      : typeof bruto === "string"
+        ? bruto
+        : "";
+
+  const fuenteEtiqueta =
+    entrada.fuentesConsultadas.length > 0
+      ? entrada.fuentesConsultadas.join("; ")
+      : FUENTE_ETIQUETA_CONTENIDO_CURADO;
+
+  if (!texto) {
+    // Curación editorial en proceso (Ola 1: estados completos, municipios
+    // en curso) — nunca "no existe", nunca un error genérico.
+    const etiqueta = NARRATIVA_ETIQUETA_INDICADOR[indicadorId] ?? "este contenido";
+    return {
+      nivel,
+      texto: null,
+      motivo:
+        nivel === "estatal"
+          ? `El contenido narrativo de ${etiqueta} para este estado aún no ha sido curado.`
+          : `El contenido narrativo de ${etiqueta} para este municipio aún no ha sido curado; puede estar disponible primero a nivel estatal.`,
+      fuenteEtiqueta: null,
+    };
+  }
+
+  return { nivel, texto, motivo: null, fuenteEtiqueta };
+}
