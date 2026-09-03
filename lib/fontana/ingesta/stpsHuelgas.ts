@@ -28,8 +28,11 @@
 
 import https from "https";
 import { normalizeGeoName } from "@/lib/geo/municipios";
+import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_STPS_HUELGAS = "STPS (Huelgas, datos.gob.mx)";
 
@@ -184,4 +187,82 @@ export async function resolverHuelgasStps(territorio: Territorio): Promise<Celda
     { nivel: "distrital", motivo: "STPS no publica huelgas por distrito electoral" },
     { nivel: "municipal", motivo: "STPS no publica huelgas por municipio, solo por entidad federativa" },
   ];
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 1ª ola 2026-09-01) — F3-16.
+// `cargarConteos()` ya construye Map<año, Map<estadoNorm, conteo>> con el
+// dataset completo (1989-presente). El resolver de celda expone un solo
+// año (`anioReferencia()`); este lee todos.
+//
+// CRITERIO DE AÑOS INCOMPLETOS (explícito, no implícito): el dataset STPS
+// se actualiza MENSUALMENTE, así que el año calendario EN CURSO está
+// parcial por definición (ej. "de 1989 a marzo 2026" en el título del
+// recurso — no hay campo estructurado de fecha de corte en los registros,
+// solo `anio_estallamiento`). Regla: se EXCLUYE siempre el año calendario
+// en curso de la serie. Todos los años < año en curso están completos
+// (cobertura del dataset), así que ninguno lleva nota de "parcial" — no se
+// muestra ningún año parcial.
+// ==========================================
+
+const CVE_ESTADO_NOMBRE_HUELGAS: Record<string, string> = Object.fromEntries(
+  Object.entries(ESTADO_CVE_MAP).map(([nombre, cve]) => [cve, nombre])
+);
+
+export async function resolverSerieHuelgas(territorio: Territorio): Promise<ResultadoSerie> {
+  let porAnioEstado: Map<string, Map<string, number>>;
+  try {
+    porAnioEstado = await cargarConteos();
+  } catch {
+    return { ok: false, motivo: "Error de conexión con STPS (datos.gob.mx)" };
+  }
+
+  const anioEnCurso = new Date().getFullYear();
+  const aniosConDatos = [...porAnioEstado.keys()]
+    .filter((a) => /^\d{4}$/.test(a) && parseInt(a, 10) < anioEnCurso)
+    .map((a) => parseInt(a, 10))
+    .sort((a, b) => a - b);
+  if (aniosConDatos.length === 0) return { ok: false, motivo: "STPS no reportó una serie de huelgas" };
+
+  // Serie DENSA de minAño..añoEnCurso-1: un año sin registros en este
+  // dataset (registro de eventos de huelga individuales) significa CERO
+  // huelgas registradas ese año — es un valor real, no un hueco. Se emite
+  // el año con valor 0 en vez de omitirlo, para que la gráfica no muestre
+  // un salto ambiguo.
+  const minAnio = aniosConDatos[0];
+  const anios: string[] = [];
+  for (let y = minAnio; y < anioEnCurso; y++) anios.push(String(y));
+
+  const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+
+  let territorioLabel: string;
+  let claveEstado: string | null = null;
+  if (nivel === "nacional") {
+    territorioLabel = "Nacional";
+  } else {
+    if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+    claveEstado = normalizeGeoName(territorio.estado);
+    const cve = ESTADO_CVE_MAP[claveEstado];
+    territorioLabel = (cve && CVE_ESTADO_NOMBRE_HUELGAS[cve]) ?? territorio.estado;
+  }
+
+  const puntos = anios.map((periodo) => {
+    const porEstado = porAnioEstado.get(periodo) ?? new Map<string, number>();
+    const valor =
+      nivel === "nacional"
+        ? [...porEstado.values()].reduce((a, b) => a + b, 0)
+        : porEstado.get(claveEstado!) ?? 0; // sin huelga registrada ese año = 0 real
+    return { periodo, valor };
+  });
+
+  return {
+    ok: true,
+    nivel,
+    territorioLabel,
+    unidad: "huelgas y paros",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_STPS_HUELGAS,
+    formato: "conteo",
+    puntos,
+  };
 }

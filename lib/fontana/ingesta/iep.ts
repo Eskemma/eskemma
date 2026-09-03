@@ -27,8 +27,11 @@
 
 import * as XLSX from "xlsx";
 import { normalizeGeoName } from "@/lib/geo/municipios";
+import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_IEP = "Institute for Economics and Peace (Índice de Paz México 2026)";
 
@@ -136,4 +139,120 @@ export async function resolverIndicePazMexico(territorio: Territorio): Promise<C
     { nivel: "distrital", motivo: "El Índice de Paz México no tiene desagregación por distrito electoral" },
     { nivel: "municipal", motivo: "El Índice de Paz México no tiene desagregación municipal" },
   ];
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 1ª ola 2026-09-01) — F3-17.
+// El XLSX ya contiene overall score 2015-2025 por geocode/año; el resolver
+// de celda descarta todo menos ANIO_REFERENCIA (2025). Este lee todos los
+// años. El IEP solo publica años cerrados (2026 es el año de EDICIÓN, no
+// tiene fila de datos), así que no hay año parcial que excluir.
+// ==========================================
+
+const UNIDAD_IEP = "índice de paz (1-5, 1 = más pacífico)";
+
+const CVE_ESTADO_NOMBRE_IEP: Record<string, string> = Object.fromEntries(
+  Object.entries(ESTADO_CVE_MAP).map(([nombre, cve]) => [cve, nombre])
+);
+
+interface SerieIepCache {
+  porEstado: Map<string, Record<string, number>>; // estadoNorm -> { año -> score }
+  nacional: Record<string, number>;
+  expira: number;
+}
+let serieCache: SerieIepCache | null = null;
+let serieEnVuelo: Promise<Omit<SerieIepCache, "expira">> | null = null;
+
+function parsearSerieXlsx(buffer: ArrayBuffer): Omit<SerieIepCache, "expira"> {
+  const wb = XLSX.read(buffer, { type: "array" });
+  const ws = wb.Sheets[HOJA];
+  if (!ws) throw new Error(`Hoja "${HOJA}" no encontrada en el XLSX del IEP`);
+  const filas = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+  const enc = (filas[4] ?? []) as string[];
+  const iG = enc.indexOf("geocode");
+  const iS = enc.indexOf("state");
+  const iY = enc.indexOf("year");
+  const iI = enc.indexOf("indicator");
+  const iSc = enc.indexOf("banded score");
+
+  const porEstado = new Map<string, Record<string, number>>();
+  const nacional: Record<string, number> = {};
+  for (let i = 5; i < filas.length; i++) {
+    const f = filas[i] as (string | number | null)[];
+    if (f[iI] !== INDICADOR) continue;
+    const year = f[iY];
+    const score = f[iSc];
+    if (typeof year !== "number" || typeof score !== "number") continue;
+    const periodo = String(year);
+    if (f[iG] === "National") {
+      nacional[periodo] = score;
+      continue;
+    }
+    if (typeof f[iS] !== "string") continue;
+    const clave = normalizeGeoName(f[iS] as string);
+    const rec = porEstado.get(clave) ?? {};
+    rec[periodo] = score;
+    porEstado.set(clave, rec);
+  }
+  return { porEstado, nacional };
+}
+
+async function cargarSerieIep(): Promise<Omit<SerieIepCache, "expira">> {
+  if (serieCache && serieCache.expira > Date.now()) {
+    return { porEstado: serieCache.porEstado, nacional: serieCache.nacional };
+  }
+  if (serieEnVuelo) return serieEnVuelo;
+  serieEnVuelo = (async () => {
+    const res = await fetch(IEP_XLSX_URL);
+    if (!res.ok) throw new Error(`IEP respondió ${res.status}`);
+    return parsearSerieXlsx(await res.arrayBuffer());
+  })();
+  try {
+    const datos = await serieEnVuelo;
+    serieCache = { ...datos, expira: Date.now() + CACHE_TTL_MS };
+    return datos;
+  } finally {
+    serieEnVuelo = null;
+  }
+}
+
+export async function resolverSerieIep(territorio: Territorio): Promise<ResultadoSerie> {
+  let datos: Omit<SerieIepCache, "expira">;
+  try {
+    datos = await cargarSerieIep();
+  } catch {
+    return { ok: false, motivo: "Error de conexión con el Índice de Paz México (indicedepazmexico.org)" };
+  }
+
+  const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  let porAno: Record<string, number> | undefined;
+  let territorioLabel: string;
+  if (nivel === "nacional") {
+    porAno = datos.nacional;
+    territorioLabel = "Nacional";
+  } else {
+    if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+    const clave = normalizeGeoName(territorio.estado);
+    porAno = datos.porEstado.get(clave);
+    const cve = ESTADO_CVE_MAP[clave];
+    territorioLabel = (cve && CVE_ESTADO_NOMBRE_IEP[cve]) ?? territorio.estado;
+  }
+  if (!porAno || Object.keys(porAno).length === 0) {
+    return { ok: false, motivo: `El IEP no reportó una serie para "${territorioLabel}"` };
+  }
+
+  const puntos = Object.keys(porAno)
+    .sort()
+    .map((periodo) => ({ periodo, valor: Math.round(porAno![periodo] * 100000) / 100000 }));
+
+  return {
+    ok: true,
+    nivel,
+    territorioLabel,
+    unidad: UNIDAD_IEP,
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_IEP,
+    formato: "indice",
+    puntos,
+  };
 }

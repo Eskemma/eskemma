@@ -1,9 +1,11 @@
 // lib/fontana/agente/tools.ts
-// Las 3 herramientas del agente conversacional "Fontana" (T10) + su
-// ejecutor. Los datos SIEMPRE salen de los endpoints ya existentes
-// (mismo cómputo que la tabla comparativa) — nunca de un import directo
-// de resolverIndicadorFontana ni de una fuente paralela:
+// Las herramientas del agente conversacional "Fontana" (T10) + su ejecutor.
+// Los datos SIEMPRE salen de los endpoints ya existentes (mismo cómputo que
+// la tabla comparativa) — nunca de un import directo de
+// resolverIndicadorFontana ni de una fuente paralela:
 //   - consultar_indicador / generar_visualizacion → GET /api/fontana/familia/[familiaId]
+//   - territorio externo → GET /api/fontana/consulta-territorio
+//   - serie temporal (F2-17) → GET /api/fontana/serie-temporal
 //   - indicadores narrativos de F5 → GET /api/fontana/sesion/[id]/narrativa
 //   - navegar_pestana → sin datos
 // El único acceso directo a `lib/` es al registry (lookup de metadatos:
@@ -16,6 +18,7 @@ import type { ProjectType } from "@/types/moddulo.types";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import { getIndicadorRegistro, getIndicadoresPorFamilia, type NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import { esIndicadorNarrativoCurado } from "@/lib/fontana/ingesta/contenidoCurado";
+import { tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
 import { FAMILIA_META } from "@/lib/fontana/familias";
 import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import { familiaDeIndicador, type FamiliaFontanaId, type FontanaCanvasItem, type FontanaToolCall } from "@/types/fontana.types";
@@ -24,6 +27,7 @@ import {
   construirCanvasDistribucion,
   construirCanvasGrafica,
   construirCanvasResumen,
+  construirCanvasSerieTemporal,
   construirCanvasTabla,
   limpiarUndefined,
   INDICADORES_CON_DISTRIBUCION,
@@ -102,6 +106,20 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "consultar_serie_temporal",
+    description:
+      "Devuelve la serie histórica (varios años) de un indicador que tiene historia consultable en Fontana. Sabes cuáles la tienen por el campo `tieneSerie: true` (en consultar_indicador, listar_indicadores_familia, listar_indicadores_activos_todas_familias). Hoy: Gini de ingreso, distribución del ingreso por decil, huelgas y paros, Índice de Paz México, pobreza, pobreza extrema y población con al menos una carencia (corte nacional/estatal), y Competitividad Estatal. Sin territorioNombre = territorio del proyecto; con territorioNombre = un estado que el usuario nombró (ajeno al proyecto, o uno de los suyos si el proyecto abarca varios estados y ya te dijo cuál). Si el proyecto abarca más de un estado devuelve `multiEstado` — pregunta al usuario a cuál se refiere, no elijas tú. El campo `nivel` de la respuesta dice a qué nivel es la serie (nacional / estatal); si es estatal, aclara que aplica a todo el estado, no es un promedio de los municipios/distritos del proyecto. NO genera nada en Canvas (para eso usa generar_visualizacion tipo 'serie_temporal').",
+    input_schema: {
+      type: "object",
+      properties: {
+        indicadorId: { type: "string", description: "ID real del indicador. Debe tener `tieneSerie: true`." },
+        territorioNombre: { type: "string", description: "Estado dicho por el usuario, solo si pidió un territorio distinto al del proyecto o si el proyecto abarca varios estados y ya te precisó cuál." },
+        estadoNombre: { type: "string", description: "Opcional, desambigua municipios homónimos." },
+      },
+      required: ["indicadorId"],
+    },
+  },
+  {
     name: "consultar_detalle_indicador",
     description:
       "Devuelve la lista de ENTIDADES (nombres) detrás de un conteo/clasificación, para indicadores que son una membresía y no un valor medido. Solo válida para: F3-8 (municipios en Zona de Atención Prioritaria rural del estado), F5-6 (giros económicos DENUE del municipio), F5-8 (localidades GACP con accesibilidad baja del municipio). Para cualquier otro indicadorId devuelve un error explícito — no la fuerces.",
@@ -135,14 +153,16 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "generar_visualizacion",
     description:
-      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12). Familia 4 no está disponible en Canvas todavía.",
+      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12) · 'serie_temporal' (evolución EN EL TIEMPO de un indicador — solo los que tienen `tieneSerie: true`). Familia 4 no está disponible en Canvas todavía.",
     input_schema: {
       type: "object",
       properties: {
-        tipo: { type: "string", enum: ["resumen", "grafica", "tabla", "distribucion"] },
+        tipo: { type: "string", enum: ["resumen", "grafica", "tabla", "distribucion", "serie_temporal"] },
         familiaId: { type: "string", enum: ["F1", "F2", "F3", "F4", "F5"], description: "Requerido para 'resumen' y 'tabla'." },
-        indicadorId: { type: "string", description: "Requerido para 'grafica' y 'distribucion'." },
+        indicadorId: { type: "string", description: "Requerido para 'grafica', 'distribucion' y 'serie_temporal'." },
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional para 'resumen'. Default = nivel del territorio." },
+        territorioNombre: { type: "string", description: "Solo para 'serie_temporal': estado que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios estados y ya te precisó cuál." },
+        estadoNombre: { type: "string", description: "Solo para 'serie_temporal': desambigua municipios homónimos." },
       },
       required: ["tipo"],
     },
@@ -246,6 +266,7 @@ export async function ejecutarHerramienta(
 ): Promise<ToolResult> {
   if (nombre === "consultar_indicador") return consultarIndicador(input, ctx);
   if (nombre === "consultar_indicador_territorio_externo") return consultarIndicadorTerritorioExterno(input, ctx);
+  if (nombre === "consultar_serie_temporal") return consultarSerieTemporal(input, ctx);
   if (nombre === "consultar_detalle_indicador") return consultarDetalleIndicador(input, ctx);
   if (nombre === "listar_indicadores_familia") return listarIndicadoresFamilia(input, ctx);
   if (nombre === "listar_indicadores_activos_todas_familias") return listarIndicadoresActivosTodasFamilias(ctx);
@@ -279,6 +300,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
     id: i.id,
     nombre: i.nombre,
     definicion: i.definicion ?? null,
+    tieneSerie: tieneSerie(i.id),
   }));
 
   // Catálogo COMPLETO de la familia desde el registry (verificado 2026-08-27:
@@ -289,6 +311,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
   const catalogoCompleto = (await getIndicadoresPorFamilia(familiaNum)).map((i) => ({
     id: i.id,
     nombre: i.nombre,
+    tieneSerie: tieneSerie(i.id),
   }));
   const activos = new Set(indicadores.map((i) => i.id));
 
@@ -342,6 +365,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
       motivo: n.motivo,
       agregacionPlural: null,
       disponibilidadTemporal: registro?.disponibilidadTemporal ?? null,
+      tieneSerie: tieneSerie(indicadorId),
       nivelesComparados: null, // indicador narrativo curado: un solo nivel
     };
     const rs =
@@ -377,7 +401,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
       const rs = `«${indicadorId}» no está en la selección de Familia 4 de esta sesión.`;
       return { resultForModel: { indicadorId, error: rs }, toolCall: { tool: "consultar_indicador", input, resultSummary: rs, ok: false } };
     }
-    const result = { indicadorId, nombre: ind.nombre, definicion: ind.definicion ?? null, esComparacionInternacional: true, paisPrincipal: data.paisPrincipal, paisesReferencia: data.paisesReferencia, fila: ind.fila, disponibilidadTemporal: registro.disponibilidadTemporal ?? null, nivelesComparados: null };
+    const result = { indicadorId, nombre: ind.nombre, definicion: ind.definicion ?? null, esComparacionInternacional: true, paisPrincipal: data.paisPrincipal, paisesReferencia: data.paisesReferencia, fila: ind.fila, disponibilidadTemporal: registro.disponibilidadTemporal ?? null, tieneSerie: tieneSerie(indicadorId), nivelesComparados: null };
     return { resultForModel: result, toolCall: { tool: "consultar_indicador", input, resultSummary: `${ind.nombre}: comparación internacional por país.`, ok: true } };
   }
 
@@ -431,6 +455,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
     motivo: valor === null ? celda?.motivo ?? "Nivel no cubierto." : null,
     agregacionPlural,
     disponibilidadTemporal: registro.disponibilidadTemporal ?? null,
+    tieneSerie: tieneSerie(indicadorId),
     nivelesComparados,
   };
   const rs = compararNiveles
@@ -446,7 +471,7 @@ async function generarVisualizacion(
   ctx: ToolContext,
   mensajeId: string
 ): Promise<ToolResult> {
-  const tipo = String(input.tipo ?? "") as "resumen" | "grafica" | "tabla" | "distribucion";
+  const tipo = String(input.tipo ?? "") as "resumen" | "grafica" | "tabla" | "distribucion" | "serie_temporal";
   const familiaFromInput = input.familiaId as FamiliaFontanaId | undefined;
   const indicadorId = input.indicadorId as string | undefined;
   const familiaId: FamiliaFontanaId | undefined =
@@ -456,6 +481,12 @@ async function generarVisualizacion(
     resultForModel: { rechazado: true, motivo: resultSummary },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: false },
   });
+
+  // serie_temporal — evolución en el tiempo, solo F2-17. No usa el endpoint
+  // de familia (los datos vienen de /api/fontana/serie-temporal).
+  if (tipo === "serie_temporal") {
+    return generarSerieTemporal(input, ctx, mensajeId, reject);
+  }
 
   if (!familiaId) return reject("Falta familiaId (para resumen/tabla) o indicadorId (para grafica).");
 
@@ -616,7 +647,7 @@ async function listarIndicadoresActivosTodasFamilias(ctx: ToolContext): Promise<
       return {
         familiaId: fid,
         nombre: meta.nombre,
-        indicadoresActivos: activos.map((i) => ({ id: i.id, nombre: i.nombre })),
+        indicadoresActivos: activos.map((i) => ({ id: i.id, nombre: i.nombre, tieneSerie: tieneSerie(i.id) })),
         totalActivos: activos.length,
         totalCatalogo,
       };
@@ -697,6 +728,197 @@ async function consultarIndicadorTerritorioExterno(input: Record<string, unknown
         `Cita la fuente igual que en cualquier otro dato.`,
     },
     toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rs, ok: data.valor !== null },
+  };
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, piloto 2026-09-01) — solo F2-17. Los datos vienen de
+// GET /api/fontana/serie-temporal (nunca de un import directo). Dos rutas:
+// consultar_serie_temporal (solo lectura) y generar_visualizacion tipo
+// "serie_temporal" (al Canvas). Ambas comparten el fetch de abajo.
+// ==========================================
+
+type PuntoSerieCanvas = {
+  periodo: string;
+  valor: number | null;
+  ranking?: number | null;
+  nivelCompetitividad?: string;
+  nota?: string;
+};
+
+async function fetchSerie(
+  input: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<Record<string, unknown>> {
+  const indicadorId = String(input.indicadorId ?? "");
+  const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
+  const territorioNombre = input.territorioNombre ? String(input.territorioNombre).trim() : "";
+  const estadoNombre = input.estadoNombre ? String(input.estadoNombre).trim() : "";
+  if (territorioNombre) params.set("territorio", territorioNombre);
+  if (estadoNombre) params.set("estado", estadoNombre);
+  const res = await fetch(`${ctx.baseUrl}/api/fontana/serie-temporal?${params.toString()}`, {
+    headers: { cookie: ctx.cookie },
+  });
+  return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+}
+
+// Frase de alcance según el nivel REAL de la serie — SIEMPRE, sea el
+// territorio del proyecto o uno externo.
+function instruccionAlcance(nivel: unknown, label: string): string {
+  if (nivel === "nacional") {
+    return "Este es un dato NACIONAL (todo México). Dilo así al reportarlo.";
+  }
+  if (nivel === "estatal") {
+    return `Este es un dato ESTATAL — aplica a TODO el estado (${label}). NO es un promedio ni agregado de los municipios/distritos del proyecto. Dilo así al reportarlo.`;
+  }
+  if (nivel === "municipal") {
+    return `Este es un dato MUNICIPAL — de ${label}.`;
+  }
+  return "";
+}
+
+async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const territorioNombre = input.territorioNombre ? String(input.territorioNombre).trim() : "";
+  const data = await fetchSerie(input, ctx);
+  const tool = "consultar_serie_temporal" as const;
+
+  if (data.multiEstado) {
+    const estados = (data.estados as string[]) ?? [];
+    const rs = `El proyecto abarca ${estados.length} estados (${estados.join(", ")}).`;
+    return {
+      resultForModel: {
+        multiEstado: true,
+        estados,
+        instruccion:
+          "El proyecto abarca varios estados y el ICE es un dato estatal. Pregunta al usuario a CUÁL de ESTOS estados suyos se refiere — es su proyecto, solo hay que precisar cuál (mismo criterio que un municipio homónimo). Cuando responda, vuelve a llamar esta herramienta con territorioNombre = ese estado. NO elijas tú.",
+      },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (data.ambiguo) {
+    const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
+    const rs = `«${territorioNombre}» es ambiguo: ${cands.length} municipios con ese nombre.`;
+    return {
+      resultForModel: {
+        ambiguo: true,
+        candidatos: cands,
+        instruccion: "Pregunta al usuario a cuál de estos territorios se refiere (municipio + estado). NO asumas.",
+      },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (data.noResuelto) {
+    const rs = `No reconozco el territorio «${territorioNombre}».`;
+    return {
+      resultForModel: { noResuelto: true, error: rs, instruccion: "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre del estado." },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (data.error === "sin_serie") {
+    const rs = String(data.mensaje ?? "Este indicador no tiene serie histórica.");
+    return {
+      resultForModel: { error: "sin_serie", mensaje: rs, instruccion: "Explica que ese indicador no tiene serie histórica disponible en Fontana todavía; si aplica, usa su `disponibilidadTemporal.nota`. Aplica el bloque de 'Preguntas de evolución temporal'." },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (!data.ok) {
+    const rs = String(data.motivo ?? "No se pudo obtener la serie.");
+    return { resultForModel: { error: rs }, toolCall: { tool, input, resultSummary: rs, ok: false } };
+  }
+
+  const terr = data.territorio as { label: string };
+  const puntos = (data.puntos as { periodo: string; valor: number | null }[]) ?? [];
+  const rs = `${String(data.nombre)} en ${terr.label}: serie ${String(data.periodoInicio)}-${String(data.periodoFin)} (${puntos.length} años).`;
+  const instruccion =
+    `${instruccionAlcance(data.nivel, terr.label)} ` +
+    (data.esTerritorioExterno
+      ? `Además, esta serie es de ${terr.label}, que NO es parte del territorio del proyecto (${territorioLabel(ctx.territorio)}). Aclárualo. `
+      : data.esTerritorioDelProyecto
+        ? `Esta es la serie de ${terr.label} — el territorio del proyecto a este nivel. `
+        : "") +
+    "Cita la fuente. Si la serie trae `ranking` por punto, menciona los cambios de posición cuando sean relevantes.";
+  return {
+    resultForModel: { ...data, instruccion },
+    toolCall: { tool, input, resultSummary: rs, ok: true },
+  };
+}
+
+async function generarSerieTemporal(
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+  mensajeId: string,
+  reject: (rs: string) => ToolResult
+): Promise<ToolResult> {
+  const indicadorId = String(input.indicadorId ?? "");
+  if (!tieneSerie(indicadorId)) {
+    return reject("Este indicador no tiene serie histórica disponible en Fontana todavía.");
+  }
+  const data = await fetchSerie(input, ctx);
+
+  if (data.multiEstado) {
+    const estados = (data.estados as string[]) ?? [];
+    return reject(
+      `El proyecto abarca varios estados (${estados.join(", ")}). Este es un dato por estado — pregunta al usuario a cuál de sus estados se refiere y vuelve a intentar con ese estado (territorioNombre).`
+    );
+  }
+  if (data.ambiguo) {
+    const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
+    return reject(`«${String(input.territorioNombre ?? "")}» coincide con ${cands.length} municipios; pregunta al usuario a cuál se refiere.`);
+  }
+  if (data.noResuelto) return reject(`No reconozco el territorio «${String(input.territorioNombre ?? "")}».`);
+  if (data.error === "sin_serie") return reject(String(data.mensaje ?? "Ese indicador no tiene serie histórica."));
+  if (!data.ok) return reject(String(data.motivo ?? "No se pudo obtener la serie."));
+
+  const terr = data.territorio as { label: string };
+  const esTerritorioExterno = Boolean(data.esTerritorioExterno);
+  const esTerritorioDelProyecto = Boolean(data.esTerritorioDelProyecto);
+  const familiaId = familiaDeIndicador(indicadorId);
+  const meta = {
+    mensajeId,
+    familiaId,
+    familiaEtiqueta: FAMILIA_ETIQUETAS[familiaId],
+    territorioLabel: terr.label,
+  };
+  const formato = (["conteo", "moneda", "porcentaje", "indice"] as const).includes(
+    data.formato as "conteo" | "moneda" | "porcentaje" | "indice"
+  )
+    ? (data.formato as "conteo" | "moneda" | "porcentaje" | "indice")
+    : "conteo";
+  const item = construirCanvasSerieTemporal(
+    indicadorId,
+    String(data.nombre ?? indicadorId),
+    {
+      unidad: data.unidad as string | undefined,
+      naturaleza: data.naturaleza as NaturalezaDato | undefined,
+      fuenteEtiqueta: String(data.fuenteEtiqueta ?? ""),
+      formato,
+      nivel: data.nivel as NivelTablaFontana,
+      puntos: (data.puntos as PuntoSerieCanvas[] | undefined) ?? [],
+    },
+    terr.label,
+    { esTerritorioExterno, esTerritorioDelProyecto },
+    meta
+  );
+  await appendCanvasItem(ctx.sesionId, item);
+  const resultSummary = `Agregué al Canvas la serie de «${item.indicadorNombre}» para ${terr.label} (${item.periodoInicio}-${item.periodoFin}).`;
+  return {
+    resultForModel: {
+      canvasItemId: item.id,
+      tipo: item.tipo,
+      titulo: item.titulo,
+      resumen: resultSummary,
+      nivel: item.nivel,
+      esTerritorioExterno,
+      esTerritorioDelProyecto,
+      territorioLabel: terr.label,
+      instruccionChat:
+        `${instruccionAlcance(item.nivel, terr.label)}` +
+        (esTerritorioExterno
+          ? ` Además, ${terr.label} no es parte del territorio del proyecto — aclárualo.`
+          : ""),
+    },
+    toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
+    canvasItem: item,
   };
 }
 

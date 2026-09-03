@@ -104,7 +104,9 @@ export default function FontanaCanvasItemCard({ item, sesion }: Props) {
 
       {item.tipo === "distribucion" && <DistribucionBarras item={item} color={color} />}
 
-      {(item.tipo === "grafica" || item.tipo === "desglose" || item.tipo === "distribucion") && item.fuenteEtiqueta && (
+      {item.tipo === "serie_temporal" && <SerieTemporalGrafica item={item} color={color} />}
+
+      {(item.tipo === "grafica" || item.tipo === "desglose" || item.tipo === "distribucion" || item.tipo === "serie_temporal") && item.fuenteEtiqueta && (
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
       )}
     </div>
@@ -145,6 +147,76 @@ function DistribucionBarras({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SerieTemporalGrafica({
+  item,
+  color,
+}: {
+  item: Extract<FontanaCanvasItem, { tipo: "serie_temporal" }>;
+  color: string;
+}) {
+  const valores = item.puntos.map((p) => p.valor ?? 0);
+  const max = Math.max(...valores, 1);
+  const fmt = (v: number) =>
+    item.formato === "moneda"
+      ? `$${v.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`
+      : item.formato === "porcentaje"
+      ? `${v.toLocaleString("es-MX", { maximumFractionDigits: 2 })}%`
+      : v.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+
+  const notaNivel =
+    item.nivel === "nacional"
+      ? "Dato nacional (todo México)."
+      : item.nivel === "municipal"
+      ? `Dato municipal — de ${item.territorioLabel}.`
+      : `Dato estatal — de ${item.territorioLabel}. No es un promedio de municipios o distritos.`;
+
+  return (
+    <div>
+      {/* Origen del dato — nunca ambiguo */}
+      {item.esTerritorioExterno ? (
+        <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-2">
+          Otro territorio: {item.territorioLabel} — no es tu proyecto
+        </p>
+      ) : item.esTerritorioDelProyecto ? (
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">
+          {item.territorioLabel} — territorio del proyecto
+        </p>
+      ) : (
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
+      )}
+
+      <div className="space-y-1.5">
+        {item.puntos.map((p) => (
+          <div key={p.periodo} className="flex items-center gap-2">
+            <span className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] w-12 shrink-0 text-right">
+              {p.periodo}
+            </span>
+            {p.valor !== null ? (
+              <>
+                <div className="flex-1 h-4 rounded-full bg-gray-eske-10 dark:bg-[#112230] overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${Math.max(4, (p.valor / max) * 100)}%`, background: color }} />
+                </div>
+                <span className="text-[11px] text-black-eske dark:text-[#EAF2F8] w-20 shrink-0 text-right">
+                  {fmt(p.valor)}
+                </span>
+                {p.ranking != null && (
+                  <span className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] w-12 shrink-0 text-right">
+                    #{p.ranking}/32
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="flex-1 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">—</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[10px] text-gray-eske-40 mt-2">{notaNivel}</p>
     </div>
   );
 }

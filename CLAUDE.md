@@ -529,9 +529,30 @@ con **tool use real** del SDK Anthropic (`lib/fontana/agente/`):
   Narrativos F5 (F5-1/3/4/5/9/10) van a `GET .../sesion/[id]/narrativa`.
 - `consultar_indicador_territorio_externo` — indicador en un estado/municipio
   DISTINTO al del proyecto, solo cuando el usuario lo nombra explícitamente.
-  `GET .../consulta-territorio` — resuelve el nombre vía `claveCanonicaMunicipio`;
+  `GET .../consulta-territorio` — resuelve el nombre vía `claveCanonicaMunicipio`
+  (helper compartido `lib/fontana/geo/resolverTerritorioNombre.ts`);
   `ambiguo` si el municipio se repite entre estados (el agente pregunta). Fase 1:
   solo lectura, sin Canvas.
+- `consultar_serie_temporal` — serie histórica (varios años) de un indicador
+  con historia. **Sin `enum` en el schema**: valida contra el config
+  `lib/fontana/series/seriesDisponibles.ts` (`SERIES_DISPONIBLES` / `tieneSerie`).
+  1ª ola (2026-09-01): **F2-6, F2-12, F3-16, F3-17, F2-1, F2-2, F2-14** (corte
+  nacional/estatal) + **F2-17** (piloto). Dispatcher
+  `lib/fontana/ingesta/serieTemporal.ts` → resolver por familia de fuente
+  (`resolverSerieEnigh` / `resolverSerieHuelgas` / `resolverSerieIep` /
+  `resolverSerieInegiPm` / el pilot `resolverSerieCompetitividadEstatal`),
+  todos junto a la función de celda existente, sin tocarla. `GET .../serie-temporal`.
+  Sin `territorioNombre` = territorio del proyecto; con `territorioNombre` =
+  un estado nombrado. Proyecto plural multi-estado (`estadosDelTerritorio`) →
+  `multiEstado` → el agente pregunta, nunca asume. La respuesta lleva `nivel`
+  (nacional / estatal) — si es estatal, el agente aclara que aplica a todo el
+  estado, no es promedio de los municipios/distritos. `tieneSerie: boolean`
+  expuesto en `consultar_indicador`, `listar_indicadores_familia`,
+  `listar_indicadores_activos_todas_familias`, `GET /familia/[id]`,
+  `GET /contexto` → el system prompt no lleva lista de excepciones. No genera
+  Canvas — para eso `generar_visualizacion` tipo `serie_temporal`. F3-16
+  (huelgas): serie DENSA min-año..año-en-curso-1 (año en curso excluido por
+  parcial; año sin registros = 0 real).
 - `consultar_detalle_indicador` — lista de entidades detrás de un
   conteo/clasificación; solo F3-8 (municipios ZAP), F5-6 (giros DENUE), F5-8
   (localidades GACP), vía `GET .../familia/[familiaId]/detalle`.
@@ -540,9 +561,10 @@ con **tool use real** del SDK Anthropic (`lib/fontana/agente/`):
 - `listar_indicadores_activos_todas_familias` — las 5 familias en 1 llamada
   (evita encadenar 5).
 - `generar_visualizacion` — crea un `canvasItem` (`resumen` / `grafica` /
-  `tabla` / `desglose` / `distribucion`). `distribucion` (F1-2, F1-11, F1-12,
-  F2-12) = desglose de categorías dentro de un nivel; distinto de `grafica`
-  (mismo indicador entre niveles). Rechaza F4. Todos los tipos llevan
+  `tabla` / `desglose` / `distribucion` / `serie_temporal`). Tres ejes:
+  `grafica` = mismo indicador entre niveles geográficos; `distribucion` (F1-2,
+  F1-11, F1-12, F2-12) = categorías dentro de un nivel; `serie_temporal`
+  (SOLO F2-17) = evolución en el tiempo. Rechaza F4. Todos llevan
   `fuenteEtiqueta`. El agente NUNCA anuncia el resultado en el mismo turno.
 - `navegar_pestana` — cambia de pestaña / abre familia.
 
@@ -715,6 +737,7 @@ firebase functions:log
 | Sin vista previa de contenido en M2 (F3-Investigación) | M2 no tiene ningún mecanismo de vista previa del contenido de un resultado antes de que el usuario lo apruebe — aplica a Canal 2, Canal 3 y Canal 1 (Fontana) por igual, ninguno está resuelto. Hoy la aprobación se basa solo en metadatos (pregunta, origen, cobertura), sin que el usuario vea el contenido real. Pendiente de diseño, fuera del alcance de Fontana — afecta a F3 en general. Suspendido deliberadamente: se aborda en un chat dedicado a M2, no en el de Fontana/Canal 1. | 26-08-19, verificación en navegador de Fontana T10 (Escenarios b/c + Canal 1) |
 | Incidente CVE_MUN INE-vs-INEGI (Fontana F1/F2) — **RESUELTO** | `resolveMunicipioCve()`/`getMunicipiosOptions()` (`lib/geo/municipios.ts`, numeración INE) divergía del CVE_MUN oficial en ~55-63% de los municipios (1,573/2,848 reverificado). Usado como join externo en `coneval.ts` (F2-1/F2-2/F2-3/F2-14), `conapoMarginacion.ts` (F2-4) y `bienestar.ts` (F2-7/F2-8) — producía el valor de OTRO municipio, sin error visible. Paso 1: mitigación de emergencia (aviso "En validación..."), verificada en navegador. Paso 2: `eceg.ts` verificado NO expuesto (32/32 estados, 0 divergencias — join internamente consistente, INE contra INE). Paso 3: auditoría de producción — 1 entrega afectada encontrada (proyecto `fvpuanYx7EYhdV3WLqBr`), confirmada como cuenta de pruebas interna, no cliente real, sin necesidad de notificación; datos marcados para reprocesar tras el fix. Paso 4: fix de fondo — los 3 adaptadores migrados a join por NOMBRE (mismo patrón ya aprobado en `icmm.ts`), incluyendo el path de agregación distrital ponderada (`resolverNumeradorDenominadorMunicipios`, vulnerable por la misma causa, no estaba en la lista original) — verificado con 18 municipios reales de 8 estados, valores correctos por municipio (no más "El Grullo" al pedir Guadalajara). Paso 5: documento central `docs/ecosistema/T10-fontana/claves-geograficas-no-confiables.md`. | 26-08-23, verificación en vivo de `gacp.ts` (Familia 5) |
 | Discrepancia menor F1-1 (ECEG) en Tuxtla Gutiérrez, Chiapas | Spot-check del incidente CVE_MUN (arriba) comparó valores reales de F1-1 (Población Total) contra la cifra oficial INEGI (Censo 2020, Comunicado 37/21): Tuxtla Gutiérrez muestra 604,089 en Fontana vs. 604,147 oficial — diferencia real de 58 habitantes (0.0096%). Causa distinta al incidente de CVE_MUN: `eceg-data-pipeline.ts` (`buildMunicipiosData`) calcula el nivel municipal sumando secciones electorales reasignadas a municipio vía `SECCION.shp`, no leyendo el total censal oficial por municipio directamente — artefacto de reconciliación sección↔municipio en el borde entre municipios. Otros 4 territorios verificados en el mismo spot-check (Nacional, Chiapas estatal, Aldama, Benemérito de las Américas) coincidieron exactamente. Diferido deliberadamente — prioridad del incidente de CVE_MUN era mayor. Pendiente: muestrear más municipios para confirmar si es un caso aislado o un patrón sistemático en el borde sección/municipio. | 26-08-23, verificación Paso 2 del incidente CVE_MUN |
+| F2-17/F2-6/F2-15/F2-16 (indicadores estatal-only) — celda simple muestra el primer estado en silencio para proyecto plural multi-estado | En un proyecto plural que abarca más de un estado, la celda de la tabla comparativa muestra el valor del PRIMER estado seleccionado sin advertir al usuario que el proyecto incluye otros estados con valores potencialmente distintos. Encontrado durante el piloto de serie temporal de F2-17 (26-09-01). Afecta un dato ya mostrado en producción. Causa raíz: `resolverCompetitividadEstatal` (`imco.ts:89-97`) y el patrón gemelo `enigh.ts:233-238` usan solo `territorio.estado`, que `TerritorySelector.tsx:326/330/339` fija al estado del PRIMER elemento seleccionado. El piloto de serie NO hereda el hueco (lo cubre con `multiEstado` → preguntar a cuál estado, vía `estadosDelTerritorio`), pero la celda simple de la tabla sí. Corrección pendiente: aparte, con su propio análisis de impacto en la UI de la tabla (no se resuelve en esta ronda). | 26-09-01, piloto de serie temporal F2-17 |
 
 ---
 
@@ -730,3 +753,5 @@ firebase functions:log
 | 26-03-28 | PESTEL correcciones post-E5 | Persistencia análisis (latest-analysis endpoint), fix economicData INEGI/Banxico→Claude, contexto legal LGIPE/INE, citación fuentes, integración Sefix (datos electorales dim-P), semáforo amarillo texto negro, principios de diseño en CLAUDE.md |
 | 26-08-27 | Fontana T10 — capa conversacional | Estructura de 2 pestañas (Indicadores / Fontana-Canvas) que reemplaza la vista única de tabla; acordeón de 5 familias con carga perezosa + caché. Agente "Fontana" con tool use real del SDK Anthropic (`consultar_indicador`, `generar_visualizacion`, `navegar_pestana`) — solo responde con datos de una llamada a herramienta. Endpoints nuevos: `POST /api/fontana/chat` (SSE), `GET .../sesion/[id]/mensajes`, `GET .../sesion/[id]/narrativa`. Persistencia: `FontanaSesion.canvasItems[]` + subcolección `fontana_sesiones/{id}/mensajes`. Primitivos compartidos nuevos: `app/components/shared/{Tabs,ResponsivePanel,chat/*}`. |
 | 26-09-01 | Fontana T10 — adjuntar archivo + dictado de voz | Composer con adjuntar archivo (PDF/DOCX/XLSX/TXT/CSV; extrae SOLO texto vía `lib/moddulo/attachments.ts` + `exceljs`, nunca el binario; validación de tipo real server-side; endpoint `POST .../sesion/[id]/adjunto`; subcolección append-only `adjuntos`; contexto por turno con presupuesto de 60 000 chars) y dictado de voz (Web Speech API nativa, `useSpeechDictation`, `es-MX`, sin auto-envío, estado de navegador no soportado; `Permissions-Policy: microphone=(self)` solo en `/centinela/fontana`). Retención: `recursiveDelete` en cascada (también cierra el hallazgo de `mensajes` huérfano) + purga a 90 días (`functions/src/fontana/purgeAdjuntos.ts`, `onSchedule` cada 24 h; lógica en `purgarAdjuntosVencidos()` separada del wrapper, verificada en el emulador 26-09-01 — deploy a producción pendiente, ver `docs/ecosistema/T10-fontana/purga-adjuntos-runbook.md`). Doc de patrón reutilizable: `docs/ecosistema/patrones-compartidos/agente-conversacional.md`. `lib/moddulo/attachments.ts` pasa de 5 a 6 consumidores. |
+| 26-09-01 | Fontana T10 — piloto de serie temporal F2-17 | Primera serie histórica consultable de Fontana. Tool nueva `consultar_serie_temporal` (enum `["F2-17"]`) + Canvas `serie_temporal` (`generar_visualizacion`) + ruta `GET /api/fontana/serie-temporal` + adaptador `resolverSerieCompetitividadEstatal` (`imco.ts`, lee los 10 años 2016-2025 del mismo `imco_ice/2025.json`). Helpers de geo compartidos: `resolverTerritorioNombre` extraído de `consulta-territorio` a `lib/fontana/geo/`, `estadosDelTerritorio` nuevo. Proyecto plural multi-estado → `multiEstado` (el agente pregunta a cuál estado, nunca asume). `alcance:"estatal"` propagado a tool/Canvas/render/prompt (el ICE aplica a todo el estado, no es promedio de municipios). System prompt: 3ª rama de desambiguación (temporal) + excepción F2-17 en "evolución temporal" + regla "no anunciar" blindada por tipo. Deuda pre-existente registrada (celda simple estatal-only muestra el primer estado en silencio) — no corregida esta ronda. Sin campo `serieHistorica` en los otros 85 (piloto de un caso). |
+| 26-09-01 | Fontana T10 — series temporales 1ª ola (7 indicadores nac/est) | Generalización del piloto F2-17. Config `lib/fontana/series/{seriesDisponibles,tipos}.ts` (`SERIES_DISPONIBLES` / `tieneSerie` — fuente única de verdad, sin `enum` en la tool). Dispatcher `lib/fontana/ingesta/serieTemporal.ts` → 4 resolvers nuevos por familia de fuente (`resolverSerieEnigh` F2-6/F2-12, `resolverSerieHuelgas` F3-16, `resolverSerieIep` F3-17, `resolverSerieInegiPm` F2-1/2/14 — todos junto a la función de celda, sin tocarla) + el pilot IMCO enrutado por `fuenteId:"imco"`. Canvas type generalizado: `alcance:"estatal"` → `nivel: NivelTablaFontana`; `esEstadoDelProyecto` → `esTerritorioDelProyecto`; render con nota por nivel. `tieneSerie` en 5 superficies de lista → prompt genérico ("si `tieneSerie:true`, usa `consultar_serie_temporal`"), sin lista. F2-6 Gini → `formato:"indice"` (coeficiente, no conteo). F3-16 huelgas → serie densa, año en curso excluido (parcial), año sin registros = 0. Fuera de esta ola: municipales (necesitan `municipiosDelTerritorio` + `no_agregable`), F4, F2-15/16/10/8, F1-18. |

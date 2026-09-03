@@ -115,6 +115,87 @@ export async function resolverCompetitividadEstatal(territorio: Territorio): Pro
   return [nacional, estatal];
 }
 
+// ==========================================
+// SERIE TEMPORAL (T10, piloto 2026-09-01) — la bodega ya trae los 10 años
+// (2016-2025) por estado; resolverCompetitividadEstatal solo lee ANO_VIGENTE.
+// Esta función expone la serie completa de UN estado. El chequeo de
+// proyecto plural multi-estado NO vive aquí (vive en la ruta
+// app/api/fontana/serie-temporal, que tiene la sesión) — aquí siempre es
+// un estado a la vez.
+// ==========================================
+
+export interface PuntoSerieIce {
+  periodo: string; // año, ej. "2025"
+  valor: number | null;
+  ranking: number | null;
+  nivelCompetitividad?: string;
+}
+
+export type SerieCompetitividadEstatal =
+  | {
+      ok: true;
+      estadoCve: string;
+      estadoNombre: string;
+      alcance: "estatal";
+      unidad: string;
+      naturaleza: "dato_directo";
+      fuenteEtiqueta: string;
+      formato: "indice";
+      puntos: PuntoSerieIce[];
+    }
+  | { ok: false; motivo: string };
+
+export async function resolverSerieCompetitividadEstatal(
+  territorio: Territorio
+): Promise<SerieCompetitividadEstatal> {
+  if (!territorio.estado) {
+    return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+  }
+  const estadoCve = resolveEstadoCve(territorio.estado);
+  if (!estadoCve) {
+    return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+  }
+
+  let datos: BodegaImcoIce | null;
+  try {
+    datos = await readFromBodega<BodegaImcoIce>("imco_ice/2025.json");
+  } catch {
+    return { ok: false, motivo: "Error de conexión con la bodega de Fontana (ICE)" };
+  }
+  if (!datos) {
+    return { ok: false, motivo: "ICE no disponible en la bodega de Fontana" };
+  }
+
+  const porAno = datos.porEstado[estadoCve];
+  if (!porAno || Object.keys(porAno).length === 0) {
+    return { ok: false, motivo: "IMCO no reportó ICE para este estado" };
+  }
+
+  const puntos: PuntoSerieIce[] = Object.keys(porAno)
+    .sort()
+    .map((ano) => {
+      const fila = porAno[ano];
+      return {
+        periodo: ano,
+        valor: typeof fila.valor === "number" ? Math.round(fila.valor * 100) / 100 : null,
+        ranking: typeof fila.ranking === "number" ? fila.ranking : null,
+        nivelCompetitividad: fila.nivelCompetitividad,
+      };
+    });
+
+  return {
+    ok: true,
+    estadoCve,
+    estadoNombre: CVE_ESTADO_NOMBRE[estadoCve] ?? territorio.estado,
+    alcance: "estatal",
+    unidad: "puntos (escala 0-100)",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_IMCO_ICE,
+    formato: "indice",
+    puntos,
+  };
+}
+
 // Desglose "Ver estados" en proyectos nivel "nacional" — mismo patrón
 // que el resto de Fontana. La bodega ya trae los 32 estados completos
 // — sin llamada nueva.

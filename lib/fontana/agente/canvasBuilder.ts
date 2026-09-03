@@ -8,11 +8,13 @@ import type { CeldaTablaFontana, IndicadorFilaFontana, NivelTablaFontana } from 
 import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { FamiliaFontanaId } from "@/types/fontana.types";
+import type { NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import type {
   FontanaCanvasDesglose,
   FontanaCanvasDistribucion,
   FontanaCanvasGrafica,
   FontanaCanvasResumen,
+  FontanaCanvasSerieTemporal,
   FontanaCanvasTabla,
 } from "@/types/fontana.types";
 
@@ -242,5 +244,66 @@ export function construirCanvasDesglose(
     motivoNoAgregable,
     fuenteEtiqueta: celdaProyecto.fuenteEtiqueta ?? indicador.fuenteEtiqueta,
     filas: desglose.map((u) => ({ unidad: u.nombre, ...filaDeCelda(u.celda) })),
+  });
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 1ª ola 2026-09-01) — evolución de un indicador en el
+// tiempo para UN territorio. Indicadores con serie: ver
+// lib/fontana/series/seriesDisponibles.ts. Los datos ya vienen resueltos
+// de GET /api/fontana/serie-temporal; esta función solo arma el item.
+// ==========================================
+
+interface SerieCanvasInput {
+  unidad?: string;
+  naturaleza?: NaturalezaDato;
+  fuenteEtiqueta: string;
+  formato: "conteo" | "moneda" | "porcentaje" | "indice";
+  nivel: NivelTablaFontana; // nivel geográfico real de la serie
+  puntos: {
+    periodo: string;
+    valor: number | null;
+    ranking?: number | null;
+    nivelCompetitividad?: string;
+    nota?: string;
+  }[];
+}
+
+export function construirCanvasSerieTemporal(
+  indicadorId: string,
+  indicadorNombre: string,
+  serie: SerieCanvasInput,
+  territorioLabel: string,
+  origen: { esTerritorioExterno: boolean; esTerritorioDelProyecto?: boolean },
+  meta: MetaTurno
+): FontanaCanvasSerieTemporal {
+  const periodoInicio = serie.puntos[0]?.periodo ?? "";
+  const periodoFin = serie.puntos[serie.puntos.length - 1]?.periodo ?? "";
+  return limpiarUndefined<FontanaCanvasSerieTemporal>({
+    id: nuevoId(),
+    tipo: "serie_temporal",
+    titulo: `${indicadorNombre} — ${territorioLabel} (${periodoInicio}-${periodoFin})`,
+    familiaId: meta.familiaId,
+    creadoEn: nowIso(),
+    mensajeId: meta.mensajeId,
+    indicadorId,
+    indicadorNombre,
+    unidad: serie.unidad,
+    formato: serie.formato,
+    nivel: serie.nivel,
+    naturaleza: serie.naturaleza,
+    fuenteEtiqueta: serie.fuenteEtiqueta,
+    territorioLabel,
+    esTerritorioExterno: origen.esTerritorioExterno,
+    esTerritorioDelProyecto: origen.esTerritorioDelProyecto,
+    periodoInicio,
+    periodoFin,
+    puntos: serie.puntos.map((p) => ({
+      periodo: p.periodo,
+      valor: p.valor,
+      ranking: p.ranking,
+      nivelCompetitividad: p.nivelCompetitividad,
+      nota: p.nota,
+    })),
   });
 }

@@ -15,7 +15,7 @@ import type { FontanaSesion } from "@/types/fontana.types";
 import type { FontanaContextoTerritorial } from "@/types/fontana.types";
 
 interface FamiliaRespuesta {
-  indicadores: { id: string; nombre: string; celdas: unknown[] }[];
+  indicadores: { id: string; nombre: string; celdas: unknown[]; tieneSerie?: boolean }[];
 }
 
 export async function GET(
@@ -58,7 +58,7 @@ export async function GET(
     const idsSeleccionados = new Set(idsPorFamilia[familiaId]);
     for (const ind of data.indicadores) {
       if (idsSeleccionados.has(ind.id)) {
-        indicadores.push({ id: ind.id, nombre: ind.nombre, celdas: ind.celdas as FontanaContextoTerritorial["indicadores"][number]["celdas"] });
+        indicadores.push({ id: ind.id, nombre: ind.nombre, celdas: ind.celdas as FontanaContextoTerritorial["indicadores"][number]["celdas"], tieneSerie: ind.tieneSerie ?? false });
       }
     }
   }

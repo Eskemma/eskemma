@@ -109,7 +109,7 @@ export interface FontanaAdjunto {
 // Firestore.
 export interface FontanaContextoTerritorial {
   territorio: Territorio;
-  indicadores: { id: string; nombre: string; celdas: CeldaTablaFontana[] }[];
+  indicadores: { id: string; nombre: string; celdas: CeldaTablaFontana[]; tieneSerie?: boolean }[];
 }
 
 // ==========================================
@@ -121,6 +121,7 @@ export type FontanaChatRole = "user" | "assistant";
 export type FontanaToolName =
   | "consultar_indicador"
   | "consultar_indicador_territorio_externo"
+  | "consultar_serie_temporal"
   | "consultar_detalle_indicador"
   | "listar_indicadores_familia"
   | "listar_indicadores_activos_todas_familias"
@@ -149,7 +150,13 @@ export interface FontanaChatMessage {
   adjuntoIds?: string[]; // solo user — adjuntos referenciados en el turno (traza)
 }
 
-export type FontanaCanvasItemTipo = "resumen" | "grafica" | "tabla" | "desglose" | "distribucion";
+export type FontanaCanvasItemTipo =
+  | "resumen"
+  | "grafica"
+  | "tabla"
+  | "desglose"
+  | "distribucion"
+  | "serie_temporal";
 
 interface FontanaCanvasItemBase {
   id: string;
@@ -233,12 +240,44 @@ export interface FontanaCanvasDistribucion extends FontanaCanvasItemBase {
   categorias: { etiqueta: string; valor: number }[];
 }
 
+// tipo "serie_temporal" — evolución de UN indicador EN EL TIEMPO (varios
+// años) para UN territorio. Distinto de "grafica" (compara entre niveles
+// geográficos) y de "distribucion" (categorías dentro de un nivel).
+// `nivel` = el nivel geográfico real de la serie (nacional / estatal /
+// municipal) — la card lo declara para que un proyecto de nivel más fino
+// no lea un dato estatal/nacional como si fuera un promedio de sus
+// municipios/distritos. Indicadores con serie: ver
+// lib/fontana/series/seriesDisponibles.ts.
+export interface FontanaCanvasSerieTemporal extends FontanaCanvasItemBase {
+  tipo: "serie_temporal";
+  indicadorId: string;
+  indicadorNombre: string; // lenguaje llano, nunca el ID
+  unidad?: string;
+  formato: "conteo" | "moneda" | "porcentaje" | "indice";
+  nivel: NivelTablaFontana; // nivel geográfico real de la serie
+  naturaleza?: NaturalezaDato;
+  fuenteEtiqueta: string; // OBLIGATORIO desde el diseño (no como parche)
+  territorioLabel: string;
+  esTerritorioExterno: boolean; // true ⇒ territorio fuera del proyecto
+  esTerritorioDelProyecto?: boolean; // true ⇒ el territorio (o su estado contenedor) es el del proyecto
+  periodoInicio: string;
+  periodoFin: string;
+  puntos: {
+    periodo: string; // año, ej. "2025"
+    valor: number | null;
+    ranking?: number | null; // solo IMCO (posición 1-32 entre entidades)
+    nivelCompetitividad?: string; // solo IMCO
+    nota?: string;
+  }[];
+}
+
 export type FontanaCanvasItem =
   | FontanaCanvasResumen
   | FontanaCanvasGrafica
   | FontanaCanvasTabla
   | FontanaCanvasDesglose
-  | FontanaCanvasDistribucion;
+  | FontanaCanvasDistribucion
+  | FontanaCanvasSerieTemporal;
 
 // Eventos del stream SSE de POST /api/fontana/chat — el cliente
 // (useChatStream) los despacha a callbacks.

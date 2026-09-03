@@ -56,6 +56,8 @@ import { normalizeGeoName } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_ENIGH = "INEGI (ENIGH 2024, tabulados por entidad federativa)";
 
@@ -359,4 +361,132 @@ export async function resolverEstadosGastoEducacion(): Promise<ElementoDeEstado[
       nombre: CVE_ESTADO_NOMBRE[cve] ?? cve,
       celda: celdaGasto(datos.gastoEducacion, cve, "estatal"),
     }));
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 1ª ola 2026-09-01) — F2-6 (Gini) y F2-12 (deciles).
+// El "Cuadro 2.1" ya trae 5 periodos en columnas C-G; los resolvers de
+// celda leen solo la G (2024). Este resolver lee las 5. Caché propia para
+// no tocar CacheEnigh (que sirve a F2-15/16 y a las celdas).
+// ==========================================
+
+// Cuadro 2.1: columnas de año. Verificado 2026-08-10 (ver cabecera).
+const COLS_ANO_CUADRO21: Record<string, string> = {
+  "2016": "C",
+  "2018": "D",
+  "2020": "E",
+  "2022": "F",
+  "2024": "G",
+};
+
+interface SerieEnighCuadro21 {
+  // clave (estadoCve | "NACIONAL") -> { periodo -> valor }
+  gini: Map<string, Record<string, number>>;
+  decilesPromedio: Map<string, Record<string, number>>;
+  ts: number;
+}
+
+let serieCache: SerieEnighCuadro21 | null = null;
+let serieEnVuelo: Promise<SerieEnighCuadro21> | null = null;
+
+async function descargarYParsearSerieEnigh(): Promise<SerieEnighCuadro21> {
+  const res = await fetch(URL_ENIGH_TABULADOS);
+  if (!res.ok) throw new Error(`ENIGH HTTP ${res.status} en ${URL_ENIGH_TABULADOS}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const wb = XLSX.read(buf, { type: "buffer" });
+  const ws = wb.Sheets["Cuadro 2.1"];
+  if (!ws) throw new Error('ENIGH: no se encontró "Cuadro 2.1" — ¿cambió el nombre de hoja?');
+
+  const gini = new Map<string, Record<string, number>>();
+  const decilesPromedio = new Map<string, Record<string, number>>();
+
+  for (let i = 0; i < 33; i++) {
+    const filaTerritorio = CUADRO21_INICIO + i * CUADRO21_BLOQUE;
+    const nombre = nombreTerritorio(ws, filaTerritorio);
+    if (!nombre) continue;
+    const clave = claveDeFila(nombre);
+
+    const porAnoGini: Record<string, number> = {};
+    const porAnoDecil: Record<string, number> = {};
+    for (const [periodo, col] of Object.entries(COLS_ANO_CUADRO21)) {
+      const g = celda(ws, col, filaTerritorio + CUADRO21_OFFSET_GINI);
+      if (g != null) porAnoGini[periodo] = g;
+      const d = celda(ws, col, filaTerritorio);
+      if (d != null) porAnoDecil[periodo] = d;
+    }
+    if (Object.keys(porAnoGini).length > 0) gini.set(clave, porAnoGini);
+    if (Object.keys(porAnoDecil).length > 0) decilesPromedio.set(clave, porAnoDecil);
+  }
+
+  return { gini, decilesPromedio, ts: Date.now() };
+}
+
+async function cargarSerieEnigh(): Promise<SerieEnighCuadro21> {
+  if (serieCache && Date.now() - serieCache.ts < CACHE_TTL_MS) return serieCache;
+  if (serieEnVuelo) return serieEnVuelo;
+  serieEnVuelo = descargarYParsearSerieEnigh();
+  try {
+    serieCache = await serieEnVuelo;
+    return serieCache;
+  } finally {
+    serieEnVuelo = null;
+  }
+}
+
+// F2-6 cambió de definición al migrar de CONEVAL a este archivo (ver
+// cabecera). La serie de este resolver es 100% del archivo ENIGH tabulados
+// (una sola metodología entre 2016 y 2024), así que es comparable
+// internamente — no se mezcla con el valor CONEVAL de años previos.
+export async function resolverSerieEnigh(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoSerie> {
+  const esGini = indicadorId === "F2-6";
+  let datos: SerieEnighCuadro21;
+  try {
+    datos = await cargarSerieEnigh();
+  } catch {
+    return { ok: false, motivo: "Error de conexión con INEGI (ENIGH tabulados)" };
+  }
+
+  const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  let clave: string;
+  let territorioLabel: string;
+  if (nivel === "nacional") {
+    clave = CLAVE_NACIONAL;
+    territorioLabel = "Nacional";
+  } else {
+    if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+    const cve = resolveEstadoCve(territorio.estado);
+    if (!cve) return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+    clave = cve;
+    territorioLabel = CVE_ESTADO_NOMBRE[cve] ?? territorio.estado;
+  }
+
+  const porAno = (esGini ? datos.gini : datos.decilesPromedio).get(clave);
+  if (!porAno || Object.keys(porAno).length === 0) {
+    return { ok: false, motivo: "INEGI no reportó una serie para este territorio" };
+  }
+
+  const puntos = Object.keys(porAno)
+    .sort()
+    .map((periodo) => ({
+      periodo,
+      valor: esGini
+        ? Math.round(porAno[periodo] * 10000) / 10000
+        : Math.round(porAno[periodo] * 100) / 100,
+    }));
+
+  return {
+    ok: true,
+    nivel,
+    territorioLabel,
+    unidad: esGini
+      ? "índice (0-1)"
+      : "pesos (ingreso corriente promedio trimestral por hogar)",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: "INEGI (ENIGH tabulados por entidad federativa, 2016-2024)",
+    formato: esGini ? "indice" : "moneda",
+    puntos,
+  };
 }

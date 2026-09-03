@@ -73,6 +73,8 @@ import { normalizeGeoName } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_INEGI_PM = "INEGI (Pobreza Multidimensional 2024)";
 
@@ -194,4 +196,84 @@ export async function resolverEstadosPobrezaExtremaInegi(): Promise<ElementoDeEs
 
 export async function resolverEstadosCarenciaSocialInegi(): Promise<ElementoDeEstado[]> {
   return resolverEstadosInegiGenerico(CODIGO_CARENCIA_SOCIAL);
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 1ª ola 2026-09-01) — F2-1 / F2-2 / F2-14, corte
+// nacional+estatal. La misma llamada BISE con `false` (en vez de `true`)
+// devuelve la Serie completa (todas las ediciones bienales) en vez de solo
+// `Serie[0]`. INEGI-PM continúa la metodología de CONEVAL (ver cabecera):
+// la serie es comparable entre ediciones.
+// ==========================================
+
+const CODIGO_POR_INDICADOR: Record<string, string> = {
+  "F2-1": CODIGO_POBREZA,
+  "F2-2": CODIGO_POBREZA_EXTREMA,
+  "F2-14": CODIGO_CARENCIA_SOCIAL,
+};
+
+async function consultarSerieBise(
+  codigo: string,
+  area: string
+): Promise<{ periodo: string; valor: number }[]> {
+  // `false` = serie histórica completa (no solo el corte más reciente).
+  const url = `${BASE_BISE}/${codigo}/${area}/es/false/null/json/${TOKEN_BISE}`;
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!res.ok) throw new Error(`INEGI BISE HTTP ${res.status} en ${url}`);
+  const json = await res.json();
+  const serie = json?.Data?.Serie;
+  if (!Array.isArray(serie)) return [];
+  return serie
+    .map((it: { TimePeriod?: unknown; CurrentValue?: unknown }) => {
+      const periodo = typeof it.TimePeriod === "string" ? it.TimePeriod.trim() : null;
+      const valor = typeof it.CurrentValue === "string" ? Number(it.CurrentValue) : NaN;
+      return periodo && Number.isFinite(valor)
+        ? { periodo, valor: Math.round(valor * 100) / 100 }
+        : null;
+    })
+    .filter((x): x is { periodo: string; valor: number } => x != null)
+    .sort((a, b) => a.periodo.localeCompare(b.periodo));
+}
+
+export async function resolverSerieInegiPm(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoSerie> {
+  const codigo = CODIGO_POR_INDICADOR[indicadorId];
+  if (!codigo) return { ok: false, motivo: `«${indicadorId}» no tiene serie en INEGI-PM` };
+
+  const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  let area: string;
+  let territorioLabel: string;
+  if (nivel === "nacional") {
+    area = "00";
+    territorioLabel = "Nacional";
+  } else {
+    if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+    const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+    if (!cve) return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+    area = cve;
+    territorioLabel = CVE_ESTADO_NOMBRE[cve] ?? territorio.estado;
+  }
+
+  let puntos: { periodo: string; valor: number }[];
+  try {
+    puntos = await consultarSerieBise(codigo, area);
+  } catch {
+    return { ok: false, motivo: "Error de conexión con INEGI (Pobreza Multidimensional)" };
+  }
+  if (puntos.length === 0) {
+    return { ok: false, motivo: "INEGI no reportó una serie para este territorio" };
+  }
+
+  return {
+    ok: true,
+    nivel,
+    territorioLabel,
+    unidad: "%",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_INEGI_PM,
+    formato: "porcentaje",
+    puntos,
+  };
 }
