@@ -165,6 +165,11 @@ interface FontanaCanvasItemBase {
   familiaId: FamiliaFontanaId;
   creadoEn: string; // ISO
   mensajeId: string; // turno de chat que lo generó (traza inversa)
+  // Borrado suave (26-09-05) — mismo patrón que FontanaSesion.archivada:
+  // el documento nunca se borra (append-only, trazabilidad con los
+  // mensajes de chat que lo generaron), solo se oculta de la vista.
+  // Items existentes sin este campo se tratan como no eliminados.
+  eliminado?: boolean;
 }
 
 // tipo "resumen" — filas indicador→valor a un nivel geográfico
@@ -235,9 +240,19 @@ export interface FontanaCanvasDistribucion extends FontanaCanvasItemBase {
   nivel: NivelTablaFontana; // nivel geográfico del que es el desglose
   ejeTipo: "categorico" | "escala_ordinal";
   formato: "conteo" | "moneda" | "porcentaje";
-  nota?: string; // aclaración honesta cuando aplica (ej. F1-2: no separado por sexo)
+  nota?: string; // aclaración honesta cuando aplica
   fuenteEtiqueta?: string;
+  // Label resuelto del territorio (ej. "GUADALAJARA, JALISCO") — solo F1-2/
+  // F1-11 con territorioNombre explícito (mismo campo que ya tiene
+  // FontanaCanvasSerieTemporal). Permite detectar, sin parsear `titulo`, que
+  // un indicador+territorio YA fue generado (26-09-05, hallazgo "Fallo 2":
+  // evita duplicar tarjetas y re-bloquear el límite de lote en una relectura).
+  territorioLabel?: string;
   categorias: { etiqueta: string; valor: number }[];
+  // Solo F1-2 — cuando está presente, el Canvas renderiza una pirámide de
+  // dos lados (hombres/mujeres) en vez del histograma de un lado.
+  // `categorias` sigue trayendo el total por grupo (compatibilidad + resumen).
+  piramideSexo?: { etiqueta: string; hombres: number; mujeres: number }[];
 }
 
 // tipo "serie_temporal" — evolución de UN indicador EN EL TIEMPO (varios

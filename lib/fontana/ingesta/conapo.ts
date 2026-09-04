@@ -48,7 +48,7 @@
 import https from "https";
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
+import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -250,7 +250,11 @@ async function resolverMunicipalCelda(estadoCve: string, territorio: Territorio)
   }
 
   const catalogo = await readFromBodega<Record<string, string>>(`iter_2020/catalogo_municipios/${estadoCve}.json`);
-  const municipioCve = catalogo?.[normalizeGeoName(municipioNombre)];
+  // Mismo punto de entrada de resolución de nombre que el resto del proyecto
+  // (el catálogo del ITER se keyea con esta misma función en el pipeline).
+  const municipioCve =
+    catalogo?.[claveCanonicaMunicipio(estadoCve, municipioNombre)] ??
+    catalogo?.[normalizeGeoName(municipioNombre)];
   if (!municipioCve) {
     return { nivel: "municipal", motivo: `Municipio "${municipioNombre}" no reconocido en el catálogo INEGI` };
   }

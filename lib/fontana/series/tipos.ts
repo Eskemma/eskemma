@@ -35,11 +35,23 @@ export type ResultadoSerie = ResultadoSerieOk | { ok: false; motivo: string };
  * Nivel al que se resuelve la serie según el territorio del proyecto y los
  * niveles a los que el indicador publica serie:
  * - proyecto nacional → "nacional" si el indicador lo tiene, si no `null`.
- * - proyecto municipal → "municipal" si el indicador lo tiene; si no,
- *   "estatal" (serie del estado que contiene al municipio) si lo tiene;
- *   si no `null`.
- * - proyecto estatal / distrito_* → "estatal" si el indicador lo tiene,
- *   si no `null`.
+ * - proyecto municipal, distrito, distrito_federal o distrito_local →
+ *   "municipal" si el indicador lo tiene (municipal gana sobre estatal:
+ *   un dato del municipio/alcaldía específico del proyecto es siempre más
+ *   útil que uno de todo el estado); si no, "estatal" (serie del estado
+ *   que contiene al municipio) si lo tiene; si no `null`. Los 4 tipos se
+ *   tratan igual porque los 4 tienen (o resuelven, vía
+ *   resolverNombreMunicipio/extraerCiudadCabecera en cada adaptador) un
+ *   municipio concreto — un distrito_local/federal SIEMPRE representa la
+ *   alcaldía/municipio de su cabecera, nunca "todo el estado" (26-09-06,
+ *   incidente Iztapalapa: antes esta función nunca intentaba "municipal"
+ *   para distrito_*, aunque el indicador SÍ lo publicara y el nombre del
+ *   municipio resolviera perfecto — devolvía el motivo genérico de "no
+ *   existe a este nivel" sin haberlo intentado, o silenciosamente daba el
+ *   dato de TODO el estado en vez de preguntarse por el municipio).
+ * - proyecto estatal puro → "estatal" si el indicador lo tiene, si no
+ *   `null` (nunca intenta "municipal" — un proyecto estatal no tiene un
+ *   municipio específico que resolver).
  * `null` = el indicador no publica serie a ningún nivel aplicable al
  * territorio del proyecto (ej. IDH municipal en un proyecto estatal).
  */
@@ -50,10 +62,15 @@ export function nivelObjetivoSerie(
   if (territorio.nivel === "nacional") {
     return niveles.includes("nacional") ? "nacional" : null;
   }
-  if (territorio.nivel === "municipal") {
+  const tieneMunicipioResoluble =
+    territorio.nivel === "municipal" ||
+    territorio.nivel === "distrito" ||
+    territorio.nivel === "distrito_federal" ||
+    territorio.nivel === "distrito_local";
+  if (tieneMunicipioResoluble) {
     if (niveles.includes("municipal")) return "municipal";
     return niveles.includes("estatal") ? "estatal" : null;
   }
-  // estatal, distrito, distrito_federal, distrito_local
+  // estatal puro
   return niveles.includes("estatal") ? "estatal" : null;
 }

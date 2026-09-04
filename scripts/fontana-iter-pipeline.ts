@@ -24,26 +24,25 @@
  *   npx tsx scripts/fontana-iter-pipeline.ts --all-estados [--upload|--dry-run]
  *
  * Salida en Firebase Storage:
- *   fontana/bodega/iter_2020/piramide/municipios/{NN}.json      → { "ENT+MUN": { POBTOT, P_0A4..P_85YMAS } }
- *   fontana/bodega/iter_2020/piramide/estatal.json              → { "ENT": { POBTOT, P_0A4..P_85YMAS } }
+ *   fontana/bodega/iter_2020/piramide/municipios/{NN}.json      → { "ENT+MUN": { POBTOT, P_0A4..P_85YMAS, P_0A4_F/_M..P_85YMAS_F/_M } }
+ *   fontana/bodega/iter_2020/piramide/estatal.json              → { "ENT": { POBTOT, P_0A4..P_85YMAS, P_0A4_F/_M..P_85YMAS_F/_M } }
  *   fontana/bodega/iter_2020/urbano_rural/municipios/{NN}.json   → { "ENT+MUN": { urbano, rural } }
  *   fontana/bodega/iter_2020/urbano_rural/estatal.json           → { "ENT": { urbano, rural } }
- *   fontana/bodega/iter_2020/catalogo_municipios/{NN}.json       → { nombreNormalizado: "MUN" }
+ *   fontana/bodega/iter_2020/catalogo_municipios/{NN}.json       → { claveCanonicaMunicipio: "MUN" }
  *
- * El catálogo de municipios se construye desde el propio ITER (columna
- * NOM_MUN de cada CSV), NO desde lib/geo/municipios.ts. Verificado en
- * esta sesión (2026-07-31): el catálogo geo (topojson de INE, usado por
- * ECEG) usa una numeración de CVE_MUN que NO coincide con el CVE_MUN
- * oficial de INEGI en 1,550 de ~2,469 municipios (63%, las 32
- * entidades) — ej. Nuevo León: geo asigna CVE "040" a "Monterrey",
- * mientras que en el ITER real (fuente oficial INEGI), "040" es
- * "Parás" (906 hab.) y "039" es Monterrey (1,142,994 hab.). Usar
- * resolveMunicipioCve de lib/geo/municipios.ts para indexar datos de
- * ITER produciría valores sistemáticamente incorrectos. No se investiga
- * aquí el origen de esa discrepancia en el catálogo geo (pre-existente,
- * fuera de alcance de este incremento) — se documenta como hallazgo y
- * se evita heredarla construyendo un catálogo propio desde la fuente
- * oficial que este adaptador sí usa.
+ * El catálogo de municipios se construye con los NOMBRES del propio ITER
+ * (columna NOM_MUN de cada CSV, leída UTF-8), pero se KEYEA con
+ * `claveCanonicaMunicipio()` de lib/geo/municipioCanonico.ts — la MISMA
+ * función que usa el query time (resolverMunicipioCveIter en
+ * lib/fontana/ingesta/iter.ts) y que produce resolverTerritorioNombre.
+ * Lo que NO se hereda del catálogo geo de INE es su NUMERACIÓN de CVE_MUN:
+ * verificado (2026-07-31) que diverge del CVE_MUN oficial de INEGI en
+ * 1,550 de ~2,469 municipios (63%) — ej. Nuevo León: geo asigna "040" a
+ * Monterrey, pero en el ITER real "040" es "Parás" y "039" es Monterrey.
+ * Por eso el catálogo mapea nombre→CVE del propio ITER; solo la
+ * NORMALIZACIÓN del nombre es compartida (antes era un normalize local
+ * que divergía — causa del fallo sistémico de nombres acentuados,
+ * 2026-09-03).
  */
 
 import fs from "fs";
@@ -53,6 +52,11 @@ import { initializeApp, cert, App } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { parse } from "csv-parse/sync";
 import dotenv from "dotenv";
+// Lógica PURA (sin firebase/topojson) — segura como import estático.
+import { claveCanonicaMunicipio } from "@/lib/geo/municipioCanonico";
+// getMunicipiosOptions (topojson INE) se importa DINÁMICAMENTE dentro de la
+// validación round-trip, después de dotenv.config() — arrastra
+// @/lib/firebase-admin, que revienta si se evalúa antes de cargar el .env.
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
@@ -67,6 +71,13 @@ const QUINQUENAL_GROUPS = [
   "P_30A34", "P_35A39", "P_40A44", "P_45A49", "P_50A54", "P_55A59",
   "P_60A64", "P_65A69", "P_70A74", "P_75A79", "P_80A84", "P_85YMAS",
 ] as const;
+
+// Desglose por sexo del mismo grupo — fd_iter_cpv2020.pdf sección
+// "ESTRUCTURA POR EDAD Y SEXO" (indicadores 48-101): P_<grupo>_F (Mujeres)
+// y P_<grupo>_M (Hombres). Se guardan JUNTO a los totales (no los
+// reemplazan) para la pirámide de dos lados del Canvas y para la
+// validación cruzada F+M ≈ total.
+const QUINQUENAL_GROUPS_SEXO = QUINQUENAL_GROUPS.flatMap((g) => [`${g}_F`, `${g}_M`]);
 
 const TAMLOC_URBANO_MIN = 5;
 const ALL_ESTADO_IDS = Array.from({ length: 32 }, (_, i) => String(i + 1).padStart(2, "0"));
@@ -96,24 +107,14 @@ function esUrbano(tamloc: string): boolean {
   return !isNaN(n) && n >= TAMLOC_URBANO_MIN;
 }
 
-// Misma normalización que normalizeGeoName en lib/geo/municipios.ts
-// (acentos → letra base, mayúsculas, Ñ/Ü preservadas) — duplicada aquí
-// en vez de importada porque este script corre fuera del runtime de
-// Next y no depende de otros módulos de lib/. lib/fontana/ingesta/iter.ts
-// SÍ importa la versión canónica de lib/geo/municipios.ts para que la
-// búsqueda en tiempo de consulta use exactamente el mismo criterio con
-// el que se construyó este catálogo.
-const ACCENT_MAP: Record<string, string> = {
-  "Á":"A","À":"A","Â":"A","Ä":"A","É":"E","È":"E","Ê":"E","Ë":"E",
-  "Í":"I","Ì":"I","Î":"I","Ï":"I","Ó":"O","Ò":"O","Ô":"O","Ö":"O",
-  "Ú":"U","Ù":"U","Û":"U",
-  "á":"A","à":"A","â":"A","ä":"A","é":"E","è":"E","ê":"E","ë":"E",
-  "í":"I","ì":"I","î":"I","ï":"I","ó":"O","ò":"O","ô":"O","ö":"O",
-  "ú":"U","ù":"U","û":"U","ñ":"Ñ","ü":"Ü",
-};
-function normalizeGeoName(s: string): string {
-  return s.split("").map((c) => ACCENT_MAP[c] ?? c).join("").toUpperCase();
-}
+// El catálogo nombre→CVE_MUN del ITER se keyea con la MISMA función
+// canónica (claveCanonicaMunicipio) que usa el query time
+// (resolverMunicipioCveIter en lib/fontana/ingesta/iter.ts) y que produce
+// resolverTerritorioNombre — sin normalización propia que pueda divergir
+// (causa del fallo sistémico de resolución de nombres acentuados,
+// 2026-09-03: este script leía los CSV UTF-8 como latin1 Y keyeaba con un
+// normalize local). El módulo lib/geo/municipioCanonico.ts es lógica pura
+// (sin firebase/topojson), importable desde este script.
 
 function findEstadoDir(estadoId: string): string | null {
   const prefix = `${estadoId}_`;
@@ -133,7 +134,9 @@ function readCsv(estadoId: string): RawRow[] {
   if (!fs.existsSync(csvPath)) {
     throw new Error(`No se encontró ${csvPath}`);
   }
-  const raw = fs.readFileSync(csvPath, "latin1");
+  // UTF-8 — verificado byte a byte (NOM_MUN acentuados = C3 xx). Leerlo como
+  // latin1 mojibake'aba las llaves del catálogo de municipios.
+  const raw = fs.readFileSync(csvPath, "utf-8");
   return parse(raw, { columns: true, skip_empty_lines: true, bom: true }) as RawRow[];
 }
 
@@ -143,7 +146,73 @@ function buildPiramideRecord(row: RawRow): PiramideRecord {
     const v = toInt(row[g]);
     rec[g] = isNaN(v) ? 0 : v;
   }
+  for (const gs of QUINQUENAL_GROUPS_SEXO) {
+    const v = toInt(row[gs]);
+    rec[gs] = isNaN(v) ? 0 : v;
+  }
   return rec;
+}
+
+// Validación cruzada: para cada grupo, Hombres + Mujeres debe igualar el
+// total (conteos crudos del censo — sin redondeo, así que === exacto en las
+// filas agregadas LOC="0000", que el diccionario confirma sin supresión a
+// nivel entidad/municipio). Cualquier desviación se reporta antes de subir.
+function verificarCruceSexo(
+  etiqueta: string,
+  registros: Record<string, PiramideRecord>
+): { ok: boolean; desviaciones: string[] } {
+  const desviaciones: string[] = [];
+  for (const [clave, rec] of Object.entries(registros)) {
+    for (const g of QUINQUENAL_GROUPS) {
+      const total = rec[g] ?? 0;
+      const suma = (rec[`${g}_M`] ?? 0) + (rec[`${g}_F`] ?? 0);
+      if (suma !== total) {
+        desviaciones.push(`${etiqueta} ${clave} ${g}: H+M=${suma} vs total=${total} (Δ ${suma - total})`);
+      }
+    }
+  }
+  return { ok: desviaciones.length === 0, desviaciones };
+}
+
+// Validación del catálogo nombre→CVE_MUN (2026-09-03):
+//  (1) GATE — cada municipio con fila ITER (piramideMunicipios) debe tener
+//      su CVE alcanzable desde el catálogo. Si falta uno, el keying del
+//      nombre falló → NO se sube.
+//  (2) ROUND-TRIP — cada nombre que produciría el query time
+//      (claveCanonicaMunicipio sobre las opciones INE de ese estado) debe
+//      ser una llave del catálogo. Las que no calzan se listan; las
+//      genuinas (municipios creados post-Censo-2020, sin fila ITER) son
+//      esperadas y no bloquean.
+async function verificarCatalogo(
+  estadoId: string,
+  piramideMunicipios: Record<string, PiramideRecord>,
+  catalogo: Record<string, string>,
+  colisionesNombre: { clave: string; cves: string[] }[]
+): Promise<{ ok: boolean; gateFaltantes: string[]; colisiones: string; roundTrip: string }> {
+  const cvesEnCatalogo = new Set(Object.values(catalogo));
+  const cvesEnColision = new Set(colisionesNombre.flatMap((c) => c.cves));
+  // GATE: municipio con fila ITER que NO se puede resolver por nombre y que
+  // NO es una colisión de nombre idéntico conocida.
+  const gateFaltantes = Object.keys(piramideMunicipios)
+    .map((k) => k.slice(2)) // ${estadoId}${mun} -> mun
+    .filter((mun) => !cvesEnCatalogo.has(mun) && !cvesEnColision.has(mun));
+
+  const colisiones = colisionesNombre.length
+    ? colisionesNombre.map((c) => `${c.clave} = cves ${c.cves.join("/")}`).join("; ")
+    : "";
+
+  const { getMunicipiosOptions } = await import("@/lib/geo/municipios");
+  const opciones = await getMunicipiosOptions(estadoId);
+  const llaves = new Set(Object.keys(catalogo));
+  const missINE: string[] = [];
+  for (const o of opciones) {
+    if (!llaves.has(claveCanonicaMunicipio(estadoId, o.nombre))) missINE.push(o.nombre);
+  }
+  const roundTrip =
+    `INE→catálogo: ${opciones.length - missINE.length}/${opciones.length}` +
+    (missINE.length ? ` — sin fila ITER: ${missINE.join(", ")}` : " (todos)");
+
+  return { ok: gateFaltantes.length === 0, gateFaltantes, colisiones, roundTrip };
 }
 
 /**
@@ -159,12 +228,19 @@ function processEstado(estadoId: string, rows: RawRow[]): {
   urbanoRuralMunicipios: Record<string, UrbanoRuralRecord>;
   urbanoRuralEstatal: UrbanoRuralRecord;
   catalogoMunicipios: Record<string, string>;
+  // Municipios de ITER cuyo nombre canónico colisiona con el de otro del
+  // mismo estado (ej. Oaxaca: 2 "SAN JUAN MIXTEPEC", 2 "SAN PEDRO
+  // MIXTEPEC", sin campo que los distinga — ver ALIAS_MUNICIPIO). El
+  // catálogo (mapa nombre→cve) solo puede guardar uno; el otro queda
+  // irresoluble por nombre — ambigüedad conocida, NO el bug de encoding.
+  colisionesNombre: { clave: string; cves: string[] }[];
 } {
   const piramideMunicipios: Record<string, PiramideRecord> = {};
   let piramideEstatal: PiramideRecord | null = null;
   const urbanoRuralMunicipios: Record<string, UrbanoRuralRecord> = {};
   const urbanoRuralEstatal: UrbanoRuralRecord = { urbano: 0, rural: 0 };
   const catalogoMunicipios: Record<string, string> = {};
+  const colisionesNombre: { clave: string; cves: string[] }[] = [];
 
   for (const row of rows) {
     const mun = row["MUN"];
@@ -178,7 +254,14 @@ function processEstado(estadoId: string, rows: RawRow[]): {
         piramideEstatal = buildPiramideRecord(row);
       } else {
         piramideMunicipios[`${estadoId}${mun}`] = buildPiramideRecord(row);
-        catalogoMunicipios[normalizeGeoName(row["NOM_MUN"])] = mun;
+        const claveCat = claveCanonicaMunicipio(estadoId, row["NOM_MUN"]);
+        const previa = catalogoMunicipios[claveCat];
+        if (previa !== undefined && previa !== mun) {
+          const col = colisionesNombre.find((c) => c.clave === claveCat);
+          if (col) col.cves.push(mun);
+          else colisionesNombre.push({ clave: claveCat, cves: [previa, mun] });
+        }
+        catalogoMunicipios[claveCat] = mun;
       }
       continue;
     }
@@ -200,7 +283,7 @@ function processEstado(estadoId: string, rows: RawRow[]): {
     }
   }
 
-  return { piramideMunicipios, piramideEstatal, urbanoRuralMunicipios, urbanoRuralEstatal, catalogoMunicipios };
+  return { piramideMunicipios, piramideEstatal, urbanoRuralMunicipios, urbanoRuralEstatal, catalogoMunicipios, colisionesNombre };
 }
 
 function initFirebase(): App {
@@ -242,17 +325,55 @@ async function main(): Promise<void> {
   const app = !dryRun && upload ? initFirebase() : null;
   const piramideEstatalTotal: Record<string, PiramideRecord> = {};
   const urbanoRuralEstatalTotal: Record<string, UrbanoRuralRecord> = {};
+  let cruceGlobalOk = true;
 
   for (const estadoId of estados) {
     process.stdout.write(`Procesando estado ${estadoId}…\n`);
     const rows = readCsv(estadoId);
-    const { piramideMunicipios, piramideEstatal, urbanoRuralMunicipios, urbanoRuralEstatal, catalogoMunicipios } = processEstado(estadoId, rows);
+    const { piramideMunicipios, piramideEstatal, urbanoRuralMunicipios, urbanoRuralEstatal, catalogoMunicipios, colisionesNombre } = processEstado(estadoId, rows);
 
     if (!piramideEstatal) {
       throw new Error(`Estado ${estadoId}: no se encontró fila agregada estatal (MUN="000", LOC="0000")`);
     }
     piramideEstatalTotal[estadoId] = piramideEstatal;
     urbanoRuralEstatalTotal[estadoId] = urbanoRuralEstatal;
+
+    // Validación cruzada H+M ≈ total (estatal + todos los municipios).
+    const cruce = verificarCruceSexo(estadoId, {
+      [`${estadoId}_ESTATAL`]: piramideEstatal,
+      ...piramideMunicipios,
+    });
+    if (cruce.ok) {
+      process.stdout.write(`  ✓ cruce H+M=total OK (estatal + ${Object.keys(piramideMunicipios).length} municipios)\n`);
+    } else {
+      cruceGlobalOk = false;
+      process.stdout.write(`  ✗ cruce H+M≠total en ${cruce.desviaciones.length} celdas:\n`);
+      for (const d of cruce.desviaciones.slice(0, 10)) process.stdout.write(`    ${d}\n`);
+      if (cruce.desviaciones.length > 10) process.stdout.write(`    …y ${cruce.desviaciones.length - 10} más\n`);
+      if (upload) {
+        throw new Error(
+          `Estado ${estadoId}: la validación cruzada H+M=total falló — NO se sube nada. Revisa con --dry-run.`
+        );
+      }
+    }
+
+    // Validación del catálogo nombre→CVE (encoding + clave canónica).
+    const cat = await verificarCatalogo(estadoId, piramideMunicipios, catalogoMunicipios, colisionesNombre);
+    process.stdout.write(`  ${cat.ok ? "✓" : "✗"} catálogo: ${cat.roundTrip}\n`);
+    if (cat.colisiones) {
+      process.stdout.write(`  ⚠ colisión de nombre idéntico (ambigüedad conocida, no bloquea): ${cat.colisiones}\n`);
+    }
+    if (!cat.ok) {
+      cruceGlobalOk = false;
+      process.stdout.write(
+        `  ✗ ${cat.gateFaltantes.length} municipios con fila ITER SIN entrada en el catálogo (no colisión): ${cat.gateFaltantes.join(", ")}\n`
+      );
+      if (upload) {
+        throw new Error(
+          `Estado ${estadoId}: hay municipios ITER que no se pueden resolver por nombre — NO se sube nada.`
+        );
+      }
+    }
 
     process.stdout.write(
       `  → ${Object.keys(piramideMunicipios).length} municipios (pirámide), ` +
@@ -281,6 +402,10 @@ async function main(): Promise<void> {
       await uploadJson(app!, catPath, catalogoMunicipios);
       process.stdout.write("  ✓ Done\n");
     }
+  }
+
+  if (!cruceGlobalOk) {
+    process.stdout.write("\n⚠️  Hubo celdas con H+M≠total (ver arriba). En --dry-run se continúa para inspección.\n");
   }
 
   if (allEstados) {

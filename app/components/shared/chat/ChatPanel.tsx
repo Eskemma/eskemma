@@ -241,84 +241,95 @@ export default function ChatPanel({
           </div>
         )}
 
-        <div className="flex items-end gap-2 border border-gray-eske-20 dark:border-white/10 rounded-2xl px-2.5 py-1.5 focus-within:border-gray-eske-40">
-          {/* Adjuntar archivo */}
-          {adjuntosSoportados && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={FORMATOS_ACEPTADOS}
-                multiple
-                onChange={handleFilePick}
-                className="hidden"
-              />
+        {/* 2 niveles (26-09-05): arriba el campo de texto a todo el ancho;
+            abajo adjuntar+dictado a la izquierda, espacio vacío al centro.
+            Enviar queda fuera de la columna, self-stretch, ocupando la
+            altura combinada de ambos niveles (items-stretch en el padre). */}
+        <div className="flex items-stretch gap-2 border border-gray-eske-20 dark:border-white/10 rounded-2xl px-2.5 py-1.5 focus-within:border-gray-eske-40">
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              disabled={streaming}
+              placeholder={listening ? "Escuchando…" : "Escribe tu pregunta…"}
+              className="w-full text-sm resize-none bg-transparent text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-40 focus:outline-none py-1.5 max-h-[120px] leading-snug disabled:opacity-50"
+            />
+
+            <div className="flex items-center gap-1">
+              {/* Adjuntar archivo */}
+              {adjuntosSoportados && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={FORMATOS_ACEPTADOS}
+                    multiple
+                    onChange={handleFilePick}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={streaming}
+                    aria-label="Adjuntar archivo"
+                    title="Adjuntar archivo (PDF, Word, Excel, texto)"
+                    className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white hover:bg-gray-eske-10 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                      <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  </button>
+                </>
+              )}
+
+              {/* Dictado por voz */}
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={streaming}
-                aria-label="Adjuntar archivo"
-                title="Adjuntar archivo (PDF, Word, Excel, texto)"
-                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white hover:bg-gray-eske-10 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                onClick={toggleDictado}
+                disabled={!vozSoportada || streaming}
+                aria-label={
+                  vozSoportada
+                    ? listening
+                      ? "Detener dictado"
+                      : "Dictar por voz"
+                    : "El dictado por voz no está disponible en este navegador"
+                }
+                aria-pressed={listening}
+                title={
+                  vozSoportada
+                    ? listening
+                      ? "Detener dictado"
+                      : "Dictar por voz"
+                    : "El dictado por voz no está disponible en este navegador"
+                }
+                className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                  listening
+                    ? "bg-red-eske text-white-eske animate-pulse motion-reduce:animate-none"
+                    : "text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white hover:bg-gray-eske-10 dark:hover:bg-white/5"
+                }`}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-                  <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3" />
                 </svg>
               </button>
-            </>
-          )}
+              {/* Espacio vacío al centro — deliberado, sin flex-1 forzando nada. */}
+            </div>
+          </div>
 
-          {/* Dictado por voz */}
-          <button
-            type="button"
-            onClick={toggleDictado}
-            disabled={!vozSoportada || streaming}
-            aria-label={
-              vozSoportada
-                ? listening
-                  ? "Detener dictado"
-                  : "Dictar por voz"
-                : "El dictado por voz no está disponible en este navegador"
-            }
-            aria-pressed={listening}
-            title={
-              vozSoportada
-                ? listening
-                  ? "Detener dictado"
-                  : "Dictar por voz"
-                : "El dictado por voz no está disponible en este navegador"
-            }
-            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              listening
-                ? "bg-red-eske text-white-eske animate-pulse motion-reduce:animate-none"
-                : "text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white hover:bg-gray-eske-10 dark:hover:bg-white/5"
-            }`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3" />
-            </svg>
-          </button>
-
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            disabled={streaming}
-            placeholder={listening ? "Escuchando…" : "Escribe tu pregunta…"}
-            className="flex-1 text-sm resize-none bg-transparent text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-40 focus:outline-none py-1.5 max-h-[120px] leading-snug disabled:opacity-50"
-          />
           {/* Enviar — ícono real (avión de papel), siempre visible; deshabilitado
-              (sin texto ni adjuntos listos, o streaming, o subiendo) baja opacidad. */}
+              (sin texto ni adjuntos listos, o streaming, o subiendo) baja opacidad.
+              self-stretch: ocupa la altura combinada de las 2 filas de la izquierda. */}
           <button
             type="button"
             onClick={handleSend}
             disabled={enviarDeshabilitado}
             aria-label="Enviar"
             title="Enviar"
-            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-blue-eske text-white-eske hover:bg-blue-eske-60 disabled:bg-blue-eske/50 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 self-stretch w-11 rounded-2xl flex items-center justify-center bg-blue-eske text-white-eske hover:bg-blue-eske-60 disabled:bg-blue-eske/50 disabled:cursor-not-allowed transition-colors"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
               <path d="M22 2 11 13" />

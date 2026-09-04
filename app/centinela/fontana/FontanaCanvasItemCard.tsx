@@ -3,32 +3,191 @@
 // app/centinela/fontana/FontanaCanvasItemCard.tsx
 // Renderiza un FontanaCanvasItem en la pestaña "Fontana" (Canvas). El
 // tipo "tabla" reutiliza FontanaComparativeTable tal cual (no se duplica).
+//
+// Kebab (⋮, 26-09-05): Descargar (PDF para resumen/tabla/desglose vía
+// lib/shared/reportExport.ts; PNG/JPG para grafica/distribucion/
+// serie_temporal vía app/components/shared/exportElementAsImage.ts) y
+// Eliminar (borrado suave — eliminado:true, nunca se borra el documento).
+// Modal de confirmación: mismo patrón inline de FontanaSesionesHub.tsx
+// (SesionCard) — no existe un componente compartido de confirmación hoy.
 
+import { useEffect, useRef, useState } from "react";
 import type { FontanaCanvasItem, FontanaSesion } from "@/types/fontana.types";
 import { NOMBRE_NIVEL_TABLA } from "@/lib/fontana/tablaColumnas";
 import { FAMILIA_META } from "@/lib/fontana/familias";
 import NaturalezaBadge from "./NaturalezaBadge";
 import FontanaComparativeTable from "./FontanaComparativeTable";
+import { canvasItemToMarkdown } from "@/lib/fontana/canvasExport";
+import { exportToPdf, buildFilename } from "@/lib/shared/reportExport";
+import { exportElementAsImage, type FormatoImagen } from "@/app/components/shared/exportElementAsImage";
 
 interface Props {
   item: FontanaCanvasItem;
   sesion: FontanaSesion;
+  onEliminado?: (itemId: string) => void;
 }
 
-export default function FontanaCanvasItemCard({ item, sesion }: Props) {
+const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal"]);
+const TIPOS_PDF = new Set<FontanaCanvasItem["tipo"]>(["resumen", "tabla", "desglose"]);
+
+export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Props) {
   const color = FAMILIA_META[item.familiaId]?.color ?? "#248cc1";
+  const graficaRef = useRef<HTMLDivElement>(null);
+  const kebabRef = useRef<HTMLDivElement>(null);
+
+  const [kebabOpen, setKebabOpen] = useState(false);
+  const [submenuDescarga, setSubmenuDescarga] = useState(false);
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!kebabOpen) return;
+    function onOutsideClick(e: MouseEvent) {
+      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+        setKebabOpen(false);
+        setSubmenuDescarga(false);
+      }
+    }
+    document.addEventListener("mousedown", onOutsideClick);
+    return () => document.removeEventListener("mousedown", onOutsideClick);
+  }, [kebabOpen]);
+
+  async function handleDescargarPdf() {
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      const markdown = canvasItemToMarkdown(item);
+      const baseName = sesion.nombre || sesion.territorio.nombre || "Fontana";
+      await exportToPdf(markdown, baseName, item.id, item.titulo, "Fontana");
+    } catch {
+      setErrorDescarga("No se pudo generar el PDF.");
+    } finally {
+      setDescargando(false);
+      setKebabOpen(false);
+      setSubmenuDescarga(false);
+    }
+  }
+
+  async function handleDescargarImagen(formato: FormatoImagen) {
+    if (!graficaRef.current) return;
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      const baseName = sesion.nombre || sesion.territorio.nombre || "Fontana";
+      const filename = buildFilename(baseName, item.id, formato === "jpg" ? "jpg" : "png");
+      await exportElementAsImage(graficaRef.current, filename, formato);
+    } catch {
+      setErrorDescarga("No se pudo generar la imagen.");
+    } finally {
+      setDescargando(false);
+      setKebabOpen(false);
+      setSubmenuDescarga(false);
+    }
+  }
+
+  async function handleEliminar() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canvasItemId: item.id, eliminarCanvasItem: true }),
+      });
+      if (res.ok) onEliminado?.(item.id);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   return (
-    <div className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-4">
+    <div className="relative rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: color }}>
           {item.familiaId.replace("F", "")}
         </span>
-        <div>
-          <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] leading-none">{item.titulo}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] leading-none truncate">{item.titulo}</p>
           <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-1">Generado desde el chat</p>
         </div>
+
+        {/* Kebab (⋮) */}
+        <div className="relative shrink-0" ref={kebabRef}>
+          <button
+            type="button"
+            aria-label="Opciones de esta tarjeta"
+            onClick={() => setKebabOpen((o) => !o)}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <circle cx="8" cy="3" r="1.5" />
+              <circle cx="8" cy="8" r="1.5" />
+              <circle cx="8" cy="13" r="1.5" />
+            </svg>
+          </button>
+          {kebabOpen && (
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white-eske dark:bg-[#1E3A52] rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20">
+              {TIPOS_PDF.has(item.tipo) && (
+                <button
+                  type="button"
+                  onClick={handleDescargarPdf}
+                  disabled={descargando}
+                  className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  Descargar PDF
+                </button>
+              )}
+              {TIPOS_IMAGEN.has(item.tipo) && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setSubmenuDescarga((s) => !s)}
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors flex items-center justify-between"
+                  >
+                    Descargar
+                    <span aria-hidden="true">{submenuDescarga ? "▾" : "▸"}</span>
+                  </button>
+                  {submenuDescarga && (
+                    <div className="pb-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDescargarImagen("png")}
+                        disabled={descargando}
+                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                      >
+                        PNG
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDescargarImagen("jpg")}
+                        disabled={descargando}
+                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                      >
+                        JPG
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="border-t border-gray-eske-10 dark:border-white/10 my-1" />
+              <button
+                type="button"
+                onClick={() => {
+                  setKebabOpen(false);
+                  setConfirmDelete(true);
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-red-eske hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Eliminar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {errorDescarga && <p className="text-xs text-red-eske mb-2">{errorDescarga}</p>}
 
       {item.tipo === "resumen" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -52,7 +211,12 @@ export default function FontanaCanvasItemCard({ item, sesion }: Props) {
       )}
 
       {item.tipo === "grafica" && (
-        <GraficaBarras item={item} color={color} />
+        <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
+          <GraficaBarras item={item} color={color} />
+          {item.fuenteEtiqueta && (
+            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+          )}
+        </div>
       )}
 
       {item.tipo === "desglose" && (
@@ -102,12 +266,63 @@ export default function FontanaCanvasItemCard({ item, sesion }: Props) {
         />
       )}
 
-      {item.tipo === "distribucion" && <DistribucionBarras item={item} color={color} />}
+      {item.tipo === "distribucion" && (
+        <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
+          <DistribucionBarras item={item} color={color} />
+          {item.fuenteEtiqueta && (
+            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+          )}
+        </div>
+      )}
 
-      {item.tipo === "serie_temporal" && <SerieTemporalGrafica item={item} color={color} />}
+      {item.tipo === "serie_temporal" && (
+        <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
+          <SerieTemporalGrafica item={item} color={color} />
+          {item.fuenteEtiqueta && (
+            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+          )}
+        </div>
+      )}
 
-      {(item.tipo === "grafica" || item.tipo === "desglose" || item.tipo === "distribucion" || item.tipo === "serie_temporal") && item.fuenteEtiqueta && (
+      {item.tipo === "desglose" && item.fuenteEtiqueta && (
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+      )}
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConfirmDelete(false);
+          }}
+        >
+          <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div>
+              <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">¿Eliminar «{item.titulo}»?</h3>
+              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
+                Dejará de verse en tu Canvas.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleEliminar}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium bg-red-eske text-white-eske rounded-lg hover:bg-red-eske/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {deleting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -119,6 +334,68 @@ function fmtValor(valor: number, formato: "conteo" | "moneda" | "porcentaje"): s
   return valor.toLocaleString("es-MX");
 }
 
+function abreviarConteo(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")} M`;
+  if (n >= 10_000) return `${Math.round(n / 1000)} k`;
+  return n.toLocaleString("es-MX");
+}
+
+// Pirámide de edades de dos lados (solo F1-2) — hombres a la izquierda,
+// mujeres a la derecha, desde un eje central. Grupo más viejo arriba.
+function PiramideSexo({
+  item,
+  color,
+}: {
+  item: Extract<FontanaCanvasItem, { tipo: "distribucion" }> & {
+    piramideSexo: NonNullable<Extract<FontanaCanvasItem, { tipo: "distribucion" }>["piramideSexo"]>;
+  };
+  color: string;
+}) {
+  const filas = [...item.piramideSexo].reverse();
+  const max = Math.max(...item.piramideSexo.flatMap((f) => [f.hombres, f.mujeres]), 1);
+  return (
+    <div>
+      <div className="flex items-center gap-1 text-[9px] font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
+        <span className="flex-1 text-right pr-1">Hombres</span>
+        <span className="w-12 shrink-0 text-center">Edad</span>
+        <span className="flex-1 pl-1">Mujeres</span>
+      </div>
+      <div className="space-y-1">
+        {filas.map((f) => (
+          <div key={f.etiqueta} className="flex items-center gap-1 text-[9px]">
+            {/* 26-09-06, corrección del fix anterior: un TOPE al ancho de la
+                barra (80%) aplanaba la diferencia entre valores altos —
+                varios grupos con valores distintos (61k-76k) se veían con
+                la misma longitud, rompiendo la lectura de proporciones que
+                es el propósito de la pirámide. Fix correcto: la etiqueta
+                vive en su propia columna de ancho FIJO (shrink-0, fuera del
+                cálculo de porcentaje); la barra se escala 0-100% dentro de
+                un "carril" (bar-track) que ya excluye ese ancho — a
+                cualquier valor, incluido el máximo, la barra llena como
+                mucho su carril, nunca invade la columna de la etiqueta.
+                Proporcionalidad exacta entre barras preservada. */}
+            <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
+              <span className="text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0 text-right">{abreviarConteo(f.hombres)}</span>
+              <div className="flex-1 flex justify-end min-w-0">
+                <div className="h-3 rounded-l-sm" style={{ width: `${(f.hombres / max) * 100}%`, background: color }} />
+              </div>
+            </div>
+            <span className="w-12 shrink-0 text-center text-black-eske-80 dark:text-[#9AAEBE]">
+              {f.etiqueta.replace(" años", "")}
+            </span>
+            <div className="flex-1 flex items-center gap-1 min-w-0">
+              <div className="flex-1 flex justify-start min-w-0">
+                <div className="h-3 rounded-r-sm" style={{ width: `${(f.mujeres / max) * 100}%`, background: color, opacity: 0.55 }} />
+              </div>
+              <span className="text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0">{abreviarConteo(f.mujeres)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DistribucionBarras({
   item,
   color,
@@ -126,6 +403,9 @@ function DistribucionBarras({
   item: Extract<FontanaCanvasItem, { tipo: "distribucion" }>;
   color: string;
 }) {
+  if (item.piramideSexo && item.piramideSexo.length > 0) {
+    return <PiramideSexo item={item as Parameters<typeof PiramideSexo>[0]["item"]} color={color} />;
+  }
   const max = Math.max(...item.categorias.map((c) => c.valor), 1);
   return (
     <div>
@@ -233,10 +513,16 @@ function SerieTemporalGrafica({
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
       )}
 
+      {/* mx-8 (26-09-06, no mx-1): las etiquetas de los puntos en 0%/100%
+          se centran con -translate-x-1/2 — la mitad del texto ("0.759",
+          "2020"…) cae fuera del propio contenedor en los extremos. mx-1
+          no dejaba margen suficiente y se veía cortado tanto en pantalla
+          como al exportar como imagen (exportElementAsImage captura el
+          recuadro exacto del nodo). */}
       {!hayDatos ? (
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
       ) : (
-        <div className="relative h-28 mt-6 mb-7 mx-1">
+        <div className="relative h-28 mt-6 mb-7 mx-8">
           <svg
             className="absolute inset-0 w-full h-full overflow-visible"
             viewBox="0 0 100 100"

@@ -103,6 +103,9 @@ export interface CeldaTablaFontana {
   // comparativa NO lo consume; se propaga solo para el Canvas "distribucion"
   // del agente (T10). Solo lo traen F1-2 / F1-11 / F1-12 / F2-12.
   distribucion?: Record<string, number>;
+  // Solo F1-2 — el mismo desglose por grupo de edad, partido por sexo, para
+  // la pirámide de dos lados del Canvas. Misma propagación que `distribucion`.
+  distribucionSexo?: Record<string, { hombres: number; mujeres: number }>;
   // Solo la celda "municipal" en proyectos distrito_federal, cuando el
   // indicador tiene mecanismo distrital de ECEG — cuántos municipios
   // componen el distrito del proyecto. > 1 habilita el botón "Ver datos

@@ -14,6 +14,10 @@
 // DELETE — borra una sesión suelta. Rechaza si tiene modduloProjectId
 // (seguridad en profundidad — el hub nunca ofrece esta acción para una
 // sesión vinculada, pero el endpoint no confía solo en eso).
+// PATCH { canvasItemId, eliminarCanvasItem: true } — borrado SUAVE de un
+// item de Canvas (26-09-05): marca `eliminado: true`, nunca borra el
+// elemento del array (append-only, trazabilidad con los mensajes de chat
+// que lo generaron — algunos traen un enlace "Ver en Canvas").
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -22,8 +26,21 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
+import { FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
+import { FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
+import { FAMILIA3_ORDEN } from "@/lib/fontana/familia3Catalogo";
+import { FAMILIA4_ORDEN } from "@/lib/fontana/familia4Catalogo";
+import { FAMILIA5_ORDEN } from "@/lib/fontana/familia5Catalogo";
 
 const FAMILIAS_VALIDAS: FamiliaFontanaId[] = ["F1", "F2", "F3", "F4", "F5"];
+
+const CATALOGO_ORDEN: Record<FamiliaFontanaId, string[]> = {
+  F1: FAMILIA1_ORDEN,
+  F2: FAMILIA2_ORDEN,
+  F3: FAMILIA3_ORDEN,
+  F4: FAMILIA4_ORDEN,
+  F5: FAMILIA5_ORDEN,
+};
 
 interface EditarMetadatosBody {
   nombre?: string;
@@ -44,11 +61,42 @@ export async function PATCH(
 
   const { sesionId } = await context.params;
 
-  let body: { accion?: "agregar" | "quitar"; familiaId?: FamiliaFontanaId; indicadorId?: string; desvincular?: boolean } & EditarMetadatosBody;
+  let body: {
+    accion?: "agregar" | "quitar" | "agregar_todos" | "quitar_todos";
+    familiaId?: FamiliaFontanaId;
+    indicadorId?: string;
+    desvincular?: boolean;
+    canvasItemId?: string;
+    eliminarCanvasItem?: boolean;
+  } & EditarMetadatosBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  // Borrado suave de un item de Canvas (26-09-05) — rama propia, antes de
+  // desvincular/metadatos/accion.
+  if (body.eliminarCanvasItem === true) {
+    if (!body.canvasItemId) {
+      return NextResponse.json({ error: "canvasItemId es requerido" }, { status: 400 });
+    }
+    const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+    if (!cargada) {
+      return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
+    }
+    const { sesion, ref } = cargada;
+    const canvasItems = sesion.canvasItems ?? [];
+    const idx = canvasItems.findIndex((it) => it.id === body.canvasItemId);
+    if (idx === -1) {
+      return NextResponse.json({ error: "Item de Canvas no encontrado" }, { status: 404 });
+    }
+    // Firestore no permite update parcial de un elemento de array por
+    // índice — se lee el array completo y se escribe de vuelta.
+    const nuevoCanvasItems = canvasItems.map((it, i) => (i === idx ? { ...it, eliminado: true } : it));
+    const nowIso = new Date().toISOString();
+    await ref.update({ canvasItems: nuevoCanvasItems, fechaUltimoGuardado: nowIso });
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 
   // Desvincular (Investigación 2) — rama propia, antes de la de metadatos.
@@ -109,6 +157,47 @@ export async function PATCH(
   }
 
   const { accion, familiaId, indicadorId } = body;
+
+  // Bulk (Punto 1, 26-09-05): "Añadir todos los indicadores" / "Limpiar
+  // indicadores" por familia — rama propia, sin indicadorId. `minimos`
+  // vive en un array separado de `seleccionUsuario`, así que "quitar_todos"
+  // nunca necesita filtrar candados: solo vacía seleccionUsuario.
+  if (accion === "agregar_todos" || accion === "quitar_todos") {
+    if (!familiaId || !FAMILIAS_VALIDAS.includes(familiaId)) {
+      return NextResponse.json({ error: "familiaId (F1-F5) es requerido" }, { status: 400 });
+    }
+    const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+    if (!cargada) {
+      return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
+    }
+    const { sesion, ref } = cargada;
+    const familia = sesion.indicadoresPorFamilia[familiaId];
+
+    const nuevaSeleccion =
+      accion === "agregar_todos"
+        ? [...new Set([...familia.seleccionUsuario, ...CATALOGO_ORDEN[familiaId]])].filter(
+            (id) => !familia.minimos.includes(id)
+          )
+        : [];
+
+    const nowIso = new Date().toISOString();
+    await ref.update({
+      [`indicadoresPorFamilia.${familiaId}.seleccionUsuario`]: nuevaSeleccion,
+      fechaUltimoGuardado: nowIso,
+    });
+
+    const sesionActualizada: FontanaSesion = {
+      ...sesion,
+      sesionId,
+      indicadoresPorFamilia: {
+        ...sesion.indicadoresPorFamilia,
+        [familiaId]: { ...familia, seleccionUsuario: nuevaSeleccion },
+      },
+      fechaUltimoGuardado: nowIso,
+    };
+    return NextResponse.json({ sesion: sesionActualizada }, { status: 200 });
+  }
+
   if (!accion || !familiaId || !indicadorId || !FAMILIAS_VALIDAS.includes(familiaId)) {
     return NextResponse.json(
       { error: "accion, familiaId (F1-F5) e indicadorId son requeridos" },

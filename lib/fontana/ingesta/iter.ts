@@ -38,6 +38,19 @@ const QUINQUENAL_GROUPS = [
   "P_60A64", "P_65A69", "P_70A74", "P_75A79", "P_80A84", "P_85YMAS",
 ] as const;
 
+// Desglose por sexo del mismo grupo (ITER 2020: P_<grupo>_F / _M). El
+// pipeline los guarda junto a los totales; hasta que la bodega se re-suba
+// con estas columnas, `rec[...]` es undefined → 0 (pirámide de un lado).
+function distribucionSexoDesde(
+  lee: (grupoSexo: string) => number
+): Record<string, { hombres: number; mujeres: number }> {
+  const out: Record<string, { hombres: number; mujeres: number }> = {};
+  for (const g of QUINQUENAL_GROUPS) {
+    out[g] = { hombres: lee(`${g}_M`), mujeres: lee(`${g}_F`) };
+  }
+  return out;
+}
+
 interface PiramideRecord {
   POBTOT: number;
   [grupo: string]: number;
@@ -66,13 +79,11 @@ function resolverNombreMunicipio(territorio: Territorio): string | undefined {
 async function resolverMunicipioCveIter(estadoCve: string, municipioNombre: string): Promise<string | null> {
   const catalogo = await readFromBodega<Record<string, string>>(`iter_2020/catalogo_municipios/${estadoCve}.json`);
   if (!catalogo) return null;
-  // FIX DE FONDO (Incidente 2, 2026-08-23) — el catálogo de este archivo
-  // se construye con el NOM_MUN propio de ITER (normalizeGeoName() sin
-  // alias, ver scripts/fontana-iter-pipeline.ts), no reconstruido con
-  // este fix. Se prueba primero la clave con alias (cubre los casos
-  // donde ITER usa la misma forma "canónica" que Sefix/INE) y, si no
-  // hay match, la clave sin alias (comportamiento previo, para no perder
-  // ningún match que ya funcionaba). Nunca se reescribe la bodega aquí.
+  // Desde 2026-09-03 el catálogo se KEYEA en el pipeline con la MISMA
+  // `claveCanonicaMunicipio()` que se usa aquí (y con lectura UTF-8 del
+  // CSV) — antes divergían: normalize local + lectura latin1 →
+  // nombres acentuados nunca calzaban. El `?? normalizeGeoName` queda
+  // como red por si se consulta un catálogo viejo aún no re-subido.
   const claveConAlias = claveCanonicaMunicipio(estadoCve, municipioNombre);
   return catalogo[claveConAlias] ?? catalogo[normalizeGeoName(municipioNombre)] ?? null;
 }
@@ -118,6 +129,7 @@ export async function resolverNacionalIter(indicadorId: "F1-2" | "F1-11"): Promi
         nivel: "nacional",
         valor: sumarConteo(estatal, "POBTOT"),
         distribucion,
+        distribucionSexo: distribucionSexoDesde((gs) => sumarConteo(estatal, gs)),
         unidad: "habitantes",
         naturaleza: "estimacion_agregada",
         fuenteEtiqueta: FUENTE_ETIQUETA_ITER,
@@ -192,6 +204,7 @@ function toPiramideCelda(nivel: NivelFontanaF1, rec: PiramideRecord): ValorIndic
     nivel,
     valor: rec.POBTOT,
     distribucion,
+    distribucionSexo: distribucionSexoDesde((gs) => rec[gs] ?? 0),
     unidad: "habitantes",
     naturaleza: "dato_directo",
     fuenteEtiqueta: FUENTE_ETIQUETA_ITER,

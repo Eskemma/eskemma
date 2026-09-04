@@ -18,10 +18,20 @@ import type { ProjectType } from "@/types/moddulo.types";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import { getIndicadorRegistro, getIndicadoresPorFamilia, type NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import { esIndicadorNarrativoCurado } from "@/lib/fontana/ingesta/contenidoCurado";
-import { tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
+import { tieneSerie, SERIES_DISPONIBLES } from "@/lib/fontana/series/seriesDisponibles";
+
+// 26-09-05, incidente Iztapalapa: el nivel geográfico de una serie
+// (nacional/estatal/municipal) NUNCA debe salir de la inferencia del
+// modelo — antes `listar_indicadores_familia`/`listar_indicadores_activos_todas_familias`
+// solo exponían `tieneSerie` (booleano), sin nivel, y el modelo lo
+// adivinaba por el NOMBRE del indicador. `nivelesSerie` da el dato real.
+function nivelesSerie(id: string): NivelTablaFontana[] | null {
+  return SERIES_DISPONIBLES[id]?.niveles ?? null;
+}
 import { FAMILIA_META } from "@/lib/fontana/familias";
 import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
 import { familiaDeIndicador, type FamiliaFontanaId, type FontanaCanvasItem, type FontanaToolCall } from "@/types/fontana.types";
+import { normalizeGeoName } from "@/lib/geo/municipioCanonico";
 import {
   construirCanvasDesglose,
   construirCanvasDistribucion,
@@ -135,13 +145,13 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "listar_indicadores_activos_todas_familias",
     description:
-      "Devuelve, en UNA sola llamada, las 5 familias con sus indicadores activos en la sesión de este usuario. Úsala para preguntas de alcance múltiple ('¿qué indicadores tengo?', 'todo lo activo en mi sesión', 'resumen de lo que hay') — NUNCA encadenes 5 llamadas a listar_indicadores_familia.",
+      "Devuelve, en UNA sola llamada, las 5 familias con sus indicadores activos en la sesión de este usuario. Úsala para preguntas de alcance múltiple ('¿qué indicadores tengo?', 'todo lo activo en mi sesión', 'resumen de lo que hay') — NUNCA encadenes 5 llamadas a listar_indicadores_familia. Cada indicador trae `tieneSerie` y `nivelesSerie` (nacional/estatal/municipal, o varios) — nunca infieras el nivel de una serie del nombre del indicador, siempre usa `nivelesSerie`.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "listar_indicadores_familia",
     description:
-      "Devuelve los indicadores de una familia que están activos en la sesión de este usuario (id, nombre, definición). Úsala SIEMPRE para responder qué indicadores tiene / cuáles son los de una familia — nunca enumeres de memoria.",
+      "Devuelve los indicadores de una familia que están activos en la sesión de este usuario (id, nombre, definición, tieneSerie, nivelesSerie) y el catálogo completo. Úsala SIEMPRE para responder qué indicadores tiene / cuáles son los de una familia — nunca enumeres de memoria. `nivelesSerie` (nacional/estatal/municipal, o varios) es el nivel REAL de la serie — nunca lo infieras del nombre del indicador.",
     input_schema: {
       type: "object",
       properties: {
@@ -161,8 +171,9 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
         familiaId: { type: "string", enum: ["F1", "F2", "F3", "F4", "F5"], description: "Requerido para 'resumen' y 'tabla'." },
         indicadorId: { type: "string", description: "Requerido para 'grafica', 'distribucion' y 'serie_temporal'." },
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional para 'resumen'. Default = nivel del territorio." },
-        territorioNombre: { type: "string", description: "Solo para 'serie_temporal': estado o municipio que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
-        estadoNombre: { type: "string", description: "Solo para 'serie_temporal': desambigua municipios homónimos." },
+        territorioNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion' (F1-2 pirámide / F1-11 urbano-rural): estado o municipio que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
+        estadoNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion': desambigua municipios homónimos." },
+        confirmadoLote: { type: "boolean", description: "Ponlo en true SOLO si el usuario ya confirmó explícitamente en un turno anterior que quiere las gráficas de varios/todos los territorios de su proyecto. Sin esto, a partir del 3er territorio distinto en un mismo turno la herramienta se detiene y te pide preguntar primero." },
       },
       required: ["tipo"],
     },
@@ -193,6 +204,32 @@ export interface ToolContext {
   baseUrl: string;
   territorio: Territorio;
   tipoProyecto: ProjectType;
+  // Territorios DISTINTOS ya usados en llamadas a generar_visualizacion con
+  // `territorioNombre` DENTRO DE ESTE TURNO del agente (26-09-04, hallazgo
+  // "frase colectiva"): a la 3ª sin `confirmadoLote:true` se bloquea para
+  // forzar UNA pregunta por lote. Se crea vacío por request de chat = por
+  // turno del agente.
+  vizTerritoriosDelTurno: Set<string>;
+  // 26-09-04, hallazgo "8 municipios de Jalisco" (2ª forma de falla): true
+  // solo si el ÚLTIMO mensaje real del asistente (antes de este turno) fue
+  // genuinamente una pregunta sobre CUÁLES/CUÁNTOS municipios — nunca por
+  // haber contestado CUALQUIER pregunta previa (ej. "¿qué tipo de gráfica
+  // quieres?"). Calculado en chat/route.ts con esPreguntaDeMunicipios().
+  municipiosPreguntadosPrevio: boolean;
+  // 26-09-05, hallazgo "Fallo 1" (nombrar 3 municipios explícitos de una
+  // vez): el mensaje ACTUAL del usuario (el que disparó este turno) — para
+  // verificar si el usuario ya nombró literalmente el territorio de una
+  // llamada. Si lo nombró, el límite de lote no debe aplicar a ese
+  // territorio sin importar cuántos sean — es su selección explícita, no el
+  // modelo enumerando por su cuenta.
+  ultimoMensajeUsuario: string;
+  // 26-09-05, hallazgo "Fallo 2" (Tlaquepaque re-falla en el turno de la
+  // lectura comparativa): canvasItems ya persistidos en la sesión al
+  // iniciar este turno, más los que se van agregando durante el turno
+  // (mutado in-place) — para detectar que un indicador+territorio YA fue
+  // generado y reusar ese resultado en vez de duplicar la tarjeta o
+  // bloquear la llamada.
+  canvasItemsSesion: FontanaCanvasItem[];
 }
 
 export interface ToolResult {
@@ -301,6 +338,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
     nombre: i.nombre,
     definicion: i.definicion ?? null,
     tieneSerie: tieneSerie(i.id),
+    nivelesSerie: nivelesSerie(i.id),
   }));
 
   // Catálogo COMPLETO de la familia desde el registry (verificado 2026-08-27:
@@ -312,6 +350,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
     id: i.id,
     nombre: i.nombre,
     tieneSerie: tieneSerie(i.id),
+    nivelesSerie: nivelesSerie(i.id),
   }));
   const activos = new Set(indicadores.map((i) => i.id));
 
@@ -550,6 +589,111 @@ async function generarVisualizacion(
         "Este indicador no tiene un desglose por categorías disponible; puedo mostrarte su comparación entre niveles geográficos en su lugar (tipo 'grafica')."
       );
     }
+
+    const territorioNombre = input.territorioNombre ? String(input.territorioNombre).trim() : "";
+
+    // F1-2 (pirámide por sexo) y F1-11 (urbano/rural) pasan por
+    // /api/fontana/distribucion — soporta territorio nombrado y el guard
+    // multiMunicipio (mismo patrón que serie-temporal). F1-12 / F2-12
+    // siguen por el flujo de familia (solo territorio del proyecto).
+    if (indicadorId === "F1-2" || indicadorId === "F1-11") {
+      const limite = limiteTerritoriosLote(input, ctx);
+      if (limite) return reject(limite);
+      const data = await fetchDistribucion(input, ctx);
+
+      if (data.multiMunicipio) {
+        const municipios = (data.municipios as string[]) ?? [];
+        return reject(
+          `El proyecto abarca varios municipios (${municipios.join(", ")}). Un desglose de un solo municipio NO representa al conjunto del proyecto. Pregunta al usuario de CUÁL o CUÁLES de sus municipios lo quiere — puede nombrar varios y generas una llamada (y una tarjeta de Canvas) por cada uno, con territorioNombre. NUNCA combines ni promedies varios municipios en un solo desglose.`
+        );
+      }
+      if (data.multiEstado) {
+        const estados = (data.estados as string[]) ?? [];
+        return reject(
+          `El proyecto abarca varios estados (${estados.join(", ")}). Pregunta al usuario a cuál se refiere y vuelve a llamar con territorioNombre = ese estado.`
+        );
+      }
+      if (data.ambiguo) {
+        const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
+        return reject(`«${territorioNombre}» coincide con ${cands.length} municipios; pregunta al usuario a cuál se refiere (municipio + estado).`);
+      }
+      if (data.noResuelto) return reject(`No reconozco el territorio «${territorioNombre}».`);
+      if (data.error === "no_soportado") {
+        return reject(String(data.mensaje ?? "Ese indicador solo se desglosa para el territorio del proyecto."));
+      }
+      if (!data.ok) return reject(String(data.motivo ?? "No se pudo obtener el desglose."));
+
+      const terr = data.territorio as { label: string };
+      const esExterno = Boolean(data.esTerritorioExterno);
+
+      // 26-09-05, hallazgo "Fallo 2": este indicador+territorio ya tiene una
+      // tarjeta en el Canvas (label ya resuelto, match exacto) — reusar sus
+      // datos para la narrativa/lectura en vez de duplicar la tarjeta.
+      const existente = buscarCanvasItemExistente(ctx.canvasItemsSesion, "distribucion", indicadorId, terr.label);
+      if (existente && existente.tipo === "distribucion") {
+        const resultSummaryExistente = existente.piramideSexo
+          ? `Ya tenías la pirámide de edades por sexo de «${existente.indicadorNombre}» para ${terr.label} en el Canvas — no se duplicó. Usa estos datos para tu lectura.`
+          : `Ya tenías la distribución de «${existente.indicadorNombre}» para ${terr.label} en el Canvas — no se duplicó. Usa estos datos para tu lectura.`;
+        return {
+          resultForModel: {
+            canvasItemId: existente.id,
+            tipo: existente.tipo,
+            titulo: existente.titulo,
+            resumen: resultSummaryExistente,
+            nivel: existente.nivel,
+            formato: existente.formato,
+            ...(existente.piramideSexo
+              ? { esPiramideSexo: true, piramideSexo: existente.piramideSexo }
+              : { categorias: existente.categorias }),
+            yaExistiaEnCanvas: true,
+          },
+          toolCall: { tool: "generar_visualizacion", input, resultSummary: resultSummaryExistente, ok: true },
+        };
+      }
+
+      item = construirCanvasDistribucion(
+        indicadorId,
+        String(data.nombre ?? indicadorId),
+        data.nivel as NivelTablaFontana,
+        (data.distribucion as Record<string, number>) ?? {},
+        (data.fuenteEtiqueta as string | null) ?? undefined,
+        { ...meta, territorioLabel: terr.label },
+        (data.distribucionSexo as Record<string, { hombres: number; mujeres: number }> | null) ?? undefined
+      );
+      await appendCanvasItem(ctx.sesionId, item);
+      ctx.canvasItemsSesion.push(item);
+      const dist = item as Extract<FontanaCanvasItem, { tipo: "distribucion" }>;
+      const resultSummary = dist.piramideSexo
+        ? `Agregué al Canvas la pirámide de edades por sexo de «${dist.indicadorNombre}» para ${terr.label} (${dist.piramideSexo.length} grupos, nivel ${dist.nivel}).`
+        : `Agregué al Canvas la distribución de «${dist.indicadorNombre}» para ${terr.label} (${dist.categorias.length} categorías, nivel ${dist.nivel}).`;
+      return {
+        resultForModel: {
+          canvasItemId: item.id,
+          tipo: item.tipo,
+          titulo: item.titulo,
+          resumen: resultSummary,
+          nivel: dist.nivel,
+          formato: dist.formato,
+          ...(dist.piramideSexo
+            ? { esPiramideSexo: true, piramideSexo: dist.piramideSexo }
+            : { categorias: dist.categorias }),
+          esTerritorioExterno: esExterno,
+          esTerritorioDelProyecto: Boolean(data.esTerritorioDelProyecto),
+          instruccionChat: esExterno
+            ? `Aclara al usuario que este desglose es de ${terr.label} EN SU CONJUNTO, no del territorio del proyecto.`
+            : null,
+        },
+        toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
+        canvasItem: item,
+      };
+    }
+
+    // F1-12 / F2-12 — flujo de familia, solo territorio del proyecto.
+    if (territorioNombre) {
+      return reject(
+        `«${resp.indicadores.find((i) => i.id === indicadorId)?.nombre ?? indicadorId}» solo se puede desglosar para el territorio del proyecto, no para «${territorioNombre}».`
+      );
+    }
     const ind = resp.indicadores.find((i) => i.id === indicadorId);
     if (!ind) return reject(`«${indicadorId}» no está en la selección de ${FAMILIA_ETIQUETAS[familiaId]} de esta sesión.`);
     // La `distribucion` puede estar solo en algunos niveles (F2-12: nac/est;
@@ -567,11 +711,14 @@ async function generarVisualizacion(
       celdaDist.nivel,
       celdaDist.distribucion,
       celdaDist.fuenteEtiqueta ?? ind.fuenteEtiqueta,
-      meta
+      meta,
+      celdaDist.distribucionSexo
     );
     await appendCanvasItem(ctx.sesionId, item);
     const dist = item as Extract<FontanaCanvasItem, { tipo: "distribucion" }>;
-    const resultSummary = `Agregué al Canvas la distribución de «${ind.nombre}» (${dist.categorias.length} categorías, nivel ${dist.nivel}).`;
+    const resultSummary = dist.piramideSexo
+      ? `Agregué al Canvas la pirámide de edades por sexo de «${ind.nombre}» (${dist.piramideSexo.length} grupos, nivel ${dist.nivel}).`
+      : `Agregué al Canvas la distribución de «${ind.nombre}» (${dist.categorias.length} categorías, nivel ${dist.nivel}).`;
     return {
       resultForModel: {
         canvasItemId: item.id,
@@ -580,7 +727,9 @@ async function generarVisualizacion(
         resumen: resultSummary,
         nivel: dist.nivel,
         formato: dist.formato,
-        categorias: dist.categorias,
+        ...(dist.piramideSexo
+          ? { esPiramideSexo: true, piramideSexo: dist.piramideSexo }
+          : { categorias: dist.categorias }),
         nota: dist.nota ?? null,
         instruccionChat: dist.nota
           ? "Menciona la `nota` al usuario en tu respuesta del chat, no la dejes solo en el Canvas."
@@ -647,7 +796,12 @@ async function listarIndicadoresActivosTodasFamilias(ctx: ToolContext): Promise<
       return {
         familiaId: fid,
         nombre: meta.nombre,
-        indicadoresActivos: activos.map((i) => ({ id: i.id, nombre: i.nombre, tieneSerie: tieneSerie(i.id) })),
+        indicadoresActivos: activos.map((i) => ({
+          id: i.id,
+          nombre: i.nombre,
+          tieneSerie: tieneSerie(i.id),
+          nivelesSerie: nivelesSerie(i.id),
+        })),
         totalActivos: activos.length,
         totalCatalogo,
       };
@@ -760,6 +914,123 @@ async function fetchSerie(
     headers: { cookie: ctx.cookie },
   });
   return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+}
+
+// Desglose por categorías de F1-2 / F1-11 para un territorio nombrado o el
+// del proyecto — mismo patrón que fetchSerie (multiMunicipio, ambigüedad,
+// esTerritorioExterno). F1-12 / F2-12 NO pasan por aquí.
+async function fetchDistribucion(
+  input: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<Record<string, unknown>> {
+  const indicadorId = String(input.indicadorId ?? "");
+  const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
+  const territorioNombre = input.territorioNombre ? String(input.territorioNombre).trim() : "";
+  const estadoNombre = input.estadoNombre ? String(input.estadoNombre).trim() : "";
+  if (territorioNombre) params.set("territorio", territorioNombre);
+  if (estadoNombre) params.set("estado", estadoNombre);
+  const res = await fetch(`${ctx.baseUrl}/api/fontana/distribucion?${params.toString()}`, {
+    headers: { cookie: ctx.cookie },
+  });
+  return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+}
+
+// 26-09-05, hallazgo "Fallo 1" (el usuario nombró 3 municipios explícitos
+// de una sola vez y el 3º se bloqueó de todos modos): true si el territorio
+// de ESTA llamada aparece nombrado literalmente en el último mensaje del
+// USUARIO — normalizado (sin acentos, mayúsculas) para robustez, y con
+// coincidencia por el último token significativo para cubrir el caso en que
+// el modelo expande el nombre corto que escribió el usuario ("Tlaquepaque")
+// al nombre oficial completo ("San Pedro Tlaquepaque").
+function territorioNombradoPorUsuario(territorioNombre: string, mensajeUsuario: string): boolean {
+  if (!territorioNombre || !mensajeUsuario) return false;
+  const msg = normalizeGeoName(mensajeUsuario);
+  const terr = normalizeGeoName(territorioNombre);
+  if (!terr) return false;
+  if (msg.includes(terr)) return true;
+  return terr.split(/\s+/).some((tok) => tok.length >= 4 && msg.includes(tok));
+}
+
+// 26-09-05, hallazgo "Fallo 2" (Tlaquepaque re-falla en el turno de la
+// lectura comparativa): busca si este indicador+territorio YA fue generado
+// con éxito en la sesión (o antes en este mismo turno). Compara por
+// `territorioLabel` — el label YA RESUELTO server-side (ej. "GUADALAJARA,
+// JALISCO"). Match por substring bidireccional (no igualdad estricta) para
+// que sirva tanto con el label ya resuelto (match exacto, usado DESPUÉS del
+// fetch) como con el nombre crudo que pasó el usuario/modelo sin sufijo de
+// estado (ej. "Tlaquepaque" vs "SAN PEDRO TLAQUEPAQUE, JALISCO", usado ANTES
+// del fetch como aproximación en limiteTerritoriosLote).
+function buscarCanvasItemExistente(
+  canvasItems: FontanaCanvasItem[],
+  tipo: "distribucion" | "serie_temporal",
+  indicadorId: string,
+  territorioNombreOLabel: string
+):
+  | Extract<FontanaCanvasItem, { tipo: "distribucion" }>
+  | Extract<FontanaCanvasItem, { tipo: "serie_temporal" }>
+  | undefined {
+  const clave = normalizeGeoName(territorioNombreOLabel);
+  if (!clave) return undefined;
+  return canvasItems.find(
+    (ci): ci is Extract<FontanaCanvasItem, { tipo: "distribucion" | "serie_temporal" }> => {
+      if (ci.tipo !== tipo || !("indicadorId" in ci) || ci.indicadorId !== indicadorId) return false;
+      if (!("territorioLabel" in ci) || !ci.territorioLabel) return false;
+      const claveExistente = normalizeGeoName(ci.territorioLabel);
+      return claveExistente.includes(clave) || clave.includes(claveExistente);
+    }
+  ) as
+    | Extract<FontanaCanvasItem, { tipo: "distribucion" }>
+    | Extract<FontanaCanvasItem, { tipo: "serie_temporal" }>
+    | undefined;
+}
+
+// Límite por turno de generar_visualizacion con territorioNombre distinto
+// (26-09-04, hallazgo "frase colectiva"): el modelo puede resolver por su
+// cuenta los N municipios de un proyecto plural y disparar N tarjetas sin
+// preguntar — los guards multiEstado/multiMunicipio NO se activan cuando
+// hay territorioNombre. A la 3ª territorio DISTINTO sin `confirmadoLote:true`
+// se bloquea para forzar UNA pregunta por lote. Devuelve el mensaje de
+// rechazo, o null si se puede seguir.
+function limiteTerritoriosLote(input: Record<string, unknown>, ctx: ToolContext): string | null {
+  const terr = input.territorioNombre ? String(input.territorioNombre).trim() : "";
+  if (!terr) return null; // sin territorioNombre lo cubren multiEstado/multiMunicipio
+  if (input.confirmadoLote === true) {
+    if (ctx.municipiosPreguntadosPrevio) return null; // el usuario SÍ confirmó el lote de municipios
+    // El modelo puso confirmadoLote:true pero la pregunta previa real NO fue
+    // sobre municipios (ej. confundió "sí, quiero la pirámide" con lote
+    // confirmado). No blindante — solo observabilidad de cuán seguido el
+    // modelo intenta este atajo pese a la regla del prompt.
+    console.warn(
+      "[fontana] confirmadoLote:true rechazado — el último mensaje del asistente no fue una pregunta de municipios",
+      { sesionId: ctx.sesionId, territorioNombre: terr }
+    );
+  }
+  // Bypass Fallo 1: el usuario ya nombró este territorio en su mensaje
+  // actual — es su selección explícita, no cuenta hacia el límite.
+  if (territorioNombradoPorUsuario(terr, ctx.ultimoMensajeUsuario)) return null;
+  // Bypass Fallo 2: este indicador+territorio ya existe en el Canvas de la
+  // sesión (aproximación por nombre crudo — el chequeo definitivo, con el
+  // label ya resuelto, ocurre después del fetch en el ejecutor). Evita
+  // bloquear una relectura de un dato que el usuario ya tiene.
+  const tipoInput = input.tipo ? String(input.tipo) : "";
+  const indicadorIdInput = input.indicadorId ? String(input.indicadorId) : "";
+  if (
+    (tipoInput === "distribucion" || tipoInput === "serie_temporal") &&
+    indicadorIdInput &&
+    buscarCanvasItemExistente(ctx.canvasItemsSesion, tipoInput, indicadorIdInput, terr)
+  ) {
+    return null;
+  }
+  const est = input.estadoNombre ? String(input.estadoNombre).trim() : "";
+  ctx.vizTerritoriosDelTurno.add(`${terr.toLowerCase()}|${est.toLowerCase()}`);
+  if (ctx.vizTerritoriosDelTurno.size >= 3) {
+    return (
+      `Vas por ${ctx.vizTerritoriosDelTurno.size} territorios distintos en este turno SIN que el usuario haya confirmado el lote. DETENTE. ` +
+      `Haz UNA sola pregunta: el proyecto abarca varios municipios — ¿los quiere TODOS (una tarjeta por cada uno) o solo algunos en particular? ` +
+      `Cuando responda, reenvía cada llamada a generar_visualizacion con \`confirmadoLote: true\`. NO generes más tarjetas hasta tener esa respuesta.`
+    );
+  }
+  return null;
 }
 
 // Frase de alcance según el nivel REAL de la serie — SIEMPRE, sea el
@@ -883,6 +1154,8 @@ async function generarSerieTemporal(
   if (!tieneSerie(indicadorId)) {
     return reject("Este indicador no tiene serie histórica disponible en Fontana todavía.");
   }
+  const limite = limiteTerritoriosLote(input, ctx);
+  if (limite) return reject(limite);
   const data = await fetchSerie(input, ctx);
 
   if (data.multiEstado) {
@@ -925,6 +1198,28 @@ async function generarSerieTemporal(
   const terr = data.territorio as { label: string };
   const esTerritorioExterno = Boolean(data.esTerritorioExterno);
   const esTerritorioDelProyecto = Boolean(data.esTerritorioDelProyecto);
+
+  // 26-09-05, hallazgo "Fallo 2": esta serie ya tiene tarjeta en el Canvas
+  // (label ya resuelto, match exacto) — reusar sus datos en vez de duplicar.
+  const existenteSerie = buscarCanvasItemExistente(ctx.canvasItemsSesion, "serie_temporal", indicadorId, terr.label);
+  if (existenteSerie && existenteSerie.tipo === "serie_temporal") {
+    const resultSummaryExistente = `Ya tenías la serie de «${existenteSerie.indicadorNombre}» para ${terr.label} en el Canvas — no se duplicó. Usa estos datos para tu lectura.`;
+    return {
+      resultForModel: {
+        canvasItemId: existenteSerie.id,
+        tipo: existenteSerie.tipo,
+        titulo: existenteSerie.titulo,
+        resumen: resultSummaryExistente,
+        nivel: existenteSerie.nivel,
+        puntos: existenteSerie.puntos,
+        periodoInicio: existenteSerie.periodoInicio,
+        periodoFin: existenteSerie.periodoFin,
+        yaExistiaEnCanvas: true,
+      },
+      toolCall: { tool: "generar_visualizacion", input, resultSummary: resultSummaryExistente, ok: true },
+    };
+  }
+
   const familiaId = familiaDeIndicador(indicadorId);
   const meta = {
     mensajeId,
@@ -953,6 +1248,7 @@ async function generarSerieTemporal(
     meta
   );
   await appendCanvasItem(ctx.sesionId, item);
+  ctx.canvasItemsSesion.push(item);
   const resultSummary = `Agregué al Canvas la serie de «${item.indicadorNombre}» para ${terr.label} (${item.periodoInicio}-${item.periodoFin}).`;
   return {
     resultForModel: {

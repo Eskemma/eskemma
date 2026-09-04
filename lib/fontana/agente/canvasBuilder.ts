@@ -145,9 +145,6 @@ export function construirCanvasTabla(resp: RespuestaFamilia, meta: MetaTurno): F
 
 export const INDICADORES_CON_DISTRIBUCION = new Set(["F1-2", "F1-11", "F1-12", "F2-12"]);
 
-const NOTA_F1_2 =
-  "Este histograma muestra población total por grupo de edad. No está separado por sexo — la fuente de datos que usa Fontana en esta versión no distingue esa columna, así que no es una pirámide de edades tradicional (hombres/mujeres reflejados).";
-
 function etiquetaEdad(clave: string): string {
   if (clave === "P_85YMAS") return "85+ años";
   const m = clave.match(/^P_(\d+)A(\d+)$/);
@@ -172,7 +169,7 @@ interface DistribConfig {
 }
 
 const CONFIG_DISTRIBUCION: Record<string, DistribConfig> = {
-  "F1-2": { ejeTipo: "categorico", formato: "conteo", nota: NOTA_F1_2, etiqueta: etiquetaEdad },
+  "F1-2": { ejeTipo: "categorico", formato: "conteo", etiqueta: etiquetaEdad },
   "F1-11": { ejeTipo: "categorico", formato: "conteo", etiqueta: (k) => ETIQUETA_F1_11[k] ?? k },
   "F1-12": { ejeTipo: "categorico", formato: "conteo", etiqueta: (k) => ETIQUETA_F1_12[k] ?? k },
   "F2-12": {
@@ -193,13 +190,35 @@ export function construirCanvasDistribucion(
   nivel: NivelTablaFontana,
   distribucionCruda: Record<string, number>,
   fuenteEtiqueta: string | undefined,
-  meta: MetaTurno
+  meta: MetaTurno,
+  // Solo F1-2 — desglose del mismo grupo de edad por sexo. Presente ⇒
+  // pirámide de dos lados; ausente ⇒ histograma de un lado (F1-11/12, F2-12).
+  distribucionSexoCruda?: Record<string, { hombres: number; mujeres: number }>
 ): FontanaCanvasDistribucion {
   const cfg = CONFIG_DISTRIBUCION[indicadorId];
   const categorias = Object.entries(distribucionCruda).map(([clave, valor]) => ({
     etiqueta: cfg.etiqueta(clave),
     valor,
   }));
+  // Principio (26-09-04): nunca renderizar algo como si tuviera contenido
+  // cuando en realidad está vacío/degenerado. Si el desglose por sexo llega
+  // pero con TODOS los valores en 0 (bodega vieja sin columnas _M/_F para
+  // ese territorio), NO se emite `piramideSexo` — se cae al histograma de
+  // `categorias` (que sí trae los totales) con una nota honesta.
+  const hayDatoSexo =
+    !!distribucionSexoCruda &&
+    Object.values(distribucionSexoCruda).some((v) => v.hombres > 0 || v.mujeres > 0);
+  const piramideSexo = hayDatoSexo
+    ? Object.entries(distribucionSexoCruda!).map(([clave, v]) => ({
+        etiqueta: cfg.etiqueta(clave),
+        hombres: v.hombres,
+        mujeres: v.mujeres,
+      }))
+    : undefined;
+  const nota =
+    !hayDatoSexo && distribucionSexoCruda
+      ? "El desglose por sexo no está disponible para este territorio en esta versión de los datos — se muestra el total por grupo de edad."
+      : cfg.nota;
   return limpiarUndefined<FontanaCanvasDistribucion>({
     id: nuevoId(),
     tipo: "distribucion",
@@ -212,9 +231,11 @@ export function construirCanvasDistribucion(
     nivel,
     ejeTipo: cfg.ejeTipo,
     formato: cfg.formato,
-    nota: cfg.nota,
+    nota,
     fuenteEtiqueta,
+    territorioLabel: meta.territorioLabel,
     categorias,
+    piramideSexo,
   });
 }
 

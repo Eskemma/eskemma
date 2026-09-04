@@ -19,6 +19,10 @@ export interface ValorIndicadorFontana {
   // desglose adicional que la tabla comparativa no consume todavía
   // (queda disponible para Canvas/gráfica — ver plan de Familia 1).
   distribucion?: Record<string, number>;
+  // Solo F1-2 — desglose del mismo grupo de edad por sexo, para la
+  // pirámide de dos lados del Canvas (ITER 2020 columnas P_*A*_F/_M).
+  // La tabla comparativa no lo consume.
+  distribucionSexo?: Record<string, { hombres: number; mujeres: number }>;
   unidad?: string;
   naturaleza: NaturalezaDato;
   fuenteEtiqueta: string;

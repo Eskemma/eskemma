@@ -634,6 +634,8 @@ function construirCeldasTabla(
         // Desglose de categorías (F1-2/F1-11/F1-12/F2-12) — la tabla no lo
         // usa; el Canvas "distribucion" del agente sí.
         ...(real.distribucion ? { distribucion: real.distribucion } : {}),
+        // Desglose por sexo del grupo de edad (solo F1-2) — pirámide de dos lados.
+        ...(real.distribucionSexo ? { distribucionSexo: real.distribucionSexo } : {}),
         ...municipiosEnDistritoField,
         ...desglosesEstadoField,
         ...tipoDistritoPropioField,

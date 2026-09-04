@@ -11,9 +11,15 @@ import FontanaCanvasItemCard from "./FontanaCanvasItemCard";
 interface Props {
   items: FontanaCanvasItem[];
   sesion: FontanaSesion;
+  onEliminarItem?: (itemId: string) => void;
 }
 
-export default function FontanaCanvasTab({ items, sesion }: Props) {
+export default function FontanaCanvasTab({ items: itemsConEliminados, sesion, onEliminarItem }: Props) {
+  // Borrado suave (26-09-05): un item puede llegar con `eliminado:true`
+  // (ya sea de una sesión recargada, o marcado en este mismo turno) — se
+  // filtra de la vista de inmediato, nunca se borra el elemento del array.
+  const items = itemsConEliminados.filter((it) => !it.eliminado);
+
   // Al aparecer un item nuevo (el chat lo generó), llevar la vista hasta él —
   // si no, el usuario no lo ve porque queda al fondo, detrás del panel.
   const ultimoRef = useRef<HTMLDivElement>(null);
@@ -58,7 +64,7 @@ export default function FontanaCanvasTab({ items, sesion }: Props) {
     <div className="px-4 md:px-8 py-6 space-y-4">
       {items.map((item, i) => (
         <div key={item.id} ref={i === items.length - 1 ? ultimoRef : undefined}>
-          <FontanaCanvasItemCard item={item} sesion={sesion} />
+          <FontanaCanvasItemCard item={item} sesion={sesion} onEliminado={onEliminarItem} />
         </div>
       ))}
     </div>

@@ -140,6 +140,33 @@ export default function FontanaIndicadoresAccordion({
     }
   }
 
+  // Punto 1 (26-09-05): "Añadir todos los indicadores" / "Limpiar
+  // indicadores" — mismo bulk PATCH del backend, sin indicadorId.
+  const BULK_SENTINEL = "__bulk__";
+  async function modificarSesionBulk(accion: "agregar_todos" | "quitar_todos", familiaId: FamiliaFontanaId) {
+    setMutando(BULK_SENTINEL);
+    setErrorMutacion(null);
+    try {
+      const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion, familiaId }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { mensaje?: string; error?: string };
+        throw new Error(err.mensaje ?? err.error ?? "No se pudo actualizar la sesión");
+      }
+      const { sesion: actualizada } = (await res.json()) as { sesion: FontanaSesion };
+      onSesionActualizada(actualizada);
+      setCache((prev) => ({ ...prev, [familiaId]: undefined }));
+      await cargarFamilia(familiaId);
+    } catch (err) {
+      setErrorMutacion(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setMutando(null);
+    }
+  }
+
   const familiaMeta = FAMILIAS.find((f) => f.id === expandedFamily);
   const familiaSeleccion = expandedFamily ? sesion.indicadoresPorFamilia[expandedFamily] : null;
   const idsEnSesion = familiaSeleccion
@@ -200,31 +227,53 @@ export default function FontanaIndicadoresAccordion({
           <h3 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">{familiaMeta.nombre}</h3>
           <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-4">{familiaMeta.descripcion}</p>
 
-          {/* + Añadir indicador */}
-          {disponiblesParaAgregar.length > 0 && (
-            <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <select
-                value={seleccionAgregar}
-                onChange={(e) => setSeleccionAgregar(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-sm text-black-eske dark:text-[#EAF2F8]"
-              >
-                <option value="">+ Añadir indicador…</option>
-                {disponiblesParaAgregar.map((id) => (
-                  <option key={id} value={id}>
-                    {familiaMeta.nombres[id] ?? id}
-                  </option>
-                ))}
-              </select>
+          {/* + Añadir indicador, y a la derecha: Añadir todos / Limpiar */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            {disponiblesParaAgregar.length > 0 ? (
+              <div className="flex flex-col sm:flex-row gap-2 sm:flex-1">
+                <select
+                  value={seleccionAgregar}
+                  onChange={(e) => setSeleccionAgregar(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-sm text-black-eske dark:text-[#EAF2F8]"
+                >
+                  <option value="">+ Añadir indicador…</option>
+                  {disponiblesParaAgregar.map((id) => (
+                    <option key={id} value={id}>
+                      {familiaMeta.nombres[id] ?? id}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => seleccionAgregar && modificarSesion("agregar", familiaMeta.id, seleccionAgregar)}
+                  disabled={!seleccionAgregar || mutando !== null}
+                  className="px-4 py-2 rounded-lg bg-bluegreen-eske text-white-eske text-sm font-medium hover:bg-bluegreen-eske-60 disabled:opacity-60 shrink-0"
+                >
+                  Añadir
+                </button>
+              </div>
+            ) : (
+              <div className="sm:flex-1" />
+            )}
+            <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => seleccionAgregar && modificarSesion("agregar", familiaMeta.id, seleccionAgregar)}
-                disabled={!seleccionAgregar || mutando !== null}
-                className="px-4 py-2 rounded-lg bg-bluegreen-eske text-white-eske text-sm font-medium hover:bg-bluegreen-eske-60 disabled:opacity-60 shrink-0"
+                onClick={() => modificarSesionBulk("agregar_todos", familiaMeta.id)}
+                disabled={disponiblesParaAgregar.length === 0 || mutando !== null}
+                className="text-[11px] text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 hover:text-bluegreen-eske-70 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                Añadir
+                Añadir todos los indicadores
+              </button>
+              <button
+                type="button"
+                onClick={() => modificarSesionBulk("quitar_todos", familiaMeta.id)}
+                disabled={(familiaSeleccion?.seleccionUsuario.length ?? 0) === 0 || mutando !== null}
+                className="text-[11px] text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 hover:text-bluegreen-eske-70 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Limpiar indicadores
               </button>
             </div>
-          )}
+          </div>
 
           {errorMutacion && <p className="text-xs text-red-eske mb-3">{errorMutacion}</p>}
 

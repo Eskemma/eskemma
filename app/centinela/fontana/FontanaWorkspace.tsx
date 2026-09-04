@@ -52,7 +52,11 @@ export default function FontanaWorkspace({ sesion, onSesionActualizada, retornoU
           />
 
           {activeTab === "fontana" ? (
-            <FontanaCanvasTab items={canvasItems} sesion={sesion} />
+            <FontanaCanvasTab
+              items={canvasItems}
+              sesion={sesion}
+              onEliminarItem={(itemId) => setCanvasItems((prev) => prev.filter((it) => it.id !== itemId))}
+            />
           ) : (
             <FontanaIndicadoresAccordion
               sesion={sesion}
