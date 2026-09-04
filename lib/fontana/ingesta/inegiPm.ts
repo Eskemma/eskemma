@@ -243,6 +243,7 @@ export async function resolverSerieInegiPm(
   if (!codigo) return { ok: false, motivo: `«${indicadorId}» no tiene serie en INEGI-PM` };
 
   const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  if (!nivel) return { ok: false, motivo: "Este indicador no tiene serie a un nivel aplicable al territorio del proyecto" };
   let area: string;
   let territorioLabel: string;
   if (nivel === "nacional") {

@@ -181,7 +181,7 @@ export default function ChatPanel({
                 />
               ))}
             </span>
-            {liveToolCalls.length > 0 && <span>Consultando datos…</span>}
+            {liveToolCalls.length > 0 && <span className="text-red-eske">Consultando datos…</span>}
           </div>
         )}
       </div>
@@ -325,18 +325,9 @@ export default function ChatPanel({
               <path d="M22 2 15 22l-4-9-9-4Z" />
             </svg>
           </button>
-          {/* Cerrar el panel — junto al de enviar, para alcance con el pulgar en mobile. */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar chat"
-            title="Cerrar chat"
-            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center border border-gray-eske-20 dark:border-white/15 text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white hover:border-gray-eske-40 transition-colors"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
+          {/* El cierre del panel vive en la × del header (más Escape y, en
+              mobile, tap en el backdrop). No se duplica en el composer para
+              dejarle todo el ancho al campo de texto. */}
         </div>
 
         {vozError ? (

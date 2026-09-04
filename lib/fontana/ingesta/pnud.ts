@@ -61,6 +61,8 @@ import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_PNUD_IDH = "PNUD México (IDH municipal 2010-2020)";
 export const FUENTE_ETIQUETA_PNUD_SE = "PNUD México (Sub-índice Educación municipal 2020)";
@@ -78,7 +80,19 @@ function urlExportXlsx(id: string): string {
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-const MOTIVO_OAXACA = "PNUD no publica IDH/Salud individual por municipio en Oaxaca en esta edición — solo agregados regionales";
+// Autosuficiente y citable verbatim por el agente — sin que necesite añadir
+// su propia explicación metodológica (hallazgo 3, 26-09-03: el agente había
+// inventado "agrupa municipios pequeños y dispersos", que NO es cierto — el
+// PNUD colapsa TODO el estado, capital incluida). Verificado en vivo
+// 2026-09-03 contra ID_IDH_COMBINADO: 30 filas "Oaxaca-Región X" (claves
+// 20601-20630), 0 municipios individuales; 20067 (Oaxaca de Juárez), 20184
+// (San Juan Bautista Tuxtepec) y 20001 ausentes del archivo.
+const MOTIVO_OAXACA =
+  "El PNUD no publica este índice por municipio individual en Oaxaca: en esta edición agrupa a los 570 municipios del estado en 30 regiones, sin desagregar ninguno — tampoco la capital (Oaxaca de Juárez) ni San Juan Bautista Tuxtepec.";
+// Versión para la serie temporal: la única fuente con historia comparable
+// (ID_IDH_COMBINADO, 2010/2015/2020) es justamente la que agrupa a Oaxaca.
+const MOTIVO_OAXACA_SERIE =
+  "No hay serie histórica municipal de este índice para Oaxaca: la única edición del PNUD con datos comparables en el tiempo (2010, 2015 y 2020) agrupa a los 570 municipios del estado en 30 regiones, sin desagregar ninguno — tampoco la capital (Oaxaca de Juárez) ni San Juan Bautista Tuxtepec.";
 
 // Migrado a claveCanonicaMunicipio() (Incidente 2, alias table) — mismo
 // patrón ya usado en coneval.ts/conapoMarginacion.ts/bienestar.ts/
@@ -325,6 +339,146 @@ export async function resolverIngresoMunicipal(territorio: Territorio): Promise<
 
 export async function resolverIdgMunicipal(territorio: Territorio): Promise<CeldaFontana[]> {
   return resolverIndicadorMunicipalPnud(territorio, (d) => d.idgPorNombre, "índice (0-1)", FUENTE_ETIQUETA_PNUD_IDG, false);
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 2ª ola municipal 2026-09-03) — F2-5 (IDH), F2-20
+// (Sub-índice Educación), F2-21 (Sub-índice Ingreso), F2-22 (Sub-índice
+// Salud). Todos municipal-only. La serie sale ÍNTEGRA del archivo
+// combinado ID_IDH_COMBINADO (2010/2015/2020), que ya se descarga para
+// las celdas — este resolver lo re-parsea leyendo las 3 columnas por
+// sub-índice en vez de solo la de 2020.
+//
+// Mapa de columnas del combinado, verificado EN VIVO 2026-09-03
+// (Aguascalientes 01001; contrastado con los archivos standalone SE/SI
+// 2020 y con la identidad IDH = media geométrica de SS·SE·SI):
+//   SS  (Salud)     2010→16 2015→17 2020→18   [la celda ya lee col 18]
+//   SE  (Educación) 2010→19 2015→20 2020→21
+//   SI  (Ingreso)   2010→22 2015→23 2020→24
+//   IDH             2010→25 2015→26 2020→27   [la celda ya lee col 27]
+//
+// ⚠️ Oaxaca: el combinado colapsa sus municipios en 30 filas
+// "Oaxaca-Región X" (col 2 vacía) — la serie NO tiene dato municipal
+// individual para NINGÚN municipio de Oaxaca, en los 4 sub-índices. Esto
+// difiere de la celda de F2-20/F2-21, que lee archivos standalone 2020
+// que sí traen Oaxaca. Documentado: para serie, Oaxaca → MOTIVO_OAXACA
+// en los 4.
+// ==========================================
+export const FUENTE_ETIQUETA_PNUD_SERIE =
+  "PNUD México (IDH y sub-índices municipales, 2010-2020)";
+
+const PERIODOS_PNUD = ["2010", "2015", "2020"];
+const COLS_PNUD_POR_INDICADOR: Record<string, Record<string, number>> = {
+  "F2-5": { "2010": 25, "2015": 26, "2020": 27 }, // IDH
+  "F2-22": { "2010": 16, "2015": 17, "2020": 18 }, // Salud
+  "F2-20": { "2010": 19, "2015": 20, "2020": 21 }, // Educación
+  "F2-21": { "2010": 22, "2015": 23, "2020": 24 }, // Ingreso
+};
+
+interface CacheSeriePnud {
+  // indicadorId -> (claveNombre estado|municipio -> { periodo -> valor })
+  porIndicador: Map<string, Map<string, Record<string, number>>>;
+  ts: number;
+}
+let cacheSeriePnud: CacheSeriePnud | null = null;
+let enVueloSeriePnud: Promise<CacheSeriePnud> | null = null;
+
+async function cargarSeriePnud(): Promise<CacheSeriePnud> {
+  if (cacheSeriePnud && Date.now() - cacheSeriePnud.ts < CACHE_TTL_MS) return cacheSeriePnud;
+  if (enVueloSeriePnud) return enVueloSeriePnud;
+
+  enVueloSeriePnud = (async () => {
+    const wb = await descargarXlsx(ID_IDH_COMBINADO);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+
+    const porIndicador = new Map<string, Map<string, Record<string, number>>>();
+    for (const id of Object.keys(COLS_PNUD_POR_INDICADOR)) porIndicador.set(id, new Map());
+
+    for (const fila of filas) {
+      const clave = fila[0];
+      if (typeof clave !== "string" || !/^\d{5}$/.test(clave)) continue;
+      const municipio = fila[2];
+      if (typeof municipio !== "string" || !municipio.trim()) continue; // excluye Oaxaca-Región
+      const key = claveNombre(clave.slice(0, 2), municipio);
+      for (const [id, cols] of Object.entries(COLS_PNUD_POR_INDICADOR)) {
+        const rec: Record<string, number> = {};
+        for (const [periodo, col] of Object.entries(cols)) {
+          const v = fila[col];
+          if (typeof v === "number") rec[periodo] = v;
+        }
+        if (Object.keys(rec).length > 0) porIndicador.get(id)!.set(key, rec);
+      }
+    }
+
+    const resultado: CacheSeriePnud = { porIndicador, ts: Date.now() };
+    cacheSeriePnud = resultado;
+    return resultado;
+  })();
+
+  try {
+    return await enVueloSeriePnud;
+  } finally {
+    enVueloSeriePnud = null;
+  }
+}
+
+export async function resolverSeriePnud(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoSerie> {
+  const cols = COLS_PNUD_POR_INDICADOR[indicadorId];
+  if (!cols) return { ok: false, motivo: "sin_serie" };
+
+  const nivel = nivelObjetivoSerie(territorio, ["municipal"]);
+  if (nivel !== "municipal") {
+    return {
+      ok: false,
+      motivo:
+        "El IDH y sus sub-índices solo existen a nivel municipal en PNUD — no hay serie nacional, estatal ni distrital",
+    };
+  }
+
+  if (!territorio.estado) {
+    return { ok: false, motivo: "El proyecto no tiene un municipio definido en su territorio" };
+  }
+  const cve = resolveEstadoCve(territorio.estado);
+  if (!cve) {
+    return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+  }
+  const nombreMun = resolverNombreMunicipio(territorio);
+  if (!nombreMun) {
+    return { ok: false, motivo: "El proyecto no tiene un municipio definido en su territorio" };
+  }
+  if (cve === "20") return { ok: false, motivo: MOTIVO_OAXACA_SERIE };
+
+  let datos: CacheSeriePnud;
+  try {
+    datos = await cargarSeriePnud();
+  } catch {
+    return { ok: false, motivo: "Error de conexión con PNUD (Google Drive)" };
+  }
+
+  const porAno = datos.porIndicador.get(indicadorId)?.get(claveNombre(cve, nombreMun));
+  if (!porAno || Object.keys(porAno).length === 0) {
+    return { ok: false, motivo: `Municipio "${nombreMun}" no reconocido en el catálogo de PNUD` };
+  }
+
+  const puntos = PERIODOS_PNUD.map((periodo) => {
+    const v = porAno[periodo];
+    return { periodo, valor: typeof v === "number" ? Math.round(v * 1000) / 1000 : null };
+  });
+
+  return {
+    ok: true,
+    nivel: "municipal",
+    territorioLabel: `${nombreMun}, ${territorio.estado}`,
+    unidad: "índice (0-1)",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_PNUD_SERIE,
+    formato: "coeficiente", // IDH y sub-índices: escala 0-1, hasta 4 decimales
+    puntos,
+  };
 }
 
 // Desglose "Ver municipios" en proyectos nivel "estatal" — construido en

@@ -165,7 +165,7 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {cargando ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Cargando…</p>
+            <p className="text-sm text-red-eske">Cargando…</p>
           ) : paises.length === 0 ? (
             <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin países con dato real para este indicador.</p>
           ) : filtrados.length === 0 ? (

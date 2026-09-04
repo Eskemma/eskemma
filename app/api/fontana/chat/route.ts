@@ -122,21 +122,45 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < MAX_ITERACIONES; i++) {
           const llmStream = anthropic.messages.stream({
             model: CLAUDE_MODEL,
-            max_tokens: 4096,
+            // > budget_tokens; el informe visible cabe de sobra en el resto.
+            max_tokens: 6000,
+            // Razonamiento privado: el modelo verifica su aritmética y se
+            // autocorrige AQUÍ, no en el texto que ve el usuario. El filtro
+            // de abajo solo reenvía `text_delta` — los `thinking_delta` /
+            // `signature_delta` nunca llegan al cliente. Los bloques
+            // `thinking` firmados viajan en finalMsg.content y se
+            // re-inyectan íntegros en el loop de tool-use (la API los exige
+            // dentro del mismo turno; entre turnos el `history` del cliente
+            // es texto plano, no se acumulan).
+            thinking: { type: "enabled", budget_tokens: 2000 },
             system: systemPrompt,
             messages: mensajes,
             tools: FONTANA_TOOLS,
           });
 
+          // Texto de ESTA iteración — se stringea optimista, pero si la
+          // iteración resulta intermedia (stop_reason "tool_use") se
+          // descarta: el usuario nunca ve narración entre herramientas
+          // ("primero déjame ver…", "ahora consulto…"), pase lo que pase.
+          let textoIter = "";
           for await (const ev of llmStream) {
             if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
-              fullText += ev.delta.text;
+              textoIter += ev.delta.text;
               send({ type: "text", content: ev.delta.text });
             }
           }
 
           const finalMsg = await llmStream.finalMessage();
           mensajes.push({ role: "assistant", content: finalMsg.content });
+
+          const esFinal = finalMsg.stop_reason !== "tool_use" || i === MAX_ITERACIONES - 1;
+          if (esFinal) {
+            fullText += textoIter;
+          } else if (textoIter) {
+            // Iteración intermedia con texto → era narración de proceso.
+            // Se le dice al cliente que borre lo que streameó este turno.
+            send({ type: "text_suppress" });
+          }
 
           if (finalMsg.stop_reason !== "tool_use") break;
 

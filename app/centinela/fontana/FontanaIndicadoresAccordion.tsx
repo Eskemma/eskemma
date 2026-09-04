@@ -229,7 +229,7 @@ export default function FontanaIndicadoresAccordion({
           {errorMutacion && <p className="text-xs text-red-eske mb-3">{errorMutacion}</p>}
 
           {!data || data.kind === "loading" ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Cargando indicadores…</p>
+            <p className="text-sm text-red-eske">Cargando indicadores…</p>
           ) : data.kind === "error" ? (
             <p className="text-sm text-red-eske">{data.message}</p>
           ) : data.kind === "f4" ? (

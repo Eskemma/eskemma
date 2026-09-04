@@ -22,23 +22,38 @@ export interface ResultadoSerieOk {
   unidad?: string;
   naturaleza?: NaturalezaDato;
   fuenteEtiqueta: string;
-  formato: "conteo" | "moneda" | "porcentaje" | "indice";
+  // Precisión de display por escala (ver fmt() en FontanaCanvasItemCard):
+  //   indice → 0-100, 2 dec (ICE)        coeficiente → 0-1 y negativos, 4 dec (Gini, IDH, rezago social)
+  //   puntaje → 1-5, 3 dec (Índice de Paz)
+  formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
   puntos: PuntoSerie[];
 }
 
 export type ResultadoSerie = ResultadoSerieOk | { ok: false; motivo: string };
 
 /**
- * Nivel al que se resuelve la serie según el territorio del proyecto:
- * proyecto nacional → serie nacional (si el indicador la tiene);
- * cualquier otro nivel → serie estatal (del estado del proyecto, o del
- * estado que contiene al municipio/distrito). Ningún indicador de la 1ª
- * ola tiene serie municipal.
+ * Nivel al que se resuelve la serie según el territorio del proyecto y los
+ * niveles a los que el indicador publica serie:
+ * - proyecto nacional → "nacional" si el indicador lo tiene, si no `null`.
+ * - proyecto municipal → "municipal" si el indicador lo tiene; si no,
+ *   "estatal" (serie del estado que contiene al municipio) si lo tiene;
+ *   si no `null`.
+ * - proyecto estatal / distrito_* → "estatal" si el indicador lo tiene,
+ *   si no `null`.
+ * `null` = el indicador no publica serie a ningún nivel aplicable al
+ * territorio del proyecto (ej. IDH municipal en un proyecto estatal).
  */
 export function nivelObjetivoSerie(
   territorio: Territorio,
   niveles: NivelTablaFontana[]
-): "nacional" | "estatal" {
-  if (territorio.nivel === "nacional" && niveles.includes("nacional")) return "nacional";
-  return "estatal";
+): "nacional" | "estatal" | "municipal" | null {
+  if (territorio.nivel === "nacional") {
+    return niveles.includes("nacional") ? "nacional" : null;
+  }
+  if (territorio.nivel === "municipal") {
+    if (niveles.includes("municipal")) return "municipal";
+    return niveles.includes("estatal") ? "estatal" : null;
+  }
+  // estatal, distrito, distrito_federal, distrito_local
+  return niveles.includes("estatal") ? "estatal" : null;
 }

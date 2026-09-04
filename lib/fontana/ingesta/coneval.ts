@@ -61,6 +61,8 @@ import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
+import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 
 export const FUENTE_ETIQUETA_CONEVAL_POBREZA = "CONEVAL (Medición de la pobreza 2020)";
 export const FUENTE_ETIQUETA_CONEVAL_IRS = "CONEVAL (Índice de Rezago Social 2020)";
@@ -433,6 +435,228 @@ export async function resolverRezagoSocial(territorio: Territorio): Promise<Celd
   }
 
   return [nacional, estatal, distrital, municipal];
+}
+
+// ==========================================
+// SERIE TEMPORAL (T10, 2ª ola municipal 2026-09-03) — F2-3 Índice de
+// Rezago Social. El ZIP IRS_ent_mun_2000_2020 trae 5 xlsx (uno por año
+// 2000/2005/2010/2015/2020); resolverRezagoSocial() arriba lee solo 2020.
+// Este resolver lee los 5. Caché propia — NO toca cacheRezagoSocial.
+//
+// Offsets del "Índice de rezago social" verificados EN VIVO 2026-09-03 en
+// los 5 archivos del ZIP: hoja "Estados" col 14, hoja "Municipios" col 16
+// — idénticos en 2000..2020 (encabezado literal "Índice de rezago social"
+// en fila 4 de ambas hojas, valores municipales numéricos reales).
+//
+// Condición explícita de la ronda: si en algún año el encabezado de esa
+// columna NO coincide con /índice de rezago social/, ese año NO
+// desaparece de la serie — se emite con `valor:null` + `nota` (mismo
+// principio de honestidad que el resto de Fontana: nunca una ausencia sin
+// explicación).
+// ==========================================
+const PERIODOS_IRS = ["2000", "2005", "2010", "2015", "2020"];
+const HEADER_ROW_IRS = 4;
+const COL_INDICE_ESTADOS = 14;
+const COL_INDICE_MUNICIPIOS = 16;
+const RE_INDICE_RS = /indice de rezago social/;
+
+interface CacheSerieRezagoSocial {
+  porEstado: Map<string, Record<string, number>>; // cve 2 díg -> { periodo -> valor }
+  porMunicipioPorNombre: Map<string, Record<string, number>>;
+  aniosNoVerificados: string[]; // periodos cuyo encabezado no calzó / año ausente en el ZIP
+  ts: number;
+}
+let cacheSerieRezagoSocial: CacheSerieRezagoSocial | null = null;
+let enVueloSerieRezagoSocial: Promise<CacheSerieRezagoSocial> | null = null;
+
+async function descargarZipYTodosLosXlsxIrs(): Promise<Map<string, XLSX.WorkBook>> {
+  const res = await fetch(URL_REZAGO_SOCIAL);
+  if (!res.ok) throw new Error(`CONEVAL HTTP ${res.status} en ${URL_REZAGO_SOCIAL}`);
+  const zip = await JSZip.loadAsync(Buffer.from(await res.arrayBuffer()));
+  const out = new Map<string, XLSX.WorkBook>();
+  for (const f of Object.values(zip.files)) {
+    if (f.dir || !/\.xlsx$/i.test(f.name)) continue;
+    const m = f.name.match(/(\d{4})\.xlsx$/i);
+    if (!m) continue;
+    out.set(m[1], XLSX.read(await f.async("nodebuffer"), { type: "buffer" }));
+  }
+  return out;
+}
+
+function normHeaderIrs(s: unknown): string {
+  return String(s ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+}
+
+// Índice de columna real de "Índice de rezago social" en la hoja, o null
+// si el encabezado no calza (→ año no verificable, punto con valor:null).
+function columnaIndiceRS(ws: XLSX.WorkSheet, colEsperada: number): number | null {
+  const filas = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+  const header = (filas[HEADER_ROW_IRS] ?? []) as unknown[];
+  if (RE_INDICE_RS.test(normHeaderIrs(header[colEsperada]))) return colEsperada;
+  const alt = header.findIndex((c) => RE_INDICE_RS.test(normHeaderIrs(c)));
+  return alt >= 0 ? alt : null;
+}
+
+function ponerPeriodoIrs(
+  m: Map<string, Record<string, number>>,
+  clave: string,
+  periodo: string,
+  valor: number
+): void {
+  const r = m.get(clave) ?? {};
+  r[periodo] = valor;
+  m.set(clave, r);
+}
+
+async function cargarSerieRezagoSocial(): Promise<CacheSerieRezagoSocial> {
+  if (cacheSerieRezagoSocial && Date.now() - cacheSerieRezagoSocial.ts < CACHE_TTL_MS) {
+    return cacheSerieRezagoSocial;
+  }
+  if (enVueloSerieRezagoSocial) return enVueloSerieRezagoSocial;
+
+  enVueloSerieRezagoSocial = (async () => {
+    const porAnio = await descargarZipYTodosLosXlsxIrs();
+    const porEstado = new Map<string, Record<string, number>>();
+    const porMunicipioPorNombre = new Map<string, Record<string, number>>();
+    const aniosNoVerificados: string[] = [];
+
+    for (const periodo of PERIODOS_IRS) {
+      const wb = porAnio.get(periodo);
+      if (!wb) {
+        aniosNoVerificados.push(periodo);
+        continue;
+      }
+      const wsEstados = wb.Sheets["Estados"];
+      const wsMun = wb.Sheets["Municipios"];
+      const colE = wsEstados ? columnaIndiceRS(wsEstados, COL_INDICE_ESTADOS) : null;
+      const colM = wsMun ? columnaIndiceRS(wsMun, COL_INDICE_MUNICIPIOS) : null;
+      if (colE == null || colM == null) aniosNoVerificados.push(periodo);
+
+      if (wsEstados && colE != null) {
+        const filas = XLSX.utils.sheet_to_json<unknown[]>(wsEstados, { header: 1, defval: null });
+        for (const fila of filas) {
+          const cveEnt = fila[0];
+          if (typeof cveEnt !== "string" || !/^\d{2}$/.test(cveEnt) || cveEnt === "00") continue;
+          const v = fila[colE];
+          if (typeof v === "number") ponerPeriodoIrs(porEstado, cveEnt, periodo, v);
+        }
+      }
+      if (wsMun && colM != null) {
+        const filas = XLSX.utils.sheet_to_json<unknown[]>(wsMun, { header: 1, defval: null });
+        for (const fila of filas) {
+          const cveMun = fila[2];
+          const cveEnt = fila[0];
+          const nombreMun = fila[3];
+          if (typeof cveMun !== "string" || !/^\d{5}$/.test(cveMun)) continue;
+          if (typeof cveEnt !== "string" || typeof nombreMun !== "string") continue;
+          const v = fila[colM];
+          if (typeof v === "number") {
+            ponerPeriodoIrs(porMunicipioPorNombre, claveMunicipioPorNombre(cveEnt, nombreMun), periodo, v);
+          }
+        }
+      }
+    }
+
+    const resultado: CacheSerieRezagoSocial = {
+      porEstado,
+      porMunicipioPorNombre,
+      aniosNoVerificados: [...new Set(aniosNoVerificados)].sort(),
+      ts: Date.now(),
+    };
+    cacheSerieRezagoSocial = resultado;
+    return resultado;
+  })();
+
+  try {
+    return await enVueloSerieRezagoSocial;
+  } finally {
+    enVueloSerieRezagoSocial = null;
+  }
+}
+
+// F2-3 — nacional/distrital NUNCA (índice compuesto sin agregación; la
+// propia fuente deja la celda país vacía). Sirve estatal + municipal.
+export async function resolverSerieConeval(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoSerie> {
+  if (indicadorId !== "F2-3") return { ok: false, motivo: "sin_serie" };
+
+  let datos: CacheSerieRezagoSocial;
+  try {
+    datos = await cargarSerieRezagoSocial();
+  } catch {
+    return { ok: false, motivo: "Error de conexión con CONEVAL (Índice de Rezago Social)" };
+  }
+
+  const nivel = nivelObjetivoSerie(territorio, ["estatal", "municipal"]);
+  if (!nivel) {
+    return {
+      ok: false,
+      motivo:
+        "El Índice de Rezago Social solo existe a nivel estatal y municipal — CONEVAL no lo publica a nivel nacional ni distrital",
+    };
+  }
+
+  let porAno: Record<string, number> | undefined;
+  let territorioLabel: string;
+
+  if (nivel === "estatal") {
+    if (!territorio.estado) {
+      return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
+    }
+    const cve = resolveEstadoCve(territorio.estado);
+    if (!cve) {
+      return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+    }
+    porAno = datos.porEstado.get(cve);
+    territorioLabel = territorio.estado;
+  } else {
+    const nombreMun = resolverNombreMunicipio(territorio);
+    if (!territorio.estado || !nombreMun) {
+      return { ok: false, motivo: "El proyecto no tiene un municipio definido en su territorio" };
+    }
+    const cve = resolveEstadoCve(territorio.estado);
+    if (!cve) {
+      return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+    }
+    porAno = datos.porMunicipioPorNombre.get(claveMunicipioPorNombre(cve, nombreMun));
+    territorioLabel = `${nombreMun}, ${territorio.estado}`;
+  }
+
+  if (!porAno || Object.keys(porAno).length === 0) {
+    return {
+      ok: false,
+      motivo: "CONEVAL no reportó una serie del Índice de Rezago Social para este territorio",
+    };
+  }
+
+  // Serie sobre los 5 cortes canónicos. Un año sin dato verificable NO se
+  // omite — se emite con valor:null + nota (condición de la ronda).
+  const puntosPorAno = porAno;
+  const puntos = PERIODOS_IRS.map((periodo) => {
+    const v = puntosPorAno[periodo];
+    if (typeof v === "number") return { periodo, valor: v };
+    if (datos.aniosNoVerificados.includes(periodo)) {
+      return {
+        periodo,
+        valor: null,
+        nota: "No se pudo verificar la estructura de este año en el archivo fuente.",
+      };
+    }
+    return { periodo, valor: null };
+  });
+
+  return {
+    ok: true,
+    nivel,
+    territorioLabel,
+    unidad: "índice",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_IRS,
+    formato: "coeficiente", // rezago social: escala ~ -2..+4, hasta 4 decimales
+    puntos,
+  };
 }
 
 // Desglose "Ver municipios" en proyectos nivel "estatal" — mismo patrón

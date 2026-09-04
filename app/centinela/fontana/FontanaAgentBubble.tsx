@@ -143,8 +143,9 @@ export default function FontanaAgentBubble({ sesionId, open, onOpenChange, onNav
       </ResponsivePanel>
 
       {/* Burbuja flotante — SOLO cuando el chat está cerrado. Con el panel
-          abierto, cerrar se hace con la × del header o la × del composer;
-          nunca dos controles compitiendo por el mismo espacio. */}
+          abierto, cerrar se hace con la × del header (más Escape y el
+          backdrop en mobile); nunca dos controles compitiendo por el
+          mismo espacio. */}
       {!open && (
         <button
           type="button"

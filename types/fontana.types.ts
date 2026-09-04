@@ -253,7 +253,8 @@ export interface FontanaCanvasSerieTemporal extends FontanaCanvasItemBase {
   indicadorId: string;
   indicadorNombre: string; // lenguaje llano, nunca el ID
   unidad?: string;
-  formato: "conteo" | "moneda" | "porcentaje" | "indice";
+  // indice → 0-100 (ICE) · coeficiente → 0-1 y negativos (Gini, IDH, rezago) · puntaje → 1-5 (Índice de Paz)
+  formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
   nivel: NivelTablaFontana; // nivel geográfico real de la serie
   naturaleza?: NaturalezaDato;
   fuenteEtiqueta: string; // OBLIGATORIO desde el diseño (no como parche)
@@ -284,6 +285,7 @@ export type FontanaCanvasItem =
 export type FontanaChatStreamEvent =
   | { type: "tool_call"; tool: FontanaToolName; input: Record<string, unknown> }
   | { type: "text"; content: string }
+  | { type: "text_suppress" } // descarta el texto streameado (era narración entre herramientas)
   | { type: "nav"; pestana: "fontana" | "indicadores"; familiaId?: FamiliaFontanaId }
   | { type: "canvas_item"; item: FontanaCanvasItem }
   | { type: "done"; mensajeId: string }

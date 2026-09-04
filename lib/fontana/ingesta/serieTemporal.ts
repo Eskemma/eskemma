@@ -12,6 +12,8 @@ import { resolverSerieEnigh } from "@/lib/fontana/ingesta/enigh";
 import { resolverSerieHuelgas } from "@/lib/fontana/ingesta/stpsHuelgas";
 import { resolverSerieIep } from "@/lib/fontana/ingesta/iep";
 import { resolverSerieInegiPm } from "@/lib/fontana/ingesta/inegiPm";
+import { resolverSerieConeval } from "@/lib/fontana/ingesta/coneval";
+import { resolverSeriePnud } from "@/lib/fontana/ingesta/pnud";
 
 export async function resolverSerieTemporal(
   indicadorId: string,
@@ -45,5 +47,9 @@ export async function resolverSerieTemporal(
       return resolverSerieIep(territorio);
     case "inegi_pm_bise":
       return resolverSerieInegiPm(indicadorId, territorio);
+    case "coneval":
+      return resolverSerieConeval(indicadorId, territorio);
+    case "pnud":
+      return resolverSeriePnud(indicadorId, territorio);
   }
 }

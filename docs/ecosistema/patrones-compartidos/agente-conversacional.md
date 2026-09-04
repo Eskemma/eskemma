@@ -8,7 +8,7 @@ de ejemplo". **No es un contrato rígido** — es el conjunto de decisiones que
 ya se tomaron y por qué, para que la siguiente app copie en vez de
 reinventar.
 
-Última actualización: 2026-09-01 (ronda de adjuntar archivo + dictado de voz).
+Última actualización: 2026-09-03 (series temporales + correcciones de razonamiento/streaming + §8 factibilidad).
 
 ---
 
@@ -49,7 +49,11 @@ reinventar.
   `resultSummary` real.
 - **Identificadores internos nunca se muestran al usuario** (en Fontana, los
   `F<familia>-<n>`). El agente los usa solo para llamar herramientas; al
-  usuario le habla con nombres en lenguaje llano.
+  usuario le habla con nombres en lenguaje llano. Ver §7 para la regla
+  completa: cubre también el intento fallido de resolución, las cadenas de
+  varias llamadas para resolver un ID, y los textos de rechazo de herramienta.
+- Eventos SSE tipados del stream: `text`, `text_suppress` (§7), `tool_call`,
+  `nav`, `canvas_item`, `done`, `error`.
 - Metadata estable (nombres de familias/categorías) vive en **una sola
   fuente** que consumen el prompt, las tools y la UI — nunca re-hardcodeada.
 
@@ -135,6 +139,97 @@ reinventar.
   `ignoreUndefinedProperties`): helper `limpiarUndefined()` en profundidad
   antes de cada `.set()`.
 
+## 7. Razonamiento y streaming: nunca pensar en voz alta
+
+**El problema que evita:** con streaming crudo de `text_delta` y sin
+presupuesto de pensamiento, cualquier razonamiento que el modelo verbalice
+aterriza en el texto que ve el usuario — incluida una autocorrección a mitad
+de frase ("…está 15 puntos por encima… espera, en realidad está por debajo")
+o la narración de resolver un identificador ("necesito el ID exacto de X",
+"primero déjame ver cuáles indicadores hay"). No hay ningún paso posterior
+que lo limpie. Detectado en verificación en vivo de Fontana (2026-09-01/03),
+como regresión de la regla de "IDs internos" tras quitar el `enum` fijo de
+una tool.
+
+**Arquitectura — tres piezas, desde el día uno:**
+
+1. **Extended thinking habilitado** en la llamada de streaming:
+   `thinking: { type: "enabled", budget_tokens: 2000 }`, con `max_tokens` >
+   `budget_tokens` (ej. 6000). El modelo verifica su aritmética y se
+   autocorrige en el bloque `thinking`, invisible. El filtro del stream
+   reenvía SOLO `text_delta` — los `thinking_delta` / `signature_delta`
+   nunca llegan al cliente. Los bloques `thinking` firmados se re-inyectan
+   íntegros (`finalMsg.content` completo) en el loop de tool-use, como exige
+   la API dentro de un mismo turno; entre turnos el `history` del cliente es
+   texto plano, así que no se acumulan. Impacto de contexto medido: ≤ 1% de
+   la ventana (un solo bloque `thinking` por turno en modo no-interleaved).
+
+2. **Supresión del texto de iteraciones intermedias del loop de tool-use.**
+   Solo se hace `send({type:"text"})` de la iteración FINAL
+   (`stop_reason !== "tool_use"`, o la última del `MAX_ITERACIONES`). El
+   texto de una iteración intermedia (narración de proceso: "primero déjame
+   ver…", "ahora consulto…") se descarta: el servidor emite un evento SSE
+   `text_suppress` y el cliente borra lo que streameó este turno
+   (`buffer = ""`, `setStreamingText("")`). Garantía **arquitectónica**: el
+   usuario nunca ve narración entre herramientas, obedezca el modelo la
+   regla de prompt o no. La verificación mostró que el modelo aún narraba
+   entre tools con thinking activado — esta pieza es la que lo blinda.
+
+3. **Regla de prompt reforzada** (complementa, no reemplaza, la arquitectura):
+   - *"Nunca pienses en voz alta en la respuesta"*: prohibido "espera", "en
+     realidad", "corrijo", "me equivoqué arriba". Si te das cuenta a mitad
+     de frase de que un número está mal, reescribe la afirmación completa ya
+     corregida.
+   - *"Verifica toda comparación aritmética"* (X puntos por encima/por debajo
+     de Y, el doble que, cayó N puntos) con los dos números exactos de la
+     herramienta ANTES de escribirla; si no puedes, presenta ambos valores y
+     deja comparar al lector.
+   - *Identificadores internos*: la resolución es SIEMPRE invisible, cueste
+     una llamada o cinco. Prohibido no solo "déjame buscar el ID" sino
+     también "el ID que usé no es correcto", "necesito el ID exacto de X",
+     "ese identificador no era el de X", y la narración de proceso entre
+     herramientas ("ahora consulto…", "primero déjame ver…").
+
+4. **Higiene de los textos de rechazo de herramienta.** Las `instruccion` /
+   `error` que una herramienta devuelve y que el modelo parafrasea al usuario
+   NO deben contener "ID", "identificador", "vuelve a intentar" ni el
+   identificador crudo — el modelo los repite. Redáctalos en términos de la
+   acción del usuario ("consulta en silencio la lista de la familia y
+   responde con el nombre correcto"), nunca del mecanismo interno.
+
+## 8. Confirma la factibilidad antes de ofrecer o ejecutar
+
+**El problema que evita:** el modelo ofrece o acepta una acción ("grafico esos
+3 municipios"), la ejecuta con parámetros que no revisó (un ID que recordó mal,
+un nivel geográfico que ese indicador no soporta) y produce algo distinto a lo
+descrito — enterándose sólo al releer su resultado. Para entonces ya persistió
+salidas incorrectas. Caso real Fontana (26-09-03): 3 tarjetas de Canvas de otro
+indicador y otra geografía que la pedida.
+
+**Regla de prompt** (mismo peso que la "regla absoluta de datos"): nunca
+ofrezcas ni ejecutes una acción sin haber confirmado, con lo que ya te dieron
+las herramientas, que es realizable **tal como la describes**, con los
+parámetros exactos que usarás.
+- Acción sobre VARIAS entidades y la herramienta procesa una a la vez → dilo
+  literal ("voy a generar 3 gráficas separadas, una por municipio"), no lo
+  ofrezcas como una salida combinada.
+- Antes de "¿genero X?", verifica con las señales que ya tienes (flags de
+  disponibilidad, niveles de la config, resultados previos de consulta) que X
+  es realizable con esos parámetros.
+- Reconfirma el identificador del recurso **antes de CADA llamada de
+  acción**, nunca de memoria ni de un turno anterior (entre turnos no
+  conservas resultados estructurados). Consultar el recurso X nunca habilita a
+  actuar sobre un recurso Y distinto "en su lugar".
+
+**Barrera de código** (no confíes sólo en el prompt): cuando el backend tenga
+que degradar la petición (otra granularidad, otra geografía, otro alcance) para
+poder responder, **no devuelvas `ok:true` en silencio** — devuelve una señal
+explícita (`{ ok:false, <motivoDeLaDegradación>, … }`). La herramienta de
+LECTURA la convierte en "acláralo al usuario ANTES de ofrecer nada"; la
+herramienta que PERSISTE la trata como rechazo y no escribe nada. Añade además
+un guard defensivo en el handler que persiste: si la geografía/alcance
+entregado no coincide con lo pedido, rechaza.
+
 ---
 
 ## Implementación de ejemplo (Fontana T10)
@@ -151,7 +246,7 @@ reinventar.
 | Definición + ejecución de tools | `lib/fontana/agente/tools.ts` |
 | Builders de salidas (Canvas) | `lib/fontana/agente/canvasBuilder.ts` |
 | Bloque de contexto de adjuntos | `lib/fontana/agente/adjuntosContexto.ts` |
-| Ruta de chat SSE | `app/api/fontana/chat/route.ts` |
+| Ruta de chat SSE (thinking habilitado + supresión de texto intermedio, §7) | `app/api/fontana/chat/route.ts` |
 | Ruta de subida de adjunto | `app/api/fontana/sesion/[sesionId]/adjunto/route.ts` |
 | Extractor de texto compartido | `lib/moddulo/attachments.ts` |
 | Purga programada | `functions/src/fontana/purgeAdjuntos.ts` |

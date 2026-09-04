@@ -200,7 +200,7 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {cargando ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Cargando…</p>
+            <p className="text-sm text-red-eske">Cargando…</p>
           ) : items.length === 0 ? (
             <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">{config.vacio}</p>
           ) : (
@@ -240,7 +240,7 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
                   disabled={cargandoMas}
                   className="mt-3 text-sm text-bluegreen-eske dark:text-blue-eske-20 hover:underline disabled:opacity-50"
                 >
-                  {cargandoMas ? "Cargando…" : `Ver más (${total - items.length} restantes)`}
+                  {cargandoMas ? <span className="text-red-eske">Cargando…</span> : `Ver más (${total - items.length} restantes)`}
                 </button>
               )}
             </>

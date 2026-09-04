@@ -7,13 +7,19 @@
 // a la shape ResultadoSerie.
 //
 // - Sin `territorio` → serie del territorio del proyecto. Si el proyecto
-//   abarca MÁS DE UN estado NO se elige por el usuario: se devuelve
-//   `{ ok:false, multiEstado:true, estados:[...] }` y el agente pregunta.
-// - Con `territorio` → un estado nombrado por el usuario (ajeno o propio
-//   tras la desambiguación), resuelto vía resolverTerritorioNombre.
-// La respuesta lleva `nivel` (nacional | estatal) para que el agente aclare
-// que un dato estatal/nacional aplica a todo el estado/país, no es un
-// promedio de los municipios/distritos del proyecto.
+//   abarca MÁS DE UN estado (indicador con serie estatal) o MÁS DE UN
+//   municipio (indicador con serie municipal — F2-3/5/20/21/22) NO se
+//   elige por el usuario: se devuelve `{ ok:false, multiEstado:true, ... }`
+//   o `{ ok:false, multiMunicipio:true, municipios:[...] }` y el agente
+//   pregunta a cuál se refiere.
+// - Con `territorio` → un estado o municipio nombrado por el usuario (ajeno
+//   o propio tras la desambiguación), resuelto vía resolverTerritorioNombre.
+//   Un municipio nombrado se mantiene municipal solo si el indicador publica
+//   serie municipal; si NO, se devuelve `{ ok:false, colapsoNivel:true, ... }`
+//   (nunca se colapsa a estado en silencio — hallazgo 1, 26-09-03).
+// La respuesta lleva `nivel` (nacional | estatal | municipal) para que el
+// agente aclare a qué unidad geográfica aplica el dato (un dato estatal es
+// de todo el estado, no un promedio de sus municipios/distritos).
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -21,9 +27,10 @@ import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio"
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { resolverTerritorioNombre } from "@/lib/fontana/geo/resolverTerritorioNombre";
 import { estadosDelTerritorio } from "@/lib/fontana/geo/estadosDelTerritorio";
+import { municipiosDelTerritorio } from "@/lib/fontana/geo/municipiosDelTerritorio";
 import { resolverSerieTemporal } from "@/lib/fontana/ingesta/serieTemporal";
-import { tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
-import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { SERIES_DISPONIBLES, tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
+import { nivelObjetivoSerie, type ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
 
@@ -58,47 +65,104 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
   }
   const { sesion } = cargada;
+  const cfg = SERIES_DISPONIBLES[indicadorId]; // garantizado por tieneSerie()
   const estadosProyecto = estadosDelTerritorio(sesion.territorio);
+  const municipiosProyecto = municipiosDelTerritorio(sesion.territorio);
   const registro = await getIndicadorRegistro(indicadorId);
   const nombre = registro?.nombre ?? indicadorId;
 
   // --- Serie del territorio del proyecto (sin `territorio` en la query) ---
   if (!territorioNombre) {
-    if (estadosProyecto.length > 1) {
+    const nivelObjetivo = nivelObjetivoSerie(sesion.territorio, cfg.niveles);
+
+    // Proyecto plural: NO se elige por el usuario — se le pregunta a cuál de
+    // sus estados/municipios se refiere.
+    if (nivelObjetivo === "estatal" && estadosProyecto.length > 1) {
       return NextResponse.json(
         { ok: false, multiEstado: true, estados: estadosProyecto },
         { status: 200 }
       );
     }
+    if (nivelObjetivo === "municipal" && municipiosProyecto.length > 1) {
+      return NextResponse.json(
+        {
+          ok: false,
+          multiMunicipio: true,
+          municipios: municipiosProyecto.map((m) => `${m.nombre}, ${m.estado}`),
+        },
+        { status: 200 }
+      );
+    }
+
     const serie = await resolverSerieTemporal(indicadorId, sesion.territorio);
     return responderSerie(serie, indicadorId, nombre, registro, {
       esTerritorioExterno: false,
       esTerritorioDelProyecto: true,
+      pedidoMunicipio: nivelObjetivo === "municipal",
     });
   }
 
-  // --- Serie de un estado nombrado por el usuario ---
+  // --- Serie de un territorio nombrado por el usuario ---
   const resol = await resolverTerritorioNombre(territorioNombre, estadoHint, nivelHint);
   if (!resol.ok) {
     return NextResponse.json(resol, { status: 200 });
   }
-  // Los indicadores de la 1ª ola son nacional/estatal; un municipio nombrado
-  // se resuelve a la serie de su estado.
-  const territorioEstatal: Territorio =
-    resol.territorio.nivel === "municipal"
-      ? { nivel: "estatal", estado: resol.territorio.estado, nombre: resol.territorio.estado ?? resol.label }
-      : resol.territorio;
 
-  const serie = await resolverSerieTemporal(indicadorId, territorioEstatal);
-  const nombreEstado = territorioEstatal.estado ?? resol.label;
-  const esTerritorioDelProyecto = estadosProyecto.some(
-    (e) => normalizeGeoName(e) === normalizeGeoName(nombreEstado)
-  );
+  // Un municipio nombrado NO se colapsa en silencio a su estado. Si el
+  // indicador no publica serie municipal, se devuelve una señal explícita
+  // (colapsoNivel) para que el agente lo aclare ANTES de ofrecer nada
+  // (lectura) o rechace la visualización (Canvas) — nunca persista una
+  // tarjeta de otra geografía que la pedida. Ver hallazgo 1 (26-09-03).
+  if (resol.territorio.nivel === "municipal" && !cfg.niveles.includes("municipal")) {
+    const estado = resol.territorio.estado ?? "";
+    const entregaNivel = cfg.niveles.includes("estatal") ? "estatal" : "nacional";
+    return NextResponse.json(
+      {
+        ok: false,
+        colapsoNivel: true,
+        pidioNivel: "municipal",
+        entregaNivel,
+        municipioPedido: resol.territorio.municipio ?? resol.label,
+        estado,
+        motivo:
+          entregaNivel === "estatal"
+            ? `«${nombre}» no tiene serie histórica a nivel municipal — solo a nivel estatal (${estado}).`
+            : `«${nombre}» no tiene serie histórica a nivel municipal — solo a nivel nacional.`,
+      },
+      { status: 200 }
+    );
+  }
 
+  let territorioSerie: Territorio;
+  let labelOverride: string;
+  let esTerritorioDelProyecto: boolean;
+
+  if (resol.territorio.nivel === "municipal") {
+    // El indicador SÍ tiene serie municipal (cfg.niveles la incluye).
+    territorioSerie = resol.territorio;
+    labelOverride = resol.label;
+    const norm = (s: string) => normalizeGeoName(s);
+    esTerritorioDelProyecto = municipiosProyecto.some(
+      (m) =>
+        norm(m.estado) === norm(resol.territorio.estado ?? "") &&
+        norm(m.nombre) === norm(resol.territorio.municipio ?? "")
+    );
+  } else {
+    // Estado nombrado directamente.
+    const nombreEstado = resol.territorio.estado ?? resol.label;
+    territorioSerie = resol.territorio;
+    labelOverride = nombreEstado;
+    esTerritorioDelProyecto = estadosProyecto.some(
+      (e) => normalizeGeoName(e) === normalizeGeoName(nombreEstado)
+    );
+  }
+
+  const serie = await resolverSerieTemporal(indicadorId, territorioSerie);
   return responderSerie(serie, indicadorId, nombre, registro, {
     esTerritorioExterno: !esTerritorioDelProyecto,
     esTerritorioDelProyecto,
-    labelOverride: nombreEstado,
+    labelOverride,
+    pedidoMunicipio: resol.territorio.nivel === "municipal",
   });
 }
 
@@ -107,7 +171,12 @@ function responderSerie(
   indicadorId: string,
   nombre: string,
   registro: Awaited<ReturnType<typeof getIndicadorRegistro>>,
-  origen: { esTerritorioExterno: boolean; esTerritorioDelProyecto: boolean; labelOverride?: string }
+  origen: {
+    esTerritorioExterno: boolean;
+    esTerritorioDelProyecto: boolean;
+    labelOverride?: string;
+    pedidoMunicipio?: boolean;
+  }
 ) {
   if (!serie.ok) {
     return NextResponse.json({ ok: false, motivo: serie.motivo }, { status: 200 });
@@ -119,6 +188,10 @@ function responderSerie(
       indicadorId,
       nombre,
       nivel: serie.nivel,
+      // true si el territorio pedido (proyecto o nombrado) era un municipio —
+      // el guard de generarSerieTemporal lo usa para no persistir una tarjeta
+      // de otra geografía (hallazgo 1).
+      pedidoMunicipio: Boolean(origen.pedidoMunicipio),
       territorio: { label },
       esTerritorioExterno: origen.esTerritorioExterno,
       esTerritorioDelProyecto: origen.esTerritorioDelProyecto,

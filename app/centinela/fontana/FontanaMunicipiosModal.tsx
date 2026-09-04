@@ -459,8 +459,8 @@ function FilaMunicipio({ municipio, tipoDistrito }: { municipio: MunicipioDesglo
 
   return (
     <li className="py-2.5 flex items-start justify-between gap-3">
-      <p className="text-sm text-black-eske dark:text-[#EAF2F8]">{nombre}</p>
-      <div className="text-right shrink-0">
+      <p className="text-sm text-black-eske dark:text-[#EAF2F8] min-w-0 flex-1 break-words">{nombre}</p>
+      <div className="text-right shrink-0 max-w-[45%]">
         {valor !== undefined ? (
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
@@ -472,10 +472,10 @@ function FilaMunicipio({ municipio, tipoDistrito }: { municipio: MunicipioDesglo
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{motivo}</p>
+          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
 
         {coberturaIncompleta && (
@@ -790,8 +790,8 @@ function FilaElementoPrecarga({ elemento }: { elemento: ElementoEstado }) {
   const { nombre, valor, unidad, naturaleza, fuenteEtiqueta, motivo } = elemento;
   return (
     <li className="py-2.5 flex items-start justify-between gap-3">
-      <p className="text-sm text-black-eske dark:text-[#EAF2F8]">{nombre}</p>
-      <div className="text-right shrink-0">
+      <p className="text-sm text-black-eske dark:text-[#EAF2F8] min-w-0 flex-1 break-words">{nombre}</p>
+      <div className="text-right shrink-0 max-w-[45%]">
         {valor !== undefined ? (
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
@@ -803,10 +803,10 @@ function FilaElementoPrecarga({ elemento }: { elemento: ElementoEstado }) {
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{motivo}</p>
+          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
       </div>
     </li>
@@ -828,7 +828,7 @@ function FilaElementoBuscador({
 }) {
   return (
     <li className="py-2.5 flex items-start justify-between gap-3">
-      <label className="flex items-start gap-2 min-w-0 cursor-pointer">
+      <label className="flex flex-1 items-start gap-2 min-w-0 cursor-pointer">
         <input
           type="checkbox"
           checked={seleccionado}
@@ -836,13 +836,13 @@ function FilaElementoBuscador({
           className="mt-0.5 shrink-0 accent-bluegreen-eske"
           aria-label={`Seleccionar ${nombre}`}
         />
-        <span className="text-sm text-black-eske dark:text-[#EAF2F8]">
+        <span className="text-sm text-black-eske dark:text-[#EAF2F8] min-w-0 break-words">
           {nombre}
           {estadoNombre && <span className="text-black-eske-80 dark:text-[#9AAEBE]"> ({estadoNombre})</span>}
         </span>
       </label>
       {valorCargado && (
-        <div className="text-right shrink-0">
+        <div className="text-right shrink-0 max-w-[45%]">
           {valorCargado.valor !== undefined ? (
             <>
               <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
@@ -857,11 +857,11 @@ function FilaElementoBuscador({
                 </div>
               )}
               {valorCargado.fuenteEtiqueta && (
-                <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{valorCargado.fuenteEtiqueta}</p>
+                <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{valorCargado.fuenteEtiqueta}</p>
               )}
             </>
           ) : (
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{valorCargado.motivo}</p>
+            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{valorCargado.motivo}</p>
           )}
         </div>
       )}
@@ -990,8 +990,8 @@ function FilaDistritoDeMunicipio({ distrito }: { distrito: DistritoDeMunicipio }
   const { nombre, pctPobtot, valor, unidad, naturaleza, fuenteEtiqueta, motivo } = distrito;
   return (
     <li className="py-2.5 flex items-start justify-between gap-3">
-      <p className="text-sm text-black-eske dark:text-[#EAF2F8]">{nombre}</p>
-      <div className="text-right shrink-0">
+      <p className="text-sm text-black-eske dark:text-[#EAF2F8] min-w-0 flex-1 break-words">{nombre}</p>
+      <div className="text-right shrink-0 max-w-[45%]">
         {valor !== undefined ? (
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
@@ -1003,10 +1003,10 @@ function FilaDistritoDeMunicipio({ distrito }: { distrito: DistritoDeMunicipio }
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{motivo}</p>
+          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
         <p className="text-[10px] italic text-gray-eske-60 dark:text-[#6D8294] mt-1 max-w-[220px]">
           {pctPobtot}% del municipio pertenece a este distrito.

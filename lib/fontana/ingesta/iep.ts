@@ -225,6 +225,7 @@ export async function resolverSerieIep(territorio: Territorio): Promise<Resultad
   }
 
   const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  if (!nivel) return { ok: false, motivo: "Este indicador no tiene serie a un nivel aplicable al territorio del proyecto" };
   let porAno: Record<string, number> | undefined;
   let territorioLabel: string;
   if (nivel === "nacional") {
@@ -252,7 +253,7 @@ export async function resolverSerieIep(territorio: Territorio): Promise<Resultad
     unidad: UNIDAD_IEP,
     naturaleza: "dato_directo",
     fuenteEtiqueta: FUENTE_ETIQUETA_IEP,
-    formato: "indice",
+    formato: "puntaje", // Índice de Paz: escala 1-5, 3 decimales
     puntos,
   };
 }

@@ -89,6 +89,11 @@ export function useChatStream({ sesionId, onNav, onCanvasItem }: Options) {
             if (ev.type === "text") {
               buffer += String(ev.content ?? "");
               setStreamingText(buffer);
+            } else if (ev.type === "text_suppress") {
+              // El servidor decidió que el texto streameado hasta ahora era
+              // narración de proceso entre herramientas — se descarta.
+              buffer = "";
+              setStreamingText("");
             } else if (ev.type === "tool_call") {
               const tc: FontanaToolCall = {
                 tool: ev.tool as FontanaToolCall["tool"],

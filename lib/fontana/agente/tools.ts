@@ -83,7 +83,7 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        indicadorId: { type: "string", description: "ID exacto del registry (ej. 'F2-1'), obtenido de listar_indicadores_familia. La familia se deriva del prefijo. Jamás inventado." },
+        indicadorId: { type: "string", description: "Identificador del registry, resuelto con listar_indicadores_familia. La familia se deriva del prefijo. Nunca lo armes tú." },
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional. Solo se usa si compararNiveles es false. Default = nivel del territorio de la sesión." },
         compararNiveles: { type: "boolean", description: "Si true (recomendado por default para cualquier pregunta sobre un indicador puntual), devuelve `nivelesComparados`: el valor en cada nivel geográfico aplicable (nacional→estatal→distrital→municipal según el territorio). Consolida en 1 llamada." },
       },
@@ -108,12 +108,12 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "consultar_serie_temporal",
     description:
-      "Devuelve la serie histórica (varios años) de un indicador que tiene historia consultable en Fontana. Sabes cuáles la tienen por el campo `tieneSerie: true` (en consultar_indicador, listar_indicadores_familia, listar_indicadores_activos_todas_familias). Hoy: Gini de ingreso, distribución del ingreso por decil, huelgas y paros, Índice de Paz México, pobreza, pobreza extrema y población con al menos una carencia (corte nacional/estatal), y Competitividad Estatal. Sin territorioNombre = territorio del proyecto; con territorioNombre = un estado que el usuario nombró (ajeno al proyecto, o uno de los suyos si el proyecto abarca varios estados y ya te dijo cuál). Si el proyecto abarca más de un estado devuelve `multiEstado` — pregunta al usuario a cuál se refiere, no elijas tú. El campo `nivel` de la respuesta dice a qué nivel es la serie (nacional / estatal); si es estatal, aclara que aplica a todo el estado, no es un promedio de los municipios/distritos del proyecto. NO genera nada en Canvas (para eso usa generar_visualizacion tipo 'serie_temporal').",
+      "Devuelve la serie histórica (varios años) de un indicador que tiene historia consultable en Fontana. Sabes cuáles la tienen por el campo `tieneSerie: true` (en consultar_indicador, listar_indicadores_familia, listar_indicadores_activos_todas_familias). Las hay con corte nacional/estatal (ej. Gini, huelgas, Índice de Paz, pobreza, Competitividad Estatal) y con corte municipal (Índice de Rezago Social, IDH municipal y sus sub-índices de salud/educación/ingreso). Sin territorioNombre = territorio del proyecto; con territorioNombre = un estado o municipio que el usuario nombró (ajeno al proyecto, o uno de los suyos si el proyecto abarca varios y ya te dijo cuál). Si el proyecto abarca más de un estado devuelve `multiEstado`, y si abarca más de un municipio (series municipales) devuelve `multiMunicipio` — en ambos casos pregunta al usuario a cuál se refiere, no elijas tú. El campo `nivel` de la respuesta dice a qué nivel es la serie (nacional / estatal / municipal); si es estatal, aclara que aplica a todo el estado, no es un promedio de los municipios/distritos del proyecto. NO genera nada en Canvas (para eso usa generar_visualizacion tipo 'serie_temporal').",
     input_schema: {
       type: "object",
       properties: {
         indicadorId: { type: "string", description: "ID real del indicador. Debe tener `tieneSerie: true`." },
-        territorioNombre: { type: "string", description: "Estado dicho por el usuario, solo si pidió un territorio distinto al del proyecto o si el proyecto abarca varios estados y ya te precisó cuál." },
+        territorioNombre: { type: "string", description: "Estado o municipio dicho por el usuario, solo si pidió un territorio distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Opcional, desambigua municipios homónimos." },
       },
       required: ["indicadorId"],
@@ -161,7 +161,7 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
         familiaId: { type: "string", enum: ["F1", "F2", "F3", "F4", "F5"], description: "Requerido para 'resumen' y 'tabla'." },
         indicadorId: { type: "string", description: "Requerido para 'grafica', 'distribucion' y 'serie_temporal'." },
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional para 'resumen'. Default = nivel del territorio." },
-        territorioNombre: { type: "string", description: "Solo para 'serie_temporal': estado que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios estados y ya te precisó cuál." },
+        territorioNombre: { type: "string", description: "Solo para 'serie_temporal': estado o municipio que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Solo para 'serie_temporal': desambigua municipios homónimos." },
       },
       required: ["tipo"],
@@ -380,10 +380,10 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
   // "F4-gini" inventado en vez de F4-2). No aplica a narrativos (ya
   // retornaron arriba).
   if (!registro) {
-    const rs = `El indicadorId «${indicadorId}» no existe. Llama a listar_indicadores_familia (familia ${familia}) para obtener los IDs reales y vuelve a intentar con uno de ellos.`;
+    const rs = `Ese indicador no se resolvió. Consulta en silencio la lista de la familia ${familia} (listar_indicadores_familia) y responde con el nombre correcto — el usuario nunca debe ver identificadores ni saber que hubo un intento fallido.`;
     return {
-      resultForModel: { indicadorId, error: rs, idInvalido: true },
-      toolCall: { tool: "consultar_indicador", input, resultSummary: rs, ok: false },
+      resultForModel: { error: rs, idInvalido: true },
+      toolCall: { tool: "consultar_indicador", input, resultSummary: "Identificador no resuelto.", ok: false },
     };
   }
 
@@ -482,8 +482,8 @@ async function generarVisualizacion(
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: false },
   });
 
-  // serie_temporal — evolución en el tiempo, solo F2-17. No usa el endpoint
-  // de familia (los datos vienen de /api/fontana/serie-temporal).
+  // serie_temporal — evolución en el tiempo (indicadores con tieneSerie:true).
+  // No usa el endpoint de familia (los datos vienen de /api/fontana/serie-temporal).
   if (tipo === "serie_temporal") {
     return generarSerieTemporal(input, ctx, mensajeId, reject);
   }
@@ -790,7 +790,20 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
         multiEstado: true,
         estados,
         instruccion:
-          "El proyecto abarca varios estados y el ICE es un dato estatal. Pregunta al usuario a CUÁL de ESTOS estados suyos se refiere — es su proyecto, solo hay que precisar cuál (mismo criterio que un municipio homónimo). Cuando responda, vuelve a llamar esta herramienta con territorioNombre = ese estado. NO elijas tú.",
+          "El proyecto abarca varios estados y esta serie es un dato por estado. Pregunta al usuario a CUÁL de ESTOS estados suyos se refiere — es su proyecto, solo hay que precisar cuál (mismo criterio que un municipio homónimo). Cuando responda, vuelve a llamar esta herramienta con territorioNombre = ese estado. NO elijas tú.",
+      },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (data.multiMunicipio) {
+    const municipios = (data.municipios as string[]) ?? [];
+    const rs = `El proyecto abarca ${municipios.length} municipios (${municipios.join(", ")}).`;
+    return {
+      resultForModel: {
+        multiMunicipio: true,
+        municipios,
+        instruccion:
+          "El proyecto abarca varios municipios y esta serie es un dato por municipio. Pregunta al usuario a CUÁL de ESTOS municipios suyos se refiere — es su proyecto, solo hay que precisar cuál. Cuando responda, vuelve a llamar esta herramienta con territorioNombre = ese municipio (y estadoNombre si hace falta desambiguar). NO elijas tú.",
       },
       toolCall: { tool, input, resultSummary: rs, ok: false },
     };
@@ -811,6 +824,23 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
     const rs = `No reconozco el territorio «${territorioNombre}».`;
     return {
       resultForModel: { noResuelto: true, error: rs, instruccion: "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre del estado." },
+      toolCall: { tool, input, resultSummary: rs, ok: false },
+    };
+  }
+  if (data.colapsoNivel) {
+    const donde = data.entregaNivel === "estatal" ? `a nivel estatal (${data.estado})` : "a nivel nacional";
+    const rs = `${String(data.motivo ?? "Este indicador no tiene serie a nivel municipal.")}`;
+    return {
+      resultForModel: {
+        colapsoNivel: true,
+        entregaNivel: data.entregaNivel,
+        estado: data.estado,
+        municipioPedido: data.municipioPedido,
+        motivo: data.motivo,
+        instruccion:
+          `Este indicador NO tiene serie histórica a nivel municipal. NO ofrezcas ni generes una gráfica de ${String(data.municipioPedido ?? "ese municipio")}. ` +
+          `Dile al usuario, ANTES de ofrecer nada, que de este indicador solo hay serie ${donde}, y pregúntale si quiere esa o si prefiere un indicador que sí tenga serie por municipio. NO asumas la respuesta.`,
+      },
       toolCall: { tool, input, resultSummary: rs, ok: false },
     };
   }
@@ -861,13 +891,36 @@ async function generarSerieTemporal(
       `El proyecto abarca varios estados (${estados.join(", ")}). Este es un dato por estado — pregunta al usuario a cuál de sus estados se refiere y vuelve a intentar con ese estado (territorioNombre).`
     );
   }
+  if (data.multiMunicipio) {
+    const municipios = (data.municipios as string[]) ?? [];
+    return reject(
+      `El proyecto abarca varios municipios (${municipios.join(", ")}). Este es un dato por municipio — pregunta al usuario a cuál de sus municipios se refiere y vuelve a intentar con ese municipio (territorioNombre).`
+    );
+  }
   if (data.ambiguo) {
     const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
     return reject(`«${String(input.territorioNombre ?? "")}» coincide con ${cands.length} municipios; pregunta al usuario a cuál se refiere.`);
   }
   if (data.noResuelto) return reject(`No reconozco el territorio «${String(input.territorioNombre ?? "")}».`);
+  if (data.colapsoNivel) {
+    const donde = data.entregaNivel === "estatal" ? `estatal (${data.estado})` : "nacional";
+    return reject(
+      `${String(data.motivo ?? "Ese indicador no tiene serie a nivel municipal.")} No se generó ninguna gráfica. ` +
+        `Aclárale al usuario que de este indicador solo hay serie ${donde} y pregúntale si quiere esa, o si prefiere un indicador con serie por municipio.`
+    );
+  }
   if (data.error === "sin_serie") return reject(String(data.mensaje ?? "Ese indicador no tiene serie histórica."));
   if (!data.ok) return reject(String(data.motivo ?? "No se pudo obtener la serie."));
+
+  // Guard hallazgo 1 (26-09-03): si se pidió un municipio y la serie entregada
+  // NO es municipal, algo se colapsó — nunca persistir una tarjeta de otra
+  // geografía que la pedida. (La ruta ya devuelve colapsoNivel para el caso
+  // conocido; esto es defensa en profundidad, sin excepción.)
+  if (data.pedidoMunicipio && data.nivel !== "municipal") {
+    return reject(
+      "Se pidió una serie de un municipio pero la que devolvió la herramienta no es municipal. No se generó ninguna gráfica — no se persiste un dato de otra geografía que la pedida."
+    );
+  }
 
   const terr = data.territorio as { label: string };
   const esTerritorioExterno = Boolean(data.esTerritorioExterno);
@@ -879,10 +932,10 @@ async function generarSerieTemporal(
     familiaEtiqueta: FAMILIA_ETIQUETAS[familiaId],
     territorioLabel: terr.label,
   };
-  const formato = (["conteo", "moneda", "porcentaje", "indice"] as const).includes(
-    data.formato as "conteo" | "moneda" | "porcentaje" | "indice"
-  )
-    ? (data.formato as "conteo" | "moneda" | "porcentaje" | "indice")
+  const FORMATOS_SERIE = ["conteo", "moneda", "porcentaje", "indice", "coeficiente", "puntaje"] as const;
+  type FormatoSerie = (typeof FORMATOS_SERIE)[number];
+  const formato: FormatoSerie = FORMATOS_SERIE.includes(data.formato as FormatoSerie)
+    ? (data.formato as FormatoSerie)
     : "conteo";
   const item = construirCanvasSerieTemporal(
     indicadorId,

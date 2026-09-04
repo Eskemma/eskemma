@@ -258,7 +258,7 @@ interface SerieCanvasInput {
   unidad?: string;
   naturaleza?: NaturalezaDato;
   fuenteEtiqueta: string;
-  formato: "conteo" | "moneda" | "porcentaje" | "indice";
+  formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
   nivel: NivelTablaFontana; // nivel geográfico real de la serie
   puntos: {
     periodo: string;

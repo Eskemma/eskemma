@@ -158,14 +158,23 @@ function SerieTemporalGrafica({
   item: Extract<FontanaCanvasItem, { tipo: "serie_temporal" }>;
   color: string;
 }) {
-  const valores = item.puntos.map((p) => p.valor ?? 0);
-  const max = Math.max(...valores, 1);
-  const fmt = (v: number) =>
-    item.formato === "moneda"
-      ? `$${v.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`
-      : item.formato === "porcentaje"
-      ? `${v.toLocaleString("es-MX", { maximumFractionDigits: 2 })}%`
-      : v.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+  // Precisión de display por escala (ver unión `formato` en fontana.types):
+  // indice → 0-100 (2 dec) · coeficiente → 0-1 y negativos (4 dec) ·
+  // puntaje → 1-5 (3 dec).
+  const fmt = (v: number) => {
+    switch (item.formato) {
+      case "moneda":
+        return `$${v.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
+      case "porcentaje":
+        return `${v.toLocaleString("es-MX", { maximumFractionDigits: 2 })}%`;
+      case "coeficiente":
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 4 });
+      case "puntaje":
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 3 });
+      default: // "conteo" | "indice"
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+    }
+  };
 
   const notaNivel =
     item.nivel === "nacional"
@@ -173,6 +182,41 @@ function SerieTemporalGrafica({
       : item.nivel === "municipal"
       ? `Dato municipal — de ${item.territorioLabel}.`
       : `Dato estatal — de ${item.territorioLabel}. No es un promedio de municipios o distritos.`;
+
+  const pts = item.puntos;
+  const n = pts.length;
+  const nums = pts.filter((p) => p.valor !== null).map((p) => p.valor as number);
+  const hayDatos = nums.length > 0;
+  const rawMin = hayDatos ? Math.min(...nums) : 0;
+  const rawMax = hayDatos ? Math.max(...nums) : 1;
+  const pad = (rawMax - rawMin || Math.abs(rawMax) || 1) * 0.08;
+  // Conteo no negativo → base 0; cualquier otra escala → rango de datos con padding.
+  const domMin = item.formato === "conteo" && rawMin >= 0 ? 0 : rawMin - pad;
+  const domMax = rawMax + pad;
+  const span = domMax - domMin || 1;
+
+  const xAt = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
+  const yAt = (v: number) => 100 - ((v - domMin) / span) * 100;
+
+  // Nulos → la línea se parte: una polilínea por corrida contigua de valores.
+  const segmentos: { x: number; y: number }[][] = [];
+  let cur: { x: number; y: number }[] = [];
+  pts.forEach((p, i) => {
+    if (p.valor === null) {
+      if (cur.length) segmentos.push(cur);
+      cur = [];
+      return;
+    }
+    cur.push({ x: xAt(i), y: yAt(p.valor) });
+  });
+  if (cur.length) segmentos.push(cur);
+
+  const idxMin = hayDatos ? pts.findIndex((p) => p.valor === rawMin) : -1;
+  const idxMax = hayDatos ? pts.findIndex((p) => p.valor === rawMax) : -1;
+  const mostrarValor = (i: number) =>
+    pts[i].valor !== null && (n <= 8 || i === 0 || i === n - 1 || i === idxMin || i === idxMax);
+  const stepX = n <= 12 ? 1 : Math.ceil(n / 8);
+  const mostrarAnio = (i: number) => i === 0 || i === n - 1 || i % stepX === 0;
 
   return (
     <div>
@@ -189,32 +233,65 @@ function SerieTemporalGrafica({
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
       )}
 
-      <div className="space-y-1.5">
-        {item.puntos.map((p) => (
-          <div key={p.periodo} className="flex items-center gap-2">
-            <span className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] w-12 shrink-0 text-right">
-              {p.periodo}
-            </span>
-            {p.valor !== null ? (
-              <>
-                <div className="flex-1 h-4 rounded-full bg-gray-eske-10 dark:bg-[#112230] overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${Math.max(4, (p.valor / max) * 100)}%`, background: color }} />
-                </div>
-                <span className="text-[11px] text-black-eske dark:text-[#EAF2F8] w-20 shrink-0 text-right">
-                  {fmt(p.valor)}
-                </span>
+      {!hayDatos ? (
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
+      ) : (
+        <div className="relative h-28 mt-6 mb-7 mx-1">
+          <svg
+            className="absolute inset-0 w-full h-full overflow-visible"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {segmentos.map((seg, si) => (
+              <polyline
+                key={si}
+                points={seg.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke={color}
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ))}
+          </svg>
+
+          {pts.map((p, i) =>
+            p.valor === null ? null : (
+              <div
+                key={p.periodo}
+                className="absolute"
+                style={{ left: `${xAt(i)}%`, top: `${yAt(p.valor)}%`, transform: "translate(-50%,-50%)" }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                {mostrarValor(i) && (
+                  <span className="absolute left-1/2 -translate-x-1/2 -top-4 whitespace-nowrap text-[9px] text-black-eske dark:text-[#EAF2F8]">
+                    {fmt(p.valor)}
+                  </span>
+                )}
                 {p.ranking != null && (
-                  <span className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] w-12 shrink-0 text-right">
+                  <span className="absolute left-1/2 -translate-x-1/2 top-1.5 whitespace-nowrap text-[9px] text-black-eske-80 dark:text-[#9AAEBE]">
                     #{p.ranking}/32
                   </span>
                 )}
-              </>
-            ) : (
-              <span className="flex-1 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">—</span>
-            )}
-          </div>
-        ))}
-      </div>
+              </div>
+            )
+          )}
+
+          {pts.map((p, i) =>
+            mostrarAnio(i) ? (
+              <span
+                key={`x-${p.periodo}`}
+                className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-80 dark:text-[#9AAEBE]"
+                style={{ left: `${xAt(i)}%` }}
+              >
+                {p.periodo}
+              </span>
+            ) : null
+          )}
+        </div>
+      )}
 
       <p className="text-[10px] text-gray-eske-40 mt-2">{notaNivel}</p>
     </div>

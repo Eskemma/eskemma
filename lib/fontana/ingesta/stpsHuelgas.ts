@@ -234,6 +234,7 @@ export async function resolverSerieHuelgas(territorio: Territorio): Promise<Resu
   for (let y = minAnio; y < anioEnCurso; y++) anios.push(String(y));
 
   const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  if (!nivel) return { ok: false, motivo: "Este indicador no tiene serie a un nivel aplicable al territorio del proyecto" };
 
   let territorioLabel: string;
   let claveEstado: string | null = null;

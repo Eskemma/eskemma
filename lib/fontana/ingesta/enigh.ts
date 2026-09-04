@@ -450,6 +450,7 @@ export async function resolverSerieEnigh(
   }
 
   const nivel = nivelObjetivoSerie(territorio, ["nacional", "estatal"]);
+  if (!nivel) return { ok: false, motivo: "Este indicador no tiene serie a un nivel aplicable al territorio del proyecto" };
   let clave: string;
   let territorioLabel: string;
   if (nivel === "nacional") {
@@ -486,7 +487,7 @@ export async function resolverSerieEnigh(
       : "pesos (ingreso corriente promedio trimestral por hogar)",
     naturaleza: "dato_directo",
     fuenteEtiqueta: "INEGI (ENIGH tabulados por entidad federativa, 2016-2024)",
-    formato: esGini ? "indice" : "moneda",
+    formato: esGini ? "coeficiente" : "moneda",
     puntos,
   };
 }
