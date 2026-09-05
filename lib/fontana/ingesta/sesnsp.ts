@@ -163,30 +163,37 @@ async function ckanBuscarCarpetas(filters: Record<string, string>): Promise<Regi
   return todos;
 }
 
-function sumarCarpetas(registros: RegistroSesnsp[]): number {
-  let total = 0;
-  for (const r of registros) {
-    for (const mes of MESES) {
-      const v = r[mes];
-      const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
-      if (!Number.isNaN(n)) total += n;
-    }
-  }
-  return total;
-}
-
+// FIX DE FONDO 3 (2026-09-06, hallazgo real: comparacion_territorios daba
+// 0 carpetas para Cuernavaca/Iztapalapa/Querétaro/etc. mientras el mismo
+// indicador, mismo territorio, vía el endpoint de familia, daba el valor
+// real — 13,863 para Cuernavaca). Causa: estas 2 funciones filtraban
+// `Municipio: municipioNombre` DIRECTO contra la API externa de SESNSP —
+// exactamente el mismo error de fondo ya documentado y corregido para
+// `carpetasPorMunicipioEstado`/el desglose plural (ver comentario debajo,
+// 2026-08-27): el filtro de SESNSP es exacto en mayúsculas y acento, y
+// `territorio.municipio` puede llegar en CUALQUIER capitalización según
+// de dónde venga (`resolverTerritorioNombre`, que resuelve nombres
+// externos vía `comparacion-territorios`/`consulta-territorio`, devuelve
+// el nombre del catálogo geográfico en MAYÚSCULAS — "CUERNAVACA" —
+// mientras que el territorio propio de un proyecto, poblado por el
+// selector de territorio, suele guardar la capitalización normal —
+// "Cuernavaca" — y solo esta última calzaba con el string exacto de
+// SESNSP). La corrección YA EXISTÍA en el archivo para el desglose por
+// estado (`carpetasPorMunicipioEstado`, línea ~310) — nunca se había
+// propagado aquí. Ahora ambas reutilizan esa misma función + el mismo
+// join canónico (`claveCanonicaMunicipio`), inmune a mayúsculas/acentos —
+// un solo mecanismo de resolución para los 3 consumidores (proyecto
+// propio, comparación de territorios, desglose por estado).
 async function carpetasMunicipio(estadoCve: string, municipioNombre: string, anio: string, subtipo?: string): Promise<number> {
-  const filters: Record<string, string> = { Entidad: SESNSP_NOMBRE_POR_CVE[estadoCve], Municipio: municipioNombre, Ano: anio };
-  if (subtipo) filters["Subtipo de delito"] = subtipo;
-  const registros = await ckanBuscarCarpetas(filters);
-  return sumarCarpetas(registros);
+  const mapa = await carpetasPorMunicipioEstado(estadoCve, anio, subtipo);
+  return mapa.get(claveCanonicaMunicipio(estadoCve, municipioNombre)) ?? 0;
 }
 
 async function carpetasEstado(estadoCve: string, anio: string, subtipo?: string): Promise<number> {
-  const filters: Record<string, string> = { Entidad: SESNSP_NOMBRE_POR_CVE[estadoCve], Ano: anio };
-  if (subtipo) filters["Subtipo de delito"] = subtipo;
-  const registros = await ckanBuscarCarpetas(filters);
-  return sumarCarpetas(registros);
+  const mapa = await carpetasPorMunicipioEstado(estadoCve, anio, subtipo);
+  let total = 0;
+  for (const v of mapa.values()) total += v;
+  return total;
 }
 
 function resolverNombreMunicipio(territorio: Territorio): string | undefined {
@@ -238,17 +245,16 @@ async function resolverSesnspGenerico(
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" };
   } else {
     try {
-      // Join por nombre — SESNSP publica el nombre del municipio
-      // directamente, se usa tal cual (no se traduce por CVE de ningún
-      // catálogo externo) para la consulta de carpetas. Para el
-      // denominador de población de CONAPO sí se necesita el CVE_MUN
-      // OFICIAL (formato CONAPO: CLAVE_ENT sin padding + MUN con padding
-      // de 3) — se resuelve con resolverCveOficialMunicipio()
-      // (lib/fontana/ingesta/anvcc.ts), mismo mecanismo nombre→CVE oficial
-      // ya establecido en el proyecto para este tipo de traducción
-      // (patrón sun.ts/gacp.ts) — NUNCA resolveMunicipioCve()
-      // (numeración INE, incompatible con CVE_MUN oficial, ver
-      // docs/ecosistema/T10-fontana/claves-geograficas-no-confiables.md).
+      // Join por NOMBRE CANÓNICO (claveCanonicaMunicipio, dentro de
+      // carpetasMunicipio) — no por el string crudo (ver FIX DE FONDO 3
+      // junto a carpetasMunicipio). Para el denominador de población de
+      // CONAPO sí se necesita el CVE_MUN OFICIAL (formato CONAPO:
+      // CLAVE_ENT sin padding + MUN con padding de 3) — se resuelve con
+      // resolverCveOficialMunicipio() (lib/fontana/ingesta/anvcc.ts),
+      // mismo mecanismo nombre→CVE oficial ya establecido en el proyecto
+      // para este tipo de traducción (patrón sun.ts/gacp.ts) — NUNCA
+      // resolveMunicipioCve() (numeración INE, incompatible con CVE_MUN
+      // oficial, ver docs/ecosistema/T10-fontana/claves-geograficas-no-confiables.md).
       const carpetas = await carpetasMunicipio(estadoCve, municipioNombre, anio, opts.subtipo);
       if (opts.comoTasa) {
         const cveOficial = await resolverCveOficialMunicipio(estadoCve, municipioNombre);

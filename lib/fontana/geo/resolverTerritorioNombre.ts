@@ -17,6 +17,39 @@ import {
   getMunicipiosOptionsNacional,
 } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
+import type { IndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
+
+// 26-09-06, incidente Querétaro/Puebla (comparacion_territorios): cuando un
+// nombre coincide con un ESTADO y con un MUNICIPIO homónimo (la capital, en
+// general), resolverTerritorioNombre resuelve ESTADO por defecto salvo que
+// el llamador pase `nivelHint:"municipal"` explícito — y hasta ahora esa
+// decisión dependía de que el MODELO la intuyera caso por caso (heurística
+// opcional, no determinística: acertaba a veces, fallaba otras, para el
+// MISMO nombre en la MISMA conversación según el flujo).
+//
+// Fix consciente del indicador (mismo principio que nivelObjetivoSerie,
+// lib/fontana/series/tipos.ts): antes de resolver el nombre, se consulta si
+// el nivel "estatal" es viable para ESE indicador en el registry
+// (`IndicadorRegistro.niveles`). Si "estatal" es `no_viable` y "municipal"
+// SÍ está confirmado, forzar `nivelHint:"municipal"` de forma determinística
+// — nunca depende de que el modelo lo intuya. Si "estatal" SÍ es viable, no
+// se toca nada (la colisión se resuelve como hoy, estado gana, salvo que el
+// llamador pida explícitamente lo contrario) — forzar municipal siempre,
+// sin este chequeo, cambiaría el bug de un lado a otro para indicadores
+// donde el estado SÍ es el nivel correcto.
+export function nivelHintPorIndicador(
+  registro: Pick<IndicadorRegistro, "niveles"> | null | undefined,
+  nivelHintExplicito: string | null
+): string | null {
+  if (nivelHintExplicito) return nivelHintExplicito; // override explícito del llamador — siempre gana
+  if (!registro) return null;
+  const estatal = registro.niveles.find((n) => n.nivel === "estatal");
+  const municipal = registro.niveles.find((n) => n.nivel === "municipal");
+  if (estatal?.estado === "no_viable" && municipal?.estado === "confirmado") {
+    return "municipal";
+  }
+  return null;
+}
 
 export type ResolucionTerritorio =
   | { ok: true; territorio: Territorio; label: string }

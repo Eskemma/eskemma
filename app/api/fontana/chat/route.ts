@@ -55,11 +55,29 @@ const AVISO_SIN_HERRAMIENTAS =
 // herramientas de ESTE turno realmente devolvieron. Si el texto final usa
 // este vocabulario y NINGÚN resultado de herramienta de este turno lo
 // contiene, se descarta y se fuerza una corrección.
+//
+// ⚠️ COBERTURA INCREMENTAL, NO PROBLEMA CERRADO (26-09-07): 2ª repetición
+// confirmada del mismo patrón — Puebla/Querétaro en SESNSP, el modelo
+// afirmó "SESNSP no desagrega a nivel de municipio capital para esas
+// entidades" (falso: SESNSP SÍ tiene el dato — 35,509 y 32,601 carpetas
+// reales, verificado; la causa real era que comparacion_territorios no
+// tenía forma de pedir nivel municipal, ver nivelesPorTerritorio arriba).
+// Un guard por lista de frases SIEMPRE va a ir un paso atrás de nuevas
+// formas de fabricación con vocabulario distinto — evaluado (2026-09-07)
+// invertir en verificación estructural (comparar semánticamente el texto
+// final contra el `motivo` real, en vez de una lista de frases) y
+// descartado por ahora: sin un LLM-juez adicional (que añade costo,
+// latencia, y su propio riesgo de alucinación — no resuelve el problema,
+// lo mueve un nivel arriba) no hay forma determinística de detectar
+// "esta oración es una explicación causal fabricada" de forma genérica.
+// Queda pendiente como mejora estructural futura (ver CLAUDE.md) si el
+// patrón se repite una 3ª vez — mientras tanto, esta lista se sigue
+// ampliando caso por caso.
 const VOCABULARIO_NO_DISPONIBLE_SIN_RESPALDO =
-  /\b(conectores?|conector(es)?|funci[oó]n(es)? pendiente|no est[aá]n? (activ[oa]s?|conectad[oa]s?)|sin conector)\b/i;
+  /\b(conectores?|conector(es)?|funci[oó]n(es)? pendiente|no est[aá]n? (activ[oa]s?|conectad[oa]s?)|sin conector|no desagrega|sin desagregaci[oó]n)\b/i;
 
 const AVISO_VOCABULARIO_SIN_RESPALDO =
-  "[verificación del sistema] En tu respuesta anterior explicaste que algo \"no está disponible\" usando palabras (conector, función pendiente, no está activo/conectado) que NO aparecen en ningún resultado real de herramienta de este turno — probablemente las tomaste de memoria de otro indicador o las inventaste por analogía. Reescribe la explicación usando EXCLUSIVAMENTE el campo `motivo` (u otro texto real) que devolvió la herramienta para ESE indicador y territorio exactos, citado tal cual. Si la herramienta no devolvió una razón, dilo así en vez de inventar una.";
+  "[verificación del sistema] En tu respuesta anterior explicaste que algo \"no está disponible\" o \"no se desagrega\" usando palabras (conector, función pendiente, no está activo/conectado, no desagrega) que NO aparecen en ningún resultado real de herramienta de este turno — probablemente las tomaste de memoria de otro indicador o las inventaste por analogía. Reescribe la explicación usando EXCLUSIVAMENTE el campo `motivo` (u otro texto real) que devolvió la herramienta para ESE indicador y territorio exactos, citado tal cual. Si la herramienta no devolvió una razón, dilo así en vez de inventar una.";
 
 // Guard "nombre de herramienta expuesto" (26-09-06, incidente Iztapalapa
 // 2ª ronda): al autocorregirse, el modelo citó el nombre snake_case literal
@@ -143,6 +161,7 @@ export async function POST(request: NextRequest) {
   const { sesion } = cargada;
 
   const systemPrompt = construirSystemPromptFontana(sesion.territorio, sesion.tipoProyecto);
+  const ultimoMensajeAsistente = ultimoMensajeAssistantReal(body.history);
   const ctx: ToolContext = {
     sesionId,
     uid: session.uid,
@@ -151,8 +170,9 @@ export async function POST(request: NextRequest) {
     territorio: sesion.territorio,
     tipoProyecto: sesion.tipoProyecto,
     vizTerritoriosDelTurno: new Set<string>(),
-    municipiosPreguntadosPrevio: esPreguntaDeMunicipios(ultimoMensajeAssistantReal(body.history)),
+    municipiosPreguntadosPrevio: esPreguntaDeMunicipios(ultimoMensajeAsistente),
     ultimoMensajeUsuario: message,
+    ultimoMensajeAsistente,
     canvasItemsSesion: sesion.canvasItems ? [...sesion.canvasItems] : [],
   };
 

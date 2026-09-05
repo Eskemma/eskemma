@@ -156,7 +156,8 @@ export type FontanaCanvasItemTipo =
   | "tabla"
   | "desglose"
   | "distribucion"
-  | "serie_temporal";
+  | "serie_temporal"
+  | "comparacion_territorios";
 
 interface FontanaCanvasItemBase {
   id: string;
@@ -287,13 +288,41 @@ export interface FontanaCanvasSerieTemporal extends FontanaCanvasItemBase {
   }[];
 }
 
+// tipo "comparacion_territorios" — UN indicador entre VARIOS territorios
+// ARBITRARIOS nombrados explícitamente por el usuario (ej. Percepción de
+// Inseguridad en Cuernavaca, Toluca, Pachuca, CDMX, Querétaro, Puebla) —
+// no niveles jerárquicos de un mismo territorio (eso es "grafica"), no
+// categorías internas (eso es "distribucion"). Cada fila puede resolver a
+// un nivel geográfico distinto (estado o municipio) — se declara honesto
+// por fila. `noResueltos` documenta qué nombres no entraron y por qué
+// (ambiguo con candidatos, o no reconocido) — mismo shape que
+// `agregacionPlural.noResueltas` (lib/fontana/tablaColumnas.ts).
+export interface FontanaCanvasComparacionTerritorios extends FontanaCanvasItemBase {
+  tipo: "comparacion_territorios";
+  indicadorId: string;
+  indicadorNombre: string;
+  unidad?: string;
+  fuenteEtiqueta?: string;
+  filas: {
+    territorioLabel: string;
+    nivel: NivelTablaFontana;
+    valor: number | null;
+    naturaleza?: NaturalezaDato;
+    motivo?: string; // presente sii valor === null
+    esTerritorioDelProyecto: boolean;
+    esTerritorioExterno: boolean;
+  }[];
+  noResueltos: { nombreIngresado: string; motivo: string; candidatos?: string[] }[];
+}
+
 export type FontanaCanvasItem =
   | FontanaCanvasResumen
   | FontanaCanvasGrafica
   | FontanaCanvasTabla
   | FontanaCanvasDesglose
   | FontanaCanvasDistribucion
-  | FontanaCanvasSerieTemporal;
+  | FontanaCanvasSerieTemporal
+  | FontanaCanvasComparacionTerritorios;
 
 // Eventos del stream SSE de POST /api/fontana/chat — el cliente
 // (useChatStream) los despacha a callbacks.

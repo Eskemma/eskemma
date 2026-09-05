@@ -27,7 +27,7 @@ interface Props {
   onEliminado?: (itemId: string) => void;
 }
 
-const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal"]);
+const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal", "comparacion_territorios"]);
 const TIPOS_PDF = new Set<FontanaCanvasItem["tipo"]>(["resumen", "tabla", "desglose"]);
 
 export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Props) {
@@ -213,6 +213,15 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
       {item.tipo === "grafica" && (
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <GraficaBarras item={item} color={color} />
+          {item.fuenteEtiqueta && (
+            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+          )}
+        </div>
+      )}
+
+      {item.tipo === "comparacion_territorios" && (
+        <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
+          <ComparacionTerritoriosBarras item={item} color={color} />
           {item.fuenteEtiqueta && (
             <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
@@ -412,19 +421,15 @@ function DistribucionBarras({
       {item.nota && (
         <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-3 leading-snug">{item.nota}</p>
       )}
-      <div className="space-y-1.5">
+      <div className="space-y-3">
         {item.categorias.map((c) => (
-          <div key={c.etiqueta} className="flex items-center gap-2">
-            <span className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] w-28 shrink-0 text-right">
-              {c.etiqueta}
-            </span>
-            <div className="flex-1 h-4 rounded-full bg-gray-eske-10 dark:bg-[#112230] overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${Math.max(3, (c.valor / max) * 100)}%`, background: color }} />
-            </div>
-            <span className="text-[11px] text-black-eske dark:text-[#EAF2F8] w-24 shrink-0 text-right">
-              {fmtValor(c.valor, item.formato)}
-            </span>
-          </div>
+          <FilaBarraHorizontal
+            key={c.etiqueta}
+            etiqueta={c.etiqueta}
+            valorTexto={fmtValor(c.valor, item.formato)}
+            pct={Math.max(3, (c.valor / max) * 100)}
+            color={color}
+          />
         ))}
       </div>
     </div>
@@ -584,6 +589,53 @@ function SerieTemporalGrafica({
   );
 }
 
+// Fila compartida por las 3 gráficas de barras horizontales del Canvas
+// (GraficaBarras, DistribucionBarras, ComparacionTerritoriosBarras) —
+// rediseño 26-09-06: el nombre completo va ARRIBA de la barra (nunca se
+// trunca, cabe cualquier longitud), la barra ocupa el ancho completo
+// debajo, y el valor se muestra junto al nombre — nunca la frase completa
+// de una unidad de medida repetida en cada fila (eso se muestra UNA vez,
+// como subtítulo de toda la gráfica, en el componente que llama a esta
+// fila). Mismo lenguaje visual en las 3 gráficas del ecosistema.
+function FilaBarraHorizontal({
+  etiqueta,
+  badge,
+  valorTexto,
+  motivo,
+  pct,
+  color,
+  opacidad,
+}: {
+  etiqueta: string;
+  badge?: React.ReactNode;
+  valorTexto: string | null;
+  motivo?: string;
+  pct: number;
+  color: string;
+  opacidad?: number;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <span className="text-xs font-medium text-black-eske dark:text-[#EAF2F8]">
+          {etiqueta}
+          {badge}
+        </span>
+        {valorTexto !== null && (
+          <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0">{valorTexto}</span>
+        )}
+      </div>
+      {valorTexto !== null ? (
+        <div className="h-2.5 rounded-full bg-gray-eske-10 dark:bg-[#112230] overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, opacity: opacidad }} />
+        </div>
+      ) : (
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">{motivo}</p>
+      )}
+    </div>
+  );
+}
+
 function GraficaBarras({
   item,
   color,
@@ -594,27 +646,76 @@ function GraficaBarras({
   const valores = item.barras.map((b) => b.valor ?? 0);
   const max = Math.max(...valores, 1);
   return (
-    <div className="space-y-2">
-      {item.barras.map((b) => (
-        <div key={b.nivel} className="flex items-center gap-2">
-          <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] w-24 shrink-0">
-            {NOMBRE_NIVEL_TABLA[b.nivel]}
-          </span>
-          {b.valor !== null ? (
-            <>
-              <div className="flex-1 h-4 rounded-full bg-gray-eske-10 dark:bg-[#112230] overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${Math.max(6, (b.valor / max) * 100)}%`, background: color }} />
-              </div>
-              <span className="text-xs text-black-eske dark:text-[#EAF2F8] w-24 shrink-0 text-right">
-                {b.valor.toLocaleString("es-MX")}
-                {item.unidad ? ` ${item.unidad}` : ""}
-              </span>
-            </>
-          ) : (
-            <span className="flex-1 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">{b.motivo}</span>
-          )}
+    <div>
+      {item.unidad && <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-3">{item.unidad}</p>}
+      <div className="space-y-3">
+        {item.barras.map((b) => (
+          <FilaBarraHorizontal
+            key={b.nivel}
+            etiqueta={NOMBRE_NIVEL_TABLA[b.nivel]}
+            valorTexto={b.valor !== null ? b.valor.toLocaleString("es-MX") : null}
+            motivo={b.motivo}
+            pct={Math.max(6, ((b.valor ?? 0) / max) * 100)}
+            color={color}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Comparación de territorios ARBITRARIOS (26-09-06) — cada barra se
+// identifica por territorioLabel (no por nivel geográfico) y declara
+// honestamente su nivel real + si es del proyecto o externo, y qué
+// territorios pedidos no entraron (noResueltos).
+function ComparacionTerritoriosBarras({
+  item,
+  color,
+}: {
+  item: Extract<FontanaCanvasItem, { tipo: "comparacion_territorios" }>;
+  color: string;
+}) {
+  const valores = item.filas.map((f) => f.valor ?? 0);
+  const max = Math.max(...valores, 1);
+  const nivelesDistintos = new Set(item.filas.map((f) => f.nivel)).size > 1;
+  return (
+    <div>
+      {item.unidad && <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.unidad}</p>}
+      {nivelesDistintos && (
+        <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-3">
+          Los territorios comparados no son todos del mismo nivel geográfico (algunos son estados, otros municipios) — el nivel de cada uno se indica junto a su nombre.
+        </p>
+      )}
+      <div className="space-y-3">
+        {item.filas.map((f) => (
+          <FilaBarraHorizontal
+            key={f.territorioLabel}
+            etiqueta={`${f.territorioLabel}${nivelesDistintos ? ` (${NOMBRE_NIVEL_TABLA[f.nivel]})` : ""}`}
+            badge={
+              f.esTerritorioDelProyecto ? (
+                <span className="text-[9px] text-black-eske-80 dark:text-[#9AAEBE] ml-1.5">(tu proyecto)</span>
+              ) : undefined
+            }
+            valorTexto={f.valor !== null ? f.valor.toLocaleString("es-MX") : null}
+            motivo={f.motivo}
+            pct={Math.max(6, ((f.valor ?? 0) / max) * 100)}
+            color={color}
+          />
+        ))}
+      </div>
+      {item.noResueltos.length > 0 && (
+        <div className="mt-3 text-[11px] text-orange-eske-60 dark:text-orange-eske-40">
+          <p className="font-medium">No se pudieron incluir:</p>
+          <ul className="list-disc list-inside">
+            {item.noResueltos.map((n) => (
+              <li key={n.nombreIngresado}>
+                {n.nombreIngresado} — {n.motivo}
+                {n.candidatos && n.candidatos.length > 0 ? ` (${n.candidatos.join(", ")})` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
-      ))}
+      )}
     </div>
   );
 }

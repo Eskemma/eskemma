@@ -33,6 +33,7 @@ import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaCo
 import { familiaDeIndicador, type FamiliaFontanaId, type FontanaCanvasItem, type FontanaToolCall } from "@/types/fontana.types";
 import { normalizeGeoName } from "@/lib/geo/municipioCanonico";
 import {
+  construirCanvasComparacionTerritorios,
   construirCanvasDesglose,
   construirCanvasDistribucion,
   construirCanvasGrafica,
@@ -163,17 +164,32 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "generar_visualizacion",
     description:
-      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12) · 'serie_temporal' (evolución EN EL TIEMPO de un indicador — solo los que tienen `tieneSerie: true`). Familia 4 no está disponible en Canvas todavía.",
+      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos de TU territorio) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12) · 'serie_temporal' (evolución EN EL TIEMPO de un indicador — solo los que tienen `tieneSerie: true`) · 'comparacion_territorios' (UN indicador entre VARIOS territorios de México que el usuario nombró EXPLÍCITAMENTE — no niveles de tu proyecto, territorios sin relación jerárquica entre sí, ej. 'la inseguridad en Cuernavaca, Toluca y Pachuca'). Familia 4 no está disponible en Canvas todavía.",
     input_schema: {
       type: "object",
       properties: {
-        tipo: { type: "string", enum: ["resumen", "grafica", "tabla", "distribucion", "serie_temporal"] },
+        tipo: { type: "string", enum: ["resumen", "grafica", "tabla", "distribucion", "serie_temporal", "comparacion_territorios"] },
         familiaId: { type: "string", enum: ["F1", "F2", "F3", "F4", "F5"], description: "Requerido para 'resumen' y 'tabla'." },
-        indicadorId: { type: "string", description: "Requerido para 'grafica', 'distribucion' y 'serie_temporal'." },
+        indicadorId: { type: "string", description: "Requerido para 'grafica', 'distribucion', 'serie_temporal' y 'comparacion_territorios'." },
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional para 'resumen'. Default = nivel del territorio." },
         territorioNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion' (F1-2 pirámide / F1-11 urbano-rural): estado o municipio que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion': desambigua municipios homónimos." },
         confirmadoLote: { type: "boolean", description: "Ponlo en true SOLO si el usuario ya confirmó explícitamente en un turno anterior que quiere las gráficas de varios/todos los territorios de su proyecto. Sin esto, a partir del 3er territorio distinto en un mismo turno la herramienta se detiene y te pide preguntar primero." },
+        territorios: {
+          type: "array",
+          items: { type: "string" },
+          description: "SOLO para 'comparacion_territorios': 2 a 8 nombres de territorios EXACTAMENTE como los escribió el usuario en su mensaje — nunca una lista que tú armaste o infreriste (ej. 'los municipios del proyecto'). El servidor verifica que cada nombre aparezca literalmente en el mensaje del usuario; si no, rechaza la llamada completa.",
+        },
+        estadosPorTerritorio: {
+          type: "array",
+          items: { type: "string" },
+          description: "SOLO para 'comparacion_territorios': paralelo a `territorios` (mismo índice) — estado que desambigua un municipio homónimo, si el usuario ya lo dijo. Usa cadena vacía en las posiciones sin desambiguar.",
+        },
+        nivelesPorTerritorio: {
+          type: "array",
+          items: { type: "string", enum: ["estatal", "municipal", ""] },
+          description: "SOLO para 'comparacion_territorios': paralelo a `territorios` (mismo índice) — 'municipal' si el usuario pidió explícitamente el municipio de un nombre que también es estado (ej. 'municipios (capitales)': Puebla, Querétaro), 'estatal' si pidió explícitamente el estado. Usa cadena vacía en las posiciones donde el usuario no especificó nivel — mismo criterio que el parámetro `nivel` de consultar_indicador_territorio_externo.",
+        },
       },
       required: ["tipo"],
     },
@@ -223,6 +239,14 @@ export interface ToolContext {
   // territorio sin importar cuántos sean — es su selección explícita, no el
   // modelo enumerando por su cuenta.
   ultimoMensajeUsuario: string;
+  // 26-09-06, fluidez del guard de lote (el sistema propuso 6 territorios,
+  // el usuario respondió "sí, es Pachuca de Soto" corrigiendo solo un
+  // nombre, y el guard exigió repetir los 6) — el ÚLTIMO mensaje real del
+  // asistente (antes de este turno). Un territorio que el asistente YA
+  // propuso ahí, combinado con que el usuario confirme/corrija en su
+  // mensaje actual, cuenta como "nombrado por el usuario" tanto como si lo
+  // hubiera escrito él mismo — ver territorioConfirmadoDePropuestaAnterior.
+  ultimoMensajeAsistente: string;
   // 26-09-05, hallazgo "Fallo 2" (Tlaquepaque re-falla en el turno de la
   // lectura comparativa): canvasItems ya persistidos en la sesión al
   // iniciar este turno, más los que se van agregando durante el turno
@@ -510,7 +534,13 @@ async function generarVisualizacion(
   ctx: ToolContext,
   mensajeId: string
 ): Promise<ToolResult> {
-  const tipo = String(input.tipo ?? "") as "resumen" | "grafica" | "tabla" | "distribucion" | "serie_temporal";
+  const tipo = String(input.tipo ?? "") as
+    | "resumen"
+    | "grafica"
+    | "tabla"
+    | "distribucion"
+    | "serie_temporal"
+    | "comparacion_territorios";
   const familiaFromInput = input.familiaId as FamiliaFontanaId | undefined;
   const indicadorId = input.indicadorId as string | undefined;
   const familiaId: FamiliaFontanaId | undefined =
@@ -525,6 +555,13 @@ async function generarVisualizacion(
   // No usa el endpoint de familia (los datos vienen de /api/fontana/serie-temporal).
   if (tipo === "serie_temporal") {
     return generarSerieTemporal(input, ctx, mensajeId, reject);
+  }
+
+  // comparacion_territorios (26-09-06) — N territorios ARBITRARIOS nombrados
+  // por el usuario. Tampoco usa el endpoint de familia (los datos vienen de
+  // /api/fontana/comparacion-territorios, resueltos por nombre en lote).
+  if (tipo === "comparacion_territorios") {
+    return generarComparacionTerritorios(input, ctx, mensajeId, reject);
   }
 
   if (!familiaId) return reject("Falta familiaId (para resumen/tabla) o indicadorId (para grafica).");
@@ -935,6 +972,19 @@ async function fetchDistribucion(
   return (await res.json().catch(() => ({}))) as Record<string, unknown>;
 }
 
+// Coincidencia de PALABRA COMPLETA (no substring plano) sobre texto ya
+// normalizado (mayúsculas, sin acentos — por eso \b funciona bien aquí,
+// a diferencia de sobre texto con acentos). 26-09-06: encontrado con
+// evidencia real que el `includes()` plano daba falso positivo — "Ciudad"
+// (token de "Ciudad de México") calzaba dentro de "ciudades" en una frase
+// genérica ("las principales ciudades capitales"), coleando un territorio
+// que el usuario NUNCA nombró.
+function contienePalabraCompleta(texto: string, patron: string): boolean {
+  if (!patron) return false;
+  const escapado = patron.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escapado}\\b`).test(texto);
+}
+
 // 26-09-05, hallazgo "Fallo 1" (el usuario nombró 3 municipios explícitos
 // de una sola vez y el 3º se bloqueó de todos modos): true si el territorio
 // de ESTA llamada aparece nombrado literalmente en el último mensaje del
@@ -947,8 +997,41 @@ function territorioNombradoPorUsuario(territorioNombre: string, mensajeUsuario: 
   const msg = normalizeGeoName(mensajeUsuario);
   const terr = normalizeGeoName(territorioNombre);
   if (!terr) return false;
-  if (msg.includes(terr)) return true;
-  return terr.split(/\s+/).some((tok) => tok.length >= 4 && msg.includes(tok));
+  if (contienePalabraCompleta(msg, terr)) return true;
+  return terr.split(/\s+/).some((tok) => tok.length >= 4 && contienePalabraCompleta(msg, tok));
+}
+
+// 26-09-06, fluidez del guard de lote: el sistema propuso ("¿confirmas
+// Cuernavaca, Toluca, Pachuca de Soto, Querétaro, Puebla y Cuauhtémoc?") y
+// el usuario respondió "sí, es Pachuca de Soto" — corrigiendo SOLO un
+// nombre, no repitiendo los 6. `territorioNombradoPorUsuario` mirando SOLO
+// el mensaje actual exigía repetir los 6 completos, rompiendo la fluidez
+// sin necesidad. Vocabulario de confirmación/corrección — deliberadamente
+// amplio (no exige que el usuario repita ningún territorio para que
+// cuente como confirmación: "sí" solo, aplicado a una propuesta que YA
+// nombraba el territorio, es suficiente).
+// Contra texto YA normalizado (normalizeGeoName: sin acentos, mayúsculas)
+// — \b con una letra acentuada ("í") no funciona en JS (í no cuenta como
+// \w, así que \b nunca cierra el límite correctamente después de ella);
+// se normaliza primero, igual que ya se hace en territorioNombradoPorUsuario.
+const RE_CONFIRMACION_O_CORRECCION =
+  /\b(SI|CONFIRMO|CONFIRMADO|CORRECTO|ASI ES|ESO ES|EXACTO|PERFECTO|VA|DALE|ADELANTE|PROCEDE|DE ACUERDO|EFECTIVAMENTE)\b/;
+
+// Un territorio cuenta como "nombrado por el usuario" también si: (1) el
+// ASISTENTE ya lo propuso literalmente en su último mensaje real (una
+// pregunta de confirmación tipo "¿quieres X, Y, Z?"), Y (2) el usuario
+// responde en este turno con lenguaje de confirmación/corrección — nunca
+// se confía en que el MODELO afirme que ya preguntó (mismo error ya
+// corregido con confirmadoLote/municipiosPreguntadosPrevio): se verifica
+// contra el TEXTO REAL de ambos mensajes, determinístico.
+//
+// Distinto del caso que el guard debe seguir bloqueando: si el asistente
+// NUNCA propuso ese territorio (ej. solo preguntó "¿qué tipo de gráfica
+// quieres?", sin nombrar ningún municipio), esta función devuelve false
+// para todos — el guard sigue exigiendo que el usuario los nombre.
+function territorioConfirmadoDePropuestaAnterior(territorioNombre: string, ctx: ToolContext): boolean {
+  if (!territorioNombradoPorUsuario(territorioNombre, ctx.ultimoMensajeAsistente)) return false;
+  return RE_CONFIRMACION_O_CORRECCION.test(normalizeGeoName(ctx.ultimoMensajeUsuario));
 }
 
 // 26-09-05, hallazgo "Fallo 2" (Tlaquepaque re-falla en el turno de la
@@ -1006,8 +1089,11 @@ function limiteTerritoriosLote(input: Record<string, unknown>, ctx: ToolContext)
     );
   }
   // Bypass Fallo 1: el usuario ya nombró este territorio en su mensaje
-  // actual — es su selección explícita, no cuenta hacia el límite.
+  // actual — es su selección explícita, no cuenta hacia el límite. También
+  // cuenta si el asistente ya lo propuso y el usuario confirma/corrige
+  // (26-09-06, fluidez) — ver territorioConfirmadoDePropuestaAnterior.
   if (territorioNombradoPorUsuario(terr, ctx.ultimoMensajeUsuario)) return null;
+  if (territorioConfirmadoDePropuestaAnterior(terr, ctx)) return null;
   // Bypass Fallo 2: este indicador+territorio ya existe en el Canvas de la
   // sesión (aproximación por nombre crudo — el chequeo definitivo, con el
   // label ya resuelto, ocurre después del fetch en el ejecutor). Evita
@@ -1265,6 +1351,120 @@ async function generarSerieTemporal(
         (esTerritorioExterno
           ? ` Además, ${terr.label} no es parte del territorio del proyecto — aclárualo.`
           : ""),
+    },
+    toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
+    canvasItem: item,
+  };
+}
+
+async function fetchComparacionTerritorios(
+  input: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<Record<string, unknown>> {
+  const indicadorId = String(input.indicadorId ?? "");
+  const territorios = Array.isArray(input.territorios) ? input.territorios.map(String) : [];
+  const estadosPorTerritorio = Array.isArray(input.estadosPorTerritorio)
+    ? input.estadosPorTerritorio.map(String)
+    : [];
+  const nivelesPorTerritorio = Array.isArray(input.nivelesPorTerritorio)
+    ? input.nivelesPorTerritorio.map(String)
+    : [];
+  const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
+  for (const t of territorios) params.append("territorio", t);
+  for (const e of estadosPorTerritorio) params.append("estado", e);
+  for (const n of nivelesPorTerritorio) params.append("nivel", n);
+  const res = await fetch(`${ctx.baseUrl}/api/fontana/comparacion-territorios?${params.toString()}`, {
+    headers: { cookie: ctx.cookie },
+  });
+  return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+}
+
+// comparacion_territorios (26-09-06) — UN indicador entre VARIOS
+// territorios ARBITRARIOS que el usuario nombró explícitamente. Guard
+// crítico (mismo principio que Fallo 1 del guard de lote, 26-09-05): esta
+// capacidad manda TODOS los nombres en UNA sola llamada — el conteo de
+// `limiteTerritoriosLote` (pensado para llamadas REPETIDAS) nunca se
+// dispara aquí, así que el modelo podría empaquetar una lista que él mismo
+// armó (ej. "los 8 municipios del proyecto") en el array y evadir el guard
+// existente. Se verifica, con la MISMA función ya usada para ese guard,
+// que CADA nombre del array aparezca literalmente en el último mensaje
+// real del usuario — si alguno no fue nombrado por el usuario, se rechaza
+// la llamada COMPLETA (no se filtra parcial: si el modelo intenta colar
+// aunque sea un territorio no nombrado, es la misma señal de que está
+// decidiendo la lista por su cuenta).
+async function generarComparacionTerritorios(
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+  mensajeId: string,
+  reject: (rs: string) => ToolResult
+): Promise<ToolResult> {
+  const indicadorId = String(input.indicadorId ?? "");
+  if (!indicadorId) return reject("Para comparar territorios hace falta indicadorId.");
+
+  const registro = await getIndicadorRegistro(indicadorId);
+  if (esIndicadorNarrativoCurado(indicadorId)) {
+    return reject(`No se puede comparar «${registro?.nombre ?? indicadorId}»: es un indicador narrativo (texto), no numérico.`);
+  }
+
+  const territorios = Array.isArray(input.territorios) ? input.territorios.map((t) => String(t).trim()).filter(Boolean) : [];
+  if (territorios.length < 2) {
+    return reject("Para comparar territorios hacen falta al menos 2 nombres en `territorios`.");
+  }
+  if (territorios.length > 8) {
+    return reject(
+      `Pediste comparar ${territorios.length} territorios — el máximo legible en una sola gráfica es 8. Dile al usuario que divida la comparación en 2 gráficas o que priorice cuáles le interesan más.`
+    );
+  }
+
+  // 26-09-06, fluidez: un territorio también cuenta como nombrado por el
+  // usuario si el asistente ya lo propuso (pregunta de confirmación) y el
+  // usuario confirma/corrige en este turno — no exige repetir la lista
+  // completa para corregir un solo nombre.
+  const noNombrados = territorios.filter(
+    (t) => !territorioNombradoPorUsuario(t, ctx.ultimoMensajeUsuario) && !territorioConfirmadoDePropuestaAnterior(t, ctx)
+  );
+  if (noNombrados.length > 0) {
+    return reject(
+      `Vas a comparar territorios que el usuario NO nombró explícitamente en su mensaje (${noNombrados.join(", ")}). DETENTE — no armes tú la lista de territorios. Pregúntale al usuario cuáles territorios en concreto quiere comparar, y vuelve a llamar solo con los que él nombre.`
+    );
+  }
+
+  const data = await fetchComparacionTerritorios(input, ctx);
+  if (!data.ok) {
+    return reject(String(data.motivo ?? "No se pudo obtener la comparación."));
+  }
+
+  const familiaId = familiaDeIndicador(indicadorId);
+  const meta = {
+    mensajeId,
+    familiaId,
+    familiaEtiqueta: FAMILIA_ETIQUETAS[familiaId],
+    territorioLabel: territorioLabel(ctx.territorio),
+  };
+
+  const item = construirCanvasComparacionTerritorios(
+    data as Parameters<typeof construirCanvasComparacionTerritorios>[0],
+    meta
+  );
+  await appendCanvasItem(ctx.sesionId, item);
+
+  const comp = item as Extract<FontanaCanvasItem, { tipo: "comparacion_territorios" }>;
+  const resultSummary = `Agregué al Canvas la comparación de «${comp.indicadorNombre}» entre ${comp.filas.length} territorios${
+    comp.noResueltos.length > 0 ? ` (${comp.noResueltos.length} no se pudieron reconocer)` : ""
+  }.`;
+
+  return {
+    resultForModel: {
+      canvasItemId: item.id,
+      tipo: item.tipo,
+      titulo: item.titulo,
+      resumen: resultSummary,
+      filas: comp.filas,
+      noResueltos: comp.noResueltos,
+      instruccionChat:
+        comp.noResueltos.length > 0
+          ? "Aclárale al usuario, con el motivo real, cuáles territorios NO entraron a la comparación (ambiguos o no reconocidos) — nunca los omitas en silencio."
+          : null,
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
     canvasItem: item,

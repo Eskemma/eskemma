@@ -18,7 +18,7 @@ import { resolverIndicadorFontana } from "@/lib/fontana/ingesta";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { esIndicadorNarrativoCurado } from "@/lib/fontana/ingesta/contenidoCurado";
 import { familiaDeIndicador } from "@/types/fontana.types";
-import { resolverTerritorioNombre } from "@/lib/fontana/geo/resolverTerritorioNombre";
+import { resolverTerritorioNombre, nivelHintPorIndicador } from "@/lib/fontana/geo/resolverTerritorioNombre";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "id_invalido", mensaje: `El indicador «${indicadorId}» no existe.` }, { status: 400 });
   }
 
-  const resol = await resolverTerritorioNombre(territorio, estadoHint, nivelHint);
+  // 26-09-06: el nivel ya no depende solo de que el modelo lo intuya — si
+  // "estatal" es no_viable para ESTE indicador y "municipal" está
+  // confirmado, se fuerza municipal de forma determinística.
+  const nivelHintFinal = nivelHintPorIndicador(registro, nivelHint);
+  const resol = await resolverTerritorioNombre(territorio, estadoHint, nivelHintFinal);
   if (!resol.ok) {
     return NextResponse.json(resol, { status: 200 });
   }

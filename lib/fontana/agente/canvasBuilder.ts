@@ -10,6 +10,7 @@ import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { FamiliaFontanaId } from "@/types/fontana.types";
 import type { NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import type {
+  FontanaCanvasComparacionTerritorios,
   FontanaCanvasDesglose,
   FontanaCanvasDistribucion,
   FontanaCanvasGrafica,
@@ -265,6 +266,46 @@ export function construirCanvasDesglose(
     motivoNoAgregable,
     fuenteEtiqueta: celdaProyecto.fuenteEtiqueta ?? indicador.fuenteEtiqueta,
     filas: desglose.map((u) => ({ unidad: u.nombre, ...filaDeCelda(u.celda) })),
+  });
+}
+
+// ==========================================
+// COMPARACIÓN DE TERRITORIOS ARBITRARIOS (26-09-06) — UN indicador entre
+// VARIOS territorios que el usuario nombró explícitamente (no niveles
+// jerárquicos de un mismo territorio, eso es "grafica"). Datos ya
+// resueltos por GET /api/fontana/comparacion-territorios.
+export function construirCanvasComparacionTerritorios(
+  data: {
+    indicadorId: string;
+    nombre: string;
+    unidad?: string;
+    fuenteEtiqueta?: string;
+    filas: {
+      territorioLabel: string;
+      nivel: NivelTablaFontana;
+      valor: number | null;
+      naturaleza?: NaturalezaDato;
+      motivo?: string;
+      esTerritorioDelProyecto: boolean;
+      esTerritorioExterno: boolean;
+    }[];
+    noResueltos: { nombreIngresado: string; motivo: string; candidatos?: string[] }[];
+  },
+  meta: MetaTurno
+): FontanaCanvasComparacionTerritorios {
+  return limpiarUndefined<FontanaCanvasComparacionTerritorios>({
+    id: nuevoId(),
+    tipo: "comparacion_territorios",
+    titulo: `${data.nombre} — comparación de territorios`,
+    familiaId: meta.familiaId,
+    creadoEn: nowIso(),
+    mensajeId: meta.mensajeId,
+    indicadorId: data.indicadorId,
+    indicadorNombre: data.nombre,
+    unidad: data.unidad,
+    fuenteEtiqueta: data.fuenteEtiqueta,
+    filas: data.filas,
+    noResueltos: data.noResueltos,
   });
 }
 
