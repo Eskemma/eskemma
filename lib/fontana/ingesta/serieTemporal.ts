@@ -6,13 +6,14 @@
 
 import type { Territorio } from "@/types/shared.types";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
+import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
 import { SERIES_DISPONIBLES } from "@/lib/fontana/series/seriesDisponibles";
 import { resolverSerieCompetitividadEstatal } from "@/lib/fontana/ingesta/imco";
 import { resolverSerieEnigh } from "@/lib/fontana/ingesta/enigh";
 import { resolverSerieHuelgas } from "@/lib/fontana/ingesta/stpsHuelgas";
 import { resolverSerieIep } from "@/lib/fontana/ingesta/iep";
 import { resolverSerieInegiPm } from "@/lib/fontana/ingesta/inegiPm";
-import { resolverSerieConeval } from "@/lib/fontana/ingesta/coneval";
+import { resolverSerieConeval, resolverSerieConevalPobrezaMunicipal } from "@/lib/fontana/ingesta/coneval";
 import { resolverSeriePnud } from "@/lib/fontana/ingesta/pnud";
 
 export async function resolverSerieTemporal(
@@ -45,8 +46,16 @@ export async function resolverSerieTemporal(
       return resolverSerieHuelgas(territorio);
     case "iep":
       return resolverSerieIep(territorio);
-    case "inegi_pm_bise":
+    case "inegi_pm_bise": {
+      // F2-1/F2-2/F2-14: nac/est vienen de INEGI-PM BISE; el corte MUNICIPAL
+      // viene de otra fuente (CSV de Datos Abiertos de CONEVAL, serie cerrada
+      // 2010/2015/2020). El switch es id→fuente y no consciente de nivel, así
+      // que el split se hace aquí. resolverSerieInegiPm calcula su propio
+      // nivel con ["nacional","estatal"] hardcodeado — no se toca.
+      const nivel = nivelObjetivoSerie(territorio, cfg.niveles);
+      if (nivel === "municipal") return resolverSerieConevalPobrezaMunicipal(indicadorId, territorio);
       return resolverSerieInegiPm(indicadorId, territorio);
+    }
     case "coneval":
       return resolverSerieConeval(indicadorId, territorio);
     case "pnud":

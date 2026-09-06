@@ -26,6 +26,12 @@ export interface ResultadoSerieOk {
   //   indice → 0-100, 2 dec (ICE)        coeficiente → 0-1 y negativos, 4 dec (Gini, IDH, rezago social)
   //   puntaje → 1-5, 3 dec (Índice de Paz)
   formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
+  // Aclaración honesta a nivel de SERIE (distinta de PuntoSerie.nota, que es
+  // por punto) — una limitación estructural del dato que debe verse siempre
+  // en la tarjeta de Canvas, no depender de que el modelo la narre. Ej.:
+  // "serie cerrada, sin ediciones futuras". Mismo criterio que la nota de
+  // FontanaCanvasDistribucion.
+  nota?: string;
   puntos: PuntoSerie[];
 }
 

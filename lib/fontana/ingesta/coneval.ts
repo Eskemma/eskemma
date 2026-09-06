@@ -659,6 +659,262 @@ export async function resolverSerieConeval(
   };
 }
 
+// ==========================================================================
+// SERIE MUNICIPAL de F2-1 / F2-2 / F2-14 (2ª ola municipal, 2026-09-06)
+// --------------------------------------------------------------------------
+// Los 3 indicadores ya tienen serie nacional/estatal vía resolverSerieInegiPm
+// (API INEGI-PM BISE). El corte MUNICIPAL viene de otra fuente: los CSV de
+// Datos Abiertos de CONEVAL, carpeta oficial "pobreza_municipal_2010-2020",
+// un archivo por año (2010, 2015, 2020). Verificado en vivo 2026-09-06:
+//   - Los 3 CSV descargan (HTTP 200, ~560-580 KB, latin-1).
+//   - Los nombres de columna `pobreza` / `pobreza_e` / `carencias` son
+//     IDÉNTICOS en los 3 años → se lee POR NOMBRE de columna, nunca por
+//     offset posicional (a diferencia del xlsx del cell). Solo las últimas
+//     4 columnas cambian (`plb*`→`plp*`, línea de ingresos, no se usa).
+//   - El PDF metodológico oficial ("5. Comparabilidad") declara "serie
+//     quinquenal comparable 2010-2020": CONEVAL re-estimó 2010 al ajustar
+//     el método en 2015. La ruptura MCS→Modelo Estadístico 2015 (nivel
+//     nacional) NO fragmenta esta serie municipal.
+// Es una SERIE CERRADA: 2020 es la última edición y no habrá más (Encuesta
+// Intercensal 2025 cancelada; la medición pasó a INEGI, que solo publica
+// nacional/estatal). Eso se comunica con la `nota` a nivel de serie
+// (ResultadoSerieOk.nota) → visible siempre en la tarjeta de Canvas.
+// Formato del CSV: campos con coma van entre comillas ("922,268"); los
+// porcentajes van planos (23.7). Requiere un splitter quote-aware (ninguno
+// de los adaptadores existentes maneja comas dentro de comillas).
+// ==========================================================================
+
+const URL_POBREZA_MUN_BASE =
+  "https://www.coneval.org.mx/Informes/Pobreza/Datos_abiertos/pobreza_municipal_2010-2020/indicadores%20de%20pobreza%20municipal_";
+export const FUENTE_ETIQUETA_CONEVAL_POBREZA_MUN =
+  "CONEVAL (Medición de la pobreza municipal 2010-2020)";
+const NOTA_SERIE_POBREZA_MUN_CERRADA =
+  "CONEVAL cerró la serie municipal de pobreza en 2020 (ediciones 2010, 2015 y 2020) — no habrá cortes municipales posteriores: la medición de pobreza pasó a INEGI, que solo la publica a nivel nacional y estatal.";
+const PERIODOS_POBREZA_MUN = ["2010", "2015", "2020"];
+const CAMPO_CSV_POR_INDICADOR: Record<string, "pobreza" | "pobreza_e" | "carencias"> = {
+  "F2-1": "pobreza", // Pobreza multidimensional
+  "F2-2": "pobreza_e", // Pobreza extrema
+  "F2-14": "carencias", // % con al menos una carencia social
+};
+
+// Splitter CSV mínimo RFC-4180: respeta "..." y "" escapado. Sin newlines
+// embebidos (estos archivos no los tienen dentro de campo).
+function parseCsvLinea(linea: string): string[] {
+  const campos: string[] = [];
+  let actual = "";
+  let enComillas = false;
+  for (let i = 0; i < linea.length; i++) {
+    const c = linea[i];
+    if (enComillas) {
+      if (c === '"') {
+        if (linea[i + 1] === '"') {
+          actual += '"';
+          i++;
+        } else {
+          enComillas = false;
+        }
+      } else {
+        actual += c;
+      }
+    } else if (c === '"') {
+      enComillas = true;
+    } else if (c === ",") {
+      campos.push(actual);
+      actual = "";
+    } else {
+      actual += c;
+    }
+  }
+  campos.push(actual);
+  return campos;
+}
+
+interface CacheSeriePobrezaMun {
+  // campo CSV ("pobreza"|"pobreza_e"|"carencias") -> Map<claveMun, { periodo -> valor }>
+  porCampo: Record<string, Map<string, Record<string, number>>>;
+  // `${campo}@${periodo}` cuya columna no se localizó en el CSV de ese año
+  // → ese punto sale con valor:null + nota (nunca se omite un año).
+  columnaNoLocalizada: Set<string>;
+  ts: number;
+}
+let cacheSeriePobrezaMun: CacheSeriePobrezaMun | null = null;
+let enVueloSeriePobrezaMun: Promise<CacheSeriePobrezaMun> | null = null;
+
+const CAMPOS_POBREZA_MUN: Array<"pobreza" | "pobreza_e" | "carencias"> = ["pobreza", "pobreza_e", "carencias"];
+
+async function descargarCsvPobrezaMunicipal(anio: string): Promise<string> {
+  const url = `${URL_POBREZA_MUN_BASE}${anio}.csv`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`CONEVAL HTTP ${res.status} en ${url}`);
+  // latin-1 (no UTF-8) — mismo caso que sic.ts/denue.ts/rsf.ts.
+  return new TextDecoder("iso-8859-1").decode(await res.arrayBuffer()).replace(/^﻿/, "");
+}
+
+// Parser puro de UN CSV anual (por nombre de columna, nunca offset). Exportado
+// solo para la verificación (permite forzar el caso "columna ausente" con un
+// CSV doctoreado). `porCampo` mapea campo → Map<claveMun, valor>; `columnasFaltantes`
+// lista los campos cuyo encabezado no apareció (→ punto null + nota).
+export function parsearCsvPobrezaMunicipalAnio(texto: string): {
+  porCampo: Record<string, Map<string, number>>;
+  columnasFaltantes: string[];
+} {
+  const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  const header = parseCsvLinea(lineas[0] ?? "").map((h) => h.trim());
+  const idxEnt = header.indexOf("clave_entidad");
+  const idxMun = header.indexOf("municipio");
+  const idxPorCampo: Record<string, number> = {};
+  const columnasFaltantes: string[] = [];
+  for (const campo of CAMPOS_POBREZA_MUN) {
+    const i = header.indexOf(campo);
+    idxPorCampo[campo] = i;
+    if (i < 0) columnasFaltantes.push(campo);
+  }
+  const porCampo: Record<string, Map<string, number>> = {
+    pobreza: new Map(),
+    pobreza_e: new Map(),
+    carencias: new Map(),
+  };
+  if (idxEnt < 0 || idxMun < 0) {
+    // sin claves de municipio no se puede keyear este año — los 3 campos
+    // quedan no localizados (punto null + nota para los 3 indicadores).
+    return { porCampo, columnasFaltantes: [...CAMPOS_POBREZA_MUN] };
+  }
+  for (let i = 1; i < lineas.length; i++) {
+    const fila = parseCsvLinea(lineas[i]);
+    const cveEntRaw = fila[idxEnt]?.trim();
+    const nombreMun = fila[idxMun]?.trim();
+    if (!cveEntRaw || !nombreMun) continue;
+    // el CSV trae la CVE de estado sin cero a la izquierda ("1".."32");
+    // ESTADO_CVE_MAP / resolveEstadoCve usan 2 dígitos ("01".."32").
+    const cveEnt = cveEntRaw.padStart(2, "0");
+    const clave = claveMunicipioPorNombre(cveEnt, nombreMun);
+    for (const campo of CAMPOS_POBREZA_MUN) {
+      const idx = idxPorCampo[campo];
+      if (idx < 0) continue;
+      const v = Number(fila[idx]?.trim());
+      if (Number.isFinite(v)) porCampo[campo].set(clave, v);
+    }
+  }
+  return { porCampo, columnasFaltantes };
+}
+
+async function cargarSeriePobrezaMunicipal(): Promise<CacheSeriePobrezaMun> {
+  if (cacheSeriePobrezaMun && Date.now() - cacheSeriePobrezaMun.ts < CACHE_TTL_MS) {
+    return cacheSeriePobrezaMun;
+  }
+  if (enVueloSeriePobrezaMun) return enVueloSeriePobrezaMun;
+
+  enVueloSeriePobrezaMun = (async () => {
+    const porCampo: Record<string, Map<string, Record<string, number>>> = {
+      pobreza: new Map(),
+      pobreza_e: new Map(),
+      carencias: new Map(),
+    };
+    const columnaNoLocalizada = new Set<string>();
+
+    for (const periodo of PERIODOS_POBREZA_MUN) {
+      const texto = await descargarCsvPobrezaMunicipal(periodo);
+      const { porCampo: delAnio, columnasFaltantes } = parsearCsvPobrezaMunicipalAnio(texto);
+      for (const campo of columnasFaltantes) columnaNoLocalizada.add(`${campo}@${periodo}`);
+      for (const campo of CAMPOS_POBREZA_MUN) {
+        for (const [clave, valor] of delAnio[campo]) {
+          const r = porCampo[campo].get(clave) ?? {};
+          r[periodo] = valor;
+          porCampo[campo].set(clave, r);
+        }
+      }
+    }
+
+    const resultado: CacheSeriePobrezaMun = { porCampo, columnaNoLocalizada, ts: Date.now() };
+    cacheSeriePobrezaMun = resultado;
+    return resultado;
+  })();
+
+  try {
+    return await enVueloSeriePobrezaMun;
+  } finally {
+    enVueloSeriePobrezaMun = null;
+  }
+}
+
+// F2-1 / F2-2 / F2-14 a nivel MUNICIPAL — serie cerrada de 3 puntos
+// (2010, 2015, 2020). El dispatcher (serieTemporal.ts) enruta aquí solo
+// cuando nivelObjetivoSerie da "municipal"; nac/est sigue en
+// resolverSerieInegiPm sin cambio.
+export async function resolverSerieConevalPobrezaMunicipal(
+  indicadorId: string,
+  territorio: Territorio
+): Promise<ResultadoSerie> {
+  const campoCsv = CAMPO_CSV_POR_INDICADOR[indicadorId];
+  if (!campoCsv) return { ok: false, motivo: "sin_serie" };
+
+  const nivel = nivelObjetivoSerie(territorio, ["municipal"]);
+  if (nivel !== "municipal") {
+    return {
+      ok: false,
+      motivo: "La serie municipal de pobreza de CONEVAL solo aplica a proyectos con municipio o distrito definido",
+    };
+  }
+  const nombreMun = resolverNombreMunicipio(territorio);
+  if (!territorio.estado || !nombreMun) {
+    return { ok: false, motivo: "El proyecto no tiene un municipio definido en su territorio" };
+  }
+  const cve = resolveEstadoCve(territorio.estado);
+  if (!cve) {
+    return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
+  }
+
+  let datos: CacheSeriePobrezaMun;
+  try {
+    datos = await cargarSeriePobrezaMunicipal();
+  } catch {
+    return { ok: false, motivo: "No se pudo descargar el archivo histórico de pobreza municipal de CONEVAL" };
+  }
+
+  const clave = claveMunicipioPorNombre(cve, nombreMun);
+  const porAno = datos.porCampo[campoCsv].get(clave);
+  const territorioLabel = `${nombreMun}, ${territorio.estado}`;
+
+  const puntos = PERIODOS_POBREZA_MUN.map((periodo) => {
+    const v = porAno?.[periodo];
+    if (typeof v === "number") return { periodo, valor: Math.round(v * 100) / 100 };
+    if (datos.columnaNoLocalizada.has(`${campoCsv}@${periodo}`)) {
+      return {
+        periodo,
+        valor: null,
+        nota: `No se pudo localizar la columna «${campoCsv}» en el archivo de CONEVAL de ${periodo}.`,
+      };
+    }
+    return { periodo, valor: null };
+  });
+
+  const conDato = puntos.filter((p) => p.valor != null).length;
+  if (conDato === 0) {
+    return {
+      ok: false,
+      motivo: `CONEVAL no tiene medición de pobreza municipal para «${territorioLabel}» en la serie 2010-2020`,
+    };
+  }
+  if (conDato < 2) {
+    return {
+      ok: false,
+      motivo: `«${territorioLabel}» tiene un solo punto en la serie municipal de pobreza de CONEVAL (2010-2020) — se creó como municipio después de las ediciones 2010/2015, así que no hay serie histórica`,
+    };
+  }
+
+  return {
+    ok: true,
+    nivel: "municipal",
+    territorioLabel,
+    unidad: "%",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: FUENTE_ETIQUETA_CONEVAL_POBREZA_MUN,
+    formato: "porcentaje",
+    nota: NOTA_SERIE_POBREZA_MUN_CERRADA,
+    puntos,
+  };
+}
+
 // Desglose "Ver municipios" en proyectos nivel "estatal" — mismo patrón
 // que resolverMunicipiosEstadoMarginacion (conapoMarginacion.ts): ambos
 // archivos ya están completos en memoria, filtrar por estado es solo

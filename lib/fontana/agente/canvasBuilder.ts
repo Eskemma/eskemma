@@ -322,6 +322,7 @@ interface SerieCanvasInput {
   fuenteEtiqueta: string;
   formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
   nivel: NivelTablaFontana; // nivel geográfico real de la serie
+  nota?: string; // aclaración a nivel de serie (ej. "serie cerrada")
   puntos: {
     periodo: string;
     valor: number | null;
@@ -355,6 +356,7 @@ export function construirCanvasSerieTemporal(
     nivel: serie.nivel,
     naturaleza: serie.naturaleza,
     fuenteEtiqueta: serie.fuenteEtiqueta,
+    nota: serie.nota,
     territorioLabel,
     esTerritorioExterno: origen.esTerritorioExterno,
     esTerritorioDelProyecto: origen.esTerritorioDelProyecto,

@@ -277,6 +277,11 @@ export interface FontanaCanvasSerieTemporal extends FontanaCanvasItemBase {
   territorioLabel: string;
   esTerritorioExterno: boolean; // true ⇒ territorio fuera del proyecto
   esTerritorioDelProyecto?: boolean; // true ⇒ el territorio (o su estado contenedor) es el del proyecto
+  // Aclaración a nivel de SERIE (una limitación estructural del dato que
+  // debe verse SIEMPRE en la tarjeta, no depender de que el modelo la
+  // narre) — ej. "serie cerrada, sin ediciones futuras". Mismo criterio
+  // que la `nota` de FontanaCanvasDistribucion. Distinta de `puntos[].nota`.
+  nota?: string;
   periodoInicio: string;
   periodoFin: string;
   puntos: {

@@ -1327,6 +1327,7 @@ async function generarSerieTemporal(
       fuenteEtiqueta: String(data.fuenteEtiqueta ?? ""),
       formato,
       nivel: data.nivel as NivelTablaFontana,
+      nota: (data.nota as string | undefined) ?? undefined,
       puntos: (data.puntos as PuntoSerieCanvas[] | undefined) ?? [],
     },
     terr.label,
@@ -1346,11 +1347,13 @@ async function generarSerieTemporal(
       esTerritorioExterno,
       esTerritorioDelProyecto,
       territorioLabel: terr.label,
+      nota: item.nota,
       instruccionChat:
         `${instruccionAlcance(item.nivel, terr.label)}` +
         (esTerritorioExterno
           ? ` Además, ${terr.label} no es parte del territorio del proyecto — aclárualo.`
-          : ""),
+          : "") +
+        (item.nota ? ` La serie trae una aclaración estructural — menciónala: "${item.nota}"` : ""),
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
     canvasItem: item,

@@ -39,9 +39,12 @@ export const SERIES_DISPONIBLES: Record<string, ConfigSerie> = {
   "F2-12": { fuenteId: "enigh", niveles: ["nacional", "estatal"] },
   "F3-16": { fuenteId: "stps_huelgas", niveles: ["nacional", "estatal"] },
   "F3-17": { fuenteId: "iep", niveles: ["nacional", "estatal"] },
-  "F2-1": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal"] },
-  "F2-2": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal"] },
-  "F2-14": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal"] },
+  // nac/est vía INEGI-PM BISE; municipal vía CONEVAL Datos Abiertos (serie
+  // cerrada 2010/2015/2020). El split por nivel lo hace serieTemporal.ts —
+  // el fuenteId sigue siendo el de nac/est. (2ª ola municipal, 2026-09-06)
+  "F2-1": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal", "municipal"] },
+  "F2-2": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal", "municipal"] },
+  "F2-14": { fuenteId: "inegi_pm_bise", niveles: ["nacional", "estatal", "municipal"] },
   // 2ª ola (2026-09-03) — series MUNICIPALES. Requieren municipiosDelTerritorio
   // en el route (proyecto plural con >1 municipio → preguntar a cuál).
   "F2-3": { fuenteId: "coneval", niveles: ["estatal", "municipal"] }, // Índice de Rezago Social

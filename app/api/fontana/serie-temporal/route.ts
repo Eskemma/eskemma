@@ -199,6 +199,10 @@ function responderSerie(
       naturaleza: serie.naturaleza ?? null,
       fuenteEtiqueta: serie.fuenteEtiqueta,
       formato: serie.formato,
+      // Aclaración a nivel de SERIE (ej. "serie cerrada, sin ediciones
+      // futuras") — el builder la pasa a la tarjeta de Canvas y el modelo
+      // la narra. Distinta de las notas por punto (dentro de `puntos`).
+      nota: serie.nota ?? null,
       puntos: serie.puntos,
       periodoInicio: serie.puntos[0]?.periodo ?? null,
       periodoFin: serie.puntos[serie.puntos.length - 1]?.periodo ?? null,

@@ -518,6 +518,13 @@ function SerieTemporalGrafica({
         <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
       )}
 
+      {/* Nota a nivel de serie — limitación estructural del dato (ej. "serie
+          cerrada, sin ediciones futuras"). Siempre visible, no depende de
+          que el modelo la narre. Mismo estilo que la nota de distribucion. */}
+      {item.nota && (
+        <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-2 leading-snug">{item.nota}</p>
+      )}
+
       {/* mx-8 (26-09-06, no mx-1): las etiquetas de los puntos en 0%/100%
           se centran con -translate-x-1/2 — la mitad del texto ("0.759",
           "2020"…) cae fuera del propio contenedor en los extremos. mx-1

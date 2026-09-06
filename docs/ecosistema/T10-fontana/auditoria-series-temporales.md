@@ -96,8 +96,8 @@ Columnas: `id | fuente | cat | niveles con historia en la FUENTE | esfuerzo de c
 
 | id | fuente | cat | niveles con historia | esfuerzo | evidencia |
 |---|---|---|---|---|---|
-| F2-1 Pobreza multidimensional | CONEVAL / INEGI-PM | a | nac/estatal: serie bienal 2008-2024 (INEGI-PM BISE). municipal: 2010/2015/2020, congelado 2020 (LGDS). distrital: reconstruido de municipal | nac/est **bajo** (array `Serie` completo en respuesta BISE); municipal **alto** (archivos CONEVAL 2010/2015 en carpetas `/2010/`, `/2015/`, no en el repo) | `inegiPm.ts:95` toma `Serie[0]`; `coneval.ts:37` URL `Concentrado_...2020.zip` (archivo de un solo año, ver punto abierto #7) |
-| F2-2 Pobreza extrema | CONEVAL / INEGI-PM | a | ídem F2-1 | ídem F2-1 | `inegiPm.ts:95` `Serie[0]`; `coneval.ts:149` |
+| F2-1 Pobreza multidimensional | CONEVAL / INEGI-PM | a | **IMPLEMENTADO (2026-09-06)**. nac/estatal: serie bienal 2016-2024 (INEGI-PM BISE, `resolverSerieInegiPm`). municipal: serie CERRADA de 3 puntos 2010/2015/2020 (`resolverSerieConevalPobrezaMunicipal`, lee los CSV de Datos Abiertos `pobreza_municipal_2010-2020/` por nombre de columna `pobreza`; comparabilidad documentada por CONEVAL, re-estimó 2010). distrital: reconstruido de municipal | nac/est **bajo**; municipal **bajo-medio** (revisado desde "alto": los 3 CSV descargan directo, encabezados estables) | `serieTemporal.ts` hace el split por nivel dentro de `case "inegi_pm_bise"`; `coneval.ts` `resolverSerieConevalPobrezaMunicipal` + `cargarSeriePobrezaMunicipal`. Cross-check 2026-09-06: punto 2020 de la serie == celda (xlsx) dentro de ±0.04 pp en 12 combos (Guadalajara F2-1 24.8) |
+| F2-2 Pobreza extrema | CONEVAL / INEGI-PM | a | ídem F2-1 (columna `pobreza_e`) | ídem F2-1 | ídem F2-1 |
 | F2-3 Índice de Rezago Social | CONEVAL IRS | a (b en nacional) | estatal + municipal: **5 cortes 2000/2005/2010/2015/2020 en el mismo ZIP**. nacional: la fuente lo deja en blanco todos los años → b | **bajo** (el ZIP ya trae los 5 años; hoy se filtra 1) | `coneval.ts:69` URL `IRS_ent_mun_2000_2020.zip`; `:60-66` comentario "el ZIP trae 5 archivos"; `:237` filtro `/2020\.xlsx$/i` descarta 4; `:36-44` nacional en blanco |
 | F2-4 Índice de Marginación | CONAPO | a | estatal + municipal: serie 1990-2020 (IME/IMM normalizados). nacional no lo publica la fuente | medio (archivos `IM*_1990.xls`…`2015.xls` aparte) | `conapoMarginacion.ts:39-40` URLs `IME_2020.xls`/`IMM_2020.xls` fijas; cache sin dimensión de año (`:63-73`) |
 | F2-5 IDH Municipal | PNUD | a | solo municipal; serie 2010/2015/2020 **en el archivo combinado** | **bajo** (el adaptador usa el standalone 2020; el combinado ya trae 3 años) | `pnud.ts:9-11` archivo combinado con 2010/2015/2020; `:132` lee solo `fila[27]` (IDH 2020) |
@@ -109,7 +109,7 @@ Columnas: `id | fuente | cat | niveles con historia en la FUENTE | esfuerzo de c
 | F2-11 Acceso a internet en hogares | ECEG | a | nac/est/mun 2015/2020 (+secc 2020) | alto | bloque ECEG (`VPH_INTER`) |
 | F2-12 Distribución del ingreso por decil | ENIGH tabulados | a | nac + estatal serie 2016-2024 (mismo Cuadro 2.1) | **bajo** | `enigh.ts:18-24`; `:160` lee `COL_ANO_2024` por decil |
 | F2-13 % Sin seguridad social (proxy PSINDER) | ECEG | **b** (decisión 2026-08-31, reabrible) | nac/est/mun 2010/2015/2020, comparabilidad no confirmada | — (bloqueado hasta diccionario de datos) | bloque ECEG (`PSINDER`); addendum decisión (a); punto abierto #9 |
-| F2-14 % Pob con ≥1 carencia | CONEVAL / INEGI-PM | a | ídem F2-1 | ídem F2-1 | `inegiPm.ts:95` `Serie[0]` |
+| F2-14 % Pob con ≥1 carencia | CONEVAL / INEGI-PM | a | ídem F2-1 (columna `carencias`) | ídem F2-1 | ídem F2-1 |
 | F2-15 Gasto hogares en educación | ENIGH tabulados | a | nac + estatal serie bienal | bajo-medio (archivo de tabulados históricos; hoy solo el 2024) | `enigh.ts:79,187` `CUADRO42_OFFSET_EDUCACION` + `COL_PROMEDIO_HOGAR="F"` del 2024 |
 | F2-16 Gasto hogares en salud | ENIGH tabulados | a | ídem F2-15 | ídem F2-15 | `enigh.ts:78,179` `CUADRO42_OFFSET_SALUD`, archivo 2024 |
 | F2-17 Competitividad Estatal (IMCO ICE) | IMCO | **c** | solo estatal; **serie 2016-2025 YA en Storage** (`imco_ice/2025.json` shape `{porEstado:{cve:{[YYYY]:FilaIce}}}`), el adaptador lee solo `ANO_VIGENTE` | (ya está — solo falta exponer) | `scripts/upload-fontana-imco-ice.ts:51,63,77` valida "10 años 2016-2025"; `imco.ts:51` `ANO_VIGENTE="2025"`; `:111,127` `datos.porEstado[cve]?.[ANO_VIGENTE]` |
@@ -231,15 +231,22 @@ Numeración estable. Estado actualizado 2026-08-31 tras investigación factual.
    cortes 2010/2015 están en un archivo aparte del standalone 2020 que hoy usa
    `pnud.ts:181-192`. (Fuentes: undp.org/es/mexico y mexico.un.org, comunicados
    del Informe Municipal 2010-2020.)
-7. **CONEVAL Pobreza (F2-1/2/14) — RESUELTO 2026-08-31: el "Concentrado" es de
-   un solo año.** El archivo `Concentrado_indicadores_de_pobreza_2020.zip` que
-   usa `coneval.ts` tiene su URL scoped a `/Pobreza_municipal/2020/` y el ZIP
-   "trae un solo .xlsx" (a diferencia del ZIP de IRS, que trae 5). Los offsets
-   `_2020` en el código son convención de nombres, **no** evidencia de columnas
-   2015/2010 en el mismo archivo. La serie histórica de F2-1/2/14 en
-   nac/estatal viene de INEGI-PM BISE (`inegiPm.ts`, array `Serie`, esfuerzo
-   bajo); en municipal requiere los archivos CONEVAL por año de las carpetas
-   `/2010/` y `/2015/` (no en el repo, esfuerzo alto).
+7. **CONEVAL Pobreza (F2-1/2/14) — CERRADO 2026-09-06: serie municipal
+   IMPLEMENTADA.** El `Concentrado_..._2020.zip` que usa la celda es de un solo
+   año (los offsets `_2020` son convención de nombres, no columnas históricas).
+   La serie municipal viene de otra fuente: los CSV de Datos Abiertos de CONEVAL
+   `.../pobreza_municipal_2010-2020/indicadores%20de%20pobreza%20municipal_{2010,2015,2020}.csv`
+   — verificado en vivo 2026-09-06 que descargan (HTTP 200, latin-1) y que las
+   columnas `pobreza`/`pobreza_e`/`carencias` tienen nombre idéntico en los 3
+   años. El PDF metodológico oficial ("5. Comparabilidad") declara "serie
+   quinquenal comparable 2010-2020" (CONEVAL re-estimó 2010 al ajustar el método
+   en 2015). Implementación: `resolverSerieConevalPobrezaMunicipal` (`coneval.ts`)
+   lee los 3 CSV por nombre de columna (splitter quote-aware — los campos con
+   coma van entre comillas); `serieTemporal.ts` enruta municipal aquí y nac/est
+   a `resolverSerieInegiPm`. Serie CERRADA de 3 puntos (2020 es la última
+   edición; Encuesta Intercensal 2025 cancelada) → `ResultadoSerieOk.nota`
+   (nueva, serie-level) lo declara en la tarjeta de Canvas. Cross-check: punto
+   2020 == celda (xlsx) dentro de ±0.04 pp en 12 combos municipio×indicador.
 8. **ECEG 2010 a escala sección/distrito — CONFIRMADO 2026-08-31: no está en el
    repo.** Grep de `eceg_2010`, `eceg_2015`, `intercensal`, `encuesta
    intercensal` en `lib/`, `scripts/`, `docs/`, `_docs/` → **cero resultados**.
