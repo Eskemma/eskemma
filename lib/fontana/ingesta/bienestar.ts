@@ -26,17 +26,40 @@
 //
 // F2-8 — Beca Benito Juárez (datos.gob.mx, package
 // "programa_nacional_becas_bienestar_benito_juarez_2025_programa_s311",
-// 128 recursos = 32 estados × 4 trimestres 2025). Elegido el recurso
-// "4to. trim. 2025" (trimestre más reciente y completo, decisión ya
-// reportada y confirmada) — campos reales `CVE_EDO`, `CVE_MUN`, `BECA`,
-// sin identificador de persona; cada fila ya representa una beca activa
-// ese trimestre para un municipio, así que el conteo de beneficiarios es
-// el total de filas por `CVE_MUN`, sin necesidad de deduplicar.
+// 128 recursos = 32 estados × 4 trimestres 2025, "Becas de Educación
+// Media Superior"). Se usa el recurso "3er. trim. 2025" — campos reales
+// `NOM_MUN` (se agrega por nombre, ver FIX DE FONDO Paso 4 abajo), `BECA`,
+// sin identificador de persona; en un snapshot trimestral limpio cada
+// fila representa un becario, así que el conteo de beneficiarios es el
+// total de filas por municipio, sin deduplicar.
+//
+// POR QUÉ Q3 Y NO Q4 (el más reciente) — corrección de integridad de
+// dato, verificada en vivo 2026-09-06 (3 hallazgos convergentes; ver
+// CLAUDE.md, sprint 26-09-06). El "4to. trim. 2025" (usado antes) NO es
+// un snapshot limpio: sobre-cuenta a nivel nacional y en cada municipio.
+//   1. Salto UNIFORME: total nacional Q1=4,206,066 · Q2=4,236,344 ·
+//      Q3=4,237,327 (planos), pero Q4=5,919,559 (+40.7%), con un
+//      multiplicador de 1.31–1.54 (casi todos ~1.40) en LOS 32 estados —
+//      un factor casi constante en todo el país es artefacto del archivo,
+//      no crecimiento real de matrícula (que sería disparejo).
+//   2. Contra la cifra oficial: la Beca Universal EMS 2025 tiene
+//      4,224,381 estudiantes (gob.mx). Q1/Q2/Q3 cuadran ±0.4%; Q4 la
+//      excede en ~1.7 millones — imposible como conteo de becarios EMS.
+//   3. Estructura de montos: `BECA` en Q4 son escalones ACUMULADOS
+//      1900/3800/5700/7600/9500 (×1..×5 del apoyo bimestral de $1,900);
+//      Q4 se publicó tras el cierre fiscal (16-ene-2026) y trae >1 fila
+//      por becario. Q1-Q3 no tienen esa mezcla. Sin columna de corte
+//      dentro de Q4 para aislar un periodo (campos: TRIMESTRE constante,
+//      BECA, FECHA_ALTA heterogénea) → no se puede "arreglar" Q4 filtrando.
+// Spot-check municipal (Jalisco/Colima): Q3 cae dentro de ±15% de un
+// prorrateo poblacional de la cifra oficial (Tlaquepaque 1.03×, Puerto
+// Vallarta 1.02×, Manzanillo 0.96×); Q4 infla ~1.25–1.45× por municipio.
+// NO reintroducir Q4 pensando que "más reciente = mejor".
 //
 // Paginación: el servidor limita cada respuesta a 32,000 registros pese
-// a pedir más (confirmado en vivo, Aguascalientes Beca 4to trim: 66,289
-// registros totales, servidor regresa 32,000 aunque se pida limit=70000)
-// — se pagina con offset hasta agotar el total real reportado por la API.
+// a pedir más (confirmado en vivo — Colima Q3: 25,466 registros totales
+// en 1 página; estados grandes como Edomex Q3 ~565k se paginan) — se
+// pagina con offset hasta agotar el total real reportado por la API.
 //
 // Mecanismo de bodega: BAJO DEMANDA por estado completo (no por
 // municipio individual) — mismo criterio que conapo.ts/compendio.ts,
@@ -61,7 +84,7 @@ import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 
 export const FUENTE_ETIQUETA_BIENESTAR_PRODUCCION = "Bienestar (Producción para el Bienestar, 2024, datos.gob.mx)";
-export const FUENTE_ETIQUETA_BIENESTAR_BECA = "Bienestar (Beca Benito Juárez, 4to. trim. 2025, datos.gob.mx)";
+export const FUENTE_ETIQUETA_BIENESTAR_BECA = "Bienestar (Beca Benito Juárez, 3er. trim. 2025, datos.gob.mx)";
 
 const CKAN_BASE = "https://www.datos.gob.mx/api/3/action/datastore_search";
 const PAGE_SIZE = 32000; // tope real del servidor, confirmado en vivo — pedir más no cambia el resultado
@@ -87,23 +110,27 @@ const RESOURCE_PRODUCCION: Record<string, string> = {
   "31": "b1a366e3-98e4-4127-8238-d8c137d43196", "32": "67a2f459-c3ee-425c-89ce-639ee2a552a8",
 };
 
+// "3er. trim. 2025", uno por estado — extraídos vía package_show
+// (2026-09-06), CVE de estado tomada del nombre de archivo del recurso
+// (`S311_EDO_NN_...`). NO son los de "4to. trim." (ver nota arriba sobre
+// por qué Q4 se descartó por sobre-conteo).
 const RESOURCE_BECA_BJ: Record<string, string> = {
-  "01": "04e34ae5-a91b-4ed1-8544-5472e72cf462", "02": "ccd1360e-a1c8-4694-826f-6fca94d97ee5",
-  "03": "da7419ae-ec4e-4d73-9f88-b325be241753", "04": "f44c0234-a1e9-4a9c-ba57-f3e0b314cf3d",
-  "05": "5829435d-82ae-41e4-94bf-b47822ef7d98", "06": "af0ca022-770a-4fa2-a45f-864fd27b087d",
-  "07": "7f735e7b-36bc-4b6b-adad-5dfa9330877b", "08": "6221b114-fcb4-4215-907a-6aee6cec3bd3",
-  "09": "ffb975eb-7408-4b01-99b4-1f3a27a94ad6", "10": "54f634c2-52b0-4550-9ab4-af6fdfc07647",
-  "11": "300f6177-a0b5-4932-a260-77f4ec33f889", "12": "9287884b-1672-44c7-8705-14e0aa4d27d4",
-  "13": "e4a8a332-59a2-4257-963c-07154ac670c0", "14": "fc4578e8-9f2e-4e39-860c-d670f8cc8ac4",
-  "15": "d16ee1b9-b42b-46ec-8c43-c27d00e5e1e4", "16": "b63c37fc-5848-4559-a3d2-a11184bed0ea",
-  "17": "6bf07b23-090a-482b-a67f-3a2dcfb046cc", "18": "6ef7c6fd-79a3-42ef-bb89-0bb91f6986ec",
-  "19": "5598375c-4822-4268-9e94-5dd4d6469917", "20": "9cea04d5-7b66-451a-b3d2-3c8f0f887e9e",
-  "21": "a5d96fdc-f4b7-47b0-be55-aad63f238057", "22": "0abaaaa7-a6d6-44a7-b73e-b60f7d123ac1",
-  "23": "cc4c673c-6d9d-4a4b-9efd-34c096807adb", "24": "c482ec07-ede8-4951-a84c-cb3ba93b67bd",
-  "25": "19c38c34-c5dd-4be8-9130-f20a89a8b378", "26": "8529267b-0fea-4ffa-94a5-feffcd906482",
-  "27": "9451bed5-f5c2-4267-9294-d56f57c15918", "28": "1662d565-e01c-4799-85de-b963736517dd",
-  "29": "57ddb4f3-20da-4668-bfc8-7d18e8a5b943", "30": "3179c6f8-838e-46f0-8c14-197b7fcc81b2",
-  "31": "0e94c6ac-2581-4215-947e-a2a7a5be0043", "32": "3d9921bb-4867-4ab4-82da-da8f636bb248",
+  "01": "f41c6f33-7dd2-45c1-97d6-5ccf0c7fb468", "02": "820cb97e-754f-4f7a-a5e3-c72319ab3da2",
+  "03": "c36efafe-f943-4b7c-a7ee-c072d3d8bc35", "04": "5c6be4dc-911b-4341-b440-0657f4cb36d8",
+  "05": "56e556cf-4570-47b4-8d34-94122f5b321c", "06": "284c961a-8f24-4d12-b636-b5ce294c397e",
+  "07": "d9993bf7-e69a-498e-96ad-97df49ec63c2", "08": "68ab2a82-4016-4453-95cf-1e02493a979c",
+  "09": "7e4b8534-3639-4829-b179-536022085cf9", "10": "d1441a13-eefa-46ff-83d7-891202bc6686",
+  "11": "e669d52d-c796-4402-84e1-0b20cd0bd190", "12": "d37cf766-cb20-422e-a1c7-17f10071a9ea",
+  "13": "616ee8b5-7b57-4376-b566-e4f654d2c128", "14": "ac47b87f-171c-4f84-9f45-98fe8e625aa1",
+  "15": "e7594cd4-f88c-45d9-9924-d15da613d48f", "16": "4da5256d-fe66-4312-8aaa-4f0b681999e1",
+  "17": "be6fc1bb-8a52-428c-b2e8-a6f932197013", "18": "1c769ffd-e0fc-4ae3-99c5-8c28042fdf96",
+  "19": "7e9691b2-1588-4ed5-9ae7-3773d3466fe6", "20": "1acc9771-7dd8-4b08-a5ae-d79cfc8fba4e",
+  "21": "0ae277ed-bd82-4787-b239-1554f70b4c3d", "22": "cab45d8f-503b-4b30-b46b-878d201880ec",
+  "23": "75f67ac4-0334-45df-9197-331c69402fd5", "24": "e396d52b-3134-4b9c-ac1b-203d4011fb03",
+  "25": "1abbff21-1bc9-49ca-9898-7aff8e1c0c56", "26": "45084355-3f22-4085-8974-d82f6f426d87",
+  "27": "cae56e73-d2fb-47b8-8581-f6ec28d81c7b", "28": "46f2529e-5436-4c0a-8a01-4fbff9d73ca4",
+  "29": "f946d228-873b-457c-bc52-f7674f586a63", "30": "0c10cd71-e446-4c2a-978b-18bc8791dbe0",
+  "31": "3c92eb98-6736-4d0b-a17b-09a99f3a4003", "32": "f1832ab7-34cd-4407-8acf-d97eacb75bcd",
 };
 
 function ckanDatastoreSearch(resourceId: string, fields: string[], offset: number): Promise<{ records: unknown[]; total: number }> {
@@ -209,7 +236,10 @@ async function agregarProduccionEstado(estadoCve: string): Promise<ConteoPorMuni
 }
 
 async function agregarBecaBJEstado(estadoCve: string): Promise<ConteoPorMunicipio> {
-  const path = `bienestar_becabj_2025q4_v2/${estadoCve}.json`;
+  // path con sufijo de trimestre — al cambiar de Q4 a Q3 (corrección de
+  // integridad, 2026-09-06) se renombra para invalidar la caché vieja
+  // (que tenía los conteos inflados de Q4), mismo patrón `_v2` ya usado.
+  const path = `bienestar_becabj_2025q3_v2/${estadoCve}.json`;
   const cached = await readFromBodega<ConteoPorMunicipio>(path);
   if (cached) return cached;
 
