@@ -54,13 +54,19 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
     return () => document.removeEventListener("mousedown", onOutsideClick);
   }, [kebabOpen]);
 
+  // Referencia legible de ESTA tarjeta para el nombre de archivo — el
+  // título ("Índice de Percepción de Corrupción — comparación
+  // internacional (2012-2024)"), no el id opaco `cv-…`. Sin título
+  // (defensivo) cae al id.
+  const refDescarga = item.titulo?.trim() || item.id;
+
   async function handleDescargarPdf() {
     setDescargando(true);
     setErrorDescarga(null);
     try {
       const markdown = canvasItemToMarkdown(item);
       const baseName = sesion.nombre || sesion.territorio.nombre || "Fontana";
-      await exportToPdf(markdown, baseName, item.id, item.titulo, "Fontana");
+      await exportToPdf(markdown, baseName, refDescarga, item.titulo, "Fontana");
     } catch {
       setErrorDescarga("No se pudo generar el PDF.");
     } finally {
@@ -76,7 +82,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
     setErrorDescarga(null);
     try {
       const baseName = sesion.nombre || sesion.territorio.nombre || "Fontana";
-      const filename = buildFilename(baseName, item.id, formato === "jpg" ? "jpg" : "png");
+      const filename = buildFilename(baseName, refDescarga, formato === "jpg" ? "jpg" : "png");
       await exportElementAsImage(graficaRef.current, filename, formato);
     } catch {
       setErrorDescarga("No se pudo generar la imagen.");

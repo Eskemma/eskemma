@@ -163,10 +163,14 @@ del 26-09-05). Cross-check en vivo: el último punto de cada serie == el valor
 de la celda actual (`resolverIndicadorComparativoF4`), exacto, para MX + 4
 referencia. **F4-2 muestra solo el tramo comparable 2016-2024 (5 puntos MX,
 sin ningún punto pre-2016)** — CEPAL marca el quiebre con sus footnotes
-(12429/12428); nota de tarjeta lo explica. **Fase 2/3 pendientes**: F4-7
-(TI, tendencia 2012-2024 en el mismo workbook), F4-1/F4-4/F4-5 (Banco Mundial:
-quitar `mrnev=1` + paginar). **Fuera**: F4-8 (RSF, "quiebre 2022" sin
-confirmar), F4-6 (EIU, tabla hardcodeada, no era serie viable).
+(12429/12428); nota de tarjeta lo explica. **F4-7 IMPLEMENTADO (Fase 2,
+26-09-07)**: CPI 2012-2024 (13 pts) completo para MX + 4 referencia, hoja
+`CPI Historical` del mismo workbook; sin quiebre metodológico interno (la
+serie arranca en 2012 por la propia revisión de TI de ese año), así que sin
+`anioMinimo` ni nota de tramo — a diferencia de F4-2. **Fase 3 pendiente**:
+F4-1/F4-4/F4-5 (Banco Mundial: quitar `mrnev=1` + paginar). **Fuera**: F4-8
+(RSF, "quiebre 2022" sin confirmar), F4-6 (EIU, tabla hardcodeada, no era
+serie viable).
 
 | id | fuente | cat | historia MX vs referencia | esfuerzo | evidencia |
 |---|---|---|---|---|---|
@@ -176,7 +180,7 @@ confirmar), F4-6 (EIU, tabla hardcodeada, no era serie viable).
 | F4-4 Pobreza línea internacional | Banco Mundial (`SI.POV.DDAY`) | a | serie por años de encuesta (irregular); huecos por disponibilidad, no asimetría MX-referencia | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
 | F4-5 Inflación | Banco Mundial (`FP.CPI.TOTL.ZG`) | a | serie anual; igual | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
 | F4-6 Índice de Democracia (EIU) | EIU vía CRS R46016 | **b** | tabla hardcodeada 2024, sin fetch; serie = transcripción manual de PDF de baja frecuencia | — | `eiuDemocracyIndex.ts:58-89` `TABLA_EIU_CRS_2024` + `AÑO_EDICION = 2024`; `score` diferido (`:8-9`) |
-| F4-7 Índice de Percepción de Corrupción | Transparencia Internacional (XLSX) | a | CPI anual desde 2012; el propio archivo trae la tendencia 2012-2024 en otras columnas | bajo-medio (leer las columnas de tendencia del mismo workbook) | `transparencyInternational.ts:24-25` URL fija `CPI2024-Results-and-trends.xlsx`, hoja "CPI 2024"; `:44-48` solo lee score+rank 2024 |
+| F4-7 Índice de Percepción de Corrupción | Transparencia Internacional (XLSX) | a | **IMPLEMENTADO (Fase 2)** — CPI 2012-2024 (13 pts) completo para MX + 4 referencia; hoja `CPI Historical` (formato largo/tidy, cols `ISO3`/`Year`/`CPI score`/`Rank`) del mismo workbook — NO la ancha `CPI Timeseries` (inconsistencia real de mayúsculas `CPI score`/`CPI Score` 2012-2013); sin quiebre interno (serie comparable desde 2012 por diseño de TI) | **bajo-medio** | `transparencyInternational.ts` `resolverSerieTransparency(isos3)` junto al de celda; cross-check último punto (2024) == celda, exacto (MEX 26, COL 39, CHL 63, BRA 34, ARG 37) |
 | F4-8 Libertad de Prensa (RSF) | RSF (CSV) | a | anual (CSVs por año `/import_classement/YYYY.csv`; quiebre 2022) | medio (fetch de CSVs por año) | `rsf.ts:24` URL fija `.../2026.csv`; `:50-52` toma `Score 2026`+`Rank` |
 | F4-9 Desconfianza en partidos/congreso | CEPALSTAT (id 995, Latinobarómetro) | a | **IMPLEMENTADO (Fase 1)** — 1996-2024 (23 pts), igual MX + 4 referencia LATAM; años sin oleada = hueco | **bajo** | `cepalstat.ts` `resolverSerieCepalstat` (dim_4821); cross-check último punto == celda |
 | F4-10 Confianza en la policía | CEPALSTAT (id 3257) | a | **IMPLEMENTADO (Fase 1)** — ídem F4-9 | **bajo** | `cepalstat.ts` `resolverSerieCepalstat` (dim_4821) |
@@ -299,10 +303,11 @@ Numeración estable. Estado actualizado 2026-08-31 tras investigación factual.
 - **"Fruta madura" (serie ya en el archivo/respuesta descargada, solo falta
   parsear/exponer + un campo de periodo en el modelo):** F2-17 (ya en Storage),
   F3-16, F3-17, F2-3, F2-5/6/8/12/19/20/21/22, F2-1/2/14 (nac/est), F1-18,
-  F4-2/3/9/10/11. ~21 indicadores, ~5 fuentes distintas.
+  F4-2/3/9/10/11, F4-7 (hoja `CPI Historical` del mismo workbook de la celda).
+  ~22 indicadores, ~5 fuentes distintas.
 - **Requiere ingesta nueva (descargas por año/edición):** bloque ECEG/ITER
   (14 tras la decisión (a): F1-1…F1-14, F1-19 y F2-13 salen), F2-4, F2-9,
-  F2-18, F3-1/2/3/4/7, F5-6/7/8, F4-1/4/5/7/8, F1-17, F2-10 (STPS).
+  F2-18, F3-1/2/3/4/7, F5-6/7/8, F4-1/4/5/8, F1-17, F2-10 (STPS).
 - **Nunca habrá serie (categoría b):** 19 — narrativa curada (6), CONAGUA (1),
   Compendio 2010 (1), EIU (1), F1-15/F1-19/F2-13 (comparabilidad no confirmada,
   reabrible), + los 7 de ANVCC (fuera de alcance permanente).

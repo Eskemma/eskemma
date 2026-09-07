@@ -35,9 +35,11 @@ function slugify(text: string): string {
   return text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // remove diacritics
-    .replace(/[^a-zA-Z0-9_\- ]/g, "")
+    .replace(/[^a-zA-Z0-9_\- ]/g, "") // drop punctuation (—, (), :, …)
     .trim()
-    .replace(/\s+/g, "_");
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_") // collapse runs left by removed punctuation ("A — B" → "A_B")
+    .replace(/^[_-]+|[_-]+$/g, "");
 }
 
 /** Returns "Nombre_Proyecto_variantSlug_2026-03-29" */

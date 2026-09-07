@@ -16,6 +16,7 @@ import type { SeriePaisComparativa, FilaSerieInternacional } from "@/lib/fontana
 import { SERIES_INTERNACIONALES_DISPONIBLES } from "@/lib/fontana/series/seriesInternacionalesDisponibles";
 import { resolverSerieCepalstat } from "@/lib/fontana/ingesta/cepalstat";
 import { resolverSerieHdr } from "@/lib/fontana/ingesta/pnudHdr";
+import { resolverSerieTransparency } from "@/lib/fontana/ingesta/transparencyInternational";
 
 const SIN_MECANISMO = (iso3: string): SeriePaisComparativa => ({
   iso3,
@@ -38,8 +39,10 @@ export async function resolverSerieInternacionalF4(
     porPais = await resolverSerieCepalstat(indicadorId, isos3, cfg.anioMinimo);
   } else if (cfg.fuenteId === "pnud_hdr") {
     porPais = await resolverSerieHdr(isos3);
+  } else if (cfg.fuenteId === "transparency") {
+    porPais = await resolverSerieTransparency(isos3);
   } else {
-    // banco_mundial / transparency — Fases 2/3, aún sin resolver de serie.
+    // banco_mundial — Fase 3, aún sin resolver de serie.
     porPais = new Map(isos3.map((iso3) => [iso3, SIN_MECANISMO(iso3)]));
   }
 

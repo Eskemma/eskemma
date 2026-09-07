@@ -29,8 +29,12 @@ import {
 import { resolverSerieInternacionalF4 } from "@/lib/fontana/ingesta/serieInternacional";
 import type { SeriePaisComparativa } from "@/lib/fontana/tablaComparativaInternacional";
 
-function formatoDesdeUnidad(unidad?: string): "porcentaje" | "coeficiente" | "moneda" | "conteo" {
+function formatoDesdeUnidad(unidad?: string): "porcentaje" | "coeficiente" | "moneda" | "conteo" | "indice" {
   if (!unidad) return "conteo";
+  // "índice (0-100)" (F4-7 CPI) — chequear ANTES de "0-1": la substring
+  // "0-1" está contenida en "0-100", así que sin este check el CPI se
+  // clasificaría como "coeficiente" (4 decimales) en vez de índice entero.
+  if (unidad.includes("0-100")) return "indice";
   if (unidad.includes("0-1")) return "coeficiente";
   if (unidad.includes("%")) return "porcentaje";
   if (unidad.toUpperCase().includes("USD")) return "moneda";

@@ -37,12 +37,17 @@ export const SERIES_INTERNACIONALES_DISPONIBLES: Record<string, ConfigSerieF4> =
       "Solo se muestra la serie comparable desde 2016 (5 puntos, 2016-2024). CEPAL rehízo la medición del ingreso de los hogares a partir de 2016 y marca explícitamente que las cifras hasta 2014 no son comparables con las posteriores — por eso el tramo anterior se omite en vez de empalmarlo.",
   },
   "F4-3": { fuenteId: "pnud_hdr" },
+  // F4-7 (CPI, Transparencia Intl) — 2026-09-07. Serie 2012-2024 completa,
+  // hoja "CPI Historical" del mismo workbook que la celda. Sin anioMinimo
+  // ni nota de tramo: TODO el rango publicado es comparable (la revisión
+  // metodológica de TI de 2012 es justo lo que define el inicio de la
+  // serie; no hay quiebre interno). Ver transparencyInternational.ts.
+  "F4-7": { fuenteId: "transparency" },
   "F4-9": { fuenteId: "cepalstat" },
   "F4-10": { fuenteId: "cepalstat" },
   "F4-11": { fuenteId: "cepalstat" },
-  // Fase 2/3 (aún sin resolver de serie — el config se completa cuando se
+  // Fase 3 (aún sin resolver de serie — el config se completa cuando se
   // implementen):
-  // "F4-7": { fuenteId: "transparency" },
   // "F4-1": { fuenteId: "banco_mundial" },
   // "F4-4": { fuenteId: "banco_mundial" },
   // "F4-5": { fuenteId: "banco_mundial" },
