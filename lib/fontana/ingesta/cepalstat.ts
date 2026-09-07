@@ -69,7 +69,7 @@
 //    visual de Raúl). Corregido resolviendo el nombre real del miembro
 //    vía /indicator/{id}/dimensions (cacheado igual que los datos).
 
-import type { CeldaComparativaPais, PaisComparativoCompleto } from "@/lib/fontana/tablaComparativaInternacional";
+import type { CeldaComparativaPais, PaisComparativoCompleto, SeriePaisComparativa } from "@/lib/fontana/tablaComparativaInternacional";
 import { ISO3_A_NOMBRE } from "@/lib/fontana/familia4Catalogo";
 
 const INDICATOR_ID_CEPALSTAT: Record<string, number> = {
@@ -203,6 +203,23 @@ function masRecienteTotal(datos: RegistroCepalstat[], iso3: string, campo: strin
   return delPais.reduce((a, b) => (b.dim_29117 > a.dim_29117 ? b : a));
 }
 
+// Motivo preciso cuando un país no tiene el valor "total" (Nacional) de un
+// indicador CEPALSTAT. NO afirma "cobertura limitada a América Latina y el
+// Caribe" por default (26-09-07): el set fijo de referencia de F4
+// (Colombia/Chile/Brasil/Argentina) y México están TODOS dentro de la
+// cobertura de CEPALSTAT — Argentina, p.ej., falta el desglose nacional
+// porque su encuesta de hogares es urbana, no porque esté fuera del
+// alcance geográfico de la fuente. El calificativo de cobertura solo sería
+// cierto si algún día se añadiera un país realmente fuera de América
+// Latina y el Caribe — y aun así "no publica este indicador para este
+// país" es exacto sin necesidad de afirmarlo.
+function motivoSinTotalCepalstat(datos: RegistroCepalstat[], iso3: string): string {
+  const apareceEnElIndicador = datos.some((d) => d.iso3 === iso3);
+  return apareceEnElIndicador
+    ? "CEPALSTAT no publica el desglose nacional de este indicador para este país (la fuente sí lo cubre, pero no con un valor nacional)."
+    : "CEPALSTAT no publica este indicador para este país.";
+}
+
 export async function resolverCepalstat(indicadorId: string, isos3: string[]): Promise<Map<string, CeldaComparativaPais>> {
   const indicatorId = INDICATOR_ID_CEPALSTAT[indicadorId];
   const unidad = UNIDAD[indicadorId];
@@ -223,7 +240,7 @@ export async function resolverCepalstat(indicadorId: string, isos3: string[]): P
   for (const iso3 of isos3) {
     const registro = masRecienteTotal(datos, iso3, dimensionTotal.campo, dimensionTotal.valorTotal);
     if (!registro) {
-      porPais.set(iso3, { iso3, estadoConsulta: "sin_datos_confirmado", motivo: "CEPALSTAT no tiene dato para este país — cobertura limitada a América Latina y el Caribe" });
+      porPais.set(iso3, { iso3, estadoConsulta: "sin_datos_confirmado", motivo: motivoSinTotalCepalstat(datos, iso3) });
       continue;
     }
     const año = mapaAños.get(registro.dim_29117) ?? String(registro.dim_29117);
@@ -234,6 +251,78 @@ export async function resolverCepalstat(indicadorId: string, isos3: string[]): P
       naturaleza: "dato_directo",
       fuenteEtiqueta: `CEPALSTAT (${año})`,
       estadoConsulta: "ok",
+    });
+  }
+  return porPais;
+}
+
+// SERIE HISTÓRICA (2026-09-06) — misma data ya cacheada por
+// fetchDatosIndicador; a diferencia de resolverCepalstat, NO colapsa a
+// masRecienteTotal: agrupa TODOS los años del "total" de cada país.
+//   - `anioMinimo` (F4-2 → 2016): CEPAL marca con sus footnotes que las
+//     cifras hasta 2014 no son comparables con las de 2016+ → se muestra
+//     solo el tramo comparable, nunca empalmado. El registro crudo NO
+//     trae `notes_ids`/footnote, así que el corte se hace por el año real
+//     resuelto (`Number(año) >= anioMinimo`).
+//   - Un año con `value` no numérico → `valor: null` (hueco honesto en la
+//     línea, ej. años sin oleada de Latinobarómetro), el año NO se omite.
+export async function resolverSerieCepalstat(
+  indicadorId: string,
+  isos3: string[],
+  anioMinimo?: number
+): Promise<Map<string, SeriePaisComparativa>> {
+  const indicatorId = INDICATOR_ID_CEPALSTAT[indicadorId];
+  const unidad = UNIDAD[indicadorId];
+  const dimensionTotal = DIMENSION_TOTAL_POR_INDICADOR[indicadorId];
+  const porPais = new Map<string, SeriePaisComparativa>();
+
+  let datos: RegistroCepalstat[];
+  let mapaAños: Map<number, string>;
+  try {
+    [datos, mapaAños] = await Promise.all([fetchDatosIndicador(indicatorId), fetchMapaAños(indicatorId)]);
+  } catch {
+    for (const iso3 of isos3) {
+      porPais.set(iso3, { iso3, estadoConsulta: "error_conexion", motivo: "Error de conexión con CEPALSTAT", puntos: [] });
+    }
+    return porPais;
+  }
+
+  for (const iso3 of isos3) {
+    const delPais = datos.filter((d) => d.iso3 === iso3 && d[dimensionTotal.campo] === dimensionTotal.valorTotal);
+    if (delPais.length === 0) {
+      porPais.set(iso3, {
+        iso3,
+        estadoConsulta: "sin_datos_confirmado",
+        motivo: motivoSinTotalCepalstat(datos, iso3),
+        puntos: [],
+      });
+      continue;
+    }
+    const puntos = delPais
+      .map((d) => {
+        const n = Number(d.value);
+        return { periodo: mapaAños.get(d.dim_29117) ?? String(d.dim_29117), valor: Number.isFinite(n) ? n : null };
+      })
+      .filter((p) => (anioMinimo ? Number(p.periodo) >= anioMinimo : true))
+      .sort((a, b) => Number(a.periodo) - Number(b.periodo));
+    if (puntos.length === 0 || puntos.every((p) => p.valor === null)) {
+      porPais.set(iso3, {
+        iso3,
+        estadoConsulta: "sin_datos_confirmado",
+        motivo: anioMinimo
+          ? `CEPALSTAT no tiene datos comparables (desde ${anioMinimo}) para este país`
+          : "CEPALSTAT no tiene serie para este país",
+        puntos: [],
+      });
+      continue;
+    }
+    porPais.set(iso3, {
+      iso3,
+      estadoConsulta: "ok",
+      unidad,
+      naturaleza: "dato_directo",
+      fuenteEtiqueta: "CEPALSTAT",
+      puntos,
     });
   }
   return porPais;

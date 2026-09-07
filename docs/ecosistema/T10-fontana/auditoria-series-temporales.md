@@ -143,19 +143,44 @@ Columnas: `id | fuente | cat | niveles con historia en la FUENTE | esfuerzo de c
 
 ### Familia 4 — Comparación internacional (Q3 = ¿historia para México y países de referencia por igual?)
 
+**Fase 1 IMPLEMENTADA (2026-09-06): F4-2, F4-3, F4-9, F4-10, F4-11.** Camino
+PARALELO al geográfico (sin `Territorio`/`SERIES_DISPONIBLES`/`serieTemporal.ts`):
+config `lib/fontana/series/seriesInternacionalesDisponibles.ts` +
+`tieneSerieInternacional`; dispatcher `lib/fontana/ingesta/serieInternacional.ts`
+(`resolverSerieInternacionalF4`, modelado en `familia4.ts:resolverIndicadorComparativoF4`);
+resolvers `resolverSerieCepalstat` (F4-2/9/10/11) y `resolverSerieHdr` (F4-3) —
+NO colapsan la serie, reutilizan el mismo fetch cacheado que el resolver de
+celda. Ruta `GET /api/fontana/serie-internacional`. Tipo de Canvas nuevo
+`FontanaCanvasSerieInternacional` (`tipo:"serie_internacional"`, clave `iso3`,
+`estadoConsulta` de 4 estados por país, `nota` de tarjeta, `polaridad`) +
+render `SerieInternacionalGrafica` (N líneas, eje X por año, México
+enfatizado). `generar_visualizacion tipo:"serie_temporal"` con `familiaId F4`
+→ bifurca a `generarSerieInternacional` (el rechazo `[C4]` del resto de tipos
+NO cambia). Guard `verify-fontana-series-disponibilidad-sync.ts` extendido a
+`SERIES_INTERNACIONALES_DISPONIBLES`; registry: `disponibilidadTemporal` de los
+5 ids puesta en `null` y subida a Storage (mismo fix que los 13 geográficos
+del 26-09-05). Cross-check en vivo: el último punto de cada serie == el valor
+de la celda actual (`resolverIndicadorComparativoF4`), exacto, para MX + 4
+referencia. **F4-2 muestra solo el tramo comparable 2016-2024 (5 puntos MX,
+sin ningún punto pre-2016)** — CEPAL marca el quiebre con sus footnotes
+(12429/12428); nota de tarjeta lo explica. **Fase 2/3 pendientes**: F4-7
+(TI, tendencia 2012-2024 en el mismo workbook), F4-1/F4-4/F4-5 (Banco Mundial:
+quitar `mrnev=1` + paginar). **Fuera**: F4-8 (RSF, "quiebre 2022" sin
+confirmar), F4-6 (EIU, tabla hardcodeada, no era serie viable).
+
 | id | fuente | cat | historia MX vs referencia | esfuerzo | evidencia |
 |---|---|---|---|---|---|
-| F4-1 PIB per cápita PPA | Banco Mundial (`NY.GDP.PCAP.PP.CD`) | a | serie anual desde 1960, igual para MX y COL/CHL/BRA/ARG (una sola llamada `country=all`) | medio (quitar `mrnev=1`, pedir `?date=1990:2025`) | `bancoMundial.ts:103` endpoint con `mrnev=1` (recorta server-side); año solo en `fuenteEtiqueta` (`:141`) |
-| F4-2 Gini internacional | CEPALSTAT (id 3289) | a | serie completa (quiebre 2014/2016 documentado); igual MX + 4 referencia LATAM | **bajo** (serie completa YA descargada y cacheada, se descarta) | `cepalstat.ts:149` endpoint sin año → todos los años; `:136` cache entera; `:200-204` `masRecienteTotal` reduce a 1 |
-| F4-3 IDH global | PNUD HDR (CSV) | a | el CSV **es** la serie completa 1990-2023 (`hdi_1990..hdi_2023`); igual MX + referencia | **bajo** (el multi-año está en la fila parseada, se tira) | `pnudHdr.ts:21` CSV "complete time series"; `:47-50` detecta todas las cols `hdi_YYYY`, toma `[length-1]` |
+| F4-1 PIB per cápita PPA | Banco Mundial (`NY.GDP.PCAP.PP.CD`) | a | serie anual desde 1960, igual para MX y COL/CHL/BRA/ARG (una sola llamada `country=all`) | medio (quitar `mrnev=1`, pedir `?date=1990:2025` + paginar) — **Fase 3** | `bancoMundial.ts:103` endpoint con `mrnev=1` (recorta server-side); año solo en `fuenteEtiqueta` (`:141`) |
+| F4-2 Gini internacional | CEPALSTAT (id 3289) | a | **IMPLEMENTADO (Fase 1)** — solo tramo comparable 2016-2024 (5 pts MX; footnotes 12429/12428 marcan el quiebre); COL/BRA anuales, CHL 3 pts, ARG sin dato en el tramo | **bajo** | `cepalstat.ts` `resolverSerieCepalstat(id, isos3, anioMinimo:2016)` — reusa `fetchDatosIndicador` (serie completa cacheada), NO colapsa |
+| F4-3 IDH global | PNUD HDR (CSV) | a | **IMPLEMENTADO (Fase 1)** — serie 1990-2023 (34 pts) igual para MX + 4 referencia | **bajo** | `pnudHdr.ts` `resolverSerieHdr(isos3)` — `FilaHdr.serie` mapea todas las cols `hdi_YYYY` |
 | F4-4 Pobreza línea internacional | Banco Mundial (`SI.POV.DDAY`) | a | serie por años de encuesta (irregular); huecos por disponibilidad, no asimetría MX-referencia | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
 | F4-5 Inflación | Banco Mundial (`FP.CPI.TOTL.ZG`) | a | serie anual; igual | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
 | F4-6 Índice de Democracia (EIU) | EIU vía CRS R46016 | **b** | tabla hardcodeada 2024, sin fetch; serie = transcripción manual de PDF de baja frecuencia | — | `eiuDemocracyIndex.ts:58-89` `TABLA_EIU_CRS_2024` + `AÑO_EDICION = 2024`; `score` diferido (`:8-9`) |
 | F4-7 Índice de Percepción de Corrupción | Transparencia Internacional (XLSX) | a | CPI anual desde 2012; el propio archivo trae la tendencia 2012-2024 en otras columnas | bajo-medio (leer las columnas de tendencia del mismo workbook) | `transparencyInternational.ts:24-25` URL fija `CPI2024-Results-and-trends.xlsx`, hoja "CPI 2024"; `:44-48` solo lee score+rank 2024 |
 | F4-8 Libertad de Prensa (RSF) | RSF (CSV) | a | anual (CSVs por año `/import_classement/YYYY.csv`; quiebre 2022) | medio (fetch de CSVs por año) | `rsf.ts:24` URL fija `.../2026.csv`; `:50-52` toma `Score 2026`+`Rank` |
-| F4-9 Desconfianza en partidos/congreso | CEPALSTAT (id 995, Latinobarómetro) | a | "Anual, con años sin oleada"; igual MX + 4 referencia LATAM | **bajo** (serie completa ya descargada + cacheada) | `cepalstat.ts:149` `/indicator/995/data` sin año; `:200-204` `masRecienteTotal` |
-| F4-10 Confianza en la policía | CEPALSTAT (id 3257) | a | ídem F4-9 | **bajo** | `cepalstat.ts:149` `/indicator/3257/data` |
-| F4-11 Confianza en el poder judicial | CEPALSTAT (id 5528) | a | ídem F4-9 | **bajo** | `cepalstat.ts:149,100` `/indicator/5528/data` (dim_144); `:200-204` |
+| F4-9 Desconfianza en partidos/congreso | CEPALSTAT (id 995, Latinobarómetro) | a | **IMPLEMENTADO (Fase 1)** — 1996-2024 (23 pts), igual MX + 4 referencia LATAM; años sin oleada = hueco | **bajo** | `cepalstat.ts` `resolverSerieCepalstat` (dim_4821); cross-check último punto == celda |
+| F4-10 Confianza en la policía | CEPALSTAT (id 3257) | a | **IMPLEMENTADO (Fase 1)** — ídem F4-9 | **bajo** | `cepalstat.ts` `resolverSerieCepalstat` (dim_4821) |
+| F4-11 Confianza en el poder judicial | CEPALSTAT (id 5528) | a | **IMPLEMENTADO (Fase 1)** — ídem F4-9 | **bajo** | `cepalstat.ts` `resolverSerieCepalstat` (dim_144) |
 
 ### Familia 5 — Características territoriales
 

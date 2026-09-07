@@ -19,6 +19,8 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import { construirSystemPromptFontana } from "@/lib/fontana/agente/systemPrompt";
 import { FONTANA_TOOLS, ejecutarHerramienta, type ToolContext } from "@/lib/fontana/agente/tools";
+import { SERIES_INTERNACIONALES_DISPONIBLES, tieneSerieInternacional } from "@/lib/fontana/series/seriesInternacionalesDisponibles";
+import { FAMILIA4_NOMBRES } from "@/lib/fontana/familia4Catalogo";
 import { limpiarUndefined } from "@/lib/fontana/agente/canvasBuilder";
 import { construirBloqueAdjuntos } from "@/lib/fontana/agente/adjuntosContexto";
 import { adminDb } from "@/lib/firebase-admin";
@@ -94,6 +96,51 @@ function contieneNombreHerramienta(texto: string): string | null {
 
 const avisoNombreHerramienta = (nombre: string) =>
   `[verificación del sistema] En tu respuesta anterior mencionaste el nombre interno de una herramienta ("${nombre}") — eso es jerga de implementación, nunca debe llegar al usuario, ni siquiera al explicar o corregir un error tuyo. Reescribe la respuesta sin nombrar ninguna función/herramienta: describe qué información consultaste o qué salió mal en lenguaje llano ("la información que consulté", "lo que revisé"), nunca el nombre técnico.`;
+
+// Guard "negó una serie que sí existe" (26-09-07, incidente F4-2 Gini
+// internacional): el agente dijo "el Gini internacional (tieneSerie: false)…
+// no tiene serie histórica habilitada" — FALSO, F4-2 SÍ tiene serie
+// internacional (Fase 1, ese mismo día). Causa raíz: un bug —
+// `listar_indicadores_*` solo consultaba `tieneSerie()` (geográfica F2/F3),
+// no `tieneSerieInternacional()`, así que devolvía `tieneSerie:false` para
+// todo F4 (corregido en `tools.ts` con `tieneSerieCualquiera`). Este guard
+// cierra la CLASE de error, no solo la instancia: es el espejo de
+// `AFIRMA_RESULTADO` — afirmar algo que no pasó es dañino, y negar una
+// capacidad que SÍ existe es igual de dañino (un usuario que no insiste se
+// queda pensando que Fontana no puede algo que sí puede). Fire: el texto
+// final niega que un indicador tenga serie histórica (o expone el campo
+// crudo `tieneSerie`) Y algún resultado de herramienta de ESTE turno
+// contiene `"tieneSerie":true` Y el texto NO afirma también, para otro
+// indicador, que sí hay serie (una respuesta matizada "X no, Y sí" es
+// correcta — no se toca).
+const NIEGA_SERIE_HISTORICA =
+  /(\btieneSerie\b\s*[:=]?\s*false|\b(no\s+(tiene|hay|cuenta con|existe|est[áa]\s+(disponible|habilitad[ao]|activ[ao]))|sin|carece de|no\s+dispone de)\b[^.\n]{0,60}\bseries?\s+hist[óo]ric[ao]s?\b)/i;
+
+// Afirmación GENUINA de que una serie existe (para excluir respuestas
+// matizadas "X no tiene, Y sí"). Lookbehind `(?<!\bno\s)` para no contar
+// "no tiene serie" como afirmación. NO incluye "disponible" ni los
+// alcances (internacional/municipal/…) porque aparecen tal cual en frases
+// NEGATIVAS ("no tiene serie histórica disponible en Fontana", "no tiene
+// serie internacional") — solo cuenta como afirmación un "sí tiene/hay",
+// o un calificador temporal concreto (año, nº de puntos, "cerrada").
+const AFIRMA_SERIE_HISTORICA =
+  /\bs[íi]\s+(la\s+)?(tiene|hay|cuenta con)\b|(?<!\bno\s)\b(tiene(n)?|hay|cuenta con)\s+serie\b|(?<!\bno\s)\bserie\s+(hist[óo]rica\s+)?(de\s+\d{4}|desde\s+\d{4}|entre\s+\d{4}|con\s+\d+\s+puntos|cerrada)/i;
+
+const AVISO_NEGO_SERIE =
+  "[verificación del sistema] En tu respuesta anterior dijiste que un indicador NO tiene serie histórica, pero en este turno hay evidencia de lo contrario (una herramienta devolvió `tieneSerie: true`, o llamaste/mencionaste un indicador de comparación internacional que SÍ tiene serie: Gini internacional, IDH global, (des)confianza en instituciones). Reescribe la respuesta reconociendo que ese indicador SÍ tiene serie histórica — para F4 es una serie internacional (país principal + set fijo de referencia, valores año por año, disponible tanto para leer como para el Canvas). Nunca digas 'no tiene serie' para uno de esos. Y nunca escribas el nombre del campo `tieneSerie` al usuario — en lenguaje llano: 'sí tengo la evolución histórica de este indicador'.";
+
+// Nombres de los indicadores F4 que SÍ tienen serie internacional — para
+// que el guard C dispare aunque el turno no tenga un tool_result de
+// listado con `"tieneSerie":true` (ej. una herramienta de LECTURA que
+// fabrica un `sin_serie` para un id de F4, incidente 26-09-07 2ª parte).
+const RE_NOMBRE_F4_CON_SERIE = new RegExp(
+  `\\b(${Object.keys(SERIES_INTERNACIONALES_DISPONIBLES)
+    .map((id) => FAMILIA4_NOMBRES[id])
+    .filter(Boolean)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})\\b`,
+  "i"
+);
 
 // Guard confirmadoLote (26-09-04, incidente "8 municipios de Jalisco", 2ª
 // forma de falla): el modelo trató la respuesta a "¿qué tipo de gráfica
@@ -218,6 +265,7 @@ export async function POST(request: NextRequest) {
       let correccionAlucinacionHecha = false;
       let correccionVocabularioHecha = false;
       let correccionNombreHerramientaHecha = false;
+      let correccionNegoSerieHecha = false;
 
       try {
         for (let i = 0; i < MAX_ITERACIONES; i++) {
@@ -293,6 +341,37 @@ export async function POST(request: NextRequest) {
             correccionNombreHerramientaHecha = true;
             if (textoIter) send({ type: "text_suppress" });
             mensajes.push({ role: "user", content: avisoNombreHerramienta(herramientaExpuesta) });
+            continue;
+          }
+
+          // Guard "negó una serie que sí existe": el texto final niega que
+          // un indicador tenga serie histórica, no afirma también que sí
+          // hay serie para otro, Y en el turno hay evidencia de que sí:
+          //  (a) algún tool_result trae `"tieneSerie":true`, o
+          //  (b) se llamó una herramienta con un `indicadorId` de F4 que
+          //      SÍ tiene serie internacional, o
+          //  (c) el texto menciona el nombre de uno de esos indicadores F4.
+          // (b)/(c) cierran la clase completa: un `sin_serie` fabricado por
+          // CUALQUIER herramienta de lectura para un id de F4, no solo el
+          // caso ya corregido (incidente 26-09-07, 4ª instancia del patrón
+          // "capacidad cableada para un camino y olvidada en el hermano").
+          const evidenciaSerieF4 =
+            toolResultTextsAcum.some((t) => t.includes('"tieneSerie":true')) ||
+            toolCallsAcum.some((tc) => {
+              const id = (tc.input as Record<string, unknown> | undefined)?.indicadorId;
+              return typeof id === "string" && tieneSerieInternacional(id);
+            }) ||
+            RE_NOMBRE_F4_CON_SERIE.test(textoIter);
+          if (
+            terminaTurno &&
+            !correccionNegoSerieHecha &&
+            NIEGA_SERIE_HISTORICA.test(textoIter) &&
+            !AFIRMA_SERIE_HISTORICA.test(textoIter) &&
+            evidenciaSerieF4
+          ) {
+            correccionNegoSerieHecha = true;
+            if (textoIter) send({ type: "text_suppress" });
+            mensajes.push({ role: "user", content: AVISO_NEGO_SERIE });
             continue;
           }
 

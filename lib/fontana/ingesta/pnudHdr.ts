@@ -16,7 +16,7 @@
 // una vez y se cachea en memoria de proceso (TTL 24h, single-flight),
 // mismo patrón que coneval.ts/inegiPm.ts.
 
-import type { CeldaComparativaPais, PaisComparativoCompleto } from "@/lib/fontana/tablaComparativaInternacional";
+import type { CeldaComparativaPais, PaisComparativoCompleto, SeriePaisComparativa } from "@/lib/fontana/tablaComparativaInternacional";
 
 const HDR_CSV_URL = "https://hdr.undp.org/sites/default/files/2025_HDR/HDR25_Composite_indices_complete_time_series.csv";
 
@@ -25,6 +25,9 @@ interface FilaHdr {
   nombre: string;
   hdiRank2023: string;
   hdiUltimoAno: number | null;
+  // Serie completa 1990..2023 (todas las columnas hdi_YYYY) — año sin
+  // dato (".." o vacío) queda como null (hueco en la línea, no se omite).
+  serie: { periodo: string; valor: number | null }[];
 }
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -56,11 +59,17 @@ function parsearCsv(texto: string): Map<string, FilaHdr> {
     if (!iso3 || iso3.length !== 3) continue;
     const valorCrudo = idxHdiUltimo >= 0 ? campos[idxHdiUltimo]?.trim() : "";
     const valor = valorCrudo && valorCrudo !== ".." ? Number(valorCrudo) : null;
+    const serie = columnasHdi.map(({ h, i: col }) => {
+      const crudo = campos[col]?.trim();
+      const n = crudo && crudo !== ".." ? Number(crudo) : NaN;
+      return { periodo: h.slice(4), valor: Number.isFinite(n) ? n : null };
+    });
     porPais.set(iso3, {
       iso3,
       nombre: campos[idxNombre]?.trim() ?? iso3,
       hdiRank2023: campos[idxRank]?.trim() ?? "",
       hdiUltimoAno: valor !== null && !Number.isNaN(valor) ? valor : null,
+      serie,
     });
   }
   return porPais;
@@ -117,6 +126,41 @@ export async function resolverPnudHdr(isos3: string[]): Promise<Map<string, Celd
   for (const iso3 of isos3) {
     porPais.set(iso3, celdaDesdeFila(iso3, tabla.get(iso3)));
   }
+  return porPais;
+}
+
+// SERIE HISTÓRICA de IDH (2026-09-06) — todas las columnas hdi_YYYY
+// (1990..2023 en la edición 2025), ya parseadas en `fila.serie`. Año sin
+// dato = null (hueco en la línea). `rankOficialUltimo` = hdi_rank_2023.
+function serieDesdeFila(iso3: string, fila: FilaHdr | undefined): SeriePaisComparativa {
+  const conDato = (fila?.serie ?? []).filter((p) => p.valor !== null);
+  if (!fila || conDato.length === 0) {
+    return { iso3, estadoConsulta: "sin_datos_confirmado", motivo: "PNUD HDR no tiene serie de IDH para este país", puntos: [] };
+  }
+  const rank = Number(fila.hdiRank2023);
+  return {
+    iso3,
+    estadoConsulta: "ok",
+    unidad: "índice (0-1)",
+    naturaleza: "dato_directo",
+    fuenteEtiqueta: "PNUD HDR 2025",
+    rankOficialUltimo: Number.isNaN(rank) ? undefined : rank,
+    puntos: fila.serie,
+  };
+}
+
+export async function resolverSerieHdr(isos3: string[]): Promise<Map<string, SeriePaisComparativa>> {
+  const porPais = new Map<string, SeriePaisComparativa>();
+  let tabla: Map<string, FilaHdr>;
+  try {
+    tabla = await fetchTablaHdr();
+  } catch {
+    for (const iso3 of isos3) {
+      porPais.set(iso3, { iso3, estadoConsulta: "error_conexion", motivo: "Error de conexión con PNUD HDR", puntos: [] });
+    }
+    return porPais;
+  }
+  for (const iso3 of isos3) porPais.set(iso3, serieDesdeFila(iso3, tabla.get(iso3)));
   return porPais;
 }
 

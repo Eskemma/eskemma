@@ -29,6 +29,7 @@ import {
 } from "@/lib/fontana/ingesta/eceg";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
+import { tieneSerieInternacional } from "@/lib/fontana/series/seriesInternacionalesDisponibles";
 import { FAMILIA1_NOMBRES, FAMILIA1_ORDEN } from "@/lib/fontana/familia1Catalogo";
 import { FAMILIA2_NOMBRES, FAMILIA2_ORDEN } from "@/lib/fontana/familia2Catalogo";
 import { FAMILIA3_NOMBRES, FAMILIA3_ORDEN } from "@/lib/fontana/familia3Catalogo";
@@ -180,7 +181,7 @@ export async function GET(
           nombre: FAMILIA4_NOMBRES[id] ?? id,
           definicion: registro?.definicion,
           esMinimo: familiaF4.minimos.includes(id),
-          tieneSerie: tieneSerie(id),
+          tieneSerie: tieneSerie(id) || tieneSerieInternacional(id),
           fila,
         };
       })

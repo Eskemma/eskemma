@@ -27,7 +27,7 @@ interface Props {
   onEliminado?: (itemId: string) => void;
 }
 
-const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal", "comparacion_territorios"]);
+const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal", "comparacion_territorios", "serie_internacional"]);
 const TIPOS_PDF = new Set<FontanaCanvasItem["tipo"]>(["resumen", "tabla", "desglose"]);
 
 export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Props) {
@@ -287,6 +287,15 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
       {item.tipo === "serie_temporal" && (
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <SerieTemporalGrafica item={item} color={color} />
+          {item.fuenteEtiqueta && (
+            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+          )}
+        </div>
+      )}
+
+      {item.tipo === "serie_internacional" && (
+        <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
+          <SerieInternacionalGrafica item={item} />
           {item.fuenteEtiqueta && (
             <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
@@ -592,6 +601,239 @@ function SerieTemporalGrafica({
       )}
 
       <p className="text-[10px] text-gray-eske-40 mt-2">{notaNivel}</p>
+    </div>
+  );
+}
+
+// Serie internacional (Familia 4) — N líneas de tiempo, una por país
+// (México + países de referencia). Cada país conserva SUS PROPIOS años; el
+// eje X posiciona cada punto por VALOR de año (no por índice), así que
+// países con muestreo distinto (México bienal, Colombia anual) se dibujan
+// sin romper la línea. Dominio Y compartido, México enfatizado (línea más
+// gruesa). Un país con `estadoConsulta` distinto de "ok" NO se dibuja — se
+// declara en la leyenda con su motivo (nunca una línea inventada).
+const PALETA_SERIE_INTL = ["#1F6FB2", "#E8833A", "#2E8B57", "#8E5BA6", "#C0392B"];
+
+function SerieInternacionalGrafica({
+  item,
+}: {
+  item: Extract<FontanaCanvasItem, { tipo: "serie_internacional" }>;
+}) {
+  const fmt = (v: number) => {
+    switch (item.formato) {
+      case "moneda":
+        return `$${v.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
+      case "porcentaje":
+        return `${v.toLocaleString("es-MX", { maximumFractionDigits: 2 })}%`;
+      case "coeficiente":
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 4 });
+      case "puntaje":
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 3 });
+      default:
+        return v.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+    }
+  };
+
+  const conSerie = item.paises.filter((p) => p.estadoConsulta === "ok" && p.puntos.length > 0);
+  const sinSerie = item.paises.filter((p) => p.estadoConsulta !== "ok" || p.puntos.length === 0);
+
+  // Eje X por VALOR de año — la unión de años de todos los países con serie.
+  const aniosUnion = [
+    ...new Set(conSerie.flatMap((p) => p.puntos.map((pt) => Number(pt.periodo)))),
+  ].sort((a, b) => a - b);
+  const minYear = aniosUnion[0] ?? 0;
+  const maxYear = aniosUnion[aniosUnion.length - 1] ?? 1;
+
+  const todosValores = conSerie.flatMap((p) => p.puntos.map((pt) => pt.valor).filter((v): v is number => v !== null));
+  const hayDatos = todosValores.length > 0;
+  const rawMin = hayDatos ? Math.min(...todosValores) : 0;
+  const rawMax = hayDatos ? Math.max(...todosValores) : 1;
+  const pad = (rawMax - rawMin || Math.abs(rawMax) || 1) * 0.08;
+  const domMin = item.formato === "conteo" && rawMin >= 0 ? 0 : rawMin - pad;
+  const domMax = rawMax + pad;
+  const span = domMax - domMin || 1;
+
+  const xAt = (year: number) => (maxYear === minYear ? 50 : ((year - minYear) / (maxYear - minYear)) * 100);
+  const yAt = (v: number) => 100 - ((v - domMin) / span) * 100;
+
+  // Un país → índice de color; México (principal) siempre el 0.
+  const colorDe = (iso3: string, esPrincipal: boolean) => {
+    if (esPrincipal) return PALETA_SERIE_INTL[0];
+    const idx = conSerie.filter((p) => !p.esPaisPrincipal).findIndex((p) => p.iso3 === iso3);
+    return PALETA_SERIE_INTL[(idx % (PALETA_SERIE_INTL.length - 1)) + 1];
+  };
+
+  const segmentosDe = (puntos: { periodo: string; valor: number | null }[]) => {
+    const segs: { x: number; y: number }[][] = [];
+    let cur: { x: number; y: number }[] = [];
+    puntos.forEach((p) => {
+      if (p.valor === null) {
+        if (cur.length) segs.push(cur);
+        cur = [];
+        return;
+      }
+      cur.push({ x: xAt(Number(p.periodo)), y: yAt(p.valor) });
+    });
+    if (cur.length) segs.push(cur);
+    return segs;
+  };
+
+  // Ticks del eje X: primer y último año + ~1 cada `stepX` de la unión.
+  const stepX = aniosUnion.length <= 12 ? 1 : Math.ceil(aniosUnion.length / 8);
+  const aniosTick = aniosUnion.filter((_, i) => i === 0 || i === aniosUnion.length - 1 || i % stepX === 0);
+
+  const polaridadNota =
+    item.polaridad === "mayor_mejor"
+      ? "Valor más alto = mejor posición."
+      : item.polaridad === "menor_mejor"
+      ? "Valor más bajo = mejor posición."
+      : null;
+
+  return (
+    <div>
+      {item.nota && (
+        <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-2 leading-snug">{item.nota}</p>
+      )}
+
+      {!hayDatos ? (
+        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
+      ) : (
+        <div className="relative h-32 mt-6 mb-7 mx-8">
+          <svg
+            className="absolute inset-0 w-full h-full overflow-visible"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {conSerie.map((p) =>
+              segmentosDe(p.puntos).map((seg, si) => (
+                <polyline
+                  key={`${p.iso3}-${si}`}
+                  points={seg.map((pt) => `${pt.x},${pt.y}`).join(" ")}
+                  fill="none"
+                  stroke={colorDe(p.iso3, p.esPaisPrincipal)}
+                  strokeWidth={p.esPaisPrincipal ? 3 : 1.5}
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              ))
+            )}
+          </svg>
+
+          {/* Valor final de cada país, junto a su último punto con dato */}
+          {conSerie.map((p) => {
+            const ultimo = [...p.puntos].reverse().find((pt) => pt.valor !== null);
+            if (!ultimo || ultimo.valor === null) return null;
+            const v = ultimo.valor;
+            return (
+              <div
+                key={`end-${p.iso3}`}
+                className="absolute"
+                style={{ left: `${xAt(Number(ultimo.periodo))}%`, top: `${yAt(v)}%`, transform: "translate(-50%,-50%)" }}
+              >
+                <div
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: colorDe(p.iso3, p.esPaisPrincipal) }}
+                />
+                <span className="absolute left-2 -translate-y-1/2 top-1/2 whitespace-nowrap text-[9px] text-black-eske dark:text-[#EAF2F8]">
+                  {fmt(v)}
+                </span>
+              </div>
+            );
+          })}
+
+          {aniosTick.map((year) => (
+            <span
+              key={`x-${year}`}
+              className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-80 dark:text-[#9AAEBE]"
+              style={{ left: `${xAt(year)}%` }}
+            >
+              {year}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Leyenda: un swatch por país con serie */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+        {conSerie.map((p) => (
+          <span key={`leg-${p.iso3}`} className="inline-flex items-center gap-1.5 text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">
+            <span
+              className="inline-block rounded-full"
+              style={{
+                width: p.esPaisPrincipal ? 14 : 10,
+                height: p.esPaisPrincipal ? 3 : 2,
+                background: colorDe(p.iso3, p.esPaisPrincipal),
+              }}
+            />
+            {p.pais}
+            {p.esPaisPrincipal ? " (tu país)" : ""}
+            {p.rankOficialUltimo != null ? ` · rank ${p.rankOficialUltimo}` : ""}
+          </span>
+        ))}
+      </div>
+
+      {/* Tabla de valores año × país — para leer los valores puntuales que
+          la gráfica multi-línea no muestra. Los años son EXACTAMENTE los
+          del eje X (`aniosTick`): completos si ≤12 puntos (F4-2, 5 años);
+          "thinned" con el mismo criterio del eje para series largas (F4-3,
+          34 años) — así tabla y gráfica quedan consistentes. */}
+      {conSerie.length > 0 && aniosTick.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="text-[10px] border-collapse w-full">
+            <thead>
+              <tr className="text-black-eske-80 dark:text-[#9AAEBE]">
+                <th className="text-left font-medium pr-2 pb-1">Año</th>
+                {conSerie.map((p) => (
+                  <th key={`th-${p.iso3}`} className="text-right font-medium px-2 pb-1 whitespace-nowrap">
+                    <span
+                      className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                      style={{ background: colorDe(p.iso3, p.esPaisPrincipal) }}
+                    />
+                    {p.pais}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="tabular-nums text-black-eske dark:text-[#EAF2F8]">
+              {aniosTick.map((year) => (
+                <tr key={`tr-${year}`} className="border-t border-gray-eske-10 dark:border-[#112230]">
+                  <td className="text-left pr-2 py-0.5 text-black-eske-80 dark:text-[#9AAEBE]">{year}</td>
+                  {conSerie.map((p) => {
+                    const pt = p.puntos.find((x) => Number(x.periodo) === year);
+                    return (
+                      <td key={`td-${year}-${p.iso3}`} className="text-right px-2 py-0.5">
+                        {pt && pt.valor !== null ? fmt(pt.valor) : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {aniosTick.length < aniosUnion.length && (
+            <p className="text-[9px] text-gray-eske-40 mt-1">
+              Años mostrados: los mismos del eje de la gráfica. La serie completa va de {minYear} a {maxYear}.
+            </p>
+          )}
+        </div>
+      )}
+
+      {sinSerie.length > 0 && (
+        <div className="mt-2 text-[11px] text-orange-eske-60 dark:text-orange-eske-40">
+          <p className="font-medium">Sin serie para este indicador:</p>
+          <ul className="list-disc list-inside">
+            {sinSerie.map((p) => (
+              <li key={`ns-${p.iso3}`}>
+                {p.pais} — {p.motivo ?? "sin dato"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {polaridadNota && <p className="text-[10px] text-gray-eske-40 mt-2">{polaridadNota}</p>}
     </div>
   );
 }

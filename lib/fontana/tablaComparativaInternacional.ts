@@ -65,3 +65,26 @@ export interface PaisComparativoCompleto {
   nombre: string;
   celda: CeldaComparativaPais;
 }
+
+// SERIE HISTÓRICA por país (2026-09-06) — paralelo a CeldaComparativaPais
+// pero con `puntos` en vez de un valor único. `estadoConsulta` se conserva
+// (4 estados, misma honestidad: "sin dato" ≠ "error de conexión") en vez
+// de un ok/motivo binario. `puntos` vacío sii estadoConsulta !== "ok".
+export interface SeriePaisComparativa {
+  iso3: string;
+  estadoConsulta: EstadoConsultaPais;
+  motivo?: string; // presente sii estadoConsulta !== "ok"
+  unidad?: string;
+  naturaleza?: NaturalezaDato;
+  fuenteEtiqueta?: string;
+  rankOficialUltimo?: number; // rank oficial en el punto más reciente, si la fuente lo publica
+  puntos: { periodo: string; valor: number | null }[];
+}
+
+// Fila de serie internacional — mismo shape que FilaComparativaInternacional
+// pero con series por país.
+export interface FilaSerieInternacional {
+  indicadorId: string;
+  paisPrincipal: SeriePaisComparativa;
+  referencia: SeriePaisComparativa[];
+}

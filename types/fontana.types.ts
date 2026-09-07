@@ -157,7 +157,8 @@ export type FontanaCanvasItemTipo =
   | "desglose"
   | "distribucion"
   | "serie_temporal"
-  | "comparacion_territorios";
+  | "comparacion_territorios"
+  | "serie_internacional";
 
 interface FontanaCanvasItemBase {
   id: string;
@@ -320,6 +321,37 @@ export interface FontanaCanvasComparacionTerritorios extends FontanaCanvasItemBa
   noResueltos: { nombreIngresado: string; motivo: string; candidatos?: string[] }[];
 }
 
+// tipo "serie_internacional" — evolución EN EL TIEMPO de un indicador de
+// Familia 4 (comparación internacional): el país principal del proyecto
+// (normalmente México) + los 4 países de referencia fijos, una línea por
+// país. Distinto de "serie_temporal" (que asume territorio mexicano con
+// nivel geográfico): aquí la clave es el país, no hay `nivel`, y el estado
+// de consulta por país es de 4 valores (misma honestidad que la tabla de
+// F4: "sin dato" ≠ "error de conexión"). `nota` = limitación estructural
+// visible SIEMPRE en la tarjeta (F4-2: por qué se excluye el tramo
+// pre-2016). Indicadores con serie: lib/fontana/series/seriesInternacionalesDisponibles.ts.
+export interface FontanaCanvasSerieInternacional extends FontanaCanvasItemBase {
+  tipo: "serie_internacional";
+  indicadorId: string;
+  indicadorNombre: string; // lenguaje llano, nunca el ID
+  unidad?: string;
+  formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
+  fuenteEtiqueta: string; // obligatorio (igual que serie_temporal)
+  polaridad?: "mayor_mejor" | "menor_mejor"; // de FAMILIA4_POLARIDAD — el render aclara la dirección
+  nota?: string; // nota de tarjeta (mismo canal que serie_temporal / distribucion)
+  periodoInicio: string;
+  periodoFin: string;
+  paises: {
+    pais: string; // nombre legible
+    iso3: string;
+    esPaisPrincipal: boolean; // normalmente México — el render lo enfatiza
+    estadoConsulta: "ok" | "error_conexion" | "sin_datos_confirmado" | "fuente_no_disponible";
+    motivo?: string; // presente sii estadoConsulta !== "ok"
+    rankOficialUltimo?: number; // rank oficial en el punto más reciente, si la fuente lo publica
+    puntos: { periodo: string; valor: number | null }[];
+  }[];
+}
+
 export type FontanaCanvasItem =
   | FontanaCanvasResumen
   | FontanaCanvasGrafica
@@ -327,7 +359,8 @@ export type FontanaCanvasItem =
   | FontanaCanvasDesglose
   | FontanaCanvasDistribucion
   | FontanaCanvasSerieTemporal
-  | FontanaCanvasComparacionTerritorios;
+  | FontanaCanvasComparacionTerritorios
+  | FontanaCanvasSerieInternacional;
 
 // Eventos del stream SSE de POST /api/fontana/chat — el cliente
 // (useChatStream) los despacha a callbacks.

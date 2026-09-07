@@ -15,6 +15,7 @@ import type {
   FontanaCanvasDistribucion,
   FontanaCanvasGrafica,
   FontanaCanvasResumen,
+  FontanaCanvasSerieInternacional,
   FontanaCanvasSerieTemporal,
   FontanaCanvasTabla,
 } from "@/types/fontana.types";
@@ -368,6 +369,70 @@ export function construirCanvasSerieTemporal(
       ranking: p.ranking,
       nivelCompetitividad: p.nivelCompetitividad,
       nota: p.nota,
+    })),
+  });
+}
+
+// ==========================================
+// tipo "serie_internacional" — serie histórica de un indicador de Familia
+// 4 (México + países de referencia). Los datos ya vienen resueltos de
+// GET /api/fontana/serie-internacional; esta función solo arma el item.
+// ==========================================
+
+interface PaisSerieCanvasInput {
+  pais: string;
+  iso3: string;
+  esPaisPrincipal: boolean;
+  estadoConsulta: "ok" | "error_conexion" | "sin_datos_confirmado" | "fuente_no_disponible";
+  motivo?: string | null;
+  rankOficialUltimo?: number | null;
+  puntos: { periodo: string; valor: number | null }[];
+}
+
+interface SerieInternacionalInput {
+  unidad?: string;
+  formato: "conteo" | "moneda" | "porcentaje" | "indice" | "coeficiente" | "puntaje";
+  fuenteEtiqueta: string;
+  polaridad?: "mayor_mejor" | "menor_mejor";
+  nota?: string;
+  paises: PaisSerieCanvasInput[];
+}
+
+export function construirCanvasSerieInternacional(
+  indicadorId: string,
+  indicadorNombre: string,
+  serie: SerieInternacionalInput,
+  meta: MetaTurno
+): FontanaCanvasSerieInternacional {
+  const periodos = [
+    ...new Set(serie.paises.flatMap((p) => p.puntos.map((pt) => pt.periodo))),
+  ].sort((a, b) => Number(a) - Number(b));
+  const periodoInicio = periodos[0] ?? "";
+  const periodoFin = periodos[periodos.length - 1] ?? "";
+  return limpiarUndefined<FontanaCanvasSerieInternacional>({
+    id: nuevoId(),
+    tipo: "serie_internacional",
+    titulo: `${indicadorNombre} — comparación internacional (${periodoInicio}-${periodoFin})`,
+    familiaId: meta.familiaId,
+    creadoEn: nowIso(),
+    mensajeId: meta.mensajeId,
+    indicadorId,
+    indicadorNombre,
+    unidad: serie.unidad,
+    formato: serie.formato,
+    fuenteEtiqueta: serie.fuenteEtiqueta,
+    polaridad: serie.polaridad,
+    nota: serie.nota,
+    periodoInicio,
+    periodoFin,
+    paises: serie.paises.map((p) => ({
+      pais: p.pais,
+      iso3: p.iso3,
+      esPaisPrincipal: p.esPaisPrincipal,
+      estadoConsulta: p.estadoConsulta,
+      motivo: p.motivo ?? undefined,
+      rankOficialUltimo: p.rankOficialUltimo ?? undefined,
+      puntos: p.puntos.map((pt) => ({ periodo: pt.periodo, valor: pt.valor })),
     })),
   });
 }

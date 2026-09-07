@@ -17,6 +17,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { SERIES_DISPONIBLES } from "../lib/fontana/series/seriesDisponibles";
+import { SERIES_INTERNACIONALES_DISPONIBLES } from "../lib/fontana/series/seriesInternacionalesDisponibles";
 
 const REGISTRY_PATH = path.resolve(__dirname, "../data/fontana/INDICATOR_REGISTRY.json");
 
@@ -25,7 +26,10 @@ function main() {
     Record<string, unknown> & { id: string }
   >;
 
-  const idsSerie = new Set(Object.keys(SERIES_DISPONIBLES));
+  const idsSerie = new Set([
+    ...Object.keys(SERIES_DISPONIBLES),
+    ...Object.keys(SERIES_INTERNACIONALES_DISPONIBLES),
+  ]);
   const idsRegistry = new Set(registry.map((i) => i.id));
   const faltantes = [...idsSerie].filter((id) => !idsRegistry.has(id));
   if (faltantes.length) {
@@ -45,7 +49,7 @@ function main() {
   }
 
   fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2) + "\n", "utf-8");
-  console.log(`OK — ${cambiados}/${idsSerie.size} indicadores de SERIES_DISPONIBLES corregidos a disponibilidadTemporal: null.`);
+  console.log(`OK — ${cambiados}/${idsSerie.size} indicadores con serie (geo + internacional) corregidos a disponibilidadTemporal: null.`);
   console.log("IDs corregidos:", Object.keys(antes).sort());
 }
 

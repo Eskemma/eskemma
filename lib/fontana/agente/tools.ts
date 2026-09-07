@@ -19,14 +19,32 @@ import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import { getIndicadorRegistro, getIndicadoresPorFamilia, type NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import { esIndicadorNarrativoCurado } from "@/lib/fontana/ingesta/contenidoCurado";
 import { tieneSerie, SERIES_DISPONIBLES } from "@/lib/fontana/series/seriesDisponibles";
+import { tieneSerieInternacional } from "@/lib/fontana/series/seriesInternacionalesDisponibles";
 
 // 26-09-05, incidente Iztapalapa: el nivel geográfico de una serie
 // (nacional/estatal/municipal) NUNCA debe salir de la inferencia del
 // modelo — antes `listar_indicadores_familia`/`listar_indicadores_activos_todas_familias`
 // solo exponían `tieneSerie` (booleano), sin nivel, y el modelo lo
 // adivinaba por el NOMBRE del indicador. `nivelesSerie` da el dato real.
-function nivelesSerie(id: string): NivelTablaFontana[] | null {
-  return SERIES_DISPONIBLES[id]?.niveles ?? null;
+// `tieneSerie` (SERIES_DISPONIBLES, geográfica F2/F3) O `tieneSerieInternacional`
+// (SERIES_INTERNACIONALES_DISPONIBLES, F4). SIEMPRE usar esta en las
+// superficies que exponen la bandera al modelo — usar solo `tieneSerie()`
+// devuelve `false` para todo F4 (incidente 26-09-07: el agente negó que el
+// Gini internacional tuviera serie porque `listar_indicadores_*` solo
+// consultaba `tieneSerie()`).
+function tieneSerieCualquiera(id: string): boolean {
+  return tieneSerie(id) || tieneSerieInternacional(id);
+}
+
+// Nivel(es) de la serie para el modelo. Geográfica → NivelTablaFontana[]
+// (nacional/estatal/municipal). F4 no tiene niveles geográficos: se marca
+// con el sentinela "internacional" (NO `null` — el prompt trataría `null`
+// + `tieneSerie:true` como una inconsistencia de datos) para que el modelo
+// tenga un valor concreto que citar: "serie que compara países, no niveles".
+function nivelesSerie(id: string): (NivelTablaFontana | "internacional")[] | null {
+  if (SERIES_DISPONIBLES[id]) return SERIES_DISPONIBLES[id].niveles;
+  if (tieneSerieInternacional(id)) return ["internacional"];
+  return null;
 }
 import { FAMILIA_META } from "@/lib/fontana/familias";
 import type { CeldaTablaFontana, NivelTablaFontana } from "@/lib/fontana/tablaColumnas";
@@ -38,6 +56,7 @@ import {
   construirCanvasDistribucion,
   construirCanvasGrafica,
   construirCanvasResumen,
+  construirCanvasSerieInternacional,
   construirCanvasSerieTemporal,
   construirCanvasTabla,
   limpiarUndefined,
@@ -119,7 +138,7 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "consultar_serie_temporal",
     description:
-      "Devuelve la serie histórica (varios años) de un indicador que tiene historia consultable en Fontana. Sabes cuáles la tienen por el campo `tieneSerie: true` (en consultar_indicador, listar_indicadores_familia, listar_indicadores_activos_todas_familias). Las hay con corte nacional/estatal (ej. Gini, huelgas, Índice de Paz, pobreza, Competitividad Estatal) y con corte municipal (Índice de Rezago Social, IDH municipal y sus sub-índices de salud/educación/ingreso). Sin territorioNombre = territorio del proyecto; con territorioNombre = un estado o municipio que el usuario nombró (ajeno al proyecto, o uno de los suyos si el proyecto abarca varios y ya te dijo cuál). Si el proyecto abarca más de un estado devuelve `multiEstado`, y si abarca más de un municipio (series municipales) devuelve `multiMunicipio` — en ambos casos pregunta al usuario a cuál se refiere, no elijas tú. El campo `nivel` de la respuesta dice a qué nivel es la serie (nacional / estatal / municipal); si es estatal, aclara que aplica a todo el estado, no es un promedio de los municipios/distritos del proyecto. NO genera nada en Canvas (para eso usa generar_visualizacion tipo 'serie_temporal').",
+      "Devuelve la serie histórica (varios años) de un indicador que tiene historia consultable en Fontana. Sabes cuáles la tienen por el campo `tieneSerie: true` (en consultar_indicador, listar_indicadores_familia, listar_indicadores_activos_todas_familias). Las hay con corte nacional/estatal (ej. Gini, huelgas, Índice de Paz, Competitividad Estatal), con corte municipal (Índice de Rezago Social, IDH municipal y sus sub-índices), con nacional/estatal Y municipal (pobreza, pobreza extrema, carencia social — el municipal es una serie cerrada de 3 puntos: 2010/2015/2020), y de comparación INTERNACIONAL (Familia 4: Gini internacional, IDH global, confianza en instituciones — serie de México + países de referencia). Si el resultado trae `nota`, cítala. Sin territorioNombre = territorio del proyecto; con territorioNombre = un estado o municipio que el usuario nombró (ajeno al proyecto, o uno de los suyos si el proyecto abarca varios y ya te dijo cuál). Si el proyecto abarca más de un estado devuelve `multiEstado`, y si abarca más de un municipio (series municipales) devuelve `multiMunicipio` — en ambos casos pregunta al usuario a cuál se refiere, no elijas tú. El campo `nivel` de la respuesta dice a qué nivel es la serie (nacional / estatal / municipal); si es estatal, aclara que aplica a todo el estado, no es un promedio de los municipios/distritos del proyecto. NO genera nada en Canvas (para eso usa generar_visualizacion tipo 'serie_temporal').",
     input_schema: {
       type: "object",
       properties: {
@@ -164,7 +183,7 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
   {
     name: "generar_visualizacion",
     description:
-      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos de TU territorio) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12) · 'serie_temporal' (evolución EN EL TIEMPO de un indicador — solo los que tienen `tieneSerie: true`) · 'comparacion_territorios' (UN indicador entre VARIOS territorios de México que el usuario nombró EXPLÍCITAMENTE — no niveles de tu proyecto, territorios sin relación jerárquica entre sí, ej. 'la inseguridad en Cuernavaca, Toluca y Pachuca'). Familia 4 no está disponible en Canvas todavía.",
+      "Agrega al Canvas: 'resumen' (tabla de una familia a un nivel) · 'grafica' (un indicador comparado ENTRE NIVELES geográficos de TU territorio) · 'tabla' (familia completa) · 'distribucion' (desglose de CATEGORÍAS dentro de un nivel: grupos de edad, deciles, estado civil, urbano/rural — solo F1-2, F1-11, F1-12, F2-12) · 'serie_temporal' (evolución EN EL TIEMPO de un indicador — solo los que tienen `tieneSerie: true`) · 'comparacion_territorios' (UN indicador entre VARIOS territorios de México que el usuario nombró EXPLÍCITAMENTE — no niveles de tu proyecto, territorios sin relación jerárquica entre sí, ej. 'la inseguridad en Cuernavaca, Toluca y Pachuca'). Familia 4 (comparación internacional) SOLO admite 'serie_temporal' — produce una tarjeta de serie internacional (México + países de referencia en el tiempo); el resto de tipos sigue sin estar disponible para F4.",
     input_schema: {
       type: "object",
       properties: {
@@ -361,7 +380,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
     id: i.id,
     nombre: i.nombre,
     definicion: i.definicion ?? null,
-    tieneSerie: tieneSerie(i.id),
+    tieneSerie: tieneSerieCualquiera(i.id),
     nivelesSerie: nivelesSerie(i.id),
   }));
 
@@ -373,7 +392,7 @@ async function listarIndicadoresFamilia(input: Record<string, unknown>, ctx: Too
   const catalogoCompleto = (await getIndicadoresPorFamilia(familiaNum)).map((i) => ({
     id: i.id,
     nombre: i.nombre,
-    tieneSerie: tieneSerie(i.id),
+    tieneSerie: tieneSerieCualquiera(i.id),
     nivelesSerie: nivelesSerie(i.id),
   }));
   const activos = new Set(indicadores.map((i) => i.id));
@@ -428,7 +447,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
       motivo: n.motivo,
       agregacionPlural: null,
       disponibilidadTemporal: registro?.disponibilidadTemporal ?? null,
-      tieneSerie: tieneSerie(indicadorId),
+      tieneSerie: tieneSerieCualquiera(indicadorId),
       nivelesComparados: null, // indicador narrativo curado: un solo nivel
     };
     const rs =
@@ -464,7 +483,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
       const rs = `«${indicadorId}» no está en la selección de Familia 4 de esta sesión.`;
       return { resultForModel: { indicadorId, error: rs }, toolCall: { tool: "consultar_indicador", input, resultSummary: rs, ok: false } };
     }
-    const result = { indicadorId, nombre: ind.nombre, definicion: ind.definicion ?? null, esComparacionInternacional: true, paisPrincipal: data.paisPrincipal, paisesReferencia: data.paisesReferencia, fila: ind.fila, disponibilidadTemporal: registro.disponibilidadTemporal ?? null, tieneSerie: tieneSerie(indicadorId), nivelesComparados: null };
+    const result = { indicadorId, nombre: ind.nombre, definicion: ind.definicion ?? null, esComparacionInternacional: true, paisPrincipal: data.paisPrincipal, paisesReferencia: data.paisesReferencia, fila: ind.fila, disponibilidadTemporal: registro.disponibilidadTemporal ?? null, tieneSerie: tieneSerieCualquiera(indicadorId), nivelesSerie: nivelesSerie(indicadorId), nivelesComparados: null };
     return { resultForModel: result, toolCall: { tool: "consultar_indicador", input, resultSummary: `${ind.nombre}: comparación internacional por país.`, ok: true } };
   }
 
@@ -518,7 +537,7 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
     motivo: valor === null ? celda?.motivo ?? "Nivel no cubierto." : null,
     agregacionPlural,
     disponibilidadTemporal: registro.disponibilidadTemporal ?? null,
-    tieneSerie: tieneSerie(indicadorId),
+    tieneSerie: tieneSerieCualquiera(indicadorId),
     nivelesComparados,
   };
   const rs = compararNiveles
@@ -553,7 +572,15 @@ async function generarVisualizacion(
 
   // serie_temporal — evolución en el tiempo (indicadores con tieneSerie:true).
   // No usa el endpoint de familia (los datos vienen de /api/fontana/serie-temporal).
+  // Familia 4 (comparación internacional): el modelo también pide
+  // tipo:"serie_temporal" (una serie en el tiempo), pero el shape de datos
+  // es distinto (países, no territorio mexicano) → se enruta a un camino
+  // paralelo que produce una tarjeta `serie_internacional`. El resto de la
+  // exclusión de F4 en Canvas (rechazo [C4] abajo) NO cambia.
   if (tipo === "serie_temporal") {
+    if (familiaDeIndicador(String(input.indicadorId ?? "")) === "F4") {
+      return generarSerieInternacional(input, ctx, mensajeId, reject);
+    }
     return generarSerieTemporal(input, ctx, mensajeId, reject);
   }
 
@@ -566,10 +593,12 @@ async function generarVisualizacion(
 
   if (!familiaId) return reject("Falta familiaId (para resumen/tabla) o indicadorId (para grafica).");
 
-  // [C4] Familia 4 no está disponible en Canvas esta ronda.
+  // [C4] Familia 4 en Canvas: SOLO `serie_temporal` (que arriba ya se
+  // enrutó a `generarSerieInternacional`). resumen/grafica/tabla/
+  // distribucion/comparacion_territorios siguen rechazados para F4.
   if (familiaId === "F4") {
     return reject(
-      "Familia 4 (comparación internacional) todavía no está disponible en Canvas. Usa navegar_pestana para abrirla en la pestaña Indicadores."
+      "Para Familia 4 (comparación internacional) solo está disponible la serie en el tiempo (tipo 'serie_temporal'). El resto de tipos de Canvas no aplica a F4 — usa navegar_pestana para abrirla en la pestaña Indicadores."
     );
   }
 
@@ -836,7 +865,7 @@ async function listarIndicadoresActivosTodasFamilias(ctx: ToolContext): Promise<
         indicadoresActivos: activos.map((i) => ({
           id: i.id,
           nombre: i.nombre,
-          tieneSerie: tieneSerie(i.id),
+          tieneSerie: tieneSerieCualquiera(i.id),
           nivelesSerie: nivelesSerie(i.id),
         })),
         totalActivos: activos.length,
@@ -1135,9 +1164,87 @@ function instruccionAlcance(nivel: unknown, label: string): string {
 }
 
 async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const tool = "consultar_serie_temporal" as const;
+  const indicadorIdRaw = String(input.indicadorId ?? "");
+
+  // Familia 4 (comparación internacional): la serie NO vive en el camino
+  // geográfico (serie-temporal/route.ts solo conoce SERIES_DISPONIBLES /
+  // `tieneSerie` geográfico → devolvería `sin_serie` para todo F4, incidente
+  // 26-09-07 2ª parte: el agente negó que el Gini internacional tuviera
+  // serie al INTENTAR LEER sus valores). Se lee por su ruta propia, igual
+  // que `generar_visualizacion` se bifurca a `generarSerieInternacional`.
+  // Devuelve `paises[].puntos` COMPLETOS para que el modelo pueda dar
+  // valores año por año.
+  if (familiaDeIndicador(indicadorIdRaw) === "F4") {
+    if (!tieneSerieInternacional(indicadorIdRaw)) {
+      const rs = "Este indicador de comparación internacional no tiene serie histórica disponible en Fontana todavía.";
+      return {
+        resultForModel: {
+          error: "sin_serie",
+          indicadorId: indicadorIdRaw,
+          mensaje: rs,
+          instruccion:
+            "Ese indicador de Familia 4 aún no tiene serie histórica. NO digas que Familia 4 no tiene series — otros indicadores F4 sí (ver el bloque 'Familia 4 (comparación internacional) — qué SÍ y qué NO en Canvas').",
+        },
+        toolCall: { tool, input, resultSummary: rs, ok: false },
+      };
+    }
+    const dataF4 = await fetchSerieInternacional(input, ctx);
+    if (dataF4.error === "sin_serie") {
+      const rs = String(dataF4.motivo ?? "Este indicador no tiene serie histórica.");
+      return {
+        resultForModel: { error: "sin_serie", indicadorId: indicadorIdRaw, mensaje: rs, instruccion: "Ese indicador de Familia 4 aún no tiene serie histórica. NO digas que Familia 4 no tiene series." },
+        toolCall: { tool, input, resultSummary: rs, ok: false },
+      };
+    }
+    if (!dataF4.ok) {
+      const rs = String(dataF4.motivo ?? "No se pudo obtener la serie internacional.");
+      return { resultForModel: { error: rs, indicadorId: indicadorIdRaw }, toolCall: { tool, input, resultSummary: rs, ok: false } };
+    }
+    const paisesF4 =
+      (dataF4.paises as Array<{
+        pais: string;
+        esPaisPrincipal: boolean;
+        estadoConsulta: string;
+        motivo?: string | null;
+        puntos: { periodo: string; valor: number | null }[];
+      }>) ?? [];
+    const conSerieF4 = paisesF4.filter((p) => p.estadoConsulta === "ok");
+    const sinSerieF4 = paisesF4.filter((p) => p.estadoConsulta !== "ok").map((p) => `${p.pais} (${p.motivo ?? "sin dato"})`);
+    const rs = `${String(dataF4.nombre)}: serie internacional ${String(dataF4.periodoInicio)}-${String(dataF4.periodoFin)}, ${conSerieF4.length} países con datos.`;
+    return {
+      resultForModel: {
+        esComparacionInternacional: true,
+        indicadorId: indicadorIdRaw,
+        nombre: dataF4.nombre,
+        unidad: dataF4.unidad ?? null,
+        formato: dataF4.formato ?? null,
+        fuenteEtiqueta: dataF4.fuenteEtiqueta ?? null,
+        nota: dataF4.nota ?? null,
+        polaridad: dataF4.polaridad ?? null,
+        periodoInicio: dataF4.periodoInicio ?? null,
+        periodoFin: dataF4.periodoFin ?? null,
+        // series COMPLETAS por país — el modelo puede citar el valor de
+        // CUALQUIER año para CUALQUIER país desde aquí.
+        paises: paisesF4.map((p) => ({
+          pais: p.pais,
+          esPaisPrincipal: p.esPaisPrincipal,
+          estadoConsulta: p.estadoConsulta,
+          motivo: p.motivo ?? null,
+          puntos: p.puntos,
+        })),
+        instruccion:
+          "Es una serie de comparación internacional: el país principal del proyecto + el set FIJO de referencia (Colombia, Chile, Brasil, Argentina). Puedes dar el valor de cualquier año para cualquier país leyéndolo de `paises[].puntos`. " +
+          (dataF4.nota ? `La serie trae una aclaración estructural — menciónala: "${String(dataF4.nota)}" ` : "") +
+          (sinSerieF4.length ? `${sinSerieF4.join(", ")} — sin serie para este indicador; no inventes valores para esos países. ` : "") +
+          "Cita la fuente. NO genera Canvas (para eso, generar_visualizacion tipo `serie_temporal`).",
+      },
+      toolCall: { tool, input, resultSummary: rs, ok: true },
+    };
+  }
+
   const territorioNombre = input.territorioNombre ? String(input.territorioNombre).trim() : "";
   const data = await fetchSerie(input, ctx);
-  const tool = "consultar_serie_temporal" as const;
 
   if (data.multiEstado) {
     const estados = (data.estados as string[]) ?? [];
@@ -1354,6 +1461,139 @@ async function generarSerieTemporal(
           ? ` Además, ${terr.label} no es parte del territorio del proyecto — aclárualo.`
           : "") +
         (item.nota ? ` La serie trae una aclaración estructural — menciónala: "${item.nota}"` : ""),
+    },
+    toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
+    canvasItem: item,
+  };
+}
+
+// ==========================================
+// SERIE INTERNACIONAL (Familia 4, 2026-09-06) — evolución en el tiempo de
+// un indicador de comparación internacional (México + países de referencia
+// fijos). Camino PARALELO al de serie_temporal: shape distinto (países, no
+// territorio), datos de GET /api/fontana/serie-internacional. El resto de
+// la exclusión de F4 en Canvas (rechazo [C4]) no cambia.
+// ==========================================
+
+type PaisSerieCanvas = {
+  pais: string;
+  iso3: string;
+  esPaisPrincipal: boolean;
+  estadoConsulta: "ok" | "error_conexion" | "sin_datos_confirmado" | "fuente_no_disponible";
+  motivo?: string | null;
+  rankOficialUltimo?: number | null;
+  puntos: { periodo: string; valor: number | null }[];
+};
+
+async function fetchSerieInternacional(
+  input: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<Record<string, unknown>> {
+  const indicadorId = String(input.indicadorId ?? "");
+  const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
+  const res = await fetch(`${ctx.baseUrl}/api/fontana/serie-internacional?${params.toString()}`, {
+    headers: { cookie: ctx.cookie },
+  });
+  return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+}
+
+async function generarSerieInternacional(
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+  mensajeId: string,
+  reject: (rs: string) => ToolResult
+): Promise<ToolResult> {
+  const indicadorId = String(input.indicadorId ?? "");
+  if (!tieneSerieInternacional(indicadorId)) {
+    return reject(
+      "Este indicador de comparación internacional no tiene serie histórica disponible en Fontana todavía. El resto de Familia 4 sigue sin estar disponible en Canvas."
+    );
+  }
+  const data = await fetchSerieInternacional(input, ctx);
+  if (data.error === "sin_serie") return reject(String(data.motivo ?? "Ese indicador no tiene serie histórica."));
+  if (!data.ok) return reject(String(data.motivo ?? "No se pudo obtener la serie internacional."));
+
+  const nombre = String(data.nombre ?? indicadorId);
+  const paises = (data.paises as PaisSerieCanvas[] | undefined) ?? [];
+
+  // Dedup por indicador (no hay territorio — una tarjeta por indicador F4).
+  const existente = ctx.canvasItemsSesion.find(
+    (ci) => ci.tipo === "serie_internacional" && "indicadorId" in ci && ci.indicadorId === indicadorId && !ci.eliminado
+  );
+  if (existente && existente.tipo === "serie_internacional") {
+    const rs = `Ya tenías la serie internacional de «${existente.indicadorNombre}» en el Canvas — no se duplicó. Usa estos datos para tu lectura.`;
+    return {
+      resultForModel: {
+        canvasItemId: existente.id,
+        tipo: existente.tipo,
+        titulo: existente.titulo,
+        resumen: rs,
+        nota: existente.nota ?? null,
+        periodoInicio: existente.periodoInicio,
+        periodoFin: existente.periodoFin,
+        paises: existente.paises.map((p) => ({
+          pais: p.pais,
+          esPaisPrincipal: p.esPaisPrincipal,
+          estadoConsulta: p.estadoConsulta,
+          nPuntos: p.puntos.filter((x) => x.valor !== null).length,
+        })),
+        yaExistiaEnCanvas: true,
+      },
+      toolCall: { tool: "generar_visualizacion", input, resultSummary: rs, ok: true },
+    };
+  }
+
+  const familiaId = familiaDeIndicador(indicadorId);
+  const FORMATOS_SERIE = ["conteo", "moneda", "porcentaje", "indice", "coeficiente", "puntaje"] as const;
+  type FormatoSerie = (typeof FORMATOS_SERIE)[number];
+  const formato: FormatoSerie = FORMATOS_SERIE.includes(data.formato as FormatoSerie)
+    ? (data.formato as FormatoSerie)
+    : "conteo";
+
+  const item = construirCanvasSerieInternacional(
+    indicadorId,
+    nombre,
+    {
+      unidad: (data.unidad as string | null) ?? undefined,
+      formato,
+      fuenteEtiqueta: String(data.fuenteEtiqueta ?? ""),
+      polaridad: (data.polaridad as "mayor_mejor" | "menor_mejor" | null) ?? undefined,
+      nota: (data.nota as string | null) ?? undefined,
+      paises,
+    },
+    {
+      mensajeId,
+      familiaId,
+      familiaEtiqueta: FAMILIA_ETIQUETAS[familiaId],
+      territorioLabel: territorioLabel(ctx.territorio),
+    }
+  );
+  await appendCanvasItem(ctx.sesionId, item);
+  ctx.canvasItemsSesion.push(item);
+  const resultSummary = `Agregué al Canvas la serie internacional de «${item.indicadorNombre}» (${item.periodoInicio}-${item.periodoFin}).`;
+  const paisesSinDato = item.paises.filter((p) => p.estadoConsulta !== "ok").map((p) => p.pais);
+  return {
+    resultForModel: {
+      canvasItemId: item.id,
+      tipo: item.tipo,
+      titulo: item.titulo,
+      resumen: resultSummary,
+      nota: item.nota ?? null,
+      periodoInicio: item.periodoInicio,
+      periodoFin: item.periodoFin,
+      paises: item.paises.map((p) => ({
+        pais: p.pais,
+        esPaisPrincipal: p.esPaisPrincipal,
+        estadoConsulta: p.estadoConsulta,
+        motivo: p.motivo ?? null,
+        nPuntos: p.puntos.filter((x) => x.valor !== null).length,
+      })),
+      instruccionChat:
+        "Es una comparación internacional en el tiempo: el país principal del proyecto (normalmente México) frente al SET FIJO de países de referencia (Colombia, Chile, Brasil, Argentina). El set de países de Familia 4 es fijo — el usuario no elige un subconjunto. Si el usuario pidió países específicos, dilo explícitamente en tu respuesta (no puedo generar solo con esos; la serie muestra el set completo, donde sí aparecen los que pidió y sí están). Cita la fuente. " +
+        (item.nota ? `La serie trae una aclaración estructural — menciónala: "${item.nota}" ` : "") +
+        (paisesSinDato.length
+          ? `${paisesSinDato.join(", ")} no tienen serie para este indicador — dilo, no inventes una línea para ellos.`
+          : ""),
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
     canvasItem: item,

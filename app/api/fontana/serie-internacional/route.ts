@@ -1,0 +1,124 @@
+// app/api/fontana/serie-internacional/route.ts
+// GET ?sesionId=&indicadorId=
+// Serie histórica de un indicador de Familia 4 (comparación internacional):
+// México (o el país principal del proyecto) + los 4 países de referencia
+// fijos (PAISES_REFERENCIA_F4), una serie de puntos por país.
+//
+// Ruta SEPARADA de serie-temporal/route.ts a propósito: esa es de un solo
+// territorio mexicano (usa sesion.territorio, estadosDelTerritorio,
+// resolverTerritorioNombre, ResultadoSerie con un solo puntos[]). F4 no
+// tiene Territorio y devuelve N series — meterlo ahí obligaría a un modo
+// "sin territorio, multi-país" en cada rama. Config de qué indicadores F4
+// tienen serie: lib/fontana/series/seriesInternacionalesDisponibles.ts.
+
+import { type NextRequest, NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/server/auth-helpers";
+import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
+import { familiaDeIndicador } from "@/types/fontana.types";
+import {
+  FAMILIA4_NOMBRES,
+  FAMILIA4_POLARIDAD,
+  ISO3_A_NOMBRE,
+  MEXICO_ISO3,
+  resolverPaisPrincipal,
+} from "@/lib/fontana/familia4Catalogo";
+import {
+  SERIES_INTERNACIONALES_DISPONIBLES,
+  tieneSerieInternacional,
+} from "@/lib/fontana/series/seriesInternacionalesDisponibles";
+import { resolverSerieInternacionalF4 } from "@/lib/fontana/ingesta/serieInternacional";
+import type { SeriePaisComparativa } from "@/lib/fontana/tablaComparativaInternacional";
+
+function formatoDesdeUnidad(unidad?: string): "porcentaje" | "coeficiente" | "moneda" | "conteo" {
+  if (!unidad) return "conteo";
+  if (unidad.includes("0-1")) return "coeficiente";
+  if (unidad.includes("%")) return "porcentaje";
+  if (unidad.toUpperCase().includes("USD")) return "moneda";
+  return "conteo";
+}
+
+export async function GET(request: NextRequest) {
+  const session = await getSessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const sesionId = searchParams.get("sesionId");
+  const indicadorId = searchParams.get("indicadorId");
+  if (!sesionId || !indicadorId) {
+    return NextResponse.json({ error: "sesionId e indicadorId son requeridos" }, { status: 400 });
+  }
+  if (familiaDeIndicador(indicadorId) !== "F4") {
+    return NextResponse.json(
+      { ok: false, motivo: "Esta ruta es solo para indicadores de Familia 4 (comparación internacional)." },
+      { status: 400 }
+    );
+  }
+  if (!tieneSerieInternacional(indicadorId)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "sin_serie",
+        motivo: "Este indicador de comparación internacional no tiene serie histórica disponible en Fontana todavía.",
+      },
+      { status: 200 }
+    );
+  }
+
+  const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
+  if (!cargada) return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
+  const { sesion } = cargada;
+
+  const paisPrincipal = resolverPaisPrincipal(sesion.territorio);
+
+  let fila;
+  try {
+    fila = await resolverSerieInternacionalF4(indicadorId, paisPrincipal.iso3);
+  } catch {
+    return NextResponse.json({ ok: false, motivo: "No se pudo obtener la serie internacional." }, { status: 200 });
+  }
+
+  const todas = [fila.paisPrincipal, ...fila.referencia];
+  const primeraOk = todas.find((s) => s.estadoConsulta === "ok");
+  if (!primeraOk) {
+    return NextResponse.json(
+      { ok: false, motivo: "Ninguno de los países tiene serie histórica para este indicador." },
+      { status: 200 }
+    );
+  }
+
+  const nombrePais = (iso3: string) =>
+    iso3 === MEXICO_ISO3 ? paisPrincipal.nombre : ISO3_A_NOMBRE[iso3] ?? iso3;
+
+  const mapPais = (s: SeriePaisComparativa, esPaisPrincipal: boolean) => ({
+    pais: nombrePais(s.iso3),
+    iso3: s.iso3,
+    esPaisPrincipal,
+    estadoConsulta: s.estadoConsulta,
+    motivo: s.motivo ?? null,
+    rankOficialUltimo: s.rankOficialUltimo ?? null,
+    puntos: s.puntos,
+  });
+  const paises = [mapPais(fila.paisPrincipal, true), ...fila.referencia.map((r) => mapPais(r, false))];
+
+  const cfg = SERIES_INTERNACIONALES_DISPONIBLES[indicadorId];
+  const periodos = [
+    ...new Set(paises.flatMap((p) => p.puntos.map((pt) => pt.periodo))),
+  ].sort((a, b) => Number(a) - Number(b));
+
+  return NextResponse.json(
+    {
+      ok: true,
+      indicadorId,
+      nombre: FAMILIA4_NOMBRES[indicadorId] ?? indicadorId,
+      formato: formatoDesdeUnidad(primeraOk.unidad),
+      unidad: primeraOk.unidad ?? null,
+      fuenteEtiqueta: primeraOk.fuenteEtiqueta ?? "",
+      nota: cfg?.notaTarjeta ?? null,
+      polaridad: FAMILIA4_POLARIDAD[indicadorId] ?? null,
+      periodoInicio: periodos[0] ?? null,
+      periodoFin: periodos[periodos.length - 1] ?? null,
+      paises,
+    },
+    { status: 200 }
+  );
+}
