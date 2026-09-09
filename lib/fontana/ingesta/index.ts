@@ -1265,6 +1265,57 @@ async function calcularTasaPonderada(
   };
 }
 
+// Desglose por estado de un indicador SOLO estatal, filtrado a un conjunto
+// de estados dados. Extraído de la rama estatal-plural de
+// resolverAgregacionPlural (abajo) — refactor sin cambio de comportamiento
+// — para reutilizarlo desde app/api/fontana/familia/[familiaId]/route.ts:
+// un proyecto plural municipal/distrital que abarca MÁS DE UN estado
+// necesita este desglose en su celda Estatal, aunque el nivel objetivo del
+// proyecto (el que resolverAgregacionPlural sobrescribe) sea otro.
+export async function desgloseEstatalParaEstados(
+  indicadorId: string,
+  nombresEstados: string[]
+): Promise<{
+  valorAgregado: CeldaFontana | null;
+  desglosePorUnidad: ElementoAgregacionPlural[];
+  noResueltas: NoResueltaAgregacionPlural[];
+}> {
+  const nivelCelda: CeldaFontana["nivel"] = "estatal";
+  const registro = await getIndicadorRegistro(indicadorId);
+  const tipo = registro?.agregacionPlural?.tipo;
+  if (!tipo) {
+    return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [], noResueltas: [] };
+  }
+
+  const todos = await resolverDesgloseEstadosNacional(indicadorId);
+  // Bug real 26-08-18: los nombres de entrada vienen en formato ESTADOS_MEXICO
+  // ("Jalisco", de TerritorySelector.tsx / estadosDelTerritorio), pero
+  // resolverEstadosNacional() etiqueta cada estado con CVE_ESTADO_NOMBRE[cve]
+  // (lib/geo/municipios.ts) en MAYÚSCULAS ("JALISCO") — una comparación de
+  // strings crudos nunca coincide. Se normalizan ambos lados con
+  // normalizeGeoName() solo para el MATCH; el nombre que se guarda en `estado`
+  // para la UI sigue siendo el canónico de entrada.
+  const normalizadoAOriginal = new Map(nombresEstados.map((n) => [normalizeGeoName(n), n]));
+  const desglose: ElementoAgregacionPlural[] = (todos ?? [])
+    .filter((e) => normalizadoAOriginal.has(normalizeGeoName(e.nombre)))
+    .map((e) => ({ ...e, estado: normalizadoAOriginal.get(normalizeGeoName(e.nombre))! }));
+
+  // Nombres de estado que no matchearon ningún estado real — mismo criterio
+  // "nunca en silencio" que agruparUnidadesPorEstado (Ronda 6, 26-08-17).
+  const resueltosNombres = new Set(desglose.map((e) => normalizeGeoName(e.estado)));
+  const noResueltas: NoResueltaAgregacionPlural[] = nombresEstados
+    .filter((n) => !resueltosNombres.has(normalizeGeoName(n)))
+    .map((n) => ({ nombre: n, estado: n, motivo: `Estado "${n}" no reconocido en el catálogo INEGI` }));
+
+  let valorAgregado: CeldaFontana | null = null;
+  if (tipo === "aditivo") valorAgregado = await calcularAditivo(desglose, nivelCelda);
+  else if (tipo === "tasa_ponderada") {
+    valorAgregado = { nivel: nivelCelda, motivo: "Reconstrucción de valor combinado no implementada a nivel Estatal en este incremento" };
+  }
+  // no_agregable: valorAgregado queda null — solo desglose.
+  return { valorAgregado, desglosePorUnidad: desglose, noResueltas };
+}
+
 export async function resolverAgregacionPlural(
   indicadorId: string,
   territorio: Territorio
@@ -1274,45 +1325,7 @@ export async function resolverAgregacionPlural(
   // Estatal-plural: las unidades SON los estados — desglose vía el
   // dispatcher "Ver estados" ya existente, filtrado a los seleccionados.
   if (territorio.nivel === "estatal" && territorio.estadosSeleccionados && territorio.estadosSeleccionados.length > 1) {
-    const registro = await getIndicadorRegistro(indicadorId);
-    const tipo = registro?.agregacionPlural?.tipo;
-    if (!tipo) return { valorAgregado: { nivel: nivelCelda, motivo: SIN_CLASIFICAR_MOTIVO }, desglosePorUnidad: [], noResueltas: [] };
-
-    const todos = await resolverDesgloseEstadosNacional(indicadorId);
-    // Bug real 26-08-18: territorio.estadosSeleccionados guarda nombres
-    // "Jalisco" (formato de ESTADOS_MEXICO en TerritorySelector.tsx —
-    // fuente de verdad del formato persistido en Firestore), pero
-    // resolverEstadosNacional() etiqueta cada estado con
-    // CVE_ESTADO_NOMBRE[cve] (lib/geo/municipios.ts), que son las claves
-    // de ESTADO_CVE_MAP en MAYÚSCULAS ("JALISCO") — una comparación de
-    // strings crudos nunca coincidía, para NINGÚN estado. Normalizamos
-    // ambos lados con normalizeGeoName() (mismo helper ya usado en este
-    // archivo para esta clase de comparación, ver agruparUnidadesPorEstado
-    // arriba) solo para el MATCH — el nombre que se guarda en `estado`
-    // para mostrar en la UI sigue siendo el formato canónico persistido
-    // (territorio.estadosSeleccionados), nunca el de CVE_ESTADO_NOMBRE.
-    const normalizadoAOriginal = new Map(
-      territorio.estadosSeleccionados.map((n) => [normalizeGeoName(n), n])
-    );
-    const desglose: ElementoAgregacionPlural[] = (todos ?? [])
-      .filter((e) => normalizadoAOriginal.has(normalizeGeoName(e.nombre)))
-      .map((e) => ({ ...e, estado: normalizadoAOriginal.get(normalizeGeoName(e.nombre))! }));
-
-    // Nombres declarados en el proyecto que no matchearon ningún estado
-    // real del desglose nacional — mismo criterio "nunca en silencio" que
-    // agruparUnidadesPorEstado (Ronda 6, 26-08-17).
-    const resueltosNombres = new Set(desglose.map((e) => normalizeGeoName(e.estado)));
-    const noResueltas: NoResueltaAgregacionPlural[] = territorio.estadosSeleccionados
-      .filter((n) => !resueltosNombres.has(normalizeGeoName(n)))
-      .map((n) => ({ nombre: n, estado: n, motivo: `Estado "${n}" no reconocido en el catálogo INEGI` }));
-
-    let valorAgregado: CeldaFontana | null = null;
-    if (tipo === "aditivo") valorAgregado = await calcularAditivo(desglose, nivelCelda);
-    else if (tipo === "tasa_ponderada") {
-      valorAgregado = { nivel: nivelCelda, motivo: "Reconstrucción de valor combinado no implementada a nivel Estatal en este incremento" };
-    }
-    // no_agregable: valorAgregado queda null — solo desglose (ver plan, pendiente confirmación de Raúl).
-    return { valorAgregado, desglosePorUnidad: desglose, noResueltas };
+    return desgloseEstatalParaEstados(indicadorId, territorio.estadosSeleccionados);
   }
 
   // Municipal/Distrital-plural

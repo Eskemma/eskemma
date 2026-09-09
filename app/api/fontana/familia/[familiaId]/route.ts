@@ -20,8 +20,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import type { FontanaSesion, FamiliaFontanaId } from "@/types/fontana.types";
-import { resolverIndicadorFontana, resolverDistritalDeMunicipioPonderado, resolverAgregacionPlural } from "@/lib/fontana/ingesta";
+import { resolverIndicadorFontana, resolverDistritalDeMunicipioPonderado, resolverAgregacionPlural, desgloseEstatalParaEstados } from "@/lib/fontana/ingesta";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
+import { estadosDelTerritorio } from "@/lib/fontana/geo/estadosDelTerritorio";
 import {
   FONTANA_ECEG_CONFIG,
   resolverDistritalDeMunicipio,
@@ -124,6 +125,18 @@ const INDICADORES_ESTADOS_NACIONAL = new Set([
   "F2-1", "F2-2", "F2-3", "F2-4", "F2-7", "F2-14", "F2-18",
   "F2-6", "F2-9", "F2-10", "F2-12", "F2-15", "F2-16", "F2-17",
 ]);
+
+// Bloque 2 ítem 1 (26-09-09) — indicadores SOLO estatales (registry:
+// municipal/distrital = no_viable). En un proyecto plural que abarca más
+// de un estado, su celda Estatal la produce el resolver con
+// territorio.estado, que TerritorySelector.tsx fija al PRIMER elemento
+// seleccionado — mostraba el valor de un solo estado en silencio. El caso
+// nivel:"estatal" plural ya lo cubre resolverAgregacionPlural (rama
+// estatal-plural); este Set gobierna el parche para el caso
+// nivel:"municipal"/"distrito_*" plural multi-estado, donde ese override
+// solo toca la celda del nivel objetivo (municipal/distrital), no la
+// Estatal. resolverDesgloseEstadosNacional cubre los 4.
+const INDICADORES_ESTATAL_ALCANCE_PLURAL = new Set(["F2-17", "F2-6", "F2-15", "F2-16"]);
 
 interface IndicadorRespuesta {
   id: string;
@@ -406,6 +419,40 @@ export async function GET(
               celdaObjetivo.motivo =
                 agregado?.motivo ?? "Sin valor combinado disponible para este indicador";
             }
+          }
+        }
+      }
+
+      // Bloque 2 ítem 1 (26-09-09) — el override plural de arriba sobrescribe
+      // SOLO la celda del nivel objetivo. Para los indicadores estatal-only
+      // en un proyecto municipal/distrital plural que abarca más de un
+      // estado, la celda Estatal seguía mostrando el valor de
+      // territorio.estado (primer elemento) sin aviso. Se le adjunta el
+      // desglose por estado — mismo mecanismo (resolverDesgloseEstadosNacional
+      // + BloqueAgregacionPlural) que ya usa el caso nivel:"estatal" plural.
+      if (
+        INDICADORES_ESTATAL_ALCANCE_PLURAL.has(id) &&
+        sesion.territorio.nivel !== "estatal"
+      ) {
+        const estados = estadosDelTerritorio(sesion.territorio);
+        if (estados.length > 1) {
+          const d = await desgloseEstatalParaEstados(id, estados);
+          const celdaEstatal = celdas.find((c) => c.nivel === "estatal");
+          if (celdaEstatal && (d.desglosePorUnidad.length > 0 || d.noResueltas.length > 0)) {
+            celdaEstatal.valor = undefined;
+            celdaEstatal.unidad = undefined;
+            celdaEstatal.naturaleza = undefined;
+            celdaEstatal.fuenteEtiqueta = undefined;
+            celdaEstatal.motivo =
+              d.valorAgregado && "motivo" in d.valorAgregado
+                ? d.valorAgregado.motivo
+                : `Este indicador es estatal y tu proyecto abarca ${estados.length} estados (${estados.join(", ")}). No es un promedio ni cubre a todos por igual — abre el desglose para ver el valor de cada estado.`;
+            celdaEstatal.agregacionPlural = {
+              valorAgregado: d.valorAgregado,
+              desglosePorUnidad: d.desglosePorUnidad,
+              noResueltas: d.noResueltas,
+              tipoCalculo: registro?.agregacionPlural?.tipo,
+            };
           }
         }
       }
