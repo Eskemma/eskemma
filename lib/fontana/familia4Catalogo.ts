@@ -79,8 +79,10 @@ export const MEXICO_ISO3 = "MEX";
 // Mismo set cerrado de PAISES_IBEROAMERICA que
 // app/components/shared/TerritorySelector.tsx — un país solo puede venir
 // de esa lista (dropdown, no texto libre), así que este mapa nunca
-// necesita más de estas 23 entradas.
-const PAIS_ISO3_POR_NOMBRE: Record<string, string> = {
+// necesita más de estas 23 entradas. Exportado (2026-09-08) para
+// resolverPaisesNombres: el usuario puede pedir agregar/excluir países
+// del set fijo de F4, y solo se aceptan nombres de esta lista.
+export const PAIS_ISO3_POR_NOMBRE: Record<string, string> = {
   "México": "MEX",
   "Estados Unidos": "USA",
   "España": "ESP",
@@ -115,6 +117,12 @@ const PAIS_ISO3_POR_NOMBRE: Record<string, string> = {
 export const ISO3_A_NOMBRE: Record<string, string> = Object.fromEntries(
   Object.entries(PAIS_ISO3_POR_NOMBRE).map(([nombre, iso3]) => [iso3, nombre])
 );
+
+// Nombres válidos que el usuario puede pedir agregar/excluir en una serie
+// de Familia 4 (el mismo dropdown iberoamericano del selector de
+// territorio). El agente los cita cuando el usuario pregunta qué países
+// puede comparar; nunca inventa uno fuera de esta lista.
+export const PAISES_F4_NOMBRES: string[] = Object.keys(PAIS_ISO3_POR_NOMBRE);
 
 // Único punto que decide el país principal de Familia 4 — si más
 // adelante cambia el criterio de fallback (ej. Iberoamérica deja de

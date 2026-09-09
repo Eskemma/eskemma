@@ -167,6 +167,12 @@ export default function FontanaF4Panel({ sesionId, indicadores, paisPrincipal, p
         </tbody>
       </table>
 
+      <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-3 leading-snug">
+        El asistente compara tu país con Colombia, Chile, Brasil y Argentina por
+        defecto. Puedes pedirle que agregue o quite países de la comparación
+        (por ejemplo: «añade Perú a la serie» o «quítame Argentina»).
+      </p>
+
       {modalIndicador && (
         <FontanaF4PaisesModal
           sesionId={sesionId}

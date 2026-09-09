@@ -46,11 +46,21 @@ export const SERIES_INTERNACIONALES_DISPONIBLES: Record<string, ConfigSerieF4> =
   "F4-9": { fuenteId: "cepalstat" },
   "F4-10": { fuenteId: "cepalstat" },
   "F4-11": { fuenteId: "cepalstat" },
-  // Fase 3 (aún sin resolver de serie — el config se completa cuando se
-  // implementen):
-  // "F4-1": { fuenteId: "banco_mundial" },
-  // "F4-4": { fuenteId: "banco_mundial" },
-  // "F4-5": { fuenteId: "banco_mundial" },
+  // F4-1/F4-4/F4-5 (Banco Mundial) — 2026-09-08 (Fase 3). Endpoint acotado a
+  // los 5 países del set (1 página, sin paginar). F4-1 (PIB PPA) serie
+  // continua 1990-2025 y F4-4 (Pobreza, años de encuesta irregulares) sin
+  // quiebre interno en un pull fresco. F4-5 (Inflación): el BM no publica CPI
+  // de Argentina antes de 2018 y su nivel reciente (decenas a >200 %) aplasta
+  // la escala del resto — `anioMinimo: 2000` (excluye la hiperinflación de
+  // Brasil 1990-1994) + `notaTarjeta`. Ver bancoMundial.ts.
+  "F4-1": { fuenteId: "banco_mundial", anioMinimo: 1990 },
+  "F4-4": { fuenteId: "banco_mundial", anioMinimo: 1990 },
+  "F4-5": {
+    fuenteId: "banco_mundial",
+    anioMinimo: 2000,
+    notaTarjeta:
+      "La serie arranca en 2000 (se omite la hiperinflación de Brasil de 1990-1994). El Banco Mundial no publica inflación anual de Argentina antes de 2018, por eso su línea empieza ahí; además su nivel reciente (decenas a más de 200 %) difiere en un orden de magnitud del resto del set (México, Colombia, Chile y Brasil, todos por debajo de ~15 % desde 2000), así que domina la escala vertical del gráfico — la tabla año×país muestra el valor exacto de cada país.",
+  },
 };
 
 export function tieneSerieInternacional(indicadorId: string): boolean {

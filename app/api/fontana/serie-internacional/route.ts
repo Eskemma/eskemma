@@ -20,6 +20,7 @@ import {
   FAMILIA4_POLARIDAD,
   ISO3_A_NOMBRE,
   MEXICO_ISO3,
+  PAISES_REFERENCIA_F4,
   resolverPaisPrincipal,
 } from "@/lib/fontana/familia4Catalogo";
 import {
@@ -27,6 +28,7 @@ import {
   tieneSerieInternacional,
 } from "@/lib/fontana/series/seriesInternacionalesDisponibles";
 import { resolverSerieInternacionalF4 } from "@/lib/fontana/ingesta/serieInternacional";
+import { resolverPaisesNombres } from "@/lib/fontana/geo/resolverPaisesNombres";
 import type { SeriePaisComparativa } from "@/lib/fontana/tablaComparativaInternacional";
 
 function formatoDesdeUnidad(unidad?: string): "porcentaje" | "coeficiente" | "moneda" | "conteo" | "indice" {
@@ -74,9 +76,42 @@ export async function GET(request: NextRequest) {
 
   const paisPrincipal = resolverPaisPrincipal(sesion.territorio);
 
+  // Set de referencia: el fijo POR DEFAULT; el usuario puede pedir agregar
+  // o excluir países explícitamente (el guard de tools.ts ya verificó que
+  // los nombró — aquí solo se mapea nombre → iso3 y se arma la lista).
+  const nombresAgregar = searchParams.getAll("paisAgregar");
+  const nombresExcluir = searchParams.getAll("paisExcluir");
+  const resAgregar = resolverPaisesNombres(nombresAgregar);
+  const resExcluir = resolverPaisesNombres(nombresExcluir);
+  const isosExcluir = new Set(resExcluir.resueltos.map((r) => r.iso3));
+  const setPersonalizado = resAgregar.resueltos.length > 0 || isosExcluir.size > 0;
+
+  const refsFinal: string[] = [];
+  for (const p of PAISES_REFERENCIA_F4) {
+    if (!isosExcluir.has(p.iso3) && p.iso3 !== paisPrincipal.iso3) refsFinal.push(p.iso3);
+  }
+  for (const r of resAgregar.resueltos) {
+    if (r.iso3 !== paisPrincipal.iso3 && !refsFinal.includes(r.iso3)) refsFinal.push(r.iso3);
+  }
+
+  if (refsFinal.length + 1 > 8) {
+    return NextResponse.json(
+      { ok: false, motivo: "Demasiados países en la comparación — el máximo legible son 8 en total (país principal + 7)." },
+      { status: 200 }
+    );
+  }
+  if (refsFinal.length === 0) {
+    return NextResponse.json(
+      { ok: false, motivo: "La comparación se quedó sin países de referencia — deja al menos uno además del país principal." },
+      { status: 200 }
+    );
+  }
+
+  const paisesNoReconocidos = [...resAgregar.noResueltos, ...resExcluir.noResueltos].map((n) => n.nombreIngresado);
+
   let fila;
   try {
-    fila = await resolverSerieInternacionalF4(indicadorId, paisPrincipal.iso3);
+    fila = await resolverSerieInternacionalF4(indicadorId, paisPrincipal.iso3, refsFinal);
   } catch {
     return NextResponse.json({ ok: false, motivo: "No se pudo obtener la serie internacional." }, { status: 200 });
   }
@@ -122,6 +157,8 @@ export async function GET(request: NextRequest) {
       periodoInicio: periodos[0] ?? null,
       periodoFin: periodos[periodos.length - 1] ?? null,
       paises,
+      setPersonalizado,
+      paisesNoReconocidos,
     },
     { status: 200 }
   );

@@ -38,8 +38,40 @@
 //
 // Sin caché en Storage — mismo criterio que coneval.ts/inegiPm.ts, solo
 // caché en memoria de proceso, TTL 24h, single-flight.
+//
+// SERIE HISTÓRICA de F4-1/F4-4/F4-5 (2026-09-08, Fase 3) — `resolverSerieBancoMundial`,
+// junto al resolver de celda sin tocarlo. Query DISTINTA a la de celda: sin
+// `mrnev=1`, con `date=1990:<año>`, y ACOTADA a los 5 países del set F4
+// (`country/mex;col;chl;bra;arg`). Verificado en vivo 2026-09-08: con 5 países
+// la respuesta cabe en `pages: 1` (`total` = 5 × años, ~200-330 filas) — el
+// "paginar ~9k filas" de la auditoría era para `country=all`, aquí no aplica.
+//   F4-1 NY.GDP.PCAP.PP.CD — serie continua 1990-2025, sin huecos (MX 2025
+//     25868.479 · COL 22640.422 · CHL 37774.088 · BRA 23433.29 · ARG 32586.631).
+//     "current international $" se re-ancla con cada ronda ICP pero el BM
+//     back-castea la serie completa → un pull fresco es internamente
+//     consistente, sin quiebre interno.
+//   F4-4 SI.POV.DDAY — años de encuesta IRREGULARES (MX 20 pts, CHL 17, BRA 40).
+//     El aviso "no comparable con ediciones anteriores" es sobre reportes
+//     viejos ($1.90/2011 PPP, $2.15/2017 PPP), NO un quiebre dentro de la
+//     serie: un pull fresco está todo en $3.00/2021 PPP. `value: 0` es real
+//     (varios países ≈0% a esa línea). Últimos (2024): 1.6 / 8.5 / 0.4 / 3 / 1.
+//   F4-5 FP.CPI.TOTL.ZG — la auditoría lo daba por "limpio como los otros";
+//     NO lo es: (a) el BM no publica CPI de Argentina antes de 2018 (7 pts
+//     2018-2024, valores 34%-220%); (b) hiperinflación de Brasil 1990-1994
+//     (~3000%). Con eje Y lineal compartido, ARG aplasta al resto. Por eso
+//     `anioMinimo: 2000` (excluye la hiperinflación de BRA) + nota de tarjeta.
+//     Últimos: MX/COL/CHL/BRA 2025 = 3.807 / 5.142 / 4.213 / 5.017 ; ARG 2024
+//     = 219.884.
+// Se conservan SOLO los puntos con `value !== null` (mismo criterio que la
+// celda, `:111`, y que las oleadas de CEPALSTAT — no se rellenan los años sin
+// dato). Filtro final por `anioMinimo`. El BM no publica rank → sin
+// `rankOficialUltimo`. Caché de serie propia (query distinta a la de celda).
 
-import type { CeldaComparativaPais, PaisComparativoCompleto } from "@/lib/fontana/tablaComparativaInternacional";
+import type {
+  CeldaComparativaPais,
+  PaisComparativoCompleto,
+  SeriePaisComparativa,
+} from "@/lib/fontana/tablaComparativaInternacional";
 
 const INDICADOR_WB: Record<string, string> = {
   "F4-1": "NY.GDP.PCAP.PP.CD",
@@ -178,4 +210,95 @@ export async function resolverBancoMundialTodos(indicadorId: string): Promise<Pa
     resultado.push({ iso3, nombre: obs.country.value, celda: celdaDesdeObservacion(iso3, obs, unidad, indicadorId) });
   }
   return resultado;
+}
+
+// ─── SERIE HISTÓRICA (F4-1, F4-4, F4-5) ──────────────────────────────────
+
+type PuntoWB = { periodo: string; valor: number | null };
+
+const cacheSerieIndicador = new Map<string, { porPais: Map<string, PuntoWB[]>; expira: number }>();
+const enVueloSerieIndicador = new Map<string, Promise<Map<string, PuntoWB[]>>>();
+
+// Serie completa (no colapsada) por país para un indicador WB — 1 sola
+// llamada acotada a los `isos3` del set F4, sin `mrnev`.
+async function fetchSerieIndicador(indicadorWB: string, isos3: string[]): Promise<Map<string, PuntoWB[]>> {
+  const clave = `${indicadorWB}|${isos3.join(",")}`;
+  const cacheado = cacheSerieIndicador.get(clave);
+  if (cacheado && cacheado.expira > Date.now()) return cacheado.porPais;
+  const enCurso = enVueloSerieIndicador.get(clave);
+  if (enCurso) return enCurso;
+
+  const promesa = (async (): Promise<Map<string, PuntoWB[]>> => {
+    const paises = isos3.map((s) => s.toLowerCase()).join(";");
+    const anioFin = new Date().getFullYear();
+    const base = `https://api.worldbank.org/v2/country/${paises}/indicator/${indicadorWB}?format=json&date=1990:${anioFin}&per_page=2000`;
+    const filas: ObservacionWB[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const res = await fetch(`${base}&page=${page}`);
+      if (!res.ok) throw new Error(`Banco Mundial respondió ${res.status} para ${indicadorWB} (serie)`);
+      const json = (await res.json()) as [{ pages: number } | undefined, ObservacionWB[] | null];
+      totalPages = json[0]?.pages ?? 1;
+      for (const obs of json[1] ?? []) filas.push(obs);
+      page += 1;
+    } while (page <= totalPages);
+
+    const porPais = new Map<string, PuntoWB[]>();
+    for (const obs of filas) {
+      if (obs.value === null || obs.value === undefined) continue; // solo puntos con dato
+      const lista = porPais.get(obs.countryiso3code) ?? [];
+      lista.push({ periodo: obs.date, valor: obs.value });
+      porPais.set(obs.countryiso3code, lista);
+    }
+    for (const lista of porPais.values()) {
+      lista.sort((a, b) => Number(a.periodo) - Number(b.periodo));
+    }
+    return porPais;
+  })();
+  enVueloSerieIndicador.set(clave, promesa);
+  try {
+    const porPais = await promesa;
+    cacheSerieIndicador.set(clave, { porPais, expira: Date.now() + CACHE_TTL_MS });
+    return porPais;
+  } finally {
+    enVueloSerieIndicador.delete(clave);
+  }
+}
+
+export async function resolverSerieBancoMundial(
+  indicadorId: string,
+  isos3: string[],
+  anioMinimo?: number
+): Promise<Map<string, SeriePaisComparativa>> {
+  const indicadorWB = INDICADOR_WB[indicadorId];
+  const unidad = UNIDAD_WB[indicadorId];
+  const porPais = new Map<string, SeriePaisComparativa>();
+
+  let tabla: Map<string, PuntoWB[]>;
+  try {
+    tabla = await fetchSerieIndicador(indicadorWB, isos3);
+  } catch {
+    for (const iso3 of isos3) {
+      porPais.set(iso3, { iso3, estadoConsulta: "error_conexion", motivo: "Error de conexión con Banco Mundial", puntos: [] });
+    }
+    return porPais;
+  }
+
+  for (const iso3 of isos3) {
+    const puntos = (tabla.get(iso3) ?? []).filter((p) => !anioMinimo || Number(p.periodo) >= anioMinimo);
+    if (puntos.length === 0) {
+      porPais.set(iso3, { iso3, estadoConsulta: "sin_datos_confirmado", motivo: "Banco Mundial no tiene serie para este país", puntos: [] });
+      continue;
+    }
+    porPais.set(iso3, {
+      iso3,
+      estadoConsulta: "ok",
+      unidad,
+      naturaleza: "dato_directo",
+      fuenteEtiqueta: "Banco Mundial",
+      puntos,
+    });
+  }
+  return porPais;
 }

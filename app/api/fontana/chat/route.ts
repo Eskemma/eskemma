@@ -142,6 +142,33 @@ const RE_NOMBRE_F4_CON_SERIE = new RegExp(
   "i"
 );
 
+// Guard NIEGA_PERSONALIZACION_PAISES (26-09-08): el usuario puede agregar
+// o excluir países del set de Familia 4. Cuando el dedup por indicadorId
+// devolvía la tarjeta vieja (bug corregido, clave ahora incluye el set de
+// países), el modelo fabricaba "el set es fijo e inamovible" / "no es
+// posible agregarlo" — una limitación arquitectónica que NO viene de
+// ningún resultado de herramienta (dump de 7GSYpu6g9zSZTmAFbbGq: #34
+// afirma "Perú no forma parte del set fijo" en el mismo turno en que #52
+// SÍ lo agregó). Fire: el texto niega la personalización Y el turno tuvo
+// una tool call a generar_visualizacion / consultar_serie_temporal con
+// paisesAgregar o paisesExcluir en el input crudo. NO se dispara con el
+// mensaje legítimo del dedup ("ya existía / no se duplicó") — la regex
+// solo matchea "fijo/inamovible", "no es posible agregar/excluir/modificar
+// países", "no forma parte del set fijo".
+const NIEGA_PERSONALIZACION_PAISES =
+  /\b(set|conjunto)\b[^.\n]{0,40}\b(fij[oa]\s+e\s+inamovible|inamovible)\b|no\s+(es\s+posible|se\s+puede|puedo)\b[^.\n]{0,45}\b(agregar|añadir|incluir|excluir|quitar|modificar|personalizar|cambiar)\b[^.\n]{0,45}\b(pa[íi]s|pa[íi]ses|set|conjunto|comparaci[óo]n|tarjeta)\b|no\s+forma\s+parte\s+del\s+set\s+fij[oa]|no\s+existe\s+un?\s+par[áa]metro\s+para\s+(agregar|excluir|elegir|quitar)/i;
+
+// Excepción: la NEGATIVA LEGÍTIMA del guard `paisesNoNombradosPorUsuario`
+// ("no puedo agregar países que NO nombraste explícitamente") también
+// matchea la regex de arriba, pero es correcta — no una limitación
+// fabricada. Se distingue porque referencia que el USUARIO no nombró el
+// país / debe nombrarlo.
+const PERSONALIZACION_RECHAZO_LEGITIMO =
+  /\bno\s+(nombr|menci)|\bque\s+(t[úu]\s+|usted\s+)?(nombr|menci)|\bexpl[íi]citamente\b|\bdime\s+(cu[áa]les|qu[ée])\b/i;
+
+const AVISO_NIEGA_PERSONALIZACION_PAISES =
+  "[verificación del sistema] En tu respuesta anterior dijiste que el set de países de Familia 4 es fijo/inamovible o que no es posible agregar/quitar países — pero en este turno SÍ llamaste una herramienta con paisesAgregar/paisesExcluir, así que la capacidad EXISTE. Si la serie que recibiste no reflejó el cambio de países, es un error puntual del sistema, NO una limitación de diseño: no lo expliques como una regla. Reescribe la respuesta reconociendo que el set de países SÍ se personaliza (agregar países del catálogo iberoamericano, o excluir alguno del set por defecto). Nunca digas 'el set es fijo e inamovible' ni 'no es posible agregarlo'.";
+
 // Guard confirmadoLote (26-09-04, incidente "8 municipios de Jalisco", 2ª
 // forma de falla): el modelo trató la respuesta a "¿qué tipo de gráfica
 // quieres?" como si confirmara el LOTE DE MUNICIPIOS, poniendo
@@ -266,6 +293,7 @@ export async function POST(request: NextRequest) {
       let correccionVocabularioHecha = false;
       let correccionNombreHerramientaHecha = false;
       let correccionNegoSerieHecha = false;
+      let correccionPersonalizacionPaisesHecha = false;
 
       try {
         for (let i = 0; i < MAX_ITERACIONES; i++) {
@@ -372,6 +400,28 @@ export async function POST(request: NextRequest) {
             correccionNegoSerieHecha = true;
             if (textoIter) send({ type: "text_suppress" });
             mensajes.push({ role: "user", content: AVISO_NEGO_SERIE });
+            continue;
+          }
+
+          // Guard: no afirmar que el set de países de F4 es inamovible
+          // cuando el turno SÍ ejerció la personalización.
+          const evidenciaPersonalizacionPaises = toolCallsAcum.some((tc) => {
+            if (tc.tool !== "generar_visualizacion" && tc.tool !== "consultar_serie_temporal") return false;
+            const inp = tc.input as Record<string, unknown> | undefined;
+            const ag = inp?.paisesAgregar;
+            const ex = inp?.paisesExcluir;
+            return (Array.isArray(ag) && ag.length > 0) || (Array.isArray(ex) && ex.length > 0);
+          });
+          if (
+            terminaTurno &&
+            !correccionPersonalizacionPaisesHecha &&
+            NIEGA_PERSONALIZACION_PAISES.test(textoIter) &&
+            !PERSONALIZACION_RECHAZO_LEGITIMO.test(textoIter) &&
+            evidenciaPersonalizacionPaises
+          ) {
+            correccionPersonalizacionPaisesHecha = true;
+            if (textoIter) send({ type: "text_suppress" });
+            mensajes.push({ role: "user", content: AVISO_NIEGA_PERSONALIZACION_PAISES });
             continue;
           }
 

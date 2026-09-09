@@ -145,6 +145,8 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
         indicadorId: { type: "string", description: "ID real del indicador. Debe tener `tieneSerie: true`." },
         territorioNombre: { type: "string", description: "Estado o municipio dicho por el usuario, solo si pidió un territorio distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Opcional, desambigua municipios homónimos." },
+        paisesAgregar: { type: "array", items: { type: "string" }, description: "SOLO Familia 4: países que el usuario pidió AGREGAR a la comparación, EXACTAMENTE como los nombró. El servidor verifica que cada uno aparezca literal en el mensaje del usuario; si no, rechaza la llamada. No lo llenes tú por tu cuenta." },
+        paisesExcluir: { type: "array", items: { type: "string" }, description: "SOLO Familia 4: países del set por defecto que el usuario pidió QUITAR (ej. 'sin Argentina'). Misma verificación." },
       },
       required: ["indicadorId"],
     },
@@ -208,6 +210,16 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
           type: "array",
           items: { type: "string", enum: ["estatal", "municipal", ""] },
           description: "SOLO para 'comparacion_territorios': paralelo a `territorios` (mismo índice) — 'municipal' si el usuario pidió explícitamente el municipio de un nombre que también es estado (ej. 'municipios (capitales)': Puebla, Querétaro), 'estatal' si pidió explícitamente el estado. Usa cadena vacía en las posiciones donde el usuario no especificó nivel — mismo criterio que el parámetro `nivel` de consultar_indicador_territorio_externo.",
+        },
+        paisesAgregar: {
+          type: "array",
+          items: { type: "string" },
+          description: "SOLO Familia 4 ('serie_temporal'): países que el usuario pidió AGREGAR a la comparación además del set por defecto (México + Colombia, Chile, Brasil, Argentina), EXACTAMENTE como los nombró (del catálogo iberoamericano). El servidor verifica que cada nombre aparezca literal en el mensaje del usuario; si no, rechaza la llamada completa. No lo llenes tú por tu cuenta.",
+        },
+        paisesExcluir: {
+          type: "array",
+          items: { type: "string" },
+          description: "SOLO Familia 4 ('serie_temporal'): países del set por defecto que el usuario pidió QUITAR (ej. 'sin Argentina', 'quítame Brasil'). Misma verificación que `paisesAgregar`.",
         },
       },
       required: ["tipo"],
@@ -1189,6 +1201,20 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
         toolCall: { tool, input, resultSummary: rs, ok: false },
       };
     }
+    const paisesNoNombrados = paisesNoNombradosPorUsuario(input, ctx);
+    if (paisesNoNombrados.length > 0) {
+      const rs = `No puedo personalizar el set de países: el usuario no nombró (${paisesNoNombrados.join(", ")}).`;
+      return {
+        resultForModel: {
+          error: "paises_no_nombrados",
+          indicadorId: indicadorIdRaw,
+          mensaje: rs,
+          instruccion:
+            "DETENTE — el set de países de Familia 4 solo se personaliza con los que el usuario pidió por su nombre. Pregúntale qué países quiere agregar o quitar y vuelve a llamar solo con esos.",
+        },
+        toolCall: { tool, input, resultSummary: rs, ok: false },
+      };
+    }
     const dataF4 = await fetchSerieInternacional(input, ctx);
     if (dataF4.error === "sin_serie") {
       const rs = String(dataF4.motivo ?? "Este indicador no tiene serie histórica.");
@@ -1224,6 +1250,8 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
         polaridad: dataF4.polaridad ?? null,
         periodoInicio: dataF4.periodoInicio ?? null,
         periodoFin: dataF4.periodoFin ?? null,
+        setPersonalizado: dataF4.setPersonalizado ?? false,
+        paisesNoReconocidos: dataF4.paisesNoReconocidos ?? [],
         // series COMPLETAS por país — el modelo puede citar el valor de
         // CUALQUIER año para CUALQUIER país desde aquí.
         paises: paisesF4.map((p) => ({
@@ -1234,7 +1262,11 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
           puntos: p.puntos,
         })),
         instruccion:
-          "Es una serie de comparación internacional: el país principal del proyecto + el set FIJO de referencia (Colombia, Chile, Brasil, Argentina). Puedes dar el valor de cualquier año para cualquier país leyéndolo de `paises[].puntos`. " +
+          "Es una serie de comparación internacional: el país principal del proyecto + un set de referencia (por defecto Colombia, Chile, Brasil, Argentina; el usuario pudo haber pedido agregar o quitar países). Puedes dar el valor de cualquier año para cualquier país leyéndolo de `paises[].puntos`. " +
+          (dataF4.setPersonalizado ? "El usuario personalizó el set de países — di explícitamente en tu respuesta con qué países quedó la comparación. " : "") +
+          (Array.isArray(dataF4.paisesNoReconocidos) && dataF4.paisesNoReconocidos.length
+            ? `Estos nombres no son países del catálogo y se ignoraron: ${(dataF4.paisesNoReconocidos as string[]).join(", ")} — díselo al usuario. `
+            : "") +
           (dataF4.nota ? `La serie trae una aclaración estructural — menciónala: "${String(dataF4.nota)}" ` : "") +
           (sinSerieF4.length ? `${sinSerieF4.join(", ")} — sin serie para este indicador; no inventes valores para esos países. ` : "") +
           "Cita la fuente. NO genera Canvas (para eso, generar_visualizacion tipo `serie_temporal`).",
@@ -1485,12 +1517,34 @@ type PaisSerieCanvas = {
   puntos: { periodo: string; valor: number | null }[];
 };
 
+function paisesDeInput(input: Record<string, unknown>): { agregar: string[]; excluir: string[] } {
+  return {
+    agregar: Array.isArray(input.paisesAgregar) ? input.paisesAgregar.map(String).filter(Boolean) : [],
+    excluir: Array.isArray(input.paisesExcluir) ? input.paisesExcluir.map(String).filter(Boolean) : [],
+  };
+}
+
+// Guard (26-09-08, réplica del de generarComparacionTerritorios): el
+// usuario puede personalizar el set de países de F4, pero el MODELO nunca
+// arma la lista por su cuenta. Devuelve los nombres de país que el usuario
+// NO nombró literalmente en su mensaje (ni confirmó de una propuesta del
+// asistente) — si el array no está vacío, se rechaza la llamada completa.
+function paisesNoNombradosPorUsuario(input: Record<string, unknown>, ctx: ToolContext): string[] {
+  const { agregar, excluir } = paisesDeInput(input);
+  return [...agregar, ...excluir].filter(
+    (p) => !territorioNombradoPorUsuario(p, ctx.ultimoMensajeUsuario) && !territorioConfirmadoDePropuestaAnterior(p, ctx)
+  );
+}
+
 async function fetchSerieInternacional(
   input: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<Record<string, unknown>> {
   const indicadorId = String(input.indicadorId ?? "");
   const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
+  const { agregar, excluir } = paisesDeInput(input);
+  for (const p of agregar) params.append("paisAgregar", p);
+  for (const p of excluir) params.append("paisExcluir", p);
   const res = await fetch(`${ctx.baseUrl}/api/fontana/serie-internacional?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
   });
@@ -1509,6 +1563,12 @@ async function generarSerieInternacional(
       "Este indicador de comparación internacional no tiene serie histórica disponible en Fontana todavía. El resto de Familia 4 sigue sin estar disponible en Canvas."
     );
   }
+  const paisesNoNombrados = paisesNoNombradosPorUsuario(input, ctx);
+  if (paisesNoNombrados.length > 0) {
+    return reject(
+      `Vas a agregar o quitar países que el usuario NO nombró explícitamente en su mensaje (${paisesNoNombrados.join(", ")}). DETENTE — el set de países de Familia 4 solo se personaliza con los que el usuario pidió por su nombre. Pregúntale qué países quiere y vuelve a llamar solo con esos.`
+    );
+  }
   const data = await fetchSerieInternacional(input, ctx);
   if (data.error === "sin_serie") return reject(String(data.motivo ?? "Ese indicador no tiene serie histórica."));
   if (!data.ok) return reject(String(data.motivo ?? "No se pudo obtener la serie internacional."));
@@ -1516,9 +1576,21 @@ async function generarSerieInternacional(
   const nombre = String(data.nombre ?? indicadorId);
   const paises = (data.paises as PaisSerieCanvas[] | undefined) ?? [];
 
-  // Dedup por indicador (no hay territorio — una tarjeta por indicador F4).
+  // Dedup por indicador + CONJUNTO DE PAÍSES. No hay territorio, pero el
+  // usuario puede personalizar el set (agregar/excluir países), así que dos
+  // peticiones son "la misma tarjeta" solo si el conjunto final de iso3
+  // coincide exactamente — de lo contrario "agrega Perú" reusaría la
+  // tarjeta del set por defecto y la personalización se perdería en
+  // silencio (bug 26-09-08, confirmado en el dump de 7GSYpu6g9zSZTmAFbbGq).
+  const claveSetPaises = (arr: { iso3: string }[]) => arr.map((p) => p.iso3).slice().sort().join(",");
+  const setNuevo = claveSetPaises(paises);
   const existente = ctx.canvasItemsSesion.find(
-    (ci) => ci.tipo === "serie_internacional" && "indicadorId" in ci && ci.indicadorId === indicadorId && !ci.eliminado
+    (ci) =>
+      ci.tipo === "serie_internacional" &&
+      "indicadorId" in ci &&
+      ci.indicadorId === indicadorId &&
+      !ci.eliminado &&
+      claveSetPaises(ci.paises ?? []) === setNuevo
   );
   if (existente && existente.tipo === "serie_internacional") {
     const rs = `Ya tenías la serie internacional de «${existente.indicadorNombre}» en el Canvas — no se duplicó. Usa estos datos para tu lectura.`;
@@ -1572,6 +1644,8 @@ async function generarSerieInternacional(
   ctx.canvasItemsSesion.push(item);
   const resultSummary = `Agregué al Canvas la serie internacional de «${item.indicadorNombre}» (${item.periodoInicio}-${item.periodoFin}).`;
   const paisesSinDato = item.paises.filter((p) => p.estadoConsulta !== "ok").map((p) => p.pais);
+  const setPersonalizado = data.setPersonalizado === true;
+  const paisesNoReconocidos = Array.isArray(data.paisesNoReconocidos) ? (data.paisesNoReconocidos as string[]) : [];
   return {
     resultForModel: {
       canvasItemId: item.id,
@@ -1581,6 +1655,8 @@ async function generarSerieInternacional(
       nota: item.nota ?? null,
       periodoInicio: item.periodoInicio,
       periodoFin: item.periodoFin,
+      setPersonalizado,
+      paisesNoReconocidos,
       paises: item.paises.map((p) => ({
         pais: p.pais,
         esPaisPrincipal: p.esPaisPrincipal,
@@ -1589,7 +1665,13 @@ async function generarSerieInternacional(
         nPuntos: p.puntos.filter((x) => x.valor !== null).length,
       })),
       instruccionChat:
-        "Es una comparación internacional en el tiempo: el país principal del proyecto (normalmente México) frente al SET FIJO de países de referencia (Colombia, Chile, Brasil, Argentina). El set de países de Familia 4 es fijo — el usuario no elige un subconjunto. Si el usuario pidió países específicos, dilo explícitamente en tu respuesta (no puedo generar solo con esos; la serie muestra el set completo, donde sí aparecen los que pidió y sí están). Cita la fuente. " +
+        "Es una comparación internacional en el tiempo: el país principal del proyecto (normalmente México) frente a un set de países de referencia (por defecto Colombia, Chile, Brasil, Argentina). El usuario PUEDE pedir agregar o quitar países explícitamente — nunca los elijas tú. " +
+        (setPersonalizado
+          ? "El usuario personalizó el set — di explícitamente con qué países quedó la comparación. "
+          : "") +
+        (paisesNoReconocidos.length
+          ? `Estos nombres no son países del catálogo y se ignoraron: ${paisesNoReconocidos.join(", ")} — díselo al usuario. `
+          : "") +
         (item.nota ? `La serie trae una aclaración estructural — menciónala: "${item.nota}" ` : "") +
         (paisesSinDato.length
           ? `${paisesSinDato.join(", ")} no tienen serie para este indicador — dilo, no inventes una línea para ellos.`

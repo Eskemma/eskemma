@@ -167,18 +167,26 @@ sin ningún punto pre-2016)** — CEPAL marca el quiebre con sus footnotes
 26-09-07)**: CPI 2012-2024 (13 pts) completo para MX + 4 referencia, hoja
 `CPI Historical` del mismo workbook; sin quiebre metodológico interno (la
 serie arranca en 2012 por la propia revisión de TI de ese año), así que sin
-`anioMinimo` ni nota de tramo — a diferencia de F4-2. **Fase 3 pendiente**:
-F4-1/F4-4/F4-5 (Banco Mundial: quitar `mrnev=1` + paginar). **Fuera**: F4-8
-(RSF, "quiebre 2022" sin confirmar), F4-6 (EIU, tabla hardcodeada, no era
-serie viable).
+`anioMinimo` ni nota de tramo — a diferencia de F4-2. **F4-1/F4-4/F4-5
+IMPLEMENTADOS (Fase 3, 26-09-08)**: Banco Mundial, un solo resolver genérico
+`resolverSerieBancoMundial`, endpoint acotado a los 5 países (1 página — el
+"paginar ~9k filas" era para `country=all`). F4-1 (PIB PPA) serie continua
+1990-2025 y F4-4 (Pobreza, años de encuesta irregulares) sin quiebre interno.
+**F4-5 (Inflación): la auditoría lo daba por "limpio como los otros"; la
+verificación en vivo reveló que NO** — el BM no publica CPI de Argentina antes
+de 2018 (7 pts 2018-2024, 34%-220%) y Brasil tuvo hiperinflación 1990-1994;
+`anioMinimo: 2000` + nota de tarjeta (Argentina domina la escala del gráfico de
+líneas con eje compartido — es información política, la tabla año×país da los
+valores exactos). **Fuera**: F4-8 (RSF, "quiebre 2022" sin confirmar), F4-6
+(EIU, tabla hardcodeada, no era serie viable). **Familia 4: series completas.**
 
 | id | fuente | cat | historia MX vs referencia | esfuerzo | evidencia |
 |---|---|---|---|---|---|
-| F4-1 PIB per cápita PPA | Banco Mundial (`NY.GDP.PCAP.PP.CD`) | a | serie anual desde 1960, igual para MX y COL/CHL/BRA/ARG (una sola llamada `country=all`) | medio (quitar `mrnev=1`, pedir `?date=1990:2025` + paginar) — **Fase 3** | `bancoMundial.ts:103` endpoint con `mrnev=1` (recorta server-side); año solo en `fuenteEtiqueta` (`:141`) |
+| F4-1 PIB per cápita PPA | Banco Mundial (`NY.GDP.PCAP.PP.CD`) | a | **IMPLEMENTADO (Fase 3)** — serie continua **1990-2025 (36 pts) sin huecos** para MX + 4 referencia; sin quiebre interno (el BM back-castea la serie a la base ICP vigente) | **bajo-medio** | `bancoMundial.ts` `resolverSerieBancoMundial` — endpoint `country/mex;col;chl;bra;arg` + `date=1990:<año>`, sin `mrnev`, 1 página; cross-check último punto (2025) == celda exacto |
 | F4-2 Gini internacional | CEPALSTAT (id 3289) | a | **IMPLEMENTADO (Fase 1)** — solo tramo comparable 2016-2024 (5 pts MX; footnotes 12429/12428 marcan el quiebre); COL/BRA anuales, CHL 3 pts, ARG sin dato en el tramo | **bajo** | `cepalstat.ts` `resolverSerieCepalstat(id, isos3, anioMinimo:2016)` — reusa `fetchDatosIndicador` (serie completa cacheada), NO colapsa |
 | F4-3 IDH global | PNUD HDR (CSV) | a | **IMPLEMENTADO (Fase 1)** — serie 1990-2023 (34 pts) igual para MX + 4 referencia | **bajo** | `pnudHdr.ts` `resolverSerieHdr(isos3)` — `FilaHdr.serie` mapea todas las cols `hdi_YYYY` |
-| F4-4 Pobreza línea internacional | Banco Mundial (`SI.POV.DDAY`) | a | serie por años de encuesta (irregular); huecos por disponibilidad, no asimetría MX-referencia | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
-| F4-5 Inflación | Banco Mundial (`FP.CPI.TOTL.ZG`) | a | serie anual; igual | medio (ídem F4-1) | `bancoMundial.ts:103` `mrnev=1` |
+| F4-4 Pobreza línea internacional | Banco Mundial (`SI.POV.DDAY`) | a | **IMPLEMENTADO (Fase 3)** — años de encuesta IRREGULARES (MX 18 pts, CHL 16, BRA 31), ARG con hueco en 2015 (INDEC); el aviso "no comparable con ediciones anteriores" es sobre reportes viejos, NO un quiebre dentro de un pull fresco ($3.00/2021 PPP); `value:0` es real | **bajo-medio** | `bancoMundial.ts` `resolverSerieBancoMundial`; solo puntos con dato (igual que la celda y CEPALSTAT); cross-check último (2024) == celda (1.6/8.5/0.4/3/1) |
+| F4-5 Inflación | Banco Mundial (`FP.CPI.TOTL.ZG`) | a | **IMPLEMENTADO (Fase 3), NO era "limpio"** — el BM no publica CPI de Argentina antes de 2018 (7 pts 2018-2024, 34%-220%) + hiperinflación de Brasil 1990-1994; con eje Y compartido ARG aplasta al resto → `anioMinimo: 2000` (excluye la hiperinflación de BRA) + `notaTarjeta` explicativa | **medio** | `bancoMundial.ts` `resolverSerieBancoMundial`; MX/COL/CHL/BRA 26 pts 2000-2025, ARG 7 pts; cross-check último == celda (3.807/5.142/4.213/5.017; ARG 219.884) |
 | F4-6 Índice de Democracia (EIU) | EIU vía CRS R46016 | **b** | tabla hardcodeada 2024, sin fetch; serie = transcripción manual de PDF de baja frecuencia | — | `eiuDemocracyIndex.ts:58-89` `TABLA_EIU_CRS_2024` + `AÑO_EDICION = 2024`; `score` diferido (`:8-9`) |
 | F4-7 Índice de Percepción de Corrupción | Transparencia Internacional (XLSX) | a | **IMPLEMENTADO (Fase 2)** — CPI 2012-2024 (13 pts) completo para MX + 4 referencia; hoja `CPI Historical` (formato largo/tidy, cols `ISO3`/`Year`/`CPI score`/`Rank`) del mismo workbook — NO la ancha `CPI Timeseries` (inconsistencia real de mayúsculas `CPI score`/`CPI Score` 2012-2013); sin quiebre interno (serie comparable desde 2012 por diseño de TI) | **bajo-medio** | `transparencyInternational.ts` `resolverSerieTransparency(isos3)` junto al de celda; cross-check último punto (2024) == celda, exacto (MEX 26, COL 39, CHL 63, BRA 34, ARG 37) |
 | F4-8 Libertad de Prensa (RSF) | RSF (CSV) | a | anual (CSVs por año `/import_classement/YYYY.csv`; quiebre 2022) | medio (fetch de CSVs por año) | `rsf.ts:24` URL fija `.../2026.csv`; `:50-52` toma `Score 2026`+`Rank` |
@@ -303,11 +311,12 @@ Numeración estable. Estado actualizado 2026-08-31 tras investigación factual.
 - **"Fruta madura" (serie ya en el archivo/respuesta descargada, solo falta
   parsear/exponer + un campo de periodo en el modelo):** F2-17 (ya en Storage),
   F3-16, F3-17, F2-3, F2-5/6/8/12/19/20/21/22, F2-1/2/14 (nac/est), F1-18,
-  F4-2/3/9/10/11, F4-7 (hoja `CPI Historical` del mismo workbook de la celda).
-  ~22 indicadores, ~5 fuentes distintas.
+  F4-2/3/9/10/11, F4-7 (hoja `CPI Historical` del mismo workbook de la celda),
+  F4-1/4/5 (Banco Mundial, endpoint acotado a 5 países — 1 página).
+  ~25 indicadores, ~6 fuentes distintas.
 - **Requiere ingesta nueva (descargas por año/edición):** bloque ECEG/ITER
   (14 tras la decisión (a): F1-1…F1-14, F1-19 y F2-13 salen), F2-4, F2-9,
-  F2-18, F3-1/2/3/4/7, F5-6/7/8, F4-1/4/5/8, F1-17, F2-10 (STPS).
+  F2-18, F3-1/2/3/4/7, F5-6/7/8, F4-8, F1-17, F2-10 (STPS).
 - **Nunca habrá serie (categoría b):** 19 — narrativa curada (6), CONAGUA (1),
   Compendio 2010 (1), EIU (1), F1-15/F1-19/F2-13 (comparabilidad no confirmada,
   reabrible), + los 7 de ANVCC (fuera de alcance permanente).

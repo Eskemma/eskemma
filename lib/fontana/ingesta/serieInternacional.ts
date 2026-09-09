@@ -17,6 +17,7 @@ import { SERIES_INTERNACIONALES_DISPONIBLES } from "@/lib/fontana/series/seriesI
 import { resolverSerieCepalstat } from "@/lib/fontana/ingesta/cepalstat";
 import { resolverSerieHdr } from "@/lib/fontana/ingesta/pnudHdr";
 import { resolverSerieTransparency } from "@/lib/fontana/ingesta/transparencyInternational";
+import { resolverSerieBancoMundial } from "@/lib/fontana/ingesta/bancoMundial";
 
 const SIN_MECANISMO = (iso3: string): SeriePaisComparativa => ({
   iso3,
@@ -27,10 +28,19 @@ const SIN_MECANISMO = (iso3: string): SeriePaisComparativa => ({
 
 export async function resolverSerieInternacionalF4(
   indicadorId: string,
-  paisPrincipalIso3: string
+  paisPrincipalIso3: string,
+  // Lista de países de referencia YA resuelta (iso3). Por default es el set
+  // fijo PAISES_REFERENCIA_F4; la ruta la sustituye cuando el usuario pidió
+  // explícitamente agregar/excluir países (verificado server-side, ver
+  // serie-internacional/route.ts). NUNCA incluye al país principal — ese se
+  // antepone aquí y se dedup por si acaso.
+  refsOverride?: string[]
 ): Promise<FilaSerieInternacional> {
   const cfg = SERIES_INTERNACIONALES_DISPONIBLES[indicadorId];
-  const isos3 = [paisPrincipalIso3, ...PAISES_REFERENCIA_F4.map((p) => p.iso3)];
+  const refs = (refsOverride ?? PAISES_REFERENCIA_F4.map((p) => p.iso3)).filter(
+    (iso3) => iso3 !== paisPrincipalIso3
+  );
+  const isos3 = [paisPrincipalIso3, ...refs];
 
   let porPais: Map<string, SeriePaisComparativa>;
   if (!cfg) {
@@ -41,8 +51,10 @@ export async function resolverSerieInternacionalF4(
     porPais = await resolverSerieHdr(isos3);
   } else if (cfg.fuenteId === "transparency") {
     porPais = await resolverSerieTransparency(isos3);
+  } else if (cfg.fuenteId === "banco_mundial") {
+    porPais = await resolverSerieBancoMundial(indicadorId, isos3, cfg.anioMinimo);
   } else {
-    // banco_mundial — Fase 3, aún sin resolver de serie.
+    // fuente sin resolver de serie todavía.
     porPais = new Map(isos3.map((iso3) => [iso3, SIN_MECANISMO(iso3)]));
   }
 
@@ -54,6 +66,6 @@ export async function resolverSerieInternacionalF4(
   return {
     indicadorId,
     paisPrincipal: porPais.get(paisPrincipalIso3) ?? SIN_MECANISMO(paisPrincipalIso3),
-    referencia: PAISES_REFERENCIA_F4.map((p) => porPais.get(p.iso3) ?? SIN_MECANISMO(p.iso3)),
+    referencia: refs.map((iso3) => porPais.get(iso3) ?? SIN_MECANISMO(iso3)),
   };
 }

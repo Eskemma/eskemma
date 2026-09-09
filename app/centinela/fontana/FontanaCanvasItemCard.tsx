@@ -659,6 +659,25 @@ function SerieInternacionalGrafica({
   const domMax = rawMax + pad;
   const span = domMax - domMin || 1;
 
+  // (c-lite) Cuando UN país tiene una magnitud muy superior al resto
+  // (ej. inflación de Argentina, 220% frente a <15% del resto), la escala
+  // Y lineal compartida comprime a los demás contra el borde. No se toca
+  // el dominio (rehacer el layout sería desproporcionado y la tabla
+  // año×país ya da los valores exactos) — solo se anota por qué se ve así.
+  // Se compara el pico de cada país (no el rango global, que también crece
+  // por variación natural): la nota solo aparece si el país más alto
+  // supera al 2º por un factor grande — un outlier real, no dispersión.
+  const picosPorPais = conSerie
+    .map((p) => ({
+      pais: p.pais,
+      pico: Math.max(...p.puntos.map((pt) => (pt.valor === null ? -Infinity : Math.abs(pt.valor)))),
+    }))
+    .filter((x) => Number.isFinite(x.pico))
+    .sort((a, b) => b.pico - a.pico);
+  const escalaComprimida =
+    hayDatos && picosPorPais.length > 2 && picosPorPais[1].pico > 0 && picosPorPais[0].pico / picosPorPais[1].pico > 5;
+  const paisDominante = escalaComprimida ? picosPorPais[0].pais : null;
+
   const xAt = (year: number) => (maxYear === minYear ? 50 : ((year - minYear) / (maxYear - minYear)) * 100);
   const yAt = (v: number) => 100 - ((v - domMin) / span) * 100;
 
@@ -695,6 +714,48 @@ function SerieInternacionalGrafica({
       ? "Valor más bajo = mejor posición."
       : null;
 
+  // Etiqueta de valor al final de cada línea. Sin descolisión, cuando dos
+  // países terminan con valores Y cercanos (F4-1: PIB PPA de MX/BRA/COL
+  // muy juntos; F4-5: 3 %/1 %/0.4 %) los `<span>` se dibujan uno encima de
+  // otro y quedan ilegibles. Se calcula un Y ajustado: ordenar por Y real,
+  // empujar hacia abajo lo que quede a menos de `gap`, y corregir hacia
+  // arriba si topa el borde. El contenedor mide 128 px (h-32) y la Y va en
+  // %, así que ~9 % ≈ 11-12 px separa texto de 9 px. El punto queda en su
+  // Y real; si la etiqueta se desplazó, una línea guía punteada las une.
+  const etiquetasFinales = conSerie
+    .map((p) => {
+      const ultimo = [...p.puntos].reverse().find((pt) => pt.valor !== null);
+      if (!ultimo || ultimo.valor === null) return null;
+      return {
+        iso3: p.iso3,
+        color: colorDe(p.iso3, p.esPaisPrincipal),
+        texto: fmt(ultimo.valor),
+        x: xAt(Number(ultimo.periodo)),
+        yReal: yAt(ultimo.valor),
+      };
+    })
+    .filter((e): e is NonNullable<typeof e> => e !== null);
+
+  const yEtiquetaFinal: number[] = (() => {
+    const n = etiquetasFinales.length;
+    const PISO = 4;
+    const TOPE = 96;
+    const gap = n > 1 ? Math.min(9, (TOPE - PISO) / (n - 1)) : 9;
+    const orden = etiquetasFinales.map((e, i) => ({ i, y: e.yReal })).sort((a, b) => a.y - b.y);
+    for (let k = 1; k < orden.length; k++) {
+      if (orden[k].y - orden[k - 1].y < gap) orden[k].y = orden[k - 1].y + gap;
+    }
+    if (orden.length && orden[orden.length - 1].y > TOPE) {
+      orden[orden.length - 1].y = TOPE;
+      for (let k = orden.length - 2; k >= 0; k--) {
+        if (orden[k + 1].y - orden[k].y < gap) orden[k].y = orden[k + 1].y - gap;
+      }
+    }
+    const out = new Array<number>(n);
+    for (const o of orden) out[o.i] = o.y;
+    return out;
+  })();
+
   return (
     <div>
       {item.nota && (
@@ -727,23 +788,32 @@ function SerieInternacionalGrafica({
             )}
           </svg>
 
-          {/* Valor final de cada país, junto a su último punto con dato */}
-          {conSerie.map((p) => {
-            const ultimo = [...p.puntos].reverse().find((pt) => pt.valor !== null);
-            if (!ultimo || ultimo.valor === null) return null;
-            const v = ultimo.valor;
+          {/* Valor final de cada país — descolisionado verticalmente */}
+          {etiquetasFinales.map((e, i) => {
+            const yLbl = yEtiquetaFinal[i];
+            const desplazada = Math.abs(yLbl - e.yReal) > 1.5;
             return (
-              <div
-                key={`end-${p.iso3}`}
-                className="absolute"
-                style={{ left: `${xAt(Number(ultimo.periodo))}%`, top: `${yAt(v)}%`, transform: "translate(-50%,-50%)" }}
-              >
+              <div key={`end-${e.iso3}`}>
                 <div
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: colorDe(p.iso3, p.esPaisPrincipal) }}
+                  className="absolute w-1.5 h-1.5 rounded-full -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${e.x}%`, top: `${e.yReal}%`, background: e.color }}
                 />
-                <span className="absolute left-2 -translate-y-1/2 top-1/2 whitespace-nowrap text-[9px] text-black-eske dark:text-[#EAF2F8]">
-                  {fmt(v)}
+                {desplazada && (
+                  <div
+                    className="absolute border-l border-dotted -translate-x-1/2"
+                    style={{
+                      left: `${e.x}%`,
+                      top: `${Math.min(e.yReal, yLbl)}%`,
+                      height: `${Math.abs(yLbl - e.yReal)}%`,
+                      borderColor: e.color,
+                    }}
+                  />
+                )}
+                <span
+                  className="absolute -translate-y-1/2 whitespace-nowrap text-[9px] text-black-eske dark:text-[#EAF2F8]"
+                  style={{ left: `calc(${e.x}% + 0.5rem)`, top: `${yLbl}%` }}
+                >
+                  {e.texto}
                 </span>
               </div>
             );
@@ -837,6 +907,15 @@ function SerieInternacionalGrafica({
             ))}
           </ul>
         </div>
+      )}
+
+      {escalaComprimida && (
+        <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-2 leading-snug">
+          {paisDominante
+            ? `${paisDominante} domina la escala vertical por su magnitud muy superior al resto — `
+            : "Un país domina la escala vertical por su magnitud muy superior al resto — "}
+          los valores exactos de cada país están en la tabla.
+        </p>
       )}
 
       {polaridadNota && <p className="text-[10px] text-gray-eske-40 mt-2">{polaridadNota}</p>}
