@@ -32,6 +32,10 @@ interface VincularBody {
   // limpia ese marcador aquí mismo, en la misma escritura, en vez de un
   // 2° endpoint/llamada aparte desde el cliente.
   fontanaSesionId?: string;
+  // Opción A (26-09-09) — storagePath del .md con el reporte interpretativo
+  // de Fontana (solo cuando la fuente externa es una sesión de Fontana).
+  // Opcional; capa adicional para la revisión humana en M2.
+  reporteStoragePath?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -50,6 +54,7 @@ export async function POST(request: NextRequest) {
   const {
     projectId, resultadoId, storagePath, nombre, tipo, metadatosFuente,
     moduloPIP, cobertura, confirmarPeseATerritorio, confirmarPeseAVigencia, fontanaSesionId,
+    reporteStoragePath,
   } = body;
   if (!projectId || !resultadoId || !storagePath || !nombre || !tipo || !metadatosFuente || !moduloPIP || !cobertura) {
     return NextResponse.json(
@@ -113,7 +118,11 @@ export async function POST(request: NextRequest) {
       fechaEntrega: new Date().toISOString(),
     },
     cobertura,
-    payload: { archivoUrl: storagePath, extractoTexto },
+    payload: {
+      archivoUrl: storagePath,
+      extractoTexto,
+      ...(reporteStoragePath ? { reporteInterpretativoUrl: reporteStoragePath } : {}),
+    },
     metadatosFuente,
     compatibilidad,
     // Ronda 13 (26-08-18) — propagación de cambios de territorio.

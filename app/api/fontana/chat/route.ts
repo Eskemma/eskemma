@@ -455,6 +455,9 @@ export async function POST(request: NextRequest) {
               canvasItemIds.push(r.canvasItem.id);
               send({ type: "canvas_item", item: r.canvasItem });
             }
+            if (r.reporteJobEvent) {
+              send({ type: "reporte_job_iniciado", jobId: r.reporteJobEvent.jobId });
+            }
             const resultTexto = JSON.stringify(r.resultForModel);
             toolResultTextsAcum.push(resultTexto);
             toolResults.push({

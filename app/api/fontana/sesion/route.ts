@@ -23,6 +23,7 @@ import { familiaVacia } from "@/types/fontana.types";
 import { derivarMinimosPorFamilia } from "@/lib/fontana/pipMinimos";
 import { derivarIndicadoresPorDefecto } from "@/lib/fontana/defaultIndicadores";
 import { buscarSesionPorProyectoConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
+import { invalidarReporteSesion } from "@/lib/fontana/reporte/invalidarReporteSesion";
 
 const COLLECTION = "fontana_sesiones";
 
@@ -86,16 +87,25 @@ async function repuntarSiCorresponde(
     },
   };
 
-  // entregaCanal1 queda obsoleto al repuntar (Punto A) — el botón de
-  // "Entregar a Moddulo F3" debe volver a su estado inicial para la
-  // tarea nueva, nunca arrastrar "ya entregado" de la tarea anterior.
-  await adminDb.collection(COLLECTION).doc(sesion.sesionId).update({
+  // entregaCanal1 queda obsoleto al repuntar (Punto A): el botón de
+  // "Entregar a Moddulo F3" debe volver a su estado inicial.
+  const sesionRef = adminDb.collection(COLLECTION).doc(sesion.sesionId);
+  await sesionRef.update({
     tareaPipIds: [pipItemIdActual],
     indicadoresPorFamilia,
     entregaCanal1: FieldValue.delete(),
   });
+  // El reporte de sesión ya no refleja el conjunto de indicadores heredados
+  // (cambió al cambiar de tarea PIP) — mismo mecanismo que "Eliminar reporte".
+  await invalidarReporteSesion(sesionRef);
 
-  return { ...sesion, tareaPipIds: [pipItemIdActual], indicadoresPorFamilia, entregaCanal1: undefined };
+  return {
+    ...sesion,
+    tareaPipIds: [pipItemIdActual],
+    indicadoresPorFamilia,
+    entregaCanal1: undefined,
+    reporteSesion: undefined,
+  };
 }
 
 export async function GET(request: NextRequest) {

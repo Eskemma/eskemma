@@ -19,12 +19,15 @@ interface Options {
   sesionId: string;
   onNav?: (pestana: "fontana" | "indicadores", familiaId?: FamiliaFontanaId) => void;
   onCanvasItem?: (item: FontanaCanvasItem) => void;
+  // El agente disparó la generación asíncrona del reporte — el cliente abre
+  // la pestaña Reporte y hace polling del job con este jobId.
+  onReporteJobIniciado?: (jobId: string) => void;
 }
 
 const uuid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random()}`;
 
-export function useChatStream({ sesionId, onNav, onCanvasItem }: Options) {
+export function useChatStream({ sesionId, onNav, onCanvasItem, onReporteJobIniciado }: Options) {
   const [messages, setMessages] = useState<FontanaChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
@@ -107,6 +110,8 @@ export function useChatStream({ sesionId, onNav, onCanvasItem }: Options) {
               onNav?.(ev.pestana as "fontana" | "indicadores", ev.familiaId as FamiliaFontanaId | undefined);
             } else if (ev.type === "canvas_item") {
               onCanvasItem?.(ev.item as FontanaCanvasItem);
+            } else if (ev.type === "reporte_job_iniciado") {
+              onReporteJobIniciado?.(String(ev.jobId));
             } else if (ev.type === "done") {
               const assistantMsg: FontanaChatMessage = {
                 id: String(ev.mensajeId ?? uuid()),
@@ -152,7 +157,7 @@ export function useChatStream({ sesionId, onNav, onCanvasItem }: Options) {
         setStreaming(false);
       }
     },
-    [messages, sesionId, streaming, onNav, onCanvasItem]
+    [messages, sesionId, streaming, onNav, onCanvasItem, onReporteJobIniciado]
   );
 
   return { messages, setMessages, streaming, streamingText, liveToolCalls, send };

@@ -207,7 +207,14 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
   );
 }
 
-export default function FontanaModduloButton({ sesion }: { sesion: FontanaSesion }) {
+export default function FontanaModduloButton({
+  sesion, reporteListo,
+}: {
+  sesion: FontanaSesion;
+  // Gate (26-09-09): ambos destinos se habilitan solo con un reporte de
+  // sesión generado (pestaña Reporte).
+  reporteListo: boolean;
+}) {
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -217,17 +224,24 @@ export default function FontanaModduloButton({ sesion }: { sesion: FontanaSesion
         <button
           type="button"
           onClick={() => router.push(`/moddulo/proyecto/nuevo?from=fontana&fontanaSesionId=${sesion.sesionId}`)}
-          className="px-5 py-2.5 bg-white text-bluegreen-eske rounded-lg text-sm font-semibold hover:bg-white/90 transition-colors shadow-sm"
+          disabled={!reporteListo}
+          className="px-5 py-2.5 bg-white text-bluegreen-eske rounded-lg text-sm font-semibold hover:bg-white/90 transition-colors shadow-sm disabled:opacity-60"
         >
           Iniciar proyecto en Moddulo
         </button>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2"
+          disabled={!reporteListo}
+          className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2 disabled:opacity-50"
         >
           Vincular a proyecto existente
         </button>
+        {!reporteListo && (
+          <p className="text-xs text-white/80 max-w-xs text-right">
+            Genera el reporte de sesión (pestaña Reporte) para habilitar estas opciones.
+          </p>
+        )}
       </div>
 
       {pickerOpen && <PickerModal sesion={sesion} onClose={() => setPickerOpen(false)} />}

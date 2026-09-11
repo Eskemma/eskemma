@@ -143,7 +143,17 @@ export const FAMILIA_METODOLOGICA_POR_TECNICA: Record<TecnicaId, FamiliaMetodolo
 // heredado de ResultadoF3) SIGUE siendo un paso humano explícito, no se
 // salta por ser api-push — mismo principio de human-in-the-loop que el
 // resto del proyecto.
-export interface ResultadoCanal1<TPayload = { archivoUrl: string; extractoTexto?: string }>
+// `reporteInterpretativoUrl` (2026-09-09) — storagePath de un .md con el
+// reporte interpretativo de Fontana (prosa que organiza lo que el usuario
+// navegó en el Canvas). Es una capa ADICIONAL, destinada a la revisión humana
+// en M2 (llena la deuda "sin vista previa de contenido en M2", CLAUDE.md).
+// La síntesis M3 (app/api/moddulo/f3/sintesis/generar) NO lo lee: serializa
+// el string del path pero nunca lo resuelve — el aislamiento de M3 es
+// estructural, no una promesa de mantenimiento. Aditivo: ningún lector actual
+// de `payload` en el repo lo requiere ni itera sus claves.
+export interface ResultadoCanal1<
+  TPayload = { archivoUrl: string; extractoTexto?: string; reporteInterpretativoUrl?: string }
+>
   extends ResultadoF3<TPayload> {
   origen: OrigenTrazabilidad & { sourceKind: "T10"; componente: "centinela" };
 }
@@ -168,7 +178,12 @@ export interface MetadatosFuenteExterna {
   tipoProyectoDeclarado: ProjectType;
 }
 
-export interface ResultadoFuenteExterna<TPayload = { archivoUrl: string; extractoTexto?: string }>
+// `reporteInterpretativoUrl` — ver nota en ResultadoCanal1. Cuando la fuente
+// externa es una sesión de Fontana (modo `fontanaSesionId` de VincularFuenteForm),
+// el .md del reporte de sesión viaja aquí igual que en Canal 1.
+export interface ResultadoFuenteExterna<
+  TPayload = { archivoUrl: string; extractoTexto?: string; reporteInterpretativoUrl?: string }
+>
   extends ResultadoF3<TPayload> {
   origen: OrigenTrazabilidad & { sourceKind: "external"; componente: "external" };
   metadatosFuente: MetadatosFuenteExterna;

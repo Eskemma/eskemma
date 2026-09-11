@@ -1,22 +1,17 @@
 // app/api/fontana/sesion/[sesionId]/contexto/route.ts
 // GET — arma el FontanaContextoTerritorial completo de una sesión (todos
-// los indicadores seleccionados en F1/F2, minimos + seleccionUsuario,
+// los indicadores seleccionados en F1/F2/F3/F5, minimos + seleccionUsuario,
 // CeldaTablaFontana completo sin aplanar) — usado por Canal 1
 // (canal1/entregar) y por "Vincular resultado externo" cuando se abre
 // desde el banner fontanaPendiente (Piezas 2/5 del plan de escenarios
-// b/c). Reutiliza /api/fontana/familia/[familiaId] tal cual (mismo
-// cómputo de celdas que ya usa la tabla comparativa) vía fetch interno,
-// en vez de duplicar la lógica de construirCeldasTabla.
+// b/c). Wrapper delgado sobre resolverCeldasIndicadoresSesion (lib/fontana),
+// que también consume generarReporteSesion.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
-import type { FontanaSesion } from "@/types/fontana.types";
-import type { FontanaContextoTerritorial } from "@/types/fontana.types";
-
-interface FamiliaRespuesta {
-  indicadores: { id: string; nombre: string; celdas: unknown[]; tieneSerie?: boolean }[];
-}
+import { resolverCeldasIndicadoresSesion } from "@/lib/fontana/resolverCeldasIndicadoresSesion";
+import type { FontanaSesion, FontanaContextoTerritorial } from "@/types/fontana.types";
 
 export async function GET(
   request: NextRequest,
@@ -34,34 +29,10 @@ export async function GET(
   }
   const sesion = { sesionId: doc.id, ...doc.data() } as FontanaSesion;
 
-  const idsPorFamilia: Record<string, string[]> = {};
-  for (const [familia, seleccion] of Object.entries(sesion.indicadoresPorFamilia)) {
-    const ids = [...seleccion.minimos, ...seleccion.seleccionUsuario];
-    if (ids.length > 0) idsPorFamilia[familia] = ids;
-  }
-
-  const cookie = request.headers.get("cookie") ?? "";
-  const baseUrl = request.nextUrl.origin;
-
-  const indicadores: FontanaContextoTerritorial["indicadores"] = [];
-  for (const familiaId of Object.keys(idsPorFamilia)) {
-    // F1/F2/F3/F5 comparten el shape de celdas geográficas. F4 (comparación
-    // internacional) se EXCLUYE del contexto inicial del agente (T10): su
-    // respuesta es una `fila` de países, no `celdas` — el agente la consulta
-    // bajo demanda vía consultar_indicador cuando el usuario pregunte por ella.
-    if (familiaId !== "F1" && familiaId !== "F2" && familiaId !== "F3" && familiaId !== "F5") continue;
-    const res = await fetch(`${baseUrl}/api/fontana/familia/${familiaId}?sesionId=${sesionId}`, {
-      headers: { cookie },
-    });
-    if (!res.ok) continue;
-    const data = (await res.json()) as FamiliaRespuesta;
-    const idsSeleccionados = new Set(idsPorFamilia[familiaId]);
-    for (const ind of data.indicadores) {
-      if (idsSeleccionados.has(ind.id)) {
-        indicadores.push({ id: ind.id, nombre: ind.nombre, celdas: ind.celdas as FontanaContextoTerritorial["indicadores"][number]["celdas"], tieneSerie: ind.tieneSerie ?? false });
-      }
-    }
-  }
+  const indicadores = await resolverCeldasIndicadoresSesion(sesion, {
+    cookie: request.headers.get("cookie") ?? "",
+    baseUrl: request.nextUrl.origin,
+  });
 
   const contexto: FontanaContextoTerritorial = { territorio: sesion.territorio, indicadores };
   return NextResponse.json({ contexto }, { status: 200 });

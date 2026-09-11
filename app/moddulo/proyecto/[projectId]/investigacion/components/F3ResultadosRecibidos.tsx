@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { TareaPIP, PIPItem, AsignacionCanal } from "@/types/moddulo.types";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import PillButton from "@/app/moddulo/components/PillButton";
+import MarkdownContent from "@/app/components/shared/chat/MarkdownContent";
 
 interface ResultadoDoc {
   resultadoId: string;
@@ -14,7 +15,16 @@ interface ResultadoDoc {
   cobertura: { completa: boolean; detalle?: string };
   aprobado?: boolean;
   notasUsuario?: string;
+  // Opción A (26-09-09) — reporte interpretativo de Fontana (Canal 1/3). El
+  // storagePath no se usa aquí; se resuelve vía
+  // GET /api/moddulo/f3/resultados/[id]/reporte (lectura server-side).
+  payload?: { reporteInterpretativoUrl?: string };
 }
+
+type EstadoReporte =
+  | { estado: "cargando" }
+  | { estado: "ok"; markdown: string }
+  | { estado: "error"; mensaje: string };
 
 interface Props {
   resultados: ResultadoDoc[];
@@ -36,6 +46,31 @@ function sourceKindToCanal(sourceKind: string): AsignacionCanal["canal"] {
 export default function F3ResultadosRecibidos({ resultados, tareas, pip, projectId, readOnly, onAprobado }: Props) {
   const [pipItemIdSeleccion, setPipItemIdSeleccion] = useState<Record<string, string>>({});
   const [asignacionSeleccion, setAsignacionSeleccion] = useState<Record<string, string>>({});
+  // Vista previa del reporte interpretativo de Fontana — se resuelve por
+  // resultado en la primera expansión (lectura server-side de Storage).
+  const [reportes, setReportes] = useState<Record<string, EstadoReporte>>({});
+  const [expandido, setExpandido] = useState<Record<string, boolean>>({});
+
+  async function togglePreview(resultadoId: string) {
+    const abierto = !expandido[resultadoId];
+    setExpandido((prev) => ({ ...prev, [resultadoId]: abierto }));
+    if (!abierto || reportes[resultadoId]) return;
+    setReportes((prev) => ({ ...prev, [resultadoId]: { estado: "cargando" } }));
+    try {
+      const res = await fetch(
+        `/api/moddulo/f3/resultados/${resultadoId}/reporte?projectId=${projectId}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.mensaje ?? data.error ?? "No se pudo cargar el reporte.");
+      setReportes((prev) => ({ ...prev, [resultadoId]: { estado: "ok", markdown: data.markdown } }));
+    } catch (err) {
+      setReportes((prev) => ({
+        ...prev,
+        [resultadoId]: { estado: "error", mensaje: err instanceof Error ? err.message : "Error inesperado" },
+      }));
+    }
+  }
 
   if (resultados.length === 0) {
     return (
@@ -79,6 +114,36 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
                 {r.aprobado ? "Aprobado" : "Sin revisar"}
               </span>
             </div>
+
+            {r.payload?.reporteInterpretativoUrl && (
+              <div className="mt-2 border-t border-gray-eske-20 dark:border-white/10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => togglePreview(r.resultadoId)}
+                  className="text-xs lg:text-sm font-medium text-bluegreen-eske dark:text-blue-eske-20 hover:underline"
+                >
+                  {expandido[r.resultadoId] ? "▾" : "▸"} Ver reporte interpretativo de Fontana
+                </button>
+                <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+                  Capa adicional para revisión. La síntesis (M3) usa solo los datos de indicadores, no este texto.
+                </p>
+                {expandido[r.resultadoId] && (
+                  <div className="mt-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] p-3 max-h-[420px] overflow-y-auto">
+                    {reportes[r.resultadoId]?.estado === "cargando" && (
+                      <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Cargando reporte…</p>
+                    )}
+                    {reportes[r.resultadoId]?.estado === "error" && (
+                      <p className="text-xs text-red-eske">
+                        {(reportes[r.resultadoId] as { mensaje: string }).mensaje}
+                      </p>
+                    )}
+                    {reportes[r.resultadoId]?.estado === "ok" && (
+                      <MarkdownContent content={(reportes[r.resultadoId] as { markdown: string }).markdown} />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {!readOnly && !r.aprobado && (
               <div className="flex flex-wrap items-center gap-2 mt-2">

@@ -63,6 +63,14 @@ export const NOMBRE_NIVEL_TABLA: Record<NivelTablaFontana, string> = {
 // columna vacía sin motivo.
 export const MOTIVO_NIVEL_NO_CUBIERTO = "Nivel no cubierto en este incremento de Fontana";
 
+// Motivo específico de TIMEOUT al resolver un indicador para el reporte de
+// sesión (job en background). Distinto a propósito de "sin dato para este
+// territorio": fue un límite de tiempo, no una ausencia real de la fuente —
+// el usuario puede reintentar regenerando el reporte. Ver
+// familia/[familiaId]/route.ts (param `timeoutMs`).
+export const MOTIVO_TIMEOUT_REPORTE =
+  "No se pudo resolver a tiempo: la fuente tardó más del límite del reporte. Vuelve a generar el reporte para reintentar.";
+
 // Umbral de precarga completa vs. modo buscador — 119 es el máximo real
 // medido en producción para Distrito→Municipios (Oaxaca); se reutiliza
 // como umbral único en todo el sistema, sin introducir un segundo número

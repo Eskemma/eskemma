@@ -24,6 +24,10 @@ interface Body {
   projectId?: string;
   sesionId?: string;
   storagePath?: string;
+  // Opción A (26-09-09) — storagePath del .md con el reporte interpretativo
+  // de Fontana. Opcional; capa adicional para la revisión humana en M2, la
+  // síntesis M3 nunca la lee (serializa el string, nunca lo resuelve).
+  reporteStoragePath?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { projectId, sesionId, storagePath } = body;
+  const { projectId, sesionId, storagePath, reporteStoragePath } = body;
   if (!projectId || !sesionId || !storagePath) {
     return NextResponse.json({ error: "projectId, sesionId y storagePath son requeridos" }, { status: 400 });
   }
@@ -86,7 +90,11 @@ export async function POST(request: NextRequest) {
     moduloPIP,
     origen: { sourceKind: "T10", componente: "centinela", analisisId: resultadoId, fechaEntrega },
     cobertura: { completa: true },
-    payload: { archivoUrl: storagePath, extractoTexto },
+    payload: {
+      archivoUrl: storagePath,
+      extractoTexto,
+      ...(reporteStoragePath ? { reporteInterpretativoUrl: reporteStoragePath } : {}),
+    },
   };
 
   await adminDb

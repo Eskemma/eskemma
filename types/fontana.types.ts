@@ -42,6 +42,13 @@ export interface FontanaSesion {
   // PhaseState (moddulo.types.ts): solo lo necesario para que la UI
   // sepa "ya se entregó" sin leer la estructura interna de f3TareasPIP.
   entregaCanal1?: { fecha: string; resultadoId: string };
+  // Puntero ligero al reporte de sesión (cuerpo markdown en la subcolección
+  // fontana_sesiones/{id}/reporte/actual — nunca en el doc de sesión por el
+  // límite de 1 MB). Su presencia habilita los 3 botones de destino
+  // (Entregar a Moddulo F3 / Vincular / Iniciar proyecto). Mismo criterio
+  // "ligero" que entregaCanal1. Se invalida (FieldValue.delete) al repuntar
+  // de tarea PIP — cambia el conjunto de indicadores heredados.
+  reporteSesion?: { generadoEn: string; editadoEn?: string; canvasItemsRef: string[] };
   // Solo relevante para sesiones sueltas (hub, Escenarios b/c) — sin esto,
   // 2 sesiones del mismo territorio se verían idénticas en el hub salvo
   // por fecha. Sugerido al crear ("Exploración — {territorio.nombre}"),
@@ -112,6 +119,46 @@ export interface FontanaContextoTerritorial {
   indicadores: { id: string; nombre: string; celdas: CeldaTablaFontana[]; tieneSerie?: boolean }[];
 }
 
+// Reporte de sesión de Fontana — subcolección fontana_sesiones/{sesionId}/reporte,
+// doc de id fijo "actual" (un solo reporte por sesión, sobreescribible). El
+// cuerpo markdown pesa: NUNCA va en el doc de sesión (límite 1 MB) — el doc de
+// sesión solo lleva el puntero `reporteSesion`. Se genera híbrido: un esqueleto
+// determinístico (secciones heredados/libres, orden, tablas desde canvasItems)
+// + prosa interpretativa de Claude sobre esos datos ya verificados, sin inventar
+// cifras. Se edita libre (patrón PESTEL ReportViewer); nunca se regenera solo.
+export interface ReporteSesionFontana {
+  contenidoMarkdown: string;
+  generadoEn: string; // ISO — última (re)generación
+  editadoEn?: string; // ISO — última edición manual del texto
+  // "canal1" = sesión de Escenario (a) (tareaPipIds no vacío) → tuvo sección
+  // de indicadores heredados del PIP. "suelta" = sin PIP → una sola sección.
+  origen: "canal1" | "suelta";
+  // indicadorIds bucketeados al (re)generar. Un canvasItem multi-indicador
+  // (resumen/tabla/comparacion_territorios/serie_internacional) entra COMPLETO
+  // en `heredados` si contiene al menos un indicador en la unión de `minimos`
+  // — nunca se divide ni se duplica entre secciones.
+  secciones: { heredados: string[]; libres: string[] };
+  // ids de canvasItems no eliminados en el momento de (re)generar — base para
+  // el aviso "hay contenido nuevo en el Canvas desde el último reporte".
+  canvasItemsRef: string[];
+}
+
+// Estado de la generación asíncrona del reporte de sesión. Vive en
+// fontana_sesiones/{sesionId}/reporte/job (doc de id fijo "job") — 1:1 con
+// la sesión, se borra en cascada con ella, sin índice compuesto. Espejo
+// ligero del patrón pestel_jobs. El disparo (POST .../reporte) crea el job
+// y corre la generación en `after()` con maxDuration 300; el cuerpo del
+// reporte (reporte/actual) y el puntero `reporteSesion` SOLO se escriben al
+// completar con éxito — durante una regeneración el reporte anterior sigue
+// intacto.
+export interface ReporteSesionJob {
+  jobId: string; // uuid — correlación en logs
+  status: "pending" | "running" | "completed" | "failed";
+  startedAt: string; // ISO
+  completedAt?: string; // ISO
+  error?: string; // presente sii status === "failed" — mensaje llano
+}
+
 // ==========================================
 // T10 — AGENTE CONVERSACIONAL "FONTANA"
 // ==========================================
@@ -126,6 +173,7 @@ export type FontanaToolName =
   | "listar_indicadores_familia"
   | "listar_indicadores_activos_todas_familias"
   | "generar_visualizacion"
+  | "generar_reporte_sesion"
   | "navegar_pestana";
 
 // Traza de una llamada a herramienta que produjo (o intentó producir) una
@@ -370,5 +418,11 @@ export type FontanaChatStreamEvent =
   | { type: "text_suppress" } // descarta el texto streameado (era narración entre herramientas)
   | { type: "nav"; pestana: "fontana" | "indicadores"; familiaId?: FamiliaFontanaId }
   | { type: "canvas_item"; item: FontanaCanvasItem }
+  // El agente DISPARÓ la generación asíncrona del reporte de sesión vía la
+  // tool generar_reporte_sesion. NO significa que el reporte esté listo — el
+  // cliente cambia a la pestaña Reporte y hace polling del job con este
+  // jobId (GET /api/fontana/sesion/[id]/reporte/job). El agente solo
+  // confirma en el chat que "empezó a generarlo".
+  | { type: "reporte_job_iniciado"; jobId: string }
   | { type: "done"; mensajeId: string }
   | { type: "error"; message: string };

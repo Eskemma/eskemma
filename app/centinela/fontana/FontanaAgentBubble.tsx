@@ -35,14 +35,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onNav: (pestana: "fontana" | "indicadores", familiaId?: FamiliaFontanaId) => void;
   onCanvasItem: (item: FontanaCanvasItem) => void;
+  onReporteJobIniciado: (jobId: string) => void;
   onVerCanvas: () => void;
 }
 
-export default function FontanaAgentBubble({ sesionId, open, onOpenChange, onNav, onCanvasItem, onVerCanvas }: Props) {
+export default function FontanaAgentBubble({ sesionId, open, onOpenChange, onNav, onCanvasItem, onReporteJobIniciado, onVerCanvas }: Props) {
   const { messages, setMessages, streaming, streamingText, liveToolCalls, send } = useChatStream({
     sesionId,
     onNav,
     onCanvasItem,
+    onReporteJobIniciado,
   });
 
   const [adjuntos, setAdjuntos] = useState<AdjuntoChip[]>([]);

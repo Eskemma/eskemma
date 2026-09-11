@@ -12,7 +12,10 @@ import type { FamiliaFontanaId, FontanaCanvasItem, FontanaSesion } from "@/types
 import Tabs from "@/app/components/shared/Tabs";
 import FontanaCanvasTab from "./FontanaCanvasTab";
 import FontanaIndicadoresAccordion from "./FontanaIndicadoresAccordion";
+import FontanaReportePanel from "./FontanaReportePanel";
 import FontanaAgentBubble from "./FontanaAgentBubble";
+
+type FontanaTabId = "fontana" | "indicadores" | "reporte";
 
 interface Props {
   sesion: FontanaSesion;
@@ -21,10 +24,13 @@ interface Props {
 }
 
 export default function FontanaWorkspace({ sesion, onSesionActualizada, retornoUrl }: Props) {
-  const [activeTab, setActiveTab] = useState<"fontana" | "indicadores">("fontana");
+  const [activeTab, setActiveTab] = useState<FontanaTabId>("fontana");
   const [expandedFamily, setExpandedFamily] = useState<FamiliaFontanaId | null>("F1");
   const [canvasItems, setCanvasItems] = useState<FontanaCanvasItem[]>(sesion.canvasItems ?? []);
   const [chatOpen, setChatOpen] = useState(false);
+  // jobId de una generación de reporte disparada desde el chat — se pasa al
+  // panel para que arranque el polling aunque la pestaña no estuviera abierta.
+  const [reporteJobId, setReporteJobId] = useState<string | null>(null);
 
   // Auto-open del chat SOLO en desktop (≥1024px): en mobile el panel es un
   // bottom sheet a 75vh que taparía casi toda la pantalla al cargar. Init
@@ -44,11 +50,12 @@ export default function FontanaWorkspace({ sesion, onSesionActualizada, retornoU
             aria-label="Vistas de Fontana"
             className="px-4 md:px-8 bg-white-eske dark:bg-[#0F2233]"
             tabs={[
-              { id: "fontana", label: "Fontana" },
+              { id: "fontana", label: "Canvas - Fontana" },
               { id: "indicadores", label: "Indicadores" },
+              { id: "reporte", label: "Reporte" },
             ]}
             activeId={activeTab}
-            onChange={(id) => setActiveTab(id as "fontana" | "indicadores")}
+            onChange={(id) => setActiveTab(id as FontanaTabId)}
           />
 
           {activeTab === "fontana" ? (
@@ -57,13 +64,21 @@ export default function FontanaWorkspace({ sesion, onSesionActualizada, retornoU
               sesion={sesion}
               onEliminarItem={(itemId) => setCanvasItems((prev) => prev.filter((it) => it.id !== itemId))}
             />
-          ) : (
+          ) : activeTab === "indicadores" ? (
             <FontanaIndicadoresAccordion
               sesion={sesion}
               expandedFamily={expandedFamily}
               onExpandedFamilyChange={setExpandedFamily}
               onSesionActualizada={onSesionActualizada}
               retornoUrl={retornoUrl}
+            />
+          ) : (
+            <FontanaReportePanel
+              sesion={sesion}
+              canvasItems={canvasItems}
+              jobIdInicial={reporteJobId}
+              onJobIdConsumido={() => setReporteJobId(null)}
+              onSesionActualizada={onSesionActualizada}
             />
           )}
         </div>
@@ -81,6 +96,10 @@ export default function FontanaWorkspace({ sesion, onSesionActualizada, retornoU
         onCanvasItem={(item) => {
           setCanvasItems((prev) => [...prev, item]);
           setActiveTab("fontana");
+        }}
+        onReporteJobIniciado={(jobId) => {
+          setReporteJobId(jobId);
+          setActiveTab("reporte");
         }}
       />
     </div>

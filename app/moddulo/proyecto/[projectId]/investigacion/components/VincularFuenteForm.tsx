@@ -20,7 +20,7 @@ import type { ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FamiliaMetodologica } from "@/types/f3.types";
 import type { EvaluacionCompatibilidad } from "@/types/shared.types";
 import { sugerirFamiliaMetodologica } from "@/lib/moddulo/sugerirFamiliaMetodologica";
-import { subirContextoTerritorial } from "@/lib/fontana/exportarContextoTerritorial";
+import { subirContextoTerritorial, subirReporteInterpretativo } from "@/lib/fontana/exportarContextoTerritorial";
 import type { FontanaContextoTerritorial } from "@/types/fontana.types";
 import PillButton from "@/app/moddulo/components/PillButton";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
@@ -107,6 +107,7 @@ export default function VincularFuenteForm({
       let storagePath: string;
       let nombreArchivo: string;
       let tipoArchivo: string;
+      let reporteStoragePath: string | undefined;
 
       if (fontanaSesionId) {
         const resContexto = await fetch(`/api/fontana/sesion/${fontanaSesionId}/contexto`);
@@ -115,6 +116,19 @@ export default function VincularFuenteForm({
         storagePath = await subirContextoTerritorial(projectId, contexto);
         nombreArchivo = "fontana-contexto.json";
         tipoArchivo = "application/json";
+        // Capa interpretativa (Opción A) — best-effort: si la sesión de
+        // Fontana tiene un reporte generado, se sube su markdown y se
+        // adjunta el path al payload (para la vista previa de M2). Si no
+        // lo tiene (404), la vinculación sigue sin la capa.
+        try {
+          const resRep = await fetch(`/api/fontana/sesion/${fontanaSesionId}/reporte`);
+          if (resRep.ok) {
+            const { contenidoMarkdown } = (await resRep.json()) as { contenidoMarkdown: string };
+            reporteStoragePath = await subirReporteInterpretativo(projectId, contenidoMarkdown);
+          }
+        } catch {
+          // no bloquear la vinculación por la capa interpretativa
+        }
       } else {
         if (!file) return;
         const ru = await fetch("/api/moddulo/f3/request-upload", {
@@ -136,7 +150,7 @@ export default function VincularFuenteForm({
           projectId, resultadoId, storagePath, nombre: nombreArchivo, tipo: tipoArchivo,
           metadatosFuente, moduloPIP, cobertura: { completa: true },
           confirmarPeseATerritorio: confirmarTerritorio, confirmarPeseAVigencia: confirmarVigencia,
-          fontanaSesionId,
+          fontanaSesionId, reporteStoragePath,
         }),
       });
       const data = await res.json();

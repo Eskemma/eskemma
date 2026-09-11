@@ -50,6 +50,7 @@ import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import {
   columnasParaTipoProyecto,
   MOTIVO_NIVEL_NO_CUBIERTO,
+  MOTIVO_TIMEOUT_REPORTE,
   UMBRAL_PRECARGA_COMPLETA,
   type CeldaTablaFontana,
   type NivelTablaFontana,
@@ -163,6 +164,12 @@ export async function GET(
   if (!sesionId) {
     return NextResponse.json({ error: "sesionId es requerido" }, { status: 400 });
   }
+  // timeoutMs: solo lo usa el job del reporte de sesión
+  // (resolverCeldasIndicadoresSesion). Si un indicador tarda más, su celda
+  // cae a MOTIVO_TIMEOUT_REPORTE (distinto de "sin dato") y el job NO se
+  // cuelga por una fuente lenta. La tabla comparativa y la entrega a F3 NO
+  // lo pasan → comportamiento sin cambios (0 = sin límite).
+  const timeoutMs = Number(searchParams.get("timeoutMs")) || 0;
 
   const cargada = await cargarSesionConTerritorioActual(sesionId, session.uid);
   if (!cargada) {
@@ -253,12 +260,47 @@ export async function GET(
   const tipoDistritoPropio: "federal" | "local" | null =
     sesion.territorio.nivel === "distrito_federal" ? "federal" : sesion.territorio.nivel === "distrito_local" ? "local" : null;
 
+  // Race con timeout por indicador (solo si timeoutMs > 0). En timeout, la
+  // celda de cada nivel cae a MOTIVO_TIMEOUT_REPORTE (no "sin dato") y se
+  // salta el bloque de agregación plural (otra llamada lenta).
+  const NIVELES_TIMEOUT: NivelTablaFontana[] = ["nacional", "estatal", "distrital", "municipal"];
+  const resolverCeldas = async (
+    id: string
+  ): Promise<{ celdas: Awaited<ReturnType<typeof resolverIndicadorFontana>>; timedOut: boolean }> => {
+    if (timeoutMs <= 0) {
+      return { celdas: await resolverIndicadorFontana(id, sesion.territorio), timedOut: false };
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const TIMEOUT = Symbol("timeout");
+    try {
+      const r = await Promise.race([
+        resolverIndicadorFontana(id, sesion.territorio),
+        new Promise<typeof TIMEOUT>((res) => {
+          timer = setTimeout(() => res(TIMEOUT), timeoutMs);
+        }),
+      ]);
+      if (r === TIMEOUT) {
+        console.warn(`[fontana/familia] timeout (${timeoutMs}ms) resolviendo ${id} para ${familiaId}`);
+        return {
+          celdas: NIVELES_TIMEOUT.map((nivel) => ({ nivel, motivo: MOTIVO_TIMEOUT_REPORTE })) as Awaited<
+            ReturnType<typeof resolverIndicadorFontana>
+          >,
+          timedOut: true,
+        };
+      }
+      return { celdas: r, timedOut: false };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
   const indicadores: IndicadorRespuesta[] = await Promise.all(
     idsOrdenados.map(async (id) => {
-      const [registro, celdasReales] = await Promise.all([
+      const [registro, resuelto] = await Promise.all([
         getIndicadorRegistro(id),
-        resolverIndicadorFontana(id, sesion.territorio),
+        resolverCeldas(id),
       ]);
+      const celdasReales = resuelto.celdas;
       const tieneMecanismoDistrital = id in FONTANA_ECEG_CONFIG;
       // Desglose "Ver municipios" en proyectos Estatal — generalizado más
       // allá de ECEG (2026-08-08): CONAPO/Bienestar sí tienen dato
@@ -366,7 +408,7 @@ export async function GET(
       // `resolverIndicadorFontana` se deja tal cual, nunca se sobrescribe
       // con el agregado genérico ni con "sin valor combinado".
       const usaResolverPropio = registro?.agregacionPlural?.resolverPropio === true;
-      if (esTerritorioParcial(sesion.territorio) && !usaResolverPropio) {
+      if (esTerritorioParcial(sesion.territorio) && !usaResolverPropio && !resuelto.timedOut) {
         const resultadoPlural = await resolverAgregacionPlural(id, sesion.territorio);
         if (resultadoPlural) {
           const nivelObjetivo =
@@ -432,7 +474,8 @@ export async function GET(
       // + BloqueAgregacionPlural) que ya usa el caso nivel:"estatal" plural.
       if (
         INDICADORES_ESTATAL_ALCANCE_PLURAL.has(id) &&
-        sesion.territorio.nivel !== "estatal"
+        sesion.territorio.nivel !== "estatal" &&
+        !resuelto.timedOut
       ) {
         const estados = estadosDelTerritorio(sesion.territorio);
         if (estados.length > 1) {

@@ -27,6 +27,12 @@ interface Props {
 export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
   const router = useRouter();
 
+  // Los botones de destino (Entregar a Moddulo F3 / Iniciar proyecto /
+  // Vincular) quedan deshabilitados hasta que la sesión tenga un reporte
+  // generado. "Regresar a Moddulo F3" (rama intermedia) NO se gatea — no
+  // es una acción de entrega.
+  const reporteListo = !!sesion.reporteSesion;
+
   return (
     <div>
       {/* Header — mismo patrón visual que las páginas internas de PESTEL:
@@ -51,7 +57,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
               </p>
             </div>
             {sesion.modduloProjectId && sesion.tareaPipIds.length > 0 ? (
-              <FontanaCanal1Button sesion={sesion} onSesionActualizada={onSesionActualizada} />
+              <FontanaCanal1Button sesion={sesion} onSesionActualizada={onSesionActualizada} reporteListo={reporteListo} />
             ) : sesion.modduloProjectId ? (
               <div className="w-full flex justify-center gap-2 sm:w-fit sm:justify-start">
                 <button
@@ -63,7 +69,7 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
                 </button>
               </div>
             ) : (
-              <FontanaModduloButton sesion={sesion} />
+              <FontanaModduloButton sesion={sesion} reporteListo={reporteListo} />
             )}
           </div>
         </div>

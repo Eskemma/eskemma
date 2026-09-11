@@ -77,6 +77,8 @@ interface ResultadoDoc {
   // presentes en resultados de Canal 3 (origen.sourceKind === "external").
   metadatosFuente?: { nombreHerramienta: string };
   proyectoTerritorioSnapshotAtVinculacion?: string;
+  // Opción A (26-09-09) — reporte interpretativo de Fontana (Canal 1/3).
+  payload?: { reporteInterpretativoUrl?: string };
 }
 
 interface Props {

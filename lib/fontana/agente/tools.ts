@@ -238,6 +238,12 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
       required: ["pestana"],
     },
   },
+  {
+    name: "generar_reporte_sesion",
+    description:
+      "Genera (o regenera) el reporte de sesión de Fontana: organiza en UN documento markdown los hallazgos que el usuario fijó en el Canvas, con la interpretación estratégica de cada uno. Es exactamente lo mismo que el botón 'Generar reporte' de la pestaña Reporte. Úsala SOLO cuando el usuario lo pida explícitamente ('genera/arma/actualiza el reporte de la sesión', 'hazme el reporte'). Requiere que haya al menos un elemento en el Canvas. NO anuncies el contenido del reporte en el chat ni lo pegues — solo confirma en una frase que quedó listo en la pestaña Reporte.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
 ];
 
 // ==========================================
@@ -292,6 +298,11 @@ export interface ToolResult {
   toolCall: FontanaToolCall;
   navEvent?: { pestana: "fontana" | "indicadores"; familiaId?: FamiliaFontanaId };
   canvasItem?: FontanaCanvasItem;
+  // generar_reporte_sesion: jobId de la generación ASÍNCRONA recién
+  // disparada — el chat route lo reenvía como evento SSE
+  // `reporte_job_iniciado` para que el cliente abra la pestaña Reporte y
+  // haga polling del job. El reporte NO está listo aún.
+  reporteJobEvent?: { jobId: string };
 }
 
 async function fetchFamilia(familiaId: string, ctx: ToolContext): Promise<RespuestaFamilia | null> {
@@ -363,6 +374,7 @@ export async function ejecutarHerramienta(
   if (nombre === "listar_indicadores_familia") return listarIndicadoresFamilia(input, ctx);
   if (nombre === "listar_indicadores_activos_todas_familias") return listarIndicadoresActivosTodasFamilias(ctx);
   if (nombre === "generar_visualizacion") return generarVisualizacion(input, ctx, mensajeId);
+  if (nombre === "generar_reporte_sesion") return generarReporteSesionTool(input, ctx);
   if (nombre === "navegar_pestana") return navegarPestana(input);
   return {
     resultForModel: { error: `Herramienta desconocida: ${nombre}` },
@@ -1871,4 +1883,74 @@ function navegarPestana(input: Record<string, unknown>): ToolResult {
     },
     navEvent: { pestana, familiaId: pestana === "indicadores" ? familiaId : undefined },
   };
+}
+
+// generar_reporte_sesion — DISPARA la generación asíncrona vía la misma
+// ruta que el botón "Generar reporte" (POST /api/fontana/sesion/[id]/reporte).
+// El reporte NO está listo cuando la tool retorna: el cliente hace polling
+// del job. El agente solo confirma que "empezó a generarlo". El mensaje de
+// error NUNCA nombra la herramienta (system prompt + guard de chat/route.ts).
+async function generarReporteSesionTool(
+  input: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolResult> {
+  try {
+    const res = await fetch(`${ctx.baseUrl}/api/fontana/sesion/${ctx.sesionId}/reporte`, {
+      method: "POST",
+      headers: { cookie: ctx.cookie, "content-type": "application/json" },
+      body: "{}",
+    });
+    const data = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string; mensaje?: string };
+
+    if (res.status === 400 && data.error === "sin_contenido") {
+      const rs = "Esta sesión no tiene indicadores: ni hallazgos en el Canvas ni indicadores en la tabla comparativa.";
+      return {
+        resultForModel: {
+          ok: false,
+          motivo: rs,
+          instruccion:
+            "Dile al usuario en una frase que primero necesita agregar algún indicador a su tabla comparativa (pestaña Indicadores) o consultar uno en el chat, y que entonces puedes armar el reporte.",
+        },
+        toolCall: { tool: "generar_reporte_sesion", input, resultSummary: rs, ok: false },
+      };
+    }
+    if (!res.ok || !data.jobId) {
+      const rs = "No se pudo iniciar la generación del reporte.";
+      return {
+        resultForModel: {
+          ok: false,
+          motivo: rs,
+          instruccion: "Dile al usuario en una frase que hubo un problema al iniciar el reporte y que lo intente de nuevo desde la pestaña Reporte.",
+        },
+        toolCall: { tool: "generar_reporte_sesion", input, resultSummary: rs, ok: false },
+      };
+    }
+
+    return {
+      resultForModel: {
+        ok: true,
+        jobEnCurso: true,
+        instruccion:
+          "EMPEZASTE a generar el reporte (es un proceso en segundo plano, puede tardar un par de minutos). Confírmalo en UNA frase: que ya lo estás generando y que aparecerá en la pestaña Reporte en cuanto esté listo. NUNCA digas que ya está listo ni describas su contenido — todavía no lo tienes.",
+      },
+      toolCall: {
+        tool: "generar_reporte_sesion",
+        input,
+        resultSummary: "Generación de reporte de sesión iniciada (job en segundo plano).",
+        ok: true,
+      },
+      reporteJobEvent: { jobId: data.jobId },
+    };
+  } catch (err) {
+    console.error("[fontana/tool] generar_reporte_sesion falló:", err);
+    const rs = "No se pudo iniciar la generación del reporte.";
+    return {
+      resultForModel: {
+        ok: false,
+        motivo: rs,
+        instruccion: "Dile al usuario en una frase que hubo un problema al iniciar el reporte y que lo intente de nuevo desde la pestaña Reporte.",
+      },
+      toolCall: { tool: "generar_reporte_sesion", input, resultSummary: rs, ok: false },
+    };
+  }
 }

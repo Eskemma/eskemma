@@ -30,6 +30,10 @@ interface ResultadoDoc {
   // presentes en resultados de Canal 3 (origen.sourceKind === "external").
   metadatosFuente?: { nombreHerramienta: string };
   proyectoTerritorioSnapshotAtVinculacion?: string;
+  // Opción A (26-09-09) — capa interpretativa de Fontana (Canal 1/3). El
+  // storagePath NO se usa en el cliente; F3ResultadosRecibidos lo resuelve
+  // vía GET /api/moddulo/f3/resultados/[id]/reporte.
+  payload?: { reporteInterpretativoUrl?: string };
 }
 
 export default function InvestigacionPage() {
