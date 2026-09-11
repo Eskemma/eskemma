@@ -127,6 +127,7 @@ export default function FontanaAgentBubble({ sesionId, open, onOpenChange, onNav
         <ChatPanel
           titulo="Fontana"
           subtitulo="Asistente de datos abiertos"
+          secondaryLink={{ label: "Notas metodológicas", href: "/centinela/fontana/notas-metodologicas" }}
           messages={messages}
           streaming={streaming}
           streamingText={streamingText}

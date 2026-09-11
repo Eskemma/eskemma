@@ -32,7 +32,7 @@ type Estado =
       pipItemId: string;
       minimosPreview: string[];
     }
-  | { tipo: "sesion"; sesion: FontanaSesion };
+  | { tipo: "sesion"; sesion: FontanaSesion; proyectoNombre?: string };
 
 const TIPO_PROYECTO_LABELS: Record<ProjectType, string> = {
   electoral: "Electoral",
@@ -76,7 +76,7 @@ export default function FontanaPage() {
           return;
         }
         const data = await res.json();
-        setEstado({ tipo: "sesion", sesion: data.sesion as FontanaSesion });
+        setEstado({ tipo: "sesion", sesion: data.sesion as FontanaSesion, proyectoNombre: data.proyectoNombre });
       } catch {
         setEstado({ tipo: "error", mensaje: "Error de conexión al cargar Fontana." });
       }
@@ -116,7 +116,7 @@ export default function FontanaPage() {
       }
       const data = await res.json();
       if (data.existe) {
-        setEstado({ tipo: "sesion", sesion: data.sesion as FontanaSesion });
+        setEstado({ tipo: "sesion", sesion: data.sesion as FontanaSesion, proyectoNombre: data.proyectoNombre });
       } else {
         setEstado({
           tipo: "wizard",
@@ -148,8 +148,8 @@ export default function FontanaPage() {
         setEstado({ tipo: "error", mensaje: err.error ?? "No se pudo crear la sesión de Fontana." });
         return;
       }
-      const data = (await res.json()) as { sesion: FontanaSesion };
-      setEstado({ tipo: "sesion", sesion: data.sesion });
+      const data = (await res.json()) as { sesion: FontanaSesion; proyectoNombre?: string };
+      setEstado({ tipo: "sesion", sesion: data.sesion, proyectoNombre: data.proyectoNombre });
     } catch {
       setEstado({ tipo: "error", mensaje: "Error de conexión al confirmar." });
     } finally {
@@ -332,7 +332,16 @@ export default function FontanaPage() {
     <main className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620]">
       <FontanaMain
         sesion={estado.sesion}
-        onSesionActualizada={(sesion) => setEstado({ tipo: "sesion", sesion })}
+        proyectoNombre={estado.proyectoNombre}
+        onSesionActualizada={(sesion) =>
+          // El nombre del proyecto no viaja en las actualizaciones parciales
+          // de sesión (reporte, canvas, etc.) — se preserva del estado previo.
+          setEstado((prev) => ({
+            tipo: "sesion",
+            sesion,
+            proyectoNombre: prev.tipo === "sesion" ? prev.proyectoNombre : undefined,
+          }))
+        }
         // Ronda 9 (26-08-18) — para que "Resolver en Moddulo" (ambigüedad
         // de municipio) pueda traer de vuelta al usuario aquí después de
         // guardar, en vez de dejarlo varado en Moddulo. Escenario a usa

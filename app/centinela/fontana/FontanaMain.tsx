@@ -11,6 +11,7 @@
 // de 2 pestañas (2026-08-27).
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { FontanaSesion } from "@/types/fontana.types";
 import FontanaWorkspace from "./FontanaWorkspace";
 import FontanaModduloButton from "./FontanaModduloButton";
@@ -18,13 +19,19 @@ import FontanaCanal1Button from "./FontanaCanal1Button";
 
 interface Props {
   sesion: FontanaSesion;
+  // Nombre del proyecto de Moddulo vinculado (Escenario a) — resuelto
+  // server-side (GET/POST /api/fontana/sesion), nunca persistido en el doc
+  // de sesión. `sesion.nombre` casi nunca existe en este escenario (solo lo
+  // usan las sesiones sueltas); sin esto el título caía a "Fontana" a secas
+  // para todo proyecto vinculado.
+  proyectoNombre?: string;
   onSesionActualizada: (sesion: FontanaSesion) => void;
   // Ronda 9 (26-08-18) — para el enlace "Resolver en Moddulo" del modal de
   // ambigüedad, que necesita saber a dónde traer de vuelta al usuario.
   retornoUrl?: string;
 }
 
-export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }: Props) {
+export default function FontanaMain({ sesion, proyectoNombre, onSesionActualizada, retornoUrl }: Props) {
   const router = useRouter();
 
   // Los botones de destino (Entregar a Moddulo F3 / Iniciar proyecto /
@@ -50,10 +57,14 @@ export default function FontanaMain({ sesion, onSesionActualizada, retornoUrl }:
           </button>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold">{sesion.nombre || "Fontana"}</h1>
+              <h1 className="text-2xl font-semibold">{proyectoNombre || sesion.nombre || "Fontana"}</h1>
               <p className="text-white/80 text-sm mt-0.5">
                 {sesion.territorio.nombre ||
                   [sesion.territorio.estado, sesion.territorio.municipio].filter(Boolean).join(" › ")}
+                {" — "}
+                <Link href="/centinela/fontana/notas-metodologicas" className="underline hover:text-white">
+                  Notas metodológicas
+                </Link>
               </p>
             </div>
             {sesion.modduloProjectId && sesion.tareaPipIds.length > 0 ? (

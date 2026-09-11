@@ -176,32 +176,9 @@ export function calculateReadingTime(content: string): number {
 }
 
 /**
- * Extrae encabezados del contenido Markdown para tabla de contenidos
+ * Extrae encabezados del contenido Markdown para tabla de contenidos.
+ * Delega a lib/shared/extractHeadings.ts — misma lógica, ahora compartida
+ * con otros consumidores del ecosistema (ej. MethodologyDocView, T10-Fontana)
+ * en vez de vivir solo aquí. Sin cambio de comportamiento para el blog.
  */
-export function extractHeadings(content: string) {
-  const headingRegex = /^(#{1,6})\s+(.+)$/gm;
-  const headings: Array<{ level: number; text: string; id: string }> = [];
-  let match;
-
-  while ((match = headingRegex.exec(content)) !== null) {
-    const level = match[1].length;
-    let text = match[2].trim();
-
-    // ✅ NUEVO: Limpiar asteriscos y otros caracteres de formato Markdown
-    text = text
-      .replace(/\*\*/g, "") // Remover negritas **texto**
-      .replace(/\*/g, "") // Remover cursivas *texto*
-      .replace(/`/g, "") // Remover code `texto`
-      .replace(/~~(.*?)~~/g, "$1") // Remover tachado ~~texto~~
-      .trim();
-
-    const id = text
-      .toLowerCase()
-      .replace(/[^a-z0-9áéíóúñ\s-]/g, "")
-      .replace(/\s+/g, "-");
-
-    headings.push({ level, text, id });
-  }
-
-  return headings;
-}
+export { extractHeadings } from "@/lib/shared/extractHeadings";

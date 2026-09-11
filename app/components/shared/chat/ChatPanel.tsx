@@ -26,6 +26,11 @@ const FORMATOS_ACEPTADOS = ".pdf,.docx,.doc,.txt,.md,.csv,.xlsx,.xls";
 interface Props {
   titulo: string;
   subtitulo?: string;
+  // Enlace secundario bajo el subtítulo (ej. "Notas metodológicas") —
+  // opcional y genérico a propósito: este componente vive en shared/ para
+  // que otras apps del ecosistema lo reutilicen con su propio enlace, sin
+  // que Fontana sea un caso hardcodeado.
+  secondaryLink?: { label: string; href: string };
   messages: FontanaChatMessage[];
   streaming: boolean;
   streamingText: string;
@@ -43,6 +48,7 @@ interface Props {
 export default function ChatPanel({
   titulo,
   subtitulo,
+  secondaryLink,
   messages,
   streaming,
   streamingText,
@@ -146,7 +152,17 @@ export default function ChatPanel({
       >
         <div>
           <p className="text-sm font-semibold leading-none">{titulo}</p>
-          {subtitulo && <p className="text-[11px] text-white/70 leading-none mt-1">{subtitulo}</p>}
+          {(subtitulo || secondaryLink) && (
+            <p className="text-[11px] text-white/70 leading-none mt-1">
+              {subtitulo}
+              {subtitulo && secondaryLink && " — "}
+              {secondaryLink && (
+                <a href={secondaryLink.href} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
+                  {secondaryLink.label}
+                </a>
+              )}
+            </p>
+          )}
         </div>
         <button
           type="button"

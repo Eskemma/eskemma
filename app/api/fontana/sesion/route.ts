@@ -127,7 +127,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
     }
     const sesion = { sesionId: doc.id, ...doc.data() } as FontanaSesion;
-    return NextResponse.json({ existe: true, sesion }, { status: 200 });
+    // Nombre del proyecto vinculado — solo para mostrar en el encabezado
+    // (FontanaMain), nunca persistido en el doc de sesión. Best-effort: si
+    // el proyecto ya no es accesible, el encabezado cae a sesion.nombre.
+    const proyectoNombre = sesion.modduloProjectId
+      ? (await getProject(sesion.modduloProjectId, session.uid))?.name
+      : undefined;
+    return NextResponse.json({ existe: true, sesion, proyectoNombre }, { status: 200 });
   }
 
   if (!modduloProjectId) {
@@ -147,7 +153,7 @@ export async function GET(request: NextRequest) {
     const sesionVigente = tareaPipParam
       ? await repuntarSiCorresponde(existente, tareaPipParam, pip, f3Tareas)
       : existente;
-    return NextResponse.json({ existe: true, sesion: sesionVigente }, { status: 200 });
+    return NextResponse.json({ existe: true, sesion: sesionVigente, proyectoNombre: project.name }, { status: 200 });
   }
 
   if (!tareaPipParam) {
@@ -244,7 +250,10 @@ export async function POST(request: NextRequest) {
   const existente = await findExistingSesion(session.uid, modduloProjectId);
   if (existente) {
     const sesionVigente = await repuntarSiCorresponde(existente, pipItemId, pip, f3Tareas);
-    return NextResponse.json({ sesionId: sesionVigente.sesionId, sesion: sesionVigente }, { status: 200 });
+    return NextResponse.json(
+      { sesionId: sesionVigente.sesionId, sesion: sesionVigente, proyectoNombre: project.name },
+      { status: 200 }
+    );
   }
 
   const { pregunta, justificacion } = resolverPreguntaYJustificacion(pip, f3Tareas, pipItemId);
@@ -272,5 +281,5 @@ export async function POST(request: NextRequest) {
   const ref = await adminDb.collection(COLLECTION).add(nuevaSesion);
   const sesion: FontanaSesion = { sesionId: ref.id, ...nuevaSesion };
 
-  return NextResponse.json({ sesionId: ref.id, sesion }, { status: 200 });
+  return NextResponse.json({ sesionId: ref.id, sesion, proyectoNombre: project.name }, { status: 200 });
 }
