@@ -26,9 +26,20 @@ export default function FontanaCanal1Button({
   const router = useRouter();
   const [entregando, setEntregando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Modal de resultado (26-09-12) — solo para la rama "Actualizar entrega"
+  // (ya entregado antes), no para la primera entrega (ese caso ya tiene
+  // suficiente feedback: la UI transiciona a la nota "Entregado el...").
+  // No existe un componente de modal de notificación/resultado compartido
+  // en el repo (barrido de los ~35 componentes con role="dialog" del sitio
+  // — todos son de contenido propio por flujo, ninguno genérico) — este
+  // modal mirror el mismo esqueleto visual ya usado en los modales de
+  // Fontana (FontanaMunicipiosModal.tsx: fixed inset-0 + backdrop + panel
+  // rounded-xl), consistente con el resto del módulo.
+  const [resultadoModal, setResultadoModal] = useState<{ tipo: "exito" | "error"; mensaje: string } | null>(null);
   const projectId = sesion.modduloProjectId!;
 
   async function handleEntregar() {
+    const esActualizacion = !!sesion.entregaCanal1;
     setEntregando(true);
     setError(null);
     try {
@@ -73,8 +84,15 @@ export default function FontanaCanal1Button({
         );
       }
       onSesionActualizada({ ...sesion, entregaCanal1: { fecha: data.fecha, resultadoId: data.resultadoId } });
+      if (esActualizacion) {
+        setResultadoModal({ tipo: "exito", mensaje: "La entrega se actualizó correctamente." });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      const mensaje = err instanceof Error ? err.message : "Error inesperado";
+      setError(mensaje);
+      if (esActualizacion) {
+        setResultadoModal({ tipo: "error", mensaje });
+      }
     } finally {
       setEntregando(false);
     }
@@ -82,7 +100,12 @@ export default function FontanaCanal1Button({
 
   if (!sesion.entregaCanal1) {
     return (
-      <div className="w-full flex flex-col items-center gap-1.5 sm:w-fit sm:items-end">
+      <div className="w-full flex flex-col gap-1.5 items-center sm:items-end sm:w-fit">
+        {!reporteListo && (
+          <p className="text-xs text-white/80 text-center sm:text-right max-w-xs">
+            Genera el reporte de sesión (pestaña Reporte) para habilitar la entrega:
+          </p>
+        )}
         <button
           type="button"
           onClick={handleEntregar}
@@ -91,11 +114,6 @@ export default function FontanaCanal1Button({
         >
           {entregando ? "Entregando…" : "Entregar a Moddulo F3"}
         </button>
-        {!reporteListo && (
-          <p className="text-xs text-white/80 max-w-xs text-right">
-            Genera el reporte de sesión (pestaña Reporte) para habilitar la entrega.
-          </p>
-        )}
         {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
       </div>
     );
@@ -113,7 +131,7 @@ export default function FontanaCanal1Button({
           disabled={entregando || !reporteListo}
           className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2 disabled:opacity-50"
         >
-          {entregando ? "Actualizando…" : "Actualizar entrega"}
+          {entregando ? <span className="text-red-eske">Actualizando…</span> : "Actualizar entrega"}
         </button>
         <button
           type="button"
@@ -124,6 +142,37 @@ export default function FontanaCanal1Button({
         </button>
       </div>
       {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
+
+      {resultadoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="resultado-actualizacion-title"
+        >
+          <div
+            className="absolute inset-0 bg-black-eske/40"
+            aria-hidden="true"
+            onClick={() => setResultadoModal(null)}
+          />
+          <div className="relative z-10 bg-white-eske dark:bg-[#18324A] rounded-xl shadow-lg border border-gray-eske-20 dark:border-white/10 w-full max-w-sm p-6 flex flex-col gap-3">
+            <h2
+              id="resultado-actualizacion-title"
+              className={`text-base font-semibold ${resultadoModal.tipo === "exito" ? "text-green-eske" : "text-red-eske"}`}
+            >
+              {resultadoModal.tipo === "exito" ? "Entrega actualizada" : "No se pudo actualizar la entrega"}
+            </h2>
+            <p className="text-sm text-black-eske dark:text-[#C7D6E0]">{resultadoModal.mensaje}</p>
+            <button
+              type="button"
+              onClick={() => setResultadoModal(null)}
+              className="self-end px-4 py-2 bg-bluegreen-eske text-white rounded-lg text-sm font-medium hover:bg-bluegreen-eske-60 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

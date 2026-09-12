@@ -88,6 +88,14 @@ export default function MethodologyDocView({ markdown, brandLabel, baseName }: P
       );
     },
     p: ({ children }) => <p className="mb-3 leading-relaxed text-black-eske dark:text-[#C7D6E0]">{children}</p>,
+    // Recuadro con borde ligero pero visible (26-09-12) — usado hoy solo
+    // para el párrafo de feedback/contacto, pero cualquier `>` del
+    // markdown queda destacado igual, sin marcado especial adicional.
+    blockquote: ({ children }) => (
+      <blockquote className="mb-3 rounded-lg border border-gray-eske-30 dark:border-white/15 bg-gray-eske-10/40 dark:bg-white/5 px-4 py-3 [&>p:last-child]:mb-0">
+        {children}
+      </blockquote>
+    ),
     ul: ({ children }) => <ul className="list-disc pl-5 mb-3 space-y-1 text-black-eske dark:text-[#C7D6E0]">{children}</ul>,
     ol: ({ children }) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-black-eske dark:text-[#C7D6E0]">{children}</ol>,
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,

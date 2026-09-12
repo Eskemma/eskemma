@@ -130,7 +130,12 @@ const STATUS_COLORS: Record<ModduloProject["status"], string> = {
   active: "bg-green-100 text-green-700",
   paused: "bg-yellow-100 text-yellow-700",
   completed: "bg-blue-100 text-blue-700",
-  archived: "bg-gray-eske-20 text-gray-eske-50",
+  // `text-gray-eske-50` no existe como token del design system (sin
+  // --color-gray-eske-50 en globals.css) — quedaba como no-op y el texto
+  // heredaba el color del ancestro, casi invisible en modo oscuro sobre el
+  // mismo `bg-gray-eske-20` claro (mismo bug ya corregido en el hub de
+  // PESTEL, 26-09-12).
+  archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]",
 };
 
 const STATUS_LABELS: Record<ModduloProject["status"], string> = {
@@ -161,6 +166,7 @@ function ProjectCard({
   const [metaDraft, setMetaDraft] = useState({ name: project.name, description: project.description ?? "", color: project.color ?? "#026988" });
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
+  const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const borderColor = project.status === "archived" ? "#9ca3af" : (project.color ?? "#026988");
 
   function openEditMeta() {
@@ -294,8 +300,8 @@ function ProjectCard({
             type="button"
             aria-label="Opciones del proyecto"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setKebabOpen((o) => !o); }}
-            className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40
-              hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10
+            className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE]
+              hover:bg-gray-eske-10 dark:hover:bg-white/5
               transition-colors focus-visible:opacity-100"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -381,7 +387,7 @@ function ProjectCard({
               </div>
               <div>
                 <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-2">Color</p>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   {META_COLOR_SWATCHES.map((hex) => (
                     <button
                       key={hex}
@@ -394,6 +400,45 @@ function ProjectCard({
                       aria-label={`Color ${hex}`}
                     />
                   ))}
+                  {/* Selector hexadecimal personalizado (26-09-12) — homologado
+                      con el mismo picker de Fontana/PESTEL/Moddulo-crear. */}
+                  <button
+                    type="button"
+                    onClick={() => colorCustomInputRef.current?.click()}
+                    className="w-7 h-7 rounded-full border-2 border-dashed border-gray-eske-40
+                      flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+                      transition-colors text-xs font-bold"
+                    aria-label="Elegir color personalizado"
+                  >
+                    +
+                  </button>
+                  <input
+                    ref={colorCustomInputRef}
+                    type="color"
+                    value={metaDraft.color}
+                    onChange={(e) => setMetaDraft((d) => ({ ...d, color: e.target.value.toUpperCase() }))}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <input
+                    type="text"
+                    value={metaDraft.color}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) setMetaDraft((d) => ({ ...d, color: val.toUpperCase() }));
+                    }}
+                    maxLength={7}
+                    className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                      text-xs font-mono bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+                    aria-label="Código hexadecimal del color"
+                  />
+                  <span
+                    className="w-7 h-7 rounded-full border border-gray-eske-20 shrink-0"
+                    style={{ backgroundColor: metaDraft.color }}
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             </div>

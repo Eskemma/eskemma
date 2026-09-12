@@ -24,6 +24,18 @@ import { FAMILIA5_ORDEN, FAMILIA5_NOMBRES } from "@/lib/fontana/familia5Catalogo
 import { FAMILIA_META } from "@/lib/fontana/familias";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 
+// Mismo criterio/fórmula ya usado en Sefix (PartidosBarChart.tsx,
+// PartidosBarChartLoc.tsx) para decidir texto negro/blanco sobre un color de
+// fondo arbitrario — duplicado aquí (helper de 5 líneas, sin extraer a
+// compartido, mismo patrón ya usado para piezas puntuales de este tamaño).
+function esColorClaro(hex: string): boolean {
+  if (!hex.startsWith("#") || hex.length < 7) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160;
+}
+
 interface FamiliaMeta {
   id: FamiliaFontanaId;
   nombre: string;
@@ -187,6 +199,14 @@ export default function FontanaIndicadoresAccordion({
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Familias de indicadores">
         {FAMILIAS.map((f) => {
           const active = expandedFamily === f.id;
+          // Texto dinámico por contraste (26-09-12) — antes fijo en blanco:
+          // ilegible sobre el amarillo de Familia 5 (#FFD14A) en cualquier
+          // tema, ya que es un color de fondo inline, no un token del design
+          // system. Mismo criterio/fórmula ya usado en Sefix
+          // (PartidosBarChart.tsx `isLightColor`) — se duplica aquí (helper
+          // de 5 líneas, sin extraer a compartido, mismo criterio ya
+          // aplicado a otros helpers puntuales de este ecosistema).
+          const textoSobreColor = esColorClaro(f.color) ? "#2b2b2b" : "#ffffff";
           return (
             <button
               key={f.id}
@@ -197,13 +217,13 @@ export default function FontanaIndicadoresAccordion({
               className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors"
               style={
                 active
-                  ? { background: f.color, color: "#fff", borderColor: f.color }
+                  ? { background: f.color, color: textoSobreColor, borderColor: f.color }
                   : { background: "transparent", color: "inherit", borderColor: "#e5e7eb" }
               }
             >
               <span
-                className="w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0 text-white"
-                style={{ background: active ? "rgba(255,255,255,0.25)" : f.color }}
+                className="w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0"
+                style={{ background: active ? "rgba(255,255,255,0.25)" : f.color, color: textoSobreColor }}
                 aria-hidden="true"
               >
                 {f.id.replace("F", "")}

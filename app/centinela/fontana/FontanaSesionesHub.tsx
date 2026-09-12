@@ -64,6 +64,7 @@ function EditModal({ sesion, onClose, onSaved }: {
   const [tipo, setTipo] = useState<ProjectType>(sesion.tipoProyecto);
   const [territorio, setTerritorio] = useState<Territorio | null>(sesion.territorio);
   const [color, setColor] = useState(sesion.color ?? COLOR_DEFAULT);
+  const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +124,46 @@ function EditModal({ sesion, onClose, onSaved }: {
                 style={{ backgroundColor: hex }}
               />
             ))}
+            {/* Selector hexadecimal personalizado (26-09-12) — mismo patrón que
+                WizardStep1Tipo.tsx de PESTEL: input nativo type="color" oculto
+                (diálogo del SO) + campo de texto hex, junto a los 7 swatches. */}
+            <button
+              type="button"
+              onClick={() => colorCustomInputRef.current?.click()}
+              className="w-7 h-7 rounded-full border-2 border-dashed border-gray-eske-40
+                flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+                transition-colors text-xs font-bold"
+              aria-label="Elegir color personalizado"
+            >
+              +
+            </button>
+            <input
+              ref={colorCustomInputRef}
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value.toUpperCase())}
+              className="sr-only"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <input
+              type="text"
+              value={color}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(val)) setColor(val.toUpperCase());
+              }}
+              maxLength={7}
+              className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                text-xs font-mono bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+              aria-label="Código hexadecimal del color"
+            />
+            <span
+              className="w-7 h-7 rounded-full border border-gray-eske-20 shrink-0"
+              style={{ backgroundColor: color }}
+              aria-hidden="true"
+            />
           </div>
         </div>
         <TerritorySelector
@@ -194,7 +235,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
               type="button"
               aria-label="Opciones de la sesión"
               onClick={() => setKebabOpen((o) => !o)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" />
@@ -317,7 +358,7 @@ function VinculadaCard({ sesion, onDesvinculada }: {
               aria-label="Opciones de la sesión"
               onClick={() => setKebabOpen((o) => !o)}
               disabled={desvinculando}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" />

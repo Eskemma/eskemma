@@ -408,10 +408,14 @@ export default function FontanaReportePanel({
         <div className="max-w-xl mx-auto text-center flex flex-col items-center gap-4">
           <p className="text-black-eske dark:text-[#EAF2F8] font-medium">Reporte de sesión</p>
           <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed">
-            Organiza en un solo documento los indicadores de esta sesión —los heredados del
-            proyecto y los que consultaste, tanto en el chat como en la tabla comparativa—, con
-            la lectura estratégica de cada uno. Puedes editarlo, descargarlo y —si esta sesión
-            viene de un proyecto— entregarlo a Moddulo.
+            Organiza en un solo documento los indicadores heredados y consultados de esta sesión
+            con la lectura estratégica de cada uno. El reporte generado por Fontana podrás
+            editarlo y descargarlo.
+          </p>
+          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed">
+            Si esta sesión viene de un proyecto, podrás entregar el reporte a Moddulo. En caso
+            contrario, si así lo decides, podrás iniciar un nuevo proyecto o vincularlo con
+            alguno existente dentro de Moddulo.
           </p>
           {generando ? (
             <div className="w-full max-w-md text-left">{bloqueGenerando}</div>

@@ -5,7 +5,7 @@
 // Ruta A — datos básicos (nombre, horizonte, color): no afecta el análisis.
 // Ruta B — reconfigurar variables: navega al wizard con advertencia previa.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
@@ -16,6 +16,10 @@ interface ConfigEditModalProps {
 }
 
 type View = "choice" | "formA" | "confirmB";
+
+// Mismos 7 valores ya usados en el resto de PESTEL (app/centinela/pestel/page.tsx,
+// WizardStep1Tipo.tsx) — homologación del selector de color (26-09-12).
+const COLOR_SWATCHES = ["#026988", "#248cc1", "#ffa366", "#649941", "#ffd14a", "#d10f3f", "#474747"];
 
 export default function ConfigEditModal({
   projectId,
@@ -31,6 +35,7 @@ export default function ConfigEditModal({
   const [nombre, setNombre] = useState("");
   const [horizonte, setHorizonte] = useState(6);
   const [color, setColor] = useState("#026988");
+  const colorCustomInputRef = useRef<HTMLInputElement>(null);
 
   useEscapeKey(true, onClose);
   const modalRef = useFocusTrap(true);
@@ -252,24 +257,66 @@ export default function ConfigEditModal({
 
               <div>
                 <label
-                  htmlFor="cfg-color"
+                  htmlFor="cfg-color-hex"
                   className="block text-xs font-semibold text-gray-eske-70 dark:text-[#9AAEBE] mb-1"
                 >
                   Color identificador
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {COLOR_SWATCHES.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setColor(hex.toUpperCase())}
+                      style={{ backgroundColor: hex }}
+                      className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                        color.toLowerCase() === hex ? "border-black-eske dark:border-white-eske scale-110" : "border-transparent"
+                      }`}
+                      aria-label={`Color ${hex}`}
+                    />
+                  ))}
+                  {/* Selector hexadecimal personalizado (26-09-12) — homologado
+                      con el resto del ecosistema (Fontana/PESTEL-crear/Moddulo);
+                      antes esta ruta solo tenía el input nativo, sin swatches ni
+                      campo de texto hex. */}
+                  <button
+                    type="button"
+                    onClick={() => colorCustomInputRef.current?.click()}
+                    className="w-7 h-7 rounded-full border-2 border-dashed border-gray-eske-40
+                      flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+                      transition-colors text-xs font-bold"
+                    aria-label="Elegir color personalizado"
+                  >
+                    +
+                  </button>
                   <input
-                    id="cfg-color"
+                    ref={colorCustomInputRef}
                     type="color"
                     value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-10 rounded-lg border border-gray-eske-30 dark:border-white/20
-                      cursor-pointer bg-transparent p-0.5
-                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+                    onChange={(e) => setColor(e.target.value.toUpperCase())}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
                   />
-                  <span className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] font-mono">
-                    {color}
-                  </span>
+                  <input
+                    id="cfg-color-hex"
+                    type="text"
+                    value={color}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) setColor(val.toUpperCase());
+                    }}
+                    maxLength={7}
+                    className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                      text-xs font-mono bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+                    aria-label="Código hexadecimal del color"
+                  />
+                  <span
+                    className="w-7 h-7 rounded-full border border-gray-eske-20 shrink-0"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
 

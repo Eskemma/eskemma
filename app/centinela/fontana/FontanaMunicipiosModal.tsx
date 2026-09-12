@@ -61,7 +61,7 @@
 // así que también mejora el caso Estatal existente (Oaxaca) — decisión
 // explícita, no acotada solo a Nacional.
 
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import { familiaDeIndicador } from "@/types/fontana.types";
@@ -177,6 +177,81 @@ function normalizar(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+// Descarga CSV (26-09-12) — primer export CSV de Fontana, sin helper
+// genérico previo en el repo (el único precedente es server-side inline en
+// app/api/sefix/historico-tabla/route.ts). Client-side puro: los datos ya
+// están en memoria en estos modales, no hace falta una ruta nueva. BOM
+// (﻿) para que Excel abra los acentos correctamente.
+function descargarCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const escapar = (v: string | number) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...rows].map((fila) => fila.map(escapar).join(",")).join("\n");
+  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function nombreArchivoCsv(prefijo: string, indicadorNombre: string): string {
+  const slug = indicadorNombre.trim().replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return `${prefijo}_${slug || "datos"}.csv`;
+}
+
+// Kebab reutilizado en los 4 modales de listado — mismo patrón hand-rolled
+// (sin librería) ya usado en FontanaCanvasItemCard.tsx, simplificado a una
+// sola opción.
+function KebabDescargarCsv({ onDescargar }: { onDescargar: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutsideClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutsideClick);
+    return () => document.removeEventListener("mousedown", onOutsideClick);
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        aria-label="Opciones"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-center w-8 h-8 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <circle cx="8" cy="3" r="1.5" />
+          <circle cx="8" cy="8" r="1.5" />
+          <circle cx="8" cy="13" r="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-40 bg-white-eske dark:bg-[#1E3A52] rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20">
+          <button
+            type="button"
+            onClick={() => {
+              onDescargar();
+              setOpen(false);
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-black-eske dark:text-[#EAF2F8] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+          >
+            Descargar CSV
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Router — cada modo llama sus propios hooks en su propio componente
 // (nunca condicionalmente dentro de uno solo), scope="distrito" preserva
 // el comportamiento exacto ya en producción, sin cambio.
@@ -261,19 +336,42 @@ function ModalSeleccion({
           </button>
         </div>
 
-        {desglosePorUnidad.length > 5 && (
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar…"
-            autoFocus
-            className="w-full px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
-              text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+        <div className="flex items-center gap-2">
+          {desglosePorUnidad.length > 5 && (
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar…"
+              autoFocus
+              className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
+                placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+            />
+          )}
+          <KebabDescargarCsv
+            onDescargar={() =>
+              descargarCsv(
+                nombreArchivoCsv("seleccion", indicadorNombre),
+                ["Nombre", "Estado", "Valor", "Unidad", "Naturaleza", "Fuente", "Motivo"],
+                filtrados.map((e) => {
+                  const celda = e.celda;
+                  const tieneValor = "valor" in celda;
+                  return [
+                    e.nombre,
+                    e.estado,
+                    tieneValor ? celda.valor ?? "" : "",
+                    tieneValor ? celda.unidad ?? "" : "",
+                    tieneValor ? celda.naturaleza ?? "" : "",
+                    tieneValor ? celda.fuenteEtiqueta ?? "" : "",
+                    tieneValor ? "" : celda.motivo ?? "",
+                  ];
+                })
+              )
+            }
           />
-        )}
+        </div>
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {filtrados.length === 0 && (
@@ -409,17 +507,28 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
           </button>
         </div>
 
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar municipio…"
-          autoFocus
-          className="w-full px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
-            text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-            placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar municipio…"
+            autoFocus
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
+              text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
+              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+          />
+          <KebabDescargarCsv
+            onDescargar={() =>
+              descargarCsv(
+                nombreArchivoCsv("municipios", indicadorNombre),
+                ["Nombre", "Valor", "Unidad", "Naturaleza", "Fuente", "Motivo"],
+                filtrados.map((m) => [m.nombre, m.valor ?? "", m.unidad ?? "", m.naturaleza ?? "", m.fuenteEtiqueta ?? "", m.motivo ?? ""])
+              )
+            }
+          />
+        </div>
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {error && <p className="text-sm text-red-eske">{error}</p>}
@@ -680,20 +789,53 @@ function ModalEstado({
           </button>
         </div>
 
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder={respuesta ? `Buscar ${tituloTipo}…` : "Cargando…"}
-          disabled={!respuesta}
-          autoFocus
-          className="w-full px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
-            text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-            disabled:opacity-60 disabled:cursor-not-allowed
-            placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]
-            disabled:placeholder:text-red-eske"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={respuesta ? `Buscar ${tituloTipo}…` : "Cargando…"}
+            disabled={!respuesta}
+            autoFocus
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
+              text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
+              disabled:opacity-60 disabled:cursor-not-allowed
+              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]
+              disabled:placeholder:text-red-eske"
+          />
+          <KebabDescargarCsv
+            onDescargar={() =>
+              descargarCsv(
+                nombreArchivoCsv(tituloTipo, indicadorNombre),
+                ["Nombre", "Estado", "Valor", "Unidad", "Naturaleza", "Fuente", "Motivo"],
+                esBuscador
+                  ? filtradosIndice.map((el) => {
+                      const clave = claveSeleccion(el, ambito);
+                      const cargado = valoresCargados.get(clave);
+                      return [
+                        el.nombre,
+                        el.estadoNombre ?? "",
+                        cargado?.valor ?? "",
+                        cargado?.unidad ?? "",
+                        cargado?.naturaleza ?? "",
+                        cargado?.fuenteEtiqueta ?? "",
+                        cargado ? cargado.motivo ?? "" : "No cargado",
+                      ];
+                    })
+                  : filtradosPrecarga.map((el) => [
+                      el.nombre,
+                      el.estadoNombre ?? "",
+                      el.valor ?? "",
+                      el.unidad ?? "",
+                      el.naturaleza ?? "",
+                      el.fuenteEtiqueta ?? "",
+                      el.motivo ?? "",
+                    ])
+              )
+            }
+          />
+        </div>
 
         {esBuscador && (
           <div className="flex items-center gap-3 -mt-1">
@@ -948,17 +1090,28 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
           </button>
         </div>
 
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder={`Buscar ${tituloTipo}…`}
-          autoFocus
-          className="w-full px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
-            text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-            placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={`Buscar ${tituloTipo}…`}
+            autoFocus
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
+              text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
+              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+          />
+          <KebabDescargarCsv
+            onDescargar={() =>
+              descargarCsv(
+                nombreArchivoCsv(tituloTipo, indicadorNombre),
+                ["Nombre", "Valor", "Unidad", "Naturaleza", "Fuente", "Motivo"],
+                filtrados.map((d) => [d.nombre, d.valor ?? "", d.unidad ?? "", d.naturaleza ?? "", d.fuenteEtiqueta ?? "", d.motivo ?? ""])
+              )
+            }
+          />
+        </div>
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {error && <p className="text-sm text-red-eske">{error}</p>}

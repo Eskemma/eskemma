@@ -51,7 +51,11 @@ const STAGE_LABELS: Record<number, string> = {
 const PESTEL_STATUS_COLORS: Record<string, string> = {
   active:   "",
   paused:   "bg-yellow-100 text-yellow-700",
-  archived: "bg-gray-eske-20 text-gray-eske-50",
+  // `text-gray-eske-50` no existe como token del design system (sin
+  // --color-gray-eske-50 en globals.css) — quedaba como no-op y el texto
+  // heredaba el color del ancestro, casi invisible en modo oscuro sobre el
+  // mismo `bg-gray-eske-20` claro (26-09-12, contraste reportado por Raúl).
+  archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]",
 };
 
 const PESTEL_STATUS_LABELS: Record<string, string> = {
@@ -86,6 +90,7 @@ function ProjectCard({
   const [editColor, setEditColor] = useState(project.color ?? "#026988");
   const [saving, setSaving] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
+  const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const stage = project.currentStage ?? 1;
   const status = project.status ?? "active";
   const isArchived = status === "archived";
@@ -232,8 +237,8 @@ function ProjectCard({
               type="button"
               aria-label="Opciones del proyecto"
               onClick={() => setKebabOpen((o) => !o)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40
-                hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE]
+                hover:bg-gray-eske-10 dark:hover:bg-white/5
                 transition-colors focus-visible:opacity-100"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -281,7 +286,7 @@ function ProjectCard({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
               isArchived
-                ? "bg-gray-eske-20 text-gray-eske-50"
+                ? "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]"
                 : "bg-bluegreen-eske/10 text-bluegreen-eske"
             }`}>
               Etapa {stage} — {STAGE_LABELS[stage] ?? ""}
@@ -331,7 +336,7 @@ function ProjectCard({
               </div>
               <div>
                 <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-2">Color</p>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   {COLOR_SWATCHES.map((hex) => (
                     <button
                       key={hex}
@@ -344,6 +349,45 @@ function ProjectCard({
                       aria-label={`Color ${hex}`}
                     />
                   ))}
+                  {/* Selector hexadecimal personalizado (26-09-12) — homologado
+                      con el mismo picker de Fontana/PESTEL-crear/Moddulo. */}
+                  <button
+                    type="button"
+                    onClick={() => colorCustomInputRef.current?.click()}
+                    className="w-7 h-7 rounded-full border-2 border-dashed border-gray-eske-40
+                      flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+                      transition-colors text-xs font-bold"
+                    aria-label="Elegir color personalizado"
+                  >
+                    +
+                  </button>
+                  <input
+                    ref={colorCustomInputRef}
+                    type="color"
+                    value={editColor}
+                    onChange={(e) => setEditColor(e.target.value.toUpperCase())}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <input
+                    type="text"
+                    value={editColor}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) setEditColor(val.toUpperCase());
+                    }}
+                    maxLength={7}
+                    className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                      text-xs font-mono bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+                    aria-label="Código hexadecimal del color"
+                  />
+                  <span
+                    className="w-7 h-7 rounded-full border border-gray-eske-20 shrink-0"
+                    style={{ backgroundColor: editColor }}
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             </div>

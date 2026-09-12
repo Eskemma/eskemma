@@ -201,7 +201,7 @@ export default function WizardStep1Tipo({
             ref={colorInputRef}
             type="color"
             value={color}
-            onChange={(e) => onChange({ color: e.target.value })}
+            onChange={(e) => onChange({ color: e.target.value.toUpperCase() })}
             className="sr-only"
             aria-hidden="true"
             tabIndex={-1}
@@ -211,7 +211,7 @@ export default function WizardStep1Tipo({
             value={color}
             onChange={(e) => {
               const val = e.target.value;
-              if (/^#[0-9A-Fa-f]{6}$/.test(val)) onChange({ color: val });
+              if (/^#[0-9A-Fa-f]{6}$/.test(val)) onChange({ color: val.toUpperCase() });
             }}
             maxLength={7}
             className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg

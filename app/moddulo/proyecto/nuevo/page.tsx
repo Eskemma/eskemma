@@ -327,7 +327,7 @@ function NuevoProyectoContent() {
                   <input
                     type="color"
                     value={color}
-                    onChange={(e) => { setColor(e.target.value); setCustomHex(e.target.value); }}
+                    onChange={(e) => { const v = e.target.value.toUpperCase(); setColor(v); setCustomHex(v); }}
                     className="w-10 h-10 rounded cursor-pointer border border-gray-eske-20"
                     aria-label="Selector de color"
                   />
@@ -337,7 +337,11 @@ function NuevoProyectoContent() {
                     onChange={(e) => {
                       const v = e.target.value;
                       setCustomHex(v);
-                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) setColor(v);
+                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                        const upper = v.toUpperCase();
+                        setColor(upper);
+                        setCustomHex(upper);
+                      }
                     }}
                     placeholder="#026988"
                     maxLength={7}

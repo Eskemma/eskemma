@@ -4,6 +4,8 @@
 
 Este es un documento de consulta. Puedes ir directo a la sección que necesites. Si es tu primera vez, te recomendamos leer "Alcance y objetivo" y "Definiciones y conceptos clave" antes que el resto. Explica cómo Fontana obtiene sus datos, qué tan confiables son, y qué hace cuando algo no está disponible. Está pensado para ti y tu equipo que usa Fontana para investigar un territorio. Los términos técnicos se explican la primera vez que aparecen.
 
+> ¡Gracias por utilizar Fontana! Ayúdanos a mejorar reportando errores, sugerencias o comentarios a: [centinela@eskemma.com](mailto:centinela@eskemma.com) ¡Nos encanta escucharte!
+
 ---
 
 ## 1. Alcance y objetivo

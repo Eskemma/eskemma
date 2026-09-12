@@ -220,28 +220,30 @@ export default function FontanaModduloButton({
 
   return (
     <>
-      <div className="w-full flex flex-col items-center gap-1.5 sm:w-fit sm:items-end">
-        <button
-          type="button"
-          onClick={() => router.push(`/moddulo/proyecto/nuevo?from=fontana&fontanaSesionId=${sesion.sesionId}`)}
-          disabled={!reporteListo}
-          className="px-5 py-2.5 bg-white text-bluegreen-eske rounded-lg text-sm font-semibold hover:bg-white/90 transition-colors shadow-sm disabled:opacity-60"
-        >
-          Iniciar proyecto en Moddulo
-        </button>
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          disabled={!reporteListo}
-          className="text-xs text-white/80 hover:text-white transition-colors underline underline-offset-2 disabled:opacity-50"
-        >
-          Vincular a proyecto existente
-        </button>
+      <div className="w-full flex flex-col gap-1.5 items-center sm:items-end sm:w-fit">
         {!reporteListo && (
-          <p className="text-xs text-white/80 max-w-xs text-right">
-            Genera el reporte de sesión (pestaña Reporte) para habilitar estas opciones.
+          <p className="text-xs text-white/80 text-center sm:text-right max-w-xs">
+            Genera el reporte de sesión (pestaña Reporte) para habilitar las siguientes opciones:
           </p>
         )}
+        <div className="flex items-stretch gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => router.push(`/moddulo/proyecto/nuevo?from=fontana&fontanaSesionId=${sesion.sesionId}`)}
+            disabled={!reporteListo}
+            className="flex-1 min-w-0 px-3 py-1.5 bg-white text-bluegreen-eske rounded-lg text-xs font-semibold hover:bg-white/90 transition-colors shadow-sm disabled:opacity-60 whitespace-normal leading-tight text-center"
+          >
+            Iniciar proyecto en Moddulo
+          </button>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            disabled={!reporteListo}
+            className="flex-1 min-w-0 px-3 py-1.5 border border-white/30 text-white rounded-lg text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50 whitespace-normal leading-tight text-center"
+          >
+            Vincular a proyecto existente
+          </button>
+        </div>
       </div>
 
       {pickerOpen && <PickerModal sesion={sesion} onClose={() => setPickerOpen(false)} />}

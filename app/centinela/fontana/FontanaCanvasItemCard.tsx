@@ -30,8 +30,21 @@ interface Props {
 const TIPOS_IMAGEN = new Set<FontanaCanvasItem["tipo"]>(["grafica", "distribucion", "serie_temporal", "comparacion_territorios", "serie_internacional"]);
 const TIPOS_PDF = new Set<FontanaCanvasItem["tipo"]>(["resumen", "tabla", "desglose"]);
 
+// Mismo criterio/fórmula ya usado en Sefix (PartidosBarChart.tsx) y en
+// FontanaIndicadoresAccordion.tsx para decidir texto negro/blanco sobre un
+// color de familia arbitrario — el amarillo de Familia 5 (#FFD14A) no es
+// legible con texto blanco fijo.
+function esColorClaro(hex: string): boolean {
+  if (!hex.startsWith("#") || hex.length < 7) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160;
+}
+
 export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Props) {
   const color = FAMILIA_META[item.familiaId]?.color ?? "#248cc1";
+  const textoSobreColor = esColorClaro(color) ? "#2b2b2b" : "#ffffff";
   const graficaRef = useRef<HTMLDivElement>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
 
@@ -111,7 +124,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
   return (
     <div className="relative rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: color }}>
+        <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={{ background: color, color: textoSobreColor }}>
           {item.familiaId.replace("F", "")}
         </span>
         <div className="flex-1 min-w-0">

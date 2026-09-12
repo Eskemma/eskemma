@@ -62,7 +62,12 @@ export default function FontanaMain({ sesion, proyectoNombre, onSesionActualizad
                 {sesion.territorio.nombre ||
                   [sesion.territorio.estado, sesion.territorio.municipio].filter(Boolean).join(" › ")}
                 {" — "}
-                <Link href="/centinela/fontana/notas-metodologicas" className="underline hover:text-white">
+                <Link
+                  href="/centinela/fontana/notas-metodologicas"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-white"
+                >
                   Notas metodológicas
                 </Link>
               </p>

@@ -11,7 +11,7 @@
 //     elige tipo + territorio (TerritorySelector) y se crea una sesión
 //     suelta con los indicadores por defecto ya poblados.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
 import type { FontanaSesion } from "@/types/fontana.types";
@@ -64,6 +64,7 @@ export default function FontanaPage() {
   const [territorioListo, setTerritorioListo] = useState(false);
   const [nombreStandalone, setNombreStandalone] = useState("");
   const [colorStandalone, setColorStandalone] = useState(COLOR_SWATCHES[1]);
+  const colorCustomInputRef = useRef<HTMLInputElement>(null);
 
   const cargar = useCallback(async () => {
     if (sesionIdParam) {
@@ -279,6 +280,46 @@ export default function FontanaPage() {
                       style={{ backgroundColor: hex }}
                     />
                   ))}
+                  {/* Selector hexadecimal personalizado (26-09-12) — mismo patrón que
+                      WizardStep1Tipo.tsx de PESTEL: input nativo type="color" oculto
+                      (diálogo del SO) + campo de texto hex, junto a los 7 swatches. */}
+                  <button
+                    type="button"
+                    onClick={() => colorCustomInputRef.current?.click()}
+                    className="w-8 h-8 rounded-full border-2 border-dashed border-gray-eske-40
+                      flex items-center justify-center text-gray-eske-60 hover:border-gray-eske-70
+                      transition-colors text-xs font-bold"
+                    aria-label="Elegir color personalizado"
+                  >
+                    +
+                  </button>
+                  <input
+                    ref={colorCustomInputRef}
+                    type="color"
+                    value={colorStandalone}
+                    onChange={(e) => setColorStandalone(e.target.value.toUpperCase())}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <input
+                    type="text"
+                    value={colorStandalone}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) setColorStandalone(val.toUpperCase());
+                    }}
+                    maxLength={7}
+                    className="w-24 px-2 py-1 border border-gray-eske-30 dark:border-white/10 rounded-lg
+                      text-xs font-mono bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske"
+                    aria-label="Código hexadecimal del color"
+                  />
+                  <span
+                    className="w-8 h-8 rounded-full border border-gray-eske-20 shrink-0"
+                    style={{ backgroundColor: colorStandalone }}
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
               {errorStandalone && <p className="text-sm text-red-eske">{errorStandalone}</p>}
