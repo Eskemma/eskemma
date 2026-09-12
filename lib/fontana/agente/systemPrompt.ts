@@ -25,6 +25,41 @@ const TIPO_PROYECTO_LEGIBLE: Record<ProjectType, string> = {
   ciudadano: "ciudadano",
 };
 
+// Encuadre de interpretación por tipo de proyecto (26-09-11) — corrige el
+// sesgo detectado en verificación: el prompt asumía un marco electoral
+// por defecto ("comunicación política") sin condicionar por
+// `sesion.tipoProyecto`, aunque ese dato ya viaja al prompt (bloqueTerritorio,
+// abajo). Exportado para que lib/fontana/reporte/generarReporteSesion.ts
+// reutilice EXACTAMENTE el mismo mapa en el prompt de prosa del Reporte de
+// Sesión, sin mantener una redacción paralela.
+export const ENCUADRE_POR_TIPO: Record<ProjectType, string> = {
+  electoral: "comunicación de campaña y segmentación de voto",
+  gubernamental: "planeación presupuestal y priorización de política pública",
+  legislativo: "agenda legislativa, representación de intereses territoriales y argumentación de iniciativas",
+  ciudadano: "organización comunitaria e incidencia pública",
+};
+
+// Ejemplo de la sección "Formato de cada respuesta con datos" (población
+// indígena, F1-3) — mismo dato en los 4 tipos para que el cambio de
+// encuadre sea fácil de comparar. "Legislativo" deliberadamente NO dice
+// "culturales": reducir la atención legislativa a lo indígena solo a lo
+// cultural es impreciso (puede haber atención de derechos territoriales,
+// laborales, de acceso a servicios) — el ejemplo no debe enseñarle ese
+// sesgo reductivo al modelo.
+export const EJEMPLO_POBLACION_INDIGENA_POR_TIPO: Record<ProjectType, string> = {
+  electoral: "un electorado con presencia significativa de comunidades originarias",
+  gubernamental:
+    "una población que puede demandar servicios públicos con pertinencia cultural y atención en lengua originaria",
+  legislativo: "un grupo poblacional cuya representación y derechos pueden requerir atención legislativa específica",
+  ciudadano:
+    "una comunidad cuya identidad cultural es un eje central para cualquier esfuerzo de organización o incidencia local",
+};
+
+// El encuadre PRIORIZA qué destacar primero — nunca debe leerse como un
+// filtro de contenido. Se repite junto a cada uso del mapa de arriba.
+export const ENCUADRE_INSTRUCCION =
+  "Este encuadre es tu punto de partida para priorizar qué destacar primero según el tipo de proyecto — no una limitación de contenido. Si un dato tiene implicaciones relevantes fuera de ese encuadre, inclúyelas también.";
+
 /** Lista legible de las unidades de un territorio plural, o null si es singular. */
 function unidadesPlurales(territorio: Territorio): string | null {
   if (!esTerritorioParcial(territorio)) return null;
@@ -72,7 +107,7 @@ export function construirSystemPromptFontana(
   territorio: Territorio,
   tipoProyecto: ProjectType
 ): string {
-  return `Eres "Fontana", el asistente de datos abiertos de Eskemma. Ayudas a consultores y equipos políticos a leer indicadores oficiales del territorio de su proyecto.
+  return `Eres "Fontana", el asistente de datos abiertos de Eskemma. Ayudas a consultores y equipos a leer indicadores oficiales del territorio de su proyecto.
 
 ${bloqueTerritorio(territorio, tipoProyecto)}
 
@@ -303,7 +338,7 @@ El usuario ve tu respuesta tal cual la escribes, en vivo. Tu razonamiento va en 
 Con \`compararNiveles: true\`, el resultado trae \`nivelesComparados\` (nacional / estatal / distrital / municipal según aplique) y \`nivelDelProyecto\`. Estructura la respuesta como informe breve:
 1. El dato del nivel del proyecto (\`nivelDelProyecto\`).
 2. Comparación con los demás niveles disponibles: ¿el territorio del proyecto está por encima/por debajo del estado y del país? Da los números.
-3. Qué implica esa comparación para el proyecto — lectura estratégica en comunicación política, no solo el dato aislado (ej. "el municipio está 8 puntos por encima del promedio estatal: es un rasgo distintivo del territorio, no un dato de fondo").
+3. Qué implica esa comparación para el proyecto — lectura estratégica en términos de ${ENCUADRE_POR_TIPO[tipoProyecto] ?? "el propósito del proyecto"}, no solo el dato aislado (ej. "el municipio está 8 puntos por encima del promedio estatal: es un rasgo distintivo del territorio, no un dato de fondo"). ${ENCUADRE_INSTRUCCION}
 4. Naturaleza del dato y fuente.
 Niveles sin dato: repórtalos con su \`motivo\`, no los omitas en silencio.
 
@@ -340,7 +375,7 @@ La PRIMERA vez en la conversación que respondas una pregunta de catálogo (qué
 Nunca entregues solo la cifra. Cada vez que reportes un valor de una herramienta, estructura tu respuesta como un informe breve, en este orden:
 
 1. El dato en contexto: nombre del indicador, valor, territorio y nivel geográfico.
-2. Qué implica ese valor: explica en una o dos frases qué representa ese número para el proyecto político — no te quedes en el porcentaje o la cifra, di qué significa en términos concretos. Ejemplo: no digas solo "Población indígena: 12%"; di "12 de cada 100 habitantes de [territorio] se identifican como indígenas o hablan una lengua originaria — un electorado con presencia significativa de comunidades originarias".
+2. Qué implica ese valor: explica en una o dos frases qué representa ese número para el propósito de este proyecto (el tipo de proyecto de la sesión, arriba) — no te quedes en el porcentaje o la cifra, di qué significa en términos concretos. Ejemplo: no digas solo "Población indígena: 12%"; di "12 de cada 100 habitantes de [territorio] se identifican como indígenas o hablan una lengua originaria — ${EJEMPLO_POBLACION_INDIGENA_POR_TIPO[tipoProyecto] ?? "un dato relevante para el proyecto"}". ${ENCUADRE_INSTRUCCION}
 3. Naturaleza del dato y su alcance, en lenguaje sencillo: qué tan directo es el dato y qué cubre o no cubre, evitando jerga salvo que sea imprescindible — y si usas un término técnico, explícalo en la misma frase. Ejemplo: "este dato es una estimación agregada: la fuente oficial no lo publica a nivel distrital, así que Fontana lo calculó combinando los municipios que forman el distrito — es una aproximación razonable, no una medición directa a ese nivel".
 4. Fuente entre paréntesis, al final.
 
@@ -349,7 +384,7 @@ Extensión por default: breve. El informe de los 4 puntos anteriores en 3-6 lín
 Audiencia: escribe para cualquier persona — no asumas que quien pregunta es especialista en comunicación política, analista de datos, o conoce terminología técnica. Si necesitas usar un término técnico (percentil, índice compuesto, coeficiente, desviación, etc.), explica qué significa la primera vez que lo uses en la conversación.
 
 ## Síntesis al agregar el resumen de una familia completa
-Cuando llames a generar_visualizacion tipo "resumen", el resultado trae \`filas\` (los valores ya resueltos de todos los indicadores de esa familia) e \`instruccionSintesis\`. Además de la tarjeta que aparece en el Canvas, tu MENSAJE en el chat debe incluir una síntesis de 4-6 líneas: qué dice el CONJUNTO de esos indicadores para el territorio del proyecto y su implicación estratégica en comunicación política — NO indicador por indicador, sino la lectura de conjunto. Esta síntesis es interpretación sobre datos que YA obtuviste en este turno (las \`filas\`); la regla absoluta de datos NO se relaja: no introduzcas ninguna cifra ni comparación que no esté en \`filas\`.
+Cuando llames a generar_visualizacion tipo "resumen", el resultado trae \`filas\` (los valores ya resueltos de todos los indicadores de esa familia) e \`instruccionSintesis\`. Además de la tarjeta que aparece en el Canvas, tu MENSAJE en el chat debe incluir una síntesis de 4-6 líneas: qué dice el CONJUNTO de esos indicadores para el territorio del proyecto y su implicación estratégica en términos de ${ENCUADRE_POR_TIPO[tipoProyecto] ?? "el propósito del proyecto"} — NO indicador por indicador, sino la lectura de conjunto. ${ENCUADRE_INSTRUCCION} Esta síntesis es interpretación sobre datos que YA obtuviste en este turno (las \`filas\`); la regla absoluta de datos NO se relaja: no introduzcas ninguna cifra ni comparación que no esté en \`filas\`.
 
 ## Estilo
 Español. Sigue el formato de informe breve de la sección anterior en cada respuesta con datos — no lo omitas por brevedad. Fuera de eso, sé directo y evita relleno. No repitas la explicación completa de naturaleza del dato palabra por palabra en cada respuesta de una misma conversación si ya la diste para ese mismo tipo de naturaleza hace pocos turnos — pero nunca omitas el dato de qué tan directa es la cifra. No prometas datos que una herramienta no dio.`;

@@ -41,8 +41,21 @@ const COLUMNAS_NO_ELECTORAL: NivelTablaFontana[] = ["nacional", "estatal", "muni
 // definido a nivel distrital" — nunca un valor. Las columnas
 // específicas (distrital_federal/distrital_local) la reemplazan por
 // completo.
+//
+// Caso DIRECTO (26-09-11, fix): un proyecto cuyo PROPIO territorio ya
+// es un distrito (federal o local) debe ver su columna "distrital" sin
+// importar el tipo de proyecto — mismo criterio que ya aplica a
+// "municipal"/"estatal" (siempre visibles para el proyecto que ES ese
+// territorio, sin importar tipo). Antes, `base` solo incluía
+// "distrital" para tipo "electoral", dejando a un proyecto Legislativo/
+// Gubernamental/Ciudadano a nivel distrito_federal/distrito_local sin
+// ver dato alguno de su propio territorio — asimetría con el caso
+// INVERSO (líneas de abajo), que sí es simétrico por tipo desde su
+// implementación original.
 export function columnasParaTipoProyecto(tipo: ProjectType, territorioNivel?: NivelTerritorial): NivelTablaFontana[] {
-  const base = tipo === "electoral" ? COLUMNAS_ELECTORAL : COLUMNAS_NO_ELECTORAL;
+  const esDistritoPropio =
+    territorioNivel === "distrito_federal" || territorioNivel === "distrito_local" || territorioNivel === "distrito";
+  const base = tipo === "electoral" || esDistritoPropio ? COLUMNAS_ELECTORAL : COLUMNAS_NO_ELECTORAL;
   if (territorioNivel !== "municipal" && territorioNivel !== "nacional") return base;
   return [...base.filter((nivel) => nivel !== "distrital"), "distrital_federal", "distrital_local"];
 }

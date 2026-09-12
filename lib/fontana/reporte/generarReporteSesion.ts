@@ -23,7 +23,9 @@ import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio"
 import { construirEsqueletoReporte, type EsqueletoReporte } from "@/lib/fontana/reporte/reporteSesionSkeleton";
 import { resolverCeldasIndicadoresSesion } from "@/lib/fontana/resolverCeldasIndicadoresSesion";
 import { marcarReporteJob } from "@/lib/fontana/reporte/reporteJob";
+import { ENCUADRE_POR_TIPO, ENCUADRE_INSTRUCCION } from "@/lib/fontana/agente/systemPrompt";
 import type { ReporteSesionFontana } from "@/types/fontana.types";
+import type { ProjectType } from "@/types/moddulo.types";
 
 // Límite por indicador dentro de resolverCeldasIndicadoresSesion →
 // familia/[id]. El extremo medido (75 indicadores, Oaxaca) lo domina F3-2
@@ -31,13 +33,23 @@ import type { ReporteSesionFontana } from "@/types/fontana.types";
 // realmente colgada.
 const TIMEOUT_INDICADOR_MS = 90_000;
 
-const SYSTEM_PROSA = `Eres el redactor de reportes territoriales de Fontana (consultoría política, Eskemma). Recibes un RESUMEN por secciones de un reporte de sesión: cada sección "##" lista sus indicadores con sus valores ya verificados (de fuentes oficiales) y sus fuentes.
+// Condicionado por sesion.tipoProyecto (26-09-11) — reutiliza EXACTAMENTE
+// el mismo mapa ENCUADRE_POR_TIPO que el chat (lib/fontana/agente/systemPrompt.ts),
+// sin mantener una redacción paralela. Antes de este cambio, el prompt
+// asumía "un proyecto político" genérico sin importar el tipo real.
+// Exportada SOLO para verificación (scripts/verify-fontana-reporte-async.ts),
+// mismo criterio que parsearProsa/ensamblar abajo.
+export function construirSystemProsa(tipoProyecto: ProjectType): string {
+  const encuadre = ENCUADRE_POR_TIPO[tipoProyecto] ?? "el propósito del proyecto";
+  return `Eres el redactor de reportes territoriales de Fontana (consultoría, Eskemma). Recibes un RESUMEN por secciones de un reporte de sesión: cada sección "##" lista sus indicadores con sus valores ya verificados (de fuentes oficiales) y sus fuentes.
 
 Devuelve SOLO un objeto JSON válido con esta forma exacta, nada más (sin \`\`\`):
 {
   "lecturaEjecutiva": "3 a 5 frases sobre el CONJUNTO del reporte",
-  "parrafosPorSeccion": { "<título EXACTO de la sección ##>": "4 a 7 frases de lectura de CONJUNTO de esa sección — qué implica para un proyecto político en el territorio, no indicador por indicador" }
+  "parrafosPorSeccion": { "<título EXACTO de la sección ##>": "4 a 7 frases de lectura de CONJUNTO de esa sección — qué implica para este proyecto en el territorio, en términos de ${encuadre}, no indicador por indicador" }
 }
+
+${ENCUADRE_INSTRUCCION}
 
 Reglas:
 - Una clave en "parrafosPorSeccion" por CADA sección "##" del resumen, con el título EXACTO (sin el "## ").
@@ -45,6 +57,7 @@ Reglas:
 - Cita "(Fuente: X)" al menos una vez por sección, tomando una fuente del resumen.
 - Español formal, tono de consultoría. Si usas un término técnico, explícalo en la misma frase.
 - Si una sección dice "(sin indicadores en esta sección)", su párrafo puede ser una sola frase que lo reconozca.`;
+}
 
 interface ProsaReporte {
   lecturaEjecutiva: string;
@@ -130,7 +143,7 @@ export async function generarReporteSesion(
       const msg = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 3000,
-        system: SYSTEM_PROSA,
+        system: construirSystemProsa(sesion.tipoProyecto),
         messages: [{ role: "user", content: esqueleto.resumenProsa }],
       });
       const texto = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();

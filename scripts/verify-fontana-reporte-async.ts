@@ -201,6 +201,54 @@ async function main() {
     console.log(`     motivo = "${MOTIVO_TIMEOUT_REPORTE}"`);
   }
 
+  // ===================================================================
+  console.log("\n5. Encuadre del Reporte de Sesión por tipo de proyecto (26-09-11)");
+  {
+    const { construirSystemProsa } = await import("../lib/fontana/reporte/generarReporteSesion");
+    const { ENCUADRE_POR_TIPO, ENCUADRE_INSTRUCCION } = await import("../lib/fontana/agente/systemPrompt");
+    const TIPOS = ["electoral", "gubernamental", "legislativo", "ciudadano"] as const;
+
+    for (const tipo of TIPOS) {
+      const prompt = construirSystemProsa(tipo);
+      ok(`${tipo}: SYSTEM_PROSA usa su propio encuadre`, prompt.includes(ENCUADRE_POR_TIPO[tipo]));
+      ok(`${tipo}: SYSTEM_PROSA incluye la instrucción "punto de partida, no restricción"`, prompt.includes(ENCUADRE_INSTRUCCION));
+      ok(`${tipo}: SYSTEM_PROSA ya NO dice "un proyecto político" genérico`, !prompt.includes("un proyecto político"));
+      for (const otro of TIPOS) {
+        if (otro === tipo) continue;
+        ok(`${tipo}: SYSTEM_PROSA NO contiene el encuadre de "${otro}"`, !prompt.includes(ENCUADRE_POR_TIPO[otro]));
+      }
+    }
+
+    // Verificación EN VIVO — un tipo no electoral (gubernamental) genera
+    // prosa real con Claude y se confirma que la lectura refleja el encuadre.
+    const { anthropic, CLAUDE_MODEL } = await import("../lib/ai/claude");
+    const resumenSintetico = [
+      "Territorio: Oaxaca de Juárez.",
+      "## Hallazgos de la sesión",
+      "- Población indígena: Municipal 12.4%, Estatal 65.7%, Nacional 19.4% (Fuente: INEGI, Censo 2020 vía ECEG)",
+    ].join("\n");
+    const msg = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 500,
+      system: construirSystemProsa("gubernamental"),
+      messages: [{ role: "user", content: resumenSintetico }],
+    });
+    const texto = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    console.log("\n     --- prosa real generada (tipo gubernamental) ---");
+    console.log(
+      texto
+        .split("\n")
+        .map((l) => "     " + l)
+        .join("\n")
+    );
+    const textoLower = texto.toLowerCase();
+    ok('prosa real (gubernamental): NO dice "proyecto político"', !textoLower.includes("proyecto político"));
+    ok(
+      "prosa real (gubernamental): usa vocabulario del encuadre esperado (servicio/presupuest/política pública)",
+      /servicio|presupuest|política pública|públic/i.test(texto)
+    );
+  }
+
   console.log(fail === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fail} fallo(s)\n`);
   process.exit(fail === 0 ? 0 : 1);
 }
