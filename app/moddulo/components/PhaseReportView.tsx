@@ -73,7 +73,7 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
         Dictamen de Coherencia XPCTO
       </h2>
       {!dictamen?.cruces?.length ? (
-        <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] italic">
+        <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] italic">
           Dictamen no disponible. Genera el reporte para calcularlo.
         </p>
       ) : (
@@ -106,8 +106,8 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
                       {cruce.veredicto === "coherente" ? "Coherente" : "Requiere ajuste"}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] italic mb-2">{cruce.pregunta}</p>
-                  <p className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] leading-relaxed">{cruce.argumentacion}</p>
+                  <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic mb-2">{cruce.pregunta}</p>
+                  <p className="text-sm text-black-eske-20 dark:text-[#C7D6E0] leading-relaxed">{cruce.argumentacion}</p>
                 </div>
               </div>
             </div>
@@ -146,7 +146,7 @@ function CriteriosSection({
             className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-eske-10/40 dark:bg-[#112230]/40 border border-gray-eske-20/60 dark:border-white/5"
           >
             <span className="shrink-0 text-xs text-gray-eske-40 dark:text-[#6D8294] w-4 text-right">{c.id}</span>
-            <span className="flex-1 text-sm text-gray-eske-70 dark:text-[#C7D6E0]">{c.nombre}</span>
+            <span className="flex-1 text-sm text-black-eske-20 dark:text-[#C7D6E0]">{c.nombre}</span>
             <span className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded ${
               c.nivel === "Prioritario"
                 ? "bg-bluegreen-eske/10 text-bluegreen-eske"
@@ -210,8 +210,8 @@ export default function PhaseReportView({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h3 className="font-semibold text-gray-eske-70 dark:text-[#9AAEBE] mb-2">Reporte no disponible</h3>
-          <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] mb-6 max-w-xs leading-relaxed">
+          <h3 className="font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-2">Reporte no disponible</h3>
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mb-6 max-w-xs leading-relaxed">
             Esta fase fue cerrada sin un reporte diagnóstico guardado. Puedes editar las variables para continuar trabajando con Moddulo.
           </p>
           {onStartEdit && (

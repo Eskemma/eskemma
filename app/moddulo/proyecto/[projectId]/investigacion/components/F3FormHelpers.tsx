@@ -20,7 +20,7 @@ export function FileSelectButton({ file, onChange, label = "Seleccionar archivo"
       <PillButton type="button" variant="solid" onClick={() => inputRef.current?.click()} className="text-xs lg:text-sm shrink-0">
         {label}
       </PillButton>
-      <span className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] truncate">
+      <span className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] truncate">
         {file ? file.name : "Ningún archivo seleccionado"}
       </span>
     </div>
@@ -28,7 +28,7 @@ export function FileSelectButton({ file, onChange, label = "Seleccionar archivo"
 }
 
 export function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs lg:text-sm font-semibold text-black-eske-80 dark:text-[#C5D8E8] mb-1">{children}</label>;
+  return <label className="block text-xs lg:text-sm font-semibold text-black-eske-40 dark:text-[#C5D8E8] mb-1">{children}</label>;
 }
 
 export const inputClass = "w-full text-xs lg:text-sm px-2 py-1.5 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230]";

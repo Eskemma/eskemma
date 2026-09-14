@@ -41,7 +41,7 @@ export default function F3Sintesis({
   if (!sintesis) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-3">
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] mb-3">
           Aún no se ha generado la síntesis de hallazgos.
         </p>
         {!readOnly && (
@@ -65,8 +65,8 @@ export default function F3Sintesis({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Convergencias</p>
-        <ul className="text-xs lg:text-sm space-y-1 list-disc list-inside text-black-eske-80 dark:text-[#C5D8E8]">
+        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-1">Convergencias</p>
+        <ul className="text-xs lg:text-sm space-y-1 list-disc list-inside text-black-eske-40 dark:text-[#C5D8E8]">
           {convergencias.map((c, i) => (
             <li key={i}>
               {c.texto}
@@ -83,13 +83,13 @@ export default function F3Sintesis({
         </ul>
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Contradicciones</p>
-        <ul className="text-xs lg:text-sm space-y-1 list-disc list-inside text-black-eske-80 dark:text-[#C5D8E8]">
+        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-1">Contradicciones</p>
+        <ul className="text-xs lg:text-sm space-y-1 list-disc list-inside text-black-eske-40 dark:text-[#C5D8E8]">
           {contradicciones.length === 0 ? <li className="opacity-60">Ninguna detectada</li> : contradicciones.map((c, i) => <li key={i}>{c}</li>)}
         </ul>
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Vacíos residuales</p>
+        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-1">Vacíos residuales</p>
         <div className="space-y-1">
           {vaciosResiduales.length === 0 ? (
             <p className="text-xs lg:text-sm opacity-60">Ninguno</p>
@@ -104,7 +104,7 @@ export default function F3Sintesis({
         </div>
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">Insumo FODA Propio</p>
+        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-1">Insumo FODA Propio</p>
         <FODAGrid foda={fodaPropioInsumo} />
       </div>
       {Object.entries(fodaAdversariosInsumo).map(([actorId, foda]) => {
@@ -118,10 +118,10 @@ export default function F3Sintesis({
         const nombreMostrado = actorVigente?.nombre ?? foda.nombreActor ?? actorId;
         return (
           <div key={actorId}>
-            <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+            <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-1">
               Insumo FODA — {nombreMostrado}
               {!actorVigente && (
-                <span className="ml-1.5 normal-case font-normal text-gray-eske-50 dark:text-[#6D8294]">(ya no está en el Semáforo vigente)</span>
+                <span className="ml-1.5 normal-case font-normal text-black-eske-20 dark:text-[#6D8294]">(ya no está en el Semáforo vigente)</span>
               )}
             </p>
             <FODAGrid foda={foda} />

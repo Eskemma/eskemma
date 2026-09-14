@@ -217,7 +217,7 @@ function NuevoProyectoContent() {
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
                   step >= s
                     ? "bg-bluegreen-eske text-white-eske"
-                    : "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-50 dark:text-[#9AAEBE]"
+                    : "bg-gray-eske-20 dark:bg-[#21425E] text-black-eske-20 dark:text-[#9AAEBE]"
                 }`}
               >
                 {s}
@@ -231,7 +231,7 @@ function NuevoProyectoContent() {
               )}
             </div>
           ))}
-          <span className="ml-2 text-sm text-gray-eske-50 dark:text-[#9AAEBE]">
+          <span className="ml-2 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
             {STEP_LABELS[step - 1]}
           </span>
         </div>
@@ -311,7 +311,7 @@ function NuevoProyectoContent() {
                   className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors ${
                     showCustomColor
                       ? "border-bluegreen-eske bg-bluegreen-eske/10 text-bluegreen-eske"
-                      : "border-gray-eske-20 dark:border-white/20 text-gray-eske-50 dark:text-[#9AAEBE] hover:border-gray-eske-40"
+                      : "border-gray-eske-20 dark:border-white/20 text-black-eske-20 dark:text-[#9AAEBE] hover:border-gray-eske-40"
                   }`}
                 >
                   +
@@ -349,7 +349,7 @@ function NuevoProyectoContent() {
                       bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] text-sm
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske/30"
                   />
-                  <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">Hex</span>
+                  <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Hex</span>
                 </div>
               )}
             </div>
@@ -439,7 +439,7 @@ function NuevoProyectoContent() {
                 <p className="text-black-eske dark:text-[#EAF2F8] font-medium mt-0.5">
                   {type && PROJECT_TYPE_LABELS[type]}
                 </p>
-                <p className="text-gray-eske-50 dark:text-[#9AAEBE] text-xs mt-0.5">
+                <p className="text-black-eske-20 dark:text-[#9AAEBE] text-xs mt-0.5">
                   {type && PROJECT_TYPE_DESCRIPTIONS[type]}
                 </p>
               </div>
@@ -447,7 +447,7 @@ function NuevoProyectoContent() {
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-widest text-gray-eske-40 dark:text-[#6D8294]">Territorio</span>
                   <p className="text-black-eske dark:text-[#EAF2F8] font-medium mt-0.5">{territory.nombre}</p>
-                  <p className="text-gray-eske-50 dark:text-[#9AAEBE] text-xs mt-0.5 capitalize">{territory.nivel}</p>
+                  <p className="text-black-eske-20 dark:text-[#9AAEBE] text-xs mt-0.5 capitalize">{territory.nivel}</p>
                 </div>
               )}
               <div className="flex items-center gap-2">
@@ -457,7 +457,7 @@ function NuevoProyectoContent() {
                   style={{ backgroundColor: color }}
                   aria-label={`Color: ${color}`}
                 />
-                <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">{color}</span>
+                <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">{color}</span>
               </div>
               {description && (
                 <div>

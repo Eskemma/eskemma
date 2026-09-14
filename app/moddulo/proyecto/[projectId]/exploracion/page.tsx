@@ -1306,7 +1306,7 @@ export default function ExploracionPage() {
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
               className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
-                mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske dark:border-blue-eske-20 dark:text-blue-eske-20" : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+                mobileTab === id ? "border-bluegreen-eske text-bluegreen-eske dark:border-blue-eske-20 dark:text-blue-eske-20" : "border-transparent text-black-eske-20 dark:text-[#9AAEBE]"
               }`}>
               {label}
             </button>
@@ -1347,7 +1347,7 @@ export default function ExploracionPage() {
                   </button>
                   <div className="flex items-center gap-2">
                     {isRegeneratingReport ? (
-                      <span className="text-xs text-gray-eske-50 dark:text-[#6D8294]">Regenerando...</span>
+                      <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Regenerando...</span>
                     ) : (
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">Reporte generado</span>
                     )}
@@ -1413,7 +1413,7 @@ export default function ExploracionPage() {
                     El proceso tarda varios minutos. Por favor, espera.
                   </p>
                   {elapsedSeconds > 0 && (
-                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-2">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-2">
                       Tiempo transcurrido:{" "}
                       {Math.floor(elapsedSeconds / 60) > 0 ? `${Math.floor(elapsedSeconds / 60)} min ` : ""}
                       {elapsedSeconds % 60} seg
@@ -1434,7 +1434,7 @@ export default function ExploracionPage() {
                   <p className="text-sm font-semibold text-black-eske dark:text-white">
                     Análisis por motores
                   </p>
-                  <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                  <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE]">
                     Revisa y aprueba cada sección antes de generar el Reporte F2.
                   </p>
                 </div>
@@ -1579,7 +1579,7 @@ export default function ExploracionPage() {
                     <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-2">
                       Análisis de exploración completo
                     </p>
-                    <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed mb-5">
+                    <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] leading-relaxed mb-5">
                       El Documento de Viabilidad Situacional está listo. Genera el Reporte F2
                       para revisar el análisis completo, edítalo si lo necesitas y, cuando estés
                       conforme, cierra la fase para avanzar a{" "}
@@ -1621,7 +1621,7 @@ export default function ExploracionPage() {
                 </div>
                 <div className="text-center">
                   <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">Análisis no completado</p>
-                  <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] mt-1">{expressError}</p>
+                  <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1">{expressError}</p>
                 </div>
                 <button
                   onClick={() => { setExpressError(null); handleGenerarDVS(); }}
@@ -1631,7 +1631,7 @@ export default function ExploracionPage() {
                 </button>
                 <button
                   onClick={() => setExpressError(null)}
-                  className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors"
                 >
                   Volver al chat
                 </button>
@@ -1713,6 +1713,22 @@ export default function ExploracionPage() {
             setMapaPESTEL(null);
             setExpressError(null);
             setMotorAprobaciones({});
+            // Causa raíz confirmada (26-09-13, bug reportado por Raúl —
+            // "Relanzar análisis" no hacía nada visible): la cadena de
+            // renderizado revisa `mode === "editing" && dvs !== null`
+            // ANTES que `isExpressAnalyzing` — si el usuario confirmaba
+            // el relanzamiento estando en modo edición (como en el caso
+            // real reportado), la vista de edición de motores se quedaba
+            // fija en pantalla durante TODO el proceso (con o sin éxito
+            // del lado del servidor, verificado en logs), sin mostrar el
+            // spinner "Analizando con IA…" ni el resultado nuevo al
+            // terminar. Salir de "editing" y de la vista de reporte aquí
+            // dispara la rama de `isExpressAnalyzing` mientras la
+            // petición está en curso — sin afectar la preservación de
+            // `draftDVS` (no se toca, sigue disponible si el usuario
+            // necesita retomar la edición tras un fallo).
+            setMode(dvs ? "completed" : "active");
+            setShowReporte(false);
             // draftDVS NO se limpia — se conserva mientras corre la
             // regeneración; solo se sobreescribe si express tiene éxito.
             handleGenerarDVSRef.current();
@@ -1842,9 +1858,9 @@ function ExplorationFormPanel({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
         {readOnly ? (
-          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Solo lectura</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
         ) : pestProjectId ? (
           <Link
             href={`/centinela/pestel/${pestProjectId}/analisis`}
@@ -1866,7 +1882,7 @@ function ExplorationFormPanel({
               <button
                 type="button"
                 onClick={onNuevoAnalisis}
-                className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] hover:underline"
+                className="text-xs text-black-eske-20 dark:text-[#9AAEBE] hover:underline"
               >
                 Nuevo análisis
               </button>
@@ -1878,8 +1894,8 @@ function ExplorationFormPanel({
               type="button"
               aria-label="Opciones de análisis PESTEL"
               onClick={() => setKebabOpen((o) => !o)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-gray-eske-40
-                hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-20
+                hover:text-black-eske hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <circle cx="8" cy="3" r="1.5" />
@@ -1904,7 +1920,7 @@ function ExplorationFormPanel({
                 <button
                   type="button"
                   onClick={() => { setKebabOpen(false); onNuevoAnalisis(); }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
                 >
                   Nuevo análisis ↺
                 </button>
@@ -1912,7 +1928,7 @@ function ExplorationFormPanel({
                   <button
                     type="button"
                     onClick={() => { setKebabOpen(false); onLinkExisting(); }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
                   >
                     Vincular con análisis independiente
                   </button>
@@ -1921,7 +1937,7 @@ function ExplorationFormPanel({
             )}
           </div>
         ) : (
-          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Auto-rellena via chat</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Auto-rellena via chat</span>
         )}
       </div>
 
@@ -1935,7 +1951,7 @@ function ExplorationFormPanel({
               className={`shrink-0 px-3 py-2 text-xs font-semibold transition-colors border-b-2 flex items-center gap-1 ${
                 activeSection === sec.id
                   ? "border-bluegreen-eske text-bluegreen-eske dark:border-blue-eske-20 dark:text-blue-eske-20"
-                  : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8]"
+                  : "border-transparent text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8]"
               }`}>
               <span className="hidden sm:inline">{sec.label}</span>
               <span className="sm:hidden">{sec.short}</span>
@@ -1959,7 +1975,7 @@ function ExplorationFormPanel({
               <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
               {(projectType === "electoral" || projectType === "gubernamental") && (
                 <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
-                  <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
+                  <p className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
                     Contexto Electoral
                   </p>
                   {esMexico
@@ -2104,13 +2120,13 @@ function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
           {dim.clasificacion}
         </span>
         {dim.confidence !== undefined && (
-          <span className="text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             {dim.confidence}% conf.
           </span>
         )}
       </div>
       {dim.narrativa && (
-        <div className="text-xs text-black-eske-80 dark:text-[#C5D8E8] space-y-2">
+        <div className="text-xs text-black-eske-40 dark:text-[#C5D8E8] space-y-2">
           {dim.narrativa.split("\n\n").filter(Boolean).map((para, i) => (
             <p key={i}>{para.trim()}</p>
           ))}
@@ -2151,13 +2167,13 @@ function SignalGroup({
   return (
     <details className={`rounded-lg overflow-hidden ${summaryClass}`}>
       <summary className={`px-3 py-2 text-xs font-semibold cursor-pointer list-none flex items-center justify-between ${colorClass}`}>
-        {title} <span className="text-gray-eske-50">({signals.length})</span>
+        {title} <span className="text-black-eske-20">({signals.length})</span>
       </summary>
       <ul className="divide-y divide-gray-eske-20 dark:divide-white/5">
         {signals.map((s, i) => (
           <li key={i} className="px-3 py-2 space-y-0.5">
             <p className="text-xs text-black-eske dark:text-[#EAF2F8]"><InlineMarkdown text={s.descripcion} /></p>
-            <div className="flex items-center gap-2 text-xs text-gray-eske-50 dark:text-[#9AAEBE]">
+            <div className="flex items-center gap-2 text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               <span>{s.fuente}</span>
               {s.fechaCorte && <span>· {s.fechaCorte}</span>}
               {s.origenInternacional && (
@@ -2269,7 +2285,7 @@ function SectionField({ label, hint, required, children }: {
 }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] block mb-1">
+      <label className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] block mb-1">
         {label}{required && <span className="ml-1 text-red-500">*</span>}
       </label>
       {hint && <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-1">{hint}</p>}
@@ -2496,14 +2512,14 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
     >
       <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between p-5 border-b border-gray-eske-20 dark:border-white/10 shrink-0">
-          <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] text-base">
+          <h3 className="font-semibold text-black-eske-20 dark:text-[#C7D6E0] text-base">
             Vincular con análisis independiente
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-black-eske-20 hover:text-black-eske hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -2555,7 +2571,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
             )}
             {fetchError && <p className="text-sm text-red-eske text-center py-8">{fetchError}</p>}
             {!loading && !fetchError && projects.length === 0 && (
-              <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] text-center py-8">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] text-center py-8">
                 No tienes proyectos PESTEL en Centinela todavía.
               </p>
             )}
@@ -2583,7 +2599,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
                       <span className="font-medium text-sm text-gray-eske-80 dark:text-[#C7D6E0] truncate">{p.nombre}</span>
                       {showWarning && <span className="shrink-0 text-yellow-eske text-xs" aria-label="Diferencia de territorio">⚠</span>}
                     </div>
-                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5 truncate">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 truncate">
                       {p.tipo}{p.territorio?.nombre ? ` · ${p.territorio.nombre}` : ""}
                     </p>
                     {!p.tipoOk && <p className="text-xs text-gray-eske-40 mt-0.5">Tipo incompatible con este proyecto</p>}
@@ -2635,7 +2651,7 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
             </li>
           ))}
         </ul>
-        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-5 leading-relaxed">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mb-5 leading-relaxed">
           Moddulo ha guardado los cambios. Revisa el trabajo de cada fase afectada para asegurarte de que las decisiones sigan siendo consistentes con el nuevo análisis.
         </p>
         <button onClick={onDismiss}
@@ -2672,7 +2688,7 @@ function EleccionCard({
     : "rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/50 dark:bg-[#112230] p-3 space-y-1.5";
   const headerCls = isPrimary
     ? "text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20"
-    : "text-xs font-semibold uppercase tracking-wider text-black-eske-80 dark:text-[#C7D6E0]";
+    : "text-xs font-semibold uppercase tracking-wider text-black-eske-40 dark:text-[#C7D6E0]";
 
   return (
     <div className={wrapCls}>
@@ -2682,7 +2698,7 @@ function EleccionCard({
             {label}{resultados ? ` ${resultados.anio}` : ""}
           </p>
           {granularity && (
-            <p className="text-xs text-black-eske-80 dark:text-[#C7D6E0] mt-0.5">{granularity}</p>
+            <p className="text-xs text-black-eske-40 dark:text-[#C7D6E0] mt-0.5">{granularity}</p>
           )}
         </div>
         {isPrimary && <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] shrink-0">INE · DERFE</span>}
@@ -2696,11 +2712,11 @@ function EleccionCard({
             {resultados.partidos.slice(0, 3).map((p) => (
               <div key={p.partido} className="text-xs">
                 <span className="font-bold text-black-eske dark:text-[#EAF2F8]">{p.partido}</span>
-                <span className="ml-1 text-black-eske-80 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
+                <span className="ml-1 text-black-eske-40 dark:text-[#9AAEBE]">{p.porcentaje}%</span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
+          <p className="text-xs text-black-eske-40 dark:text-[#6D8294]">
             Participación: {resultados.participacion}%
             {isPrimary && resultados.totalVotos > 0 && ` · ${fmtN(resultados.totalVotos)} votos`}
           </p>
@@ -2898,7 +2914,7 @@ function WebElectoralWidget({
         </div>
         <ul className="space-y-1.5">
           {data.indicadores.map((ind, i) => (
-            <li key={i} className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+            <li key={i} className="text-xs text-black-eske-40 dark:text-[#9AAEBE]">
               <span className="font-medium">{ind.nombre}:</span>{" "}
               {ind.valor}
               {ind.fecha ? (
@@ -2945,23 +2961,23 @@ function SefixWidget({ data, projectType }: { data: SefixData; projectType?: Pro
           <p className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 leading-snug">
             {isElectoral ? `LNE y Padrón Electoral — ${data.padronLabel}` : "Contexto Electoral de Referencia"}
           </p>
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-2">
+          <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE] mb-2">
             INE / DERFE · al {padron.corte}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-              <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
+              <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE] mb-0.5">Lista Nominal</p>
               <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.listaNominal)}</p>
-              <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
+              <p className="text-xs text-black-eske-40 dark:text-[#6D8294]">
                 {padron.listaNominalHombres && padron.listaNominalMujeres
                   ? `H: ${fmtN(padron.listaNominalHombres)} · M: ${fmtN(padron.listaNominalMujeres)}`
                   : "Desglose no disponible"}
               </p>
             </div>
             <div className="bg-white-eske dark:bg-[#21425E] rounded-lg px-2.5 py-2">
-              <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
+              <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE] mb-0.5">Padrón Electoral</p>
               <p className="text-sm font-bold text-black-eske dark:text-[#EAF2F8]">{fmtN(padron.padronElectoral)}</p>
-              <p className="text-xs text-black-eske-80 dark:text-[#6D8294]">
+              <p className="text-xs text-black-eske-40 dark:text-[#6D8294]">
                 H: {fmtN(padron.padronHombres)} · M: {fmtN(padron.padronMujeres)}
               </p>
             </div>
@@ -3246,7 +3262,7 @@ function F2LandingView({
               </span>
             )}
             {projectTerritory?.nombre && (
-              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-black-eske-20 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
                 {projectTerritory.nombre}
               </span>
             )}
@@ -3254,7 +3270,7 @@ function F2LandingView({
         </div>
 
         {/* Descripción de F2 */}
-        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">
+        <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] leading-relaxed">
           F2 establece el mapa situacional del entorno del proyecto mediante el modelo PESTEL,
           contrasta las señales del entorno con las variables XPCTO definidas en F1,
           y produce el Programa de Investigación Profunda que guiará la Fase 3.
@@ -3262,7 +3278,7 @@ function F2LandingView({
 
         {/* Los cinco motores */}
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+          <p className="text-xs font-bold uppercase tracking-widest text-black-eske-20 dark:text-[#9AAEBE]">
             Los cinco motores de F2
           </p>
           <div className="space-y-2">
@@ -3283,7 +3299,7 @@ function F2LandingView({
         </div>
 
         {/* Nota informativa */}
-        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
           Los resultados de F2 son editables en cualquier momento. Cualquier cambio actualiza
           automáticamente el DVS y puede impactar las fases anteriores y posteriores.
         </p>

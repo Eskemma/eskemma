@@ -266,7 +266,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     setElectoralConfig({ ...electoralConfig, position: e.target.value })
                   }
                   placeholder="Ej: Presidencia, Gubernatura, Alcaldía"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
 
@@ -285,7 +285,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     })
                   }
                   placeholder="Ej: María López García"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     })
                   }
                   placeholder="Ej: Movimiento Ciudadano"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
 
@@ -323,7 +323,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     })
                   }
                   placeholder="Ej: Educación y transparencia para México"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
             </div>
@@ -387,7 +387,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     })
                   }
                   placeholder="Ej: Gobierno de México, Gobierno de Jalisco"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
 
@@ -409,7 +409,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                     })
                   }
                   placeholder="Ej: Presidenta, Gobernador, Alcalde"
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 />
               </div>
 
@@ -426,7 +426,7 @@ export default function ConfigWizard({ onComplete, onClose }: ConfigWizardProps)
                       communicationType: e.target.value as any,
                     })
                   }
-                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder:text-[#6D8294]"
+                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-white/10 rounded-lg focus:border-green-600 focus:outline-none bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder:text-[#6D8294]"
                 >
                   <option value="institucional">Institucional (general)</option>
                   <option value="rendicion-cuentas">Rendición de cuentas</option>

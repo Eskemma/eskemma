@@ -25,7 +25,12 @@ export const scrapeAndAnalyze = onRequest(
   {
     timeoutSeconds: 1080,
     memory: "1GiB",
-    secrets: ["INEGI_TOKEN", "BANXICO_TOKEN", "ANTHROPIC_API_KEY"],
+    // FONTANA_INTERNAL_TOKEN (26-09-13, integración PESTEL↔Fontana):
+    // valida la llamada de esta Cloud Function al endpoint interno
+    // `POST /api/fontana/insumos-pestel` (Next.js) — mismo patrón de
+    // secreto que INEGI_TOKEN/BANXICO_TOKEN. FONTANA_API_BASE_URL (la
+    // URL pública de la app) NO es un secreto — va en `functions/.env`.
+    secrets: ["INEGI_TOKEN", "BANXICO_TOKEN", "ANTHROPIC_API_KEY", "FONTANA_INTERNAL_TOKEN"],
   },
   async (req, res) => {
     if (req.method !== "POST") {
@@ -304,6 +309,10 @@ export const scrapeAndAnalyze = onRequest(
             userId,
             tipo: projectData.tipo as string ?? "ciudadano",
             territorio: territorioNombre,
+            // Territorio COMPLETO (integración PESTEL↔Fontana, 26-09-13) —
+            // `projectData.territorio` ya se leyó arriba (línea ~86); se
+            // reenvía tal cual, sin re-tipar (cruza a JSON en el fetch).
+            territorioCompleto: projectData.territorio,
             horizonte: projectData.horizonte as number ?? 6,
             variableConfigs,
             sefixData: sefixData ?? null,

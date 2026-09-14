@@ -138,7 +138,7 @@ export default function F3TareasPIP({
           </div>
         ) : (
           <>
-            <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-3">
+            <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] mb-3">
               Aún no se ha generado el tablero de tareas a partir del PIP heredado de F2.
             </p>
             {!readOnly && (
@@ -210,7 +210,7 @@ export default function F3TareasPIP({
                             ? "font-bold text-bluegreen-eske-60 dark:text-blue-eske-20 cursor-pointer hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske focus-visible:ring-offset-1"
                             : asig.canal === "canal1" && asig.tecnicaId
                               ? "font-bold text-bluegreen-eske dark:font-medium dark:text-[#C5D8E8]"
-                              : "font-medium text-black-eske-80 dark:text-[#C5D8E8]";
+                              : "font-medium text-black-eske-40 dark:text-[#C5D8E8]";
                           const etiqueta = asignacionEtiquetaCompleta(asig);
                           if (!clicable) {
                             return <span className={`${baseClass} ${colorClass}`}>{etiqueta}</span>;
@@ -258,7 +258,7 @@ export default function F3TareasPIP({
                             });
                             onRefresh();
                           }}
-                          className="text-[10px] lg:text-xs px-1.5 py-0.5 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-80 dark:text-[#C5D8E8]"
+                          className="text-[10px] lg:text-xs px-1.5 py-0.5 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-40 dark:text-[#C5D8E8]"
                         >
                           <option value="activada">Activada</option>
                           <option value="desactivada">Desactivada</option>
@@ -281,7 +281,7 @@ export default function F3TareasPIP({
                         No disponible aún — derivado a carga manual
                       </div>
                     )}
-                    <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1">{asig.justificacion}</p>
+                    <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] mt-1">{asig.justificacion}</p>
 
                     {expandedAsignacionId === asig.asignacionId && !readOnly && (
                       <div className="mt-3 pt-3 border-t border-gray-eske-20 dark:border-white/10">
@@ -304,7 +304,7 @@ export default function F3TareasPIP({
                           />
                         )}
                         {asig.canal === "canal1" && !(asig.tecnicaId === "T10" && disponible) && (
-                          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+                          <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">
                             Activación de apps del ecosistema aún no está disponible como
                             integración automática — usa carga manual o vincula una herramienta externa mientras tanto.
                           </p>

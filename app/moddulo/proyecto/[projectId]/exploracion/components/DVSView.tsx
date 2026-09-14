@@ -85,7 +85,7 @@ function M2Panel({ items }: { items: ContrasteXPCTO[] }) {
             </span>
             <VeredictoM2Badge v={item.veredicto} />
           </div>
-          <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] mb-2">
+          <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] mb-2">
             {item.argumentacion}
           </p>
           {item.senalesPESTEL.length > 0 && (
@@ -127,7 +127,7 @@ function M3Panel({ actores }: { actores: ActorVetoF2[] }) {
             </div>
             <NivelRiesgoBadge nivel={actor.nivelRiesgo} />
           </div>
-          <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8] mb-1">
+          <p className="text-xs text-black-eske-40 dark:text-[#C5D8E8] mb-1">
             <span className="font-medium">Capacidad de veto:</span> {actor.capacidadVeto}
           </p>
           <p className="text-xs text-bluegreen-eske/60 dark:text-blue-eske-20/80">
@@ -201,7 +201,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
         <p className="font-semibold text-sm text-black-eske dark:text-white mb-2">
           {dvs.hei.tensionCentral}
         </p>
-        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] mb-3">
+        <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] mb-3">
           {dvs.hei.contexto}
         </p>
         <hr className="border-gray-eske-20 dark:border-white/10 my-3" />
@@ -212,7 +212,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
             </p>
             <ul className="space-y-1 list-disc list-inside">
               {dvs.hei.condicionesFavorables.map((c, i) => (
-                <li key={i} className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+                <li key={i} className="text-sm text-black-eske-40 dark:text-[#C5D8E8]">
                   {c}
                 </li>
               ))}
@@ -224,14 +224,14 @@ export default function DVSView({ dvs }: DVSViewProps) {
             </p>
             <ul className="space-y-1 list-disc list-inside">
               {dvs.hei.condicionesAdversas.map((c, i) => (
-                <li key={i} className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+                <li key={i} className="text-sm text-black-eske-40 dark:text-[#C5D8E8]">
                   {c}
                 </li>
               ))}
             </ul>
           </div>
         </div>
-        <p className="text-xs italic text-black-eske-70 dark:text-[#9AAEBE] border-t border-bluegreen-eske/30 pt-2">
+        <p className="text-xs italic text-black-eske-40 dark:text-[#9AAEBE] border-t border-bluegreen-eske/30 pt-2">
           {dvs.hei.premisaEstrategica}
         </p>
       </div>
@@ -259,7 +259,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
             >
               {tab.label}
               {tab.count !== undefined && (
-                <span className="ml-1 text-gray-eske-50">({tab.count})</span>
+                <span className="ml-1 text-black-eske-20">({tab.count})</span>
               )}
             </button>
           ))}

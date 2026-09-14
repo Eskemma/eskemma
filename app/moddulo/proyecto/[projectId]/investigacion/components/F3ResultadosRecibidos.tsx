@@ -75,7 +75,7 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
   if (resultados.length === 0) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">
           Todavía no ha llegado ningún resultado de investigación.
         </p>
       </div>
@@ -101,15 +101,15 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs lg:text-sm font-semibold text-black-eske dark:text-[#EAF2F8] truncate">{r.moduloPIP}</p>
-                <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+                <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] mt-0.5">
                   Origen: {r.origen.componente} ({r.origen.sourceKind}) — {new Date(r.origen.fechaEntrega).toLocaleDateString("es-MX")}
                 </p>
-                <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+                <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">
                   Cobertura: {r.cobertura.completa ? "completa" : "parcial"}{r.cobertura.detalle ? ` — ${r.cobertura.detalle}` : ""}
                 </p>
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs lg:text-sm font-medium ${
-                r.aprobado ? "bg-green-eske/15 text-green-eske" : "bg-gray-eske-20 text-black-eske-80"
+                r.aprobado ? "bg-green-eske/15 text-green-eske" : "bg-gray-eske-20 text-black-eske-40"
               }`}>
                 {r.aprobado ? "Aprobado" : "Sin revisar"}
               </span>
@@ -124,13 +124,13 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
                 >
                   {expandido[r.resultadoId] ? "▾" : "▸"} Ver reporte interpretativo de Fontana
                 </button>
-                <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+                <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE] mt-0.5">
                   Capa adicional para revisión. La síntesis (M3) usa solo los datos de indicadores, no este texto.
                 </p>
                 {expandido[r.resultadoId] && (
                   <div className="mt-2 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] p-3 max-h-[420px] overflow-y-auto">
                     {reportes[r.resultadoId]?.estado === "cargando" && (
-                      <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Cargando reporte…</p>
+                      <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE]">Cargando reporte…</p>
                     )}
                     {reportes[r.resultadoId]?.estado === "error" && (
                       <p className="text-xs text-red-eske">

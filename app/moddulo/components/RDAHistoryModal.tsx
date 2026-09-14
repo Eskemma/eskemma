@@ -88,7 +88,7 @@ export default function RDAHistoryModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {gruposPorFase.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] italic">
+            <p className="text-sm text-black-eske-40 dark:text-[#9AAEBE] italic">
               Sin deficiencias registradas todavía.
             </p>
           )}
@@ -123,25 +123,25 @@ export default function RDAHistoryModal({
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <p className={`text-xs font-bold ${
                           mostrarComoAceptado
-                            ? "text-black-eske-80 dark:text-[#9AAEBE]"
+                            ? "text-black-eske-40 dark:text-[#9AAEBE]"
                             : item.nivelImpacto === "prioritario" ? "text-red-eske" : "text-purple-700 dark:text-yellow-eske"
                         }`}>
                           {nombre}
                         </p>
                         {mostrarComoAceptado && (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-eske-20 text-black-eske-80 dark:bg-white/10 dark:text-[#C7D6E0] shrink-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-eske-20 text-black-eske-40 dark:bg-white/10 dark:text-[#C7D6E0] shrink-0">
                             {isAutoAceptado ? "Aceptado automáticamente" : "Aceptado como condición"}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-black-eske-80 dark:text-[#C7D6E0] mb-2">{descripcion}</p>
+                      <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0] mb-2">{descripcion}</p>
                       {recomendacion && (
                         <p className="text-xs text-bluegreen-eske dark:text-[#6BA4C6] font-medium mb-1">
                           ↳ {recomendacion}
                         </p>
                       )}
                       {dims.length > 0 && (
-                        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                        <p className="text-[11px] text-black-eske-40 dark:text-[#9AAEBE] mb-1">
                           Dimensiones PESTEL más afectadas: {dims.map((d) => DIMENSION_LABEL_ES[d] ?? d).join(", ")}
                         </p>
                       )}

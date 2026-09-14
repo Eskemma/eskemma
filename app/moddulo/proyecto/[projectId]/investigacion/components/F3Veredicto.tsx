@@ -29,7 +29,7 @@ export default function F3Veredicto({
   if (!veredicto) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center space-y-2">
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">
           {cubiertas} de {total} tareas cubiertas.
         </p>
         {!readOnly && (
@@ -38,7 +38,7 @@ export default function F3Veredicto({
           </PillButton>
         )}
         {!puedeGenerar && total > 0 && (
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+          <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">
             Aún faltan tareas por cubrir (con un resultado real, o clasificadas como vacío residual en la síntesis).
           </p>
         )}
@@ -57,16 +57,16 @@ export default function F3Veredicto({
         )}
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold text-black-eske-80 dark:text-[#9AAEBE]">Contraste</p>
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{veredicto.contraste}</p>
+        <p className="text-xs lg:text-sm font-bold text-black-eske-40 dark:text-[#9AAEBE]">Contraste</p>
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#C5D8E8]">{veredicto.contraste}</p>
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold text-black-eske-80 dark:text-[#9AAEBE]">Argumentación</p>
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{veredicto.argumentacion}</p>
+        <p className="text-xs lg:text-sm font-bold text-black-eske-40 dark:text-[#9AAEBE]">Argumentación</p>
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#C5D8E8]">{veredicto.argumentacion}</p>
       </div>
       <div>
-        <p className="text-xs lg:text-sm font-bold text-black-eske-80 dark:text-[#9AAEBE]">Premisa resultante</p>
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8]">{veredicto.premisaResultante}</p>
+        <p className="text-xs lg:text-sm font-bold text-black-eske-40 dark:text-[#9AAEBE]">Premisa resultante</p>
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#C5D8E8]">{veredicto.premisaResultante}</p>
       </div>
       {!readOnly && !veredicto.aprobadoPorUsuario && (
         <PillButton variant="solid" onClick={onAprobar} disabled={aprobando}>

@@ -156,7 +156,7 @@ export default function ProjectDropdown({
                         </p>
                       )}
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-eske-50">
+                        <span className="text-xs text-black-eske-20">
                           {project.stats.totalGenerations} posts
                         </span>
                       </div>

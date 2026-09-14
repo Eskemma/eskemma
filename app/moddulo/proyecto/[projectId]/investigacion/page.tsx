@@ -458,7 +458,7 @@ export default function InvestigacionPage() {
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setMobileTab(id)}
               className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 dark:text-blue-eske-20 ${
-                mobileTab === id ? "border-bluegreen-eske dark:border-blue-eske-20 text-bluegreen-eske" : "border-transparent text-gray-eske-50"
+                mobileTab === id ? "border-bluegreen-eske dark:border-blue-eske-20 text-bluegreen-eske" : "border-transparent text-black-eske-20"
               }`}>
               {label}
             </button>

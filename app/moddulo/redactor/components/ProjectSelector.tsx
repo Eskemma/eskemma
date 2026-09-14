@@ -187,7 +187,7 @@ export default function ProjectSelector({
       <div className="min-h-screen flex items-center justify-center bg-gray-eske-10 dark:bg-[#0B1620]">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-bluegreen-eske border-t-transparent" />
-          <p className="mt-4 text-gray-eske-70 dark:text-[#9AAEBE]">Cargando proyectos...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando proyectos...</p>
         </div>
       </div>
     );
@@ -211,7 +211,7 @@ export default function ProjectSelector({
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-bluegreen-eske mb-2">Redactor Político</h1>
-              <p className="text-sm text-gray-eske-70 dark:text-[#9AAEBE]">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
                 Selecciona un proyecto o crea uno nuevo para comenzar
               </p>
             </div>
@@ -343,7 +343,7 @@ export default function ProjectSelector({
                       {project.name}
                     </h3>
                     {project.description && (
-                      <p className="text-sm text-gray-eske-70 dark:text-[#9AAEBE] line-clamp-2">
+                      <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] line-clamp-2">
                         {project.description}
                       </p>
                     )}

@@ -261,7 +261,7 @@ export default function VincularFuenteForm({
 
       {compatibilidad && compatibilidad.pertinencia.cumple && (
         <div className="space-y-2 rounded-md border border-gray-eske-20 dark:border-white/10 p-2">
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.pertinencia.detalle}</p>
+          <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">{compatibilidad.pertinencia.detalle}</p>
           {compatibilidad.pertinencia.territorioRequiereConfirmacion && (
             <label className="flex items-start gap-2 text-xs lg:text-sm text-yellow-eske-70">
               <input type="checkbox" checked={confirmarTerritorio} onChange={(e) => setConfirmarTerritorio(e.target.checked)} className="mt-0.5" />
@@ -274,7 +274,7 @@ export default function VincularFuenteForm({
               <span>{compatibilidad.vigencia.detalle} Confirmo que quiero usar este dato pese a la fecha.</span>
             </label>
           )}
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">{compatibilidad.compatibilidadMetodologica.detalle}</p>
+          <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">{compatibilidad.compatibilidadMetodologica.detalle}</p>
 
           <div className="flex gap-2">
             <PillButton variant="solid" onClick={handleVincular} disabled={loading || !puedeVincular}>

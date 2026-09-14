@@ -16,6 +16,7 @@ import type {
   DimensionCode,
   DimensionAnalysisResult,
   EconomicDataPoint,
+  FontanaInsumo,
 } from "./classifier/claudePESTL";
 import {calculateRiskVector} from "./risk/vectorCalculator";
 import type {InegiDataPoint} from "./scrapers/inegi";
@@ -50,6 +51,67 @@ interface PestlVariableConfig {
 interface PestlDimensionConfig {
   code: DimensionCode;
   variables: PestlVariableConfig[];
+}
+
+// ============================================================
+// INTEGRACIÓN PESTEL↔FONTANA (26-09-13)
+// ============================================================
+//
+// `functions/` no puede importar `lib/` (regla del repo) — Fontana solo
+// es alcanzable vía HTTP, a diferencia del path Express (Next.js, mismo
+// runtime, importa lib/fontana/tabla/construirCeldasTabla.ts directo).
+// Primer caso de una Cloud Function llamando a un endpoint interno de
+// Next.js (dirección inversa a la habitual trigger→CF). Requiere:
+// - `FONTANA_INTERNAL_TOKEN` (Secret Manager, mismo patrón que
+//   INEGI_TOKEN/BANXICO_TOKEN) — agregar a los `secrets` de
+//   scrapeAndAnalyze.ts.
+// - `FONTANA_API_BASE_URL` (functions/.env, plano — NO es un secreto, es
+//   la URL pública de la app) — ej. "https://eskemma.com".
+const DIMENSIONES_CON_FONTANA: DimensionCode[] = ["E", "S", "Ec"];
+
+/**
+ * Fetches Fontana insumos for one PEST-L dimension via the internal
+ * Next.js endpoint. Never throws — on any failure, returns an empty
+ * array so the dimension prompt simply has no Fontana data (same
+ * fail-open behavior as the other scrapers in this file).
+ * @param {DimensionCode} dimension "E" | "S" | "Ec"
+ * @param {unknown} territorio Full Territorio object from pestel_projects
+ * @param {string} tipoProyecto Project type (electoral/gubernamental/...)
+ * @return {Promise<FontanaInsumo[]>} Resolved insumos, or [] on failure
+ */
+async function fetchFontanaInsumos(
+  dimension: DimensionCode,
+  territorio: unknown,
+  tipoProyecto: string
+): Promise<FontanaInsumo[]> {
+  const baseUrl = process.env.FONTANA_API_BASE_URL;
+  const token = process.env.FONTANA_INTERNAL_TOKEN;
+  if (!baseUrl || !token || !territorio) return [];
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20_000);
+    const res = await fetch(`${baseUrl}/api/fontana/insumos-pestel`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-fontana-internal-token": token,
+      },
+      body: JSON.stringify({territorio, tipoProyecto, dimension}),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      console.warn(
+        `[generateFeed] Fontana insumos ${dimension}: HTTP ${res.status}`
+      );
+      return [];
+    }
+    const data = await res.json() as {insumos?: FontanaInsumo[]};
+    return data.insumos ?? [];
+  } catch (err) {
+    console.warn(`[generateFeed] Fontana insumos ${dimension} falló:`, err);
+    return [];
+  }
 }
 
 // ============================================================
@@ -217,6 +279,10 @@ export async function generateAnalysisV2(params: {
   userId: string;
   tipo: string;
   territorio: string;
+  // Territorio COMPLETO (nivel/estado/municipio/etc.), para la
+  // integración con Fontana — `territorio` (arriba) sigue siendo solo el
+  // nombre legible para el prompt, sin cambio de comportamiento.
+  territorioCompleto?: unknown;
   horizonte: number;
   variableConfigs: PestlDimensionConfig[];
   sefixData?: SefixData | null;
@@ -229,6 +295,7 @@ export async function generateAnalysisV2(params: {
     userId,
     tipo,
     territorio,
+    territorioCompleto,
     horizonte,
     variableConfigs,
     sefixData,
@@ -374,6 +441,21 @@ export async function generateAnalysisV2(params: {
     console.log(`[generateFeed] dim ${code}: ${articleCount} articles routed`);
   }
 
+  // Integración PESTEL↔Fontana (26-09-13) — una llamada por dimensión
+  // E/S/Ec, en paralelo, ANTES del batch de Claude (fail-open: si Fontana
+  // no responde, la dimensión sigue su curso normal sin ese bloque).
+  const fontanaByDim: Partial<Record<DimensionCode, FontanaInsumo[]>> = {};
+  if (territorioCompleto) {
+    const fontanaResultados = await Promise.all(
+      DIMENSIONES_CON_FONTANA.map((code) =>
+        fetchFontanaInsumos(code, territorioCompleto, tipo).then((insumos) => ({code, insumos}))
+      )
+    );
+    for (const {code, insumos} of fontanaResultados) {
+      fontanaByDim[code] = insumos;
+    }
+  }
+
   console.log(
     "[generateFeed] Starting dimension analyses " +
     `(${BATCH_SIZE_DIM} concurrent per batch)...`
@@ -398,6 +480,7 @@ export async function generateAnalysisV2(params: {
           inegiData: code === "E" ? inegiData : undefined,
           banxicoData: code === "E" ? banxicoData : undefined,
           biseData: code === "S" ? biseData : undefined,
+          fontanaData: fontanaByDim[code],
           anthropicKey,
         }).then((result) => {
           console.log(

@@ -113,7 +113,7 @@ function getMotorSummary(id: MotorId, dvs: DVSF2): string {
 // ── Shared field helpers ───────────────────────────────────────────────────────
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">{children}</p>;
+  return <p className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-1">{children}</p>;
 }
 
 function DescTwoLines({ text, className }: { text: string; className: string }) {
@@ -255,7 +255,7 @@ function M2Panel({ items, editable, onChange }: {
   };
 
   if (!items.length)
-    return <p className="text-sm text-gray-eske-50 italic text-center py-4">Generando contraste XPCTO…</p>;
+    return <p className="text-sm text-black-eske-20 italic text-center py-4">Generando contraste XPCTO…</p>;
 
   return (
     <div className="space-y-3">
@@ -287,7 +287,7 @@ function M2Panel({ items, editable, onChange }: {
               rows={3}
             />
           ) : (
-            <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">{item.argumentacion}</p>
+            <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] leading-relaxed">{item.argumentacion}</p>
           )}
         </div>
       ))}
@@ -325,7 +325,7 @@ function M3Panel({ actores, editable, onChange }: {
   const remove = (i: number) => onChange(actores.filter((_, idx) => idx !== i));
 
   if (!actores.length && !editable)
-    return <p className="text-sm text-gray-eske-50 italic text-center py-4">Sin actores de veto identificados.</p>;
+    return <p className="text-sm text-black-eske-20 italic text-center py-4">Sin actores de veto identificados.</p>;
 
   return (
     <div className="space-y-3">
@@ -362,7 +362,7 @@ function M3Panel({ actores, editable, onChange }: {
           ) : (
             <>
               {/* Row 1 (lectura): descripción de nivel */}
-              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] leading-snug" />
+              <DescTwoLines text={NIVEL_RIESGO_DESC[actor.nivelRiesgo]} className="text-[10px] text-black-eske-20 dark:text-[#6D8294] leading-snug" />
               {/* Row 2 (lectura): dot + nombre + tipo */}
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${NIVEL_DOT[actor.nivelRiesgo]}`} aria-hidden />
@@ -389,7 +389,7 @@ function M3Panel({ actores, editable, onChange }: {
             </div>
           ) : (
             <>
-              <p className="text-xs text-black-eske-80 dark:text-[#C5D8E8]"><span className="font-medium">Capacidad:</span> {actor.capacidadVeto}</p>
+              <p className="text-xs text-black-eske-40 dark:text-[#C5D8E8]"><span className="font-medium">Capacidad:</span> {actor.capacidadVeto}</p>
               <p className="text-xs text-gray-eske-70 dark:text-[#9AAEBE]"><span className="font-medium">Motivación:</span> {actor.motivacion}</p>
               {actor.requiereInvestigacion && (
                 <span className="inline-block text-xs px-2 py-0.5 bg-orange-eske-10 text-orange-eske-80 rounded-full dark:bg-orange-eske/20">Requiere investigación de campo</span>
@@ -460,7 +460,7 @@ function M4Panel({ items, editable, onChange }: {
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
 
   if (!items.length && !editable)
-    return <p className="text-sm text-gray-eske-50 italic text-center py-4">Sin incertidumbres registradas.</p>;
+    return <p className="text-sm text-black-eske-20 italic text-center py-4">Sin incertidumbres registradas.</p>;
 
   return (
     <div className="space-y-3">
@@ -478,17 +478,17 @@ function M4Panel({ items, editable, onChange }: {
               <InlineEdit value={item.descripcion} onChange={(v) => update(i, { descripcion: v })} placeholder="Descripción de la incertidumbre…" rows={2} className="w-full pr-5" />
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Urgencia</p>
+                  <p className="text-[10px] text-black-eske-20 dark:text-[#6D8294] mb-1">Urgencia</p>
                   <SelectField value={item.urgencia}   onChange={(v) => update(i, { urgencia: v })}   options={URGENCIA_OPTS} />
                   <DescTwoLines text={URGENCIA_DESC[item.urgencia]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Resolución</p>
+                  <p className="text-[10px] text-black-eske-20 dark:text-[#6D8294] mb-1">Resolución</p>
                   <SelectField value={item.resolucion} onChange={(v) => update(i, { resolucion: v })} options={RESOLUCION_OPTS} />
                   <DescTwoLines text={RESOLUCION_DESC[item.resolucion]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-eske-50 dark:text-[#6D8294] mb-1">Destino</p>
+                  <p className="text-[10px] text-black-eske-20 dark:text-[#6D8294] mb-1">Destino</p>
                   <SelectField value={item.destino}    onChange={(v) => update(i, { destino: v })}    options={DESTINO_OPTS} />
                   <DescTwoLines text={DESTINO_DESC[item.destino]} className="text-[10px] text-bluegreen-eske dark:text-blue-eske-20 mt-1" />
                 </div>
@@ -534,7 +534,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
 
   if (isEmpty && !editable) {
     return (
-      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 p-4 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 p-4 text-sm text-black-eske-40 dark:text-[#C5D8E8]">
         No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
       </div>
     );
@@ -543,7 +543,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
   return (
     <>
     {isEmpty && editable && (
-      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 px-4 py-3 mb-3 text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+      <div className="rounded-xl border border-yellow-eske-60 dark:border-yellow-eske-40 bg-yellow-eske-10/40 dark:bg-yellow-eske/5 px-4 py-3 mb-3 text-sm text-black-eske-40 dark:text-[#C5D8E8]">
         No se generó contenido para este motor. Puedes llenarlo manualmente aquí o relanzar el análisis completo desde el principio.
       </div>
     )}
@@ -606,18 +606,18 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
         ) : (
           <>
             <p className="font-semibold text-sm text-black-eske dark:text-white">{hei.tensionCentral}</p>
-            <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">{hei.contexto}</p>
+            <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8]">{hei.contexto}</p>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="font-semibold text-green-eske-70 dark:text-[#7BC47C] mb-1">Condiciones favorables</p>
-                <ul className="space-y-1 list-disc list-inside">{hei.condicionesFavorables.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
+                <ul className="space-y-1 list-disc list-inside">{hei.condicionesFavorables.map((c, i) => <li key={i} className="text-black-eske-40 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
               <div>
                 <p className="font-semibold text-red-eske-70 dark:text-orange-eske mb-1">Condiciones adversas</p>
-                <ul className="space-y-1 list-disc list-inside">{hei.condicionesAdversas.map((c, i) => <li key={i} className="text-black-eske-80 dark:text-[#C5D8E8]">{c}</li>)}</ul>
+                <ul className="space-y-1 list-disc list-inside">{hei.condicionesAdversas.map((c, i) => <li key={i} className="text-black-eske-40 dark:text-[#C5D8E8]">{c}</li>)}</ul>
               </div>
             </div>
-            <p className="text-xs italic text-black-eske-70 dark:text-[#9AAEBE] border-t border-bluegreen-eske/30 pt-2">{hei.premisaEstrategica}</p>
+            <p className="text-xs italic text-black-eske-40 dark:text-[#9AAEBE] border-t border-bluegreen-eske/30 pt-2">{hei.premisaEstrategica}</p>
           </>
         )}
       </div>
@@ -664,7 +664,7 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-black-eske-80 dark:text-white">Método: {item.metodo}</p>
+                    <p className="text-xs text-black-eske-40 dark:text-white">Método: {item.metodo}</p>
                     <p className="text-xs text-bluegreen-eske-70 dark:text-white">Vínculo: {item.vinculoHito}</p>
                     {item.orden !== undefined && item.orden !== item.numero && (
                       <p className="text-xs text-orange-eske-60 dark:text-orange-eske-40">
@@ -866,7 +866,7 @@ export default function MotoresSequentialView({
                   isApproved ? "bg-green-eske-60" : isActive ? "bg-bluegreen-eske" : "bg-gray-eske-30 dark:bg-white/20"
                 }`} aria-hidden />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-eske-50 dark:text-[#6D8294]">{motor.id}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-black-eske-20 dark:text-[#6D8294]">{motor.id}</p>
                   <div className={`text-sm font-semibold leading-snug flex items-center gap-1.5 ${isLocked ? "text-gray-eske-40 dark:text-[#6D8294]" : "text-black-eske dark:text-white"}`}>
                     {motor.label}
                     {motor.tooltip && (

@@ -130,7 +130,7 @@ const STATUS_COLORS: Record<ModduloProject["status"], string> = {
   active: "bg-green-100 text-green-700",
   paused: "bg-yellow-100 text-yellow-700",
   completed: "bg-blue-100 text-blue-700",
-  // `text-gray-eske-50` no existe como token del design system (sin
+  // `text-black-eske-20` no existe como token del design system (sin
   // --color-gray-eske-50 en globals.css) — quedaba como no-op y el texto
   // heredaba el color del ancestro, casi invisible en modo oscuro sobre el
   // mismo `bg-gray-eske-20` claro (mismo bug ya corregido en el hub de
@@ -272,14 +272,14 @@ function ProjectCard({
               {project.name}
             </h3>
             {project.description && (
-              <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5 line-clamp-2">
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 line-clamp-2">
                 {project.description}
               </p>
             )}
           </div>
 
           {/* Meta row */}
-          <div className="flex items-center gap-3 text-xs text-gray-eske-50 dark:text-[#9AAEBE] flex-wrap">
+          <div className="flex items-center gap-3 text-xs text-black-eske-20 dark:text-[#9AAEBE] flex-wrap">
             <span className="font-medium text-bluegreen-eske/80 dark:text-[#6BA4C6]">
               {PROJECT_TYPE_LABELS[project.type]}
             </span>
@@ -300,7 +300,7 @@ function ProjectCard({
             type="button"
             aria-label="Opciones del proyecto"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setKebabOpen((o) => !o); }}
-            className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE]
+            className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-40 dark:text-[#9AAEBE]
               hover:bg-gray-eske-10 dark:hover:bg-white/5
               transition-colors focus-visible:opacity-100"
           >
@@ -359,7 +359,7 @@ function ProjectCard({
             </h3>
             <div className="space-y-3">
               <div>
-                <label htmlFor="meta-name" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                <label htmlFor="meta-name" className="block text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-1">
                   Nombre <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -373,7 +373,7 @@ function ProjectCard({
                 <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-0.5">{metaDraft.name.length}/100</p>
               </div>
               <div>
-                <label htmlFor="meta-desc" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                <label htmlFor="meta-desc" className="block text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-1">
                   Descripción
                 </label>
                 <textarea
@@ -386,7 +386,7 @@ function ProjectCard({
                 />
               </div>
               <div>
-                <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-2">Color</p>
+                <p className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-2">Color</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   {META_COLOR_SWATCHES.map((hex) => (
                     <button
@@ -563,7 +563,7 @@ function EmptyState() {
       <h2 className="text-lg font-semibold text-gray-eske-80 dark:text-[#C7D6E0] mb-2">
         Aún no tienes proyectos
       </h2>
-      <p className="text-gray-eske-50 dark:text-[#9AAEBE] mb-6 text-sm font-light max-w-sm mx-auto">
+      <p className="text-black-eske-20 dark:text-[#9AAEBE] mb-6 text-sm font-light max-w-sm mx-auto">
         Crea tu primer proyecto estratégico y comienza a trabajar con Moddulo como tu colaborador estratégico
       </p>
       <Link

@@ -100,13 +100,13 @@ export default function AdvisorPanel({ projectId, motor, campo, onClose }: Advis
           <p className="text-xs font-semibold text-black-eske dark:text-white">
             Advisor — {motor}
           </p>
-          <p className="text-xs text-gray-eske-50 dark:text-[#6D8294]">{campo}</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#6D8294]">{campo}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar advisor"
-          className="text-gray-eske-40 hover:text-gray-eske-70 dark:hover:text-white transition-colors"
+          className="text-black-eske-20 hover:text-black-eske dark:hover:text-white transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -117,7 +117,7 @@ export default function AdvisorPanel({ projectId, motor, campo, onClose }: Advis
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-sm">
         {mensajes.length === 0 && isStreaming && (
-          <div className="flex items-center gap-2 text-gray-eske-50 dark:text-[#6D8294]">
+          <div className="flex items-center gap-2 text-black-eske-20 dark:text-[#6D8294]">
             <div className="flex gap-1">
               {[0, 1, 2].map((i) => (
                 <span

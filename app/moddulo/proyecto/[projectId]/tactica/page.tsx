@@ -9,7 +9,7 @@ export default function DiseñoTácticoPage() {
           <h1 className="text-2xl font-bold text-gray-eske-80 dark:text-[#EAF2F8] mt-1">Diseño Táctico</h1>
           <p className="text-gray-eske-60 dark:text-[#9AAEBE] mt-2">Programación operativa — Ingeniería de operaciones</p>
         </div>
-        <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-8 text-center text-gray-eske-50 dark:text-[#9AAEBE]">
+        <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-8 text-center text-black-eske-20 dark:text-[#9AAEBE]">
           <p>Módulo en construcción</p>
         </div>
       </div>

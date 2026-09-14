@@ -232,7 +232,7 @@ export default function F3Tablero({
             type="button"
             onClick={onCerrarVeredictoTerritorio}
             aria-label="Cerrar"
-            className="shrink-0 text-black-eske-80 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white"
+            className="shrink-0 text-black-eske-40 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-white"
           >
             ✕
           </button>
@@ -241,10 +241,10 @@ export default function F3Tablero({
 
       {/* Resumen heredado de F2 */}
       <section>
-        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE] mb-2">
+        <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE] mb-2">
           Heredado de F2
         </h2>
-        <div className="text-xs lg:text-sm text-black-eske-80 dark:text-[#C5D8E8] space-y-1">
+        <div className="text-xs lg:text-sm text-black-eske-40 dark:text-[#C5D8E8] space-y-1">
           <p><strong>Hipótesis Estratégica Inicial (HEI):</strong> {hei?.premisaEstrategica ?? "Sin HEI disponible"}</p>
           <p><strong>PIP:</strong> {pip.length} necesidades de información</p>
           <p className="flex items-center gap-1.5">
@@ -347,11 +347,11 @@ export default function F3Tablero({
       {modalAbierto === "incertidumbres" && (
         <InfoListModal title="Incertidumbres heredadas de F2" onClose={() => setModalAbierto(null)}>
           {incertidumbresF3.length === 0 ? (
-            <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin incertidumbres registradas.</p>
+            <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">Sin incertidumbres registradas.</p>
           ) : incertidumbresF3.map((inc, i) => (
             <div key={i} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-2.5">
               <p className="text-xs lg:text-sm text-black-eske dark:text-[#EAF2F8]">{i + 1}. {inc.descripcion}</p>
-              <p className="text-[11px] lg:text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">
+              <p className="text-[11px] lg:text-xs text-black-eske-40 dark:text-[#9AAEBE] mt-1">
                 Urgencia: {URGENCIA_LABEL[inc.urgencia] ?? inc.urgencia} · Resolución: {URGENCIA_LABEL[inc.resolucion] ?? inc.resolucion}
               </p>
             </div>
@@ -362,13 +362,13 @@ export default function F3Tablero({
       {modalAbierto === "semaforo" && (
         <InfoListModal title="Semáforo de Riesgo de Veto" onClose={() => setModalAbierto(null)}>
           {semaforo.length === 0 ? (
-            <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin actores registrados.</p>
+            <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">Sin actores registrados.</p>
           ) : semaforo.map((a, i) => (
             <div key={i} className="rounded-lg border border-gray-eske-20 dark:border-white/10 p-2.5">
               <p className="text-xs lg:text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
                 {a.nombre} ({a.tipo}) — {NIVEL_RIESGO_LABEL[a.nivelRiesgo] ?? a.nivelRiesgo}
               </p>
-              <p className="text-[11px] lg:text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">{a.motivacion}</p>
+              <p className="text-[11px] lg:text-xs text-black-eske-40 dark:text-[#9AAEBE] mt-1">{a.motivacion}</p>
             </div>
           ))}
         </InfoListModal>

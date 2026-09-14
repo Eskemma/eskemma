@@ -43,6 +43,8 @@ import {
   fetchWebLegalContext,
 } from "@/lib/search/webContextFetcher";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
+import { resolverInsumosFontanaPestel } from "@/lib/fontana/tabla/insumosPestel";
+import type { InsumoFontana } from "@/lib/fontana/pestelInsumos";
 
 export const maxDuration = 300;
 
@@ -220,6 +222,40 @@ export async function POST(request: NextRequest) {
     };
   }
 
+  // Integración PESTEL↔Fontana (26-09-13) — Express, mismo runtime
+  // Next.js, importa `resolverInsumosFontanaPestel` directo (sin HTTP,
+  // a diferencia del path Controlado que sí necesita el endpoint interno
+  // por el límite de runtime cruzado con `functions/`). Fail-open: si
+  // Fontana no resuelve (territorio incompleto, error de fuente), el
+  // resto del análisis sigue igual, sin ese bloque.
+  //
+  // `timeoutMs: 25_000` (corrección post-verificación, 26-09-13 —
+  // bug real reportado por Raúl): esta llamada NO tenía timeout,
+  // dejando cada indicador resolverse sin límite — un solo indicador
+  // externo lento (ej. SESNSP en frío) colgaba TODA la petición hasta
+  // que la plataforma la mataba a los 300s (`maxDuration`), sin ningún
+  // error visible ("Relanzar análisis" no hacía nada). Decisión de
+  // Raúl: Express es la vía RÁPIDA (para eso existe la vía Controlada,
+  // más exhaustiva) — 25s por indicador, aceptando que un indicador
+  // lento caiga honestamente a "sin_dato" (nunca se finge que el dato
+  // no existía) en vez de colgar el análisis completo. Los indicadores
+  // de una misma dimensión resuelven en PARALELO (`Promise.all` dentro
+  // de `resolverCeldasParaTerritorio`), así que el tiempo real ≈ el más
+  // lento de ellos, no la suma.
+  let fontana: Partial<Record<"E" | "S" | "Ec", InsumoFontana[]>> | undefined;
+  if (project.territorio) {
+    const territorioFontana = project.territorio as import("@/types/shared.types").Territorio;
+    const dimensiones: ("E" | "S" | "Ec")[] = ["E", "S", "Ec"];
+    const resultados = await Promise.allSettled(
+      dimensiones.map((d) => resolverInsumosFontanaPestel(d, territorioFontana, tipoProyecto, { timeoutMs: 25_000 }))
+    );
+    fontana = {};
+    resultados.forEach((r, i) => {
+      if (r.status === "fulfilled") fontana![dimensiones[i]] = r.value;
+      else console.warn(`[generate-m1-express] Fontana insumos ${dimensiones[i]} falló:`, r.reason);
+    });
+  }
+
   console.log(
     `[generate-m1-express] pais=${paisProyecto ?? "México (legacy)"} esMexico=${esMexico} ` +
       `Sources: news=${news.length}, dof=${dof.length}, ` +
@@ -235,7 +271,7 @@ export async function POST(request: NextRequest) {
     tipoProyecto,
     xpcto as Record<string, unknown>,
     archivos.length > 0 ? archivos : undefined,
-    { news, dof, inegi, banxico, sefix, bise, webContext }
+    { news, dof, inegi, banxico, sefix, bise, webContext, fontana }
   );
 
   const response = await anthropic.messages.create({

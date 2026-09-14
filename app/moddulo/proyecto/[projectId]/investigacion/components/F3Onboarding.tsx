@@ -51,7 +51,7 @@ export default function F3Onboarding({
           </div>
         </div>
 
-        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">
+        <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] leading-relaxed">
           F3 es el gestor de investigación de Moddulo. No investiga directamente: coordina,
           distribuye, recibe y procesa. Traduce el Programa de Investigación Profunda (PIP) de
           F2 en tareas concretas, las asigna a los canales disponibles, sintetiza los resultados
@@ -59,7 +59,7 @@ export default function F3Onboarding({
         </p>
 
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+          <p className="text-xs font-bold uppercase tracking-widest text-black-eske-20 dark:text-[#9AAEBE]">
             Los cuatro motores
           </p>
           <div className="space-y-2">
@@ -79,7 +79,7 @@ export default function F3Onboarding({
           </div>
         </div>
 
-        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
           M1 propone qué apps del ecosistema activar, cuándo pedirte carga manual o vincular una
           fuente externa — siempre con tu aprobación explícita antes de activar cada canal.
         </p>

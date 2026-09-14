@@ -314,7 +314,7 @@ export default function ModduloChat({
             placeholder="Escribe tu respuesta aquí..."
             rows={2}
             disabled={isLoading || isUploading}
-            className="flex-1 resize-none px-4 py-3 text-sm font-medium border-2 border-gray-300 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-bluegreen-eske/30 focus:border-bluegreen-eske disabled:opacity-50 text-gray-800 dark:text-[#EAF2F8] placeholder:text-gray-400 dark:placeholder-[#6D8294] bg-gray-50 dark:bg-[#112230] transition-colors"
+            className="flex-1 resize-none px-4 py-3 text-sm font-medium border-2 border-gray-300 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-bluegreen-eske/30 focus:border-bluegreen-eske disabled:opacity-50 text-gray-800 dark:text-[#EAF2F8] placeholder:text-gray-eske-70 dark:placeholder-[#6D8294] bg-gray-50 dark:bg-[#112230] transition-colors"
             style={{ maxHeight: "120px" }}
           />
           <div className="flex flex-col gap-1.5 shrink-0">
@@ -323,7 +323,7 @@ export default function ModduloChat({
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploading}
               aria-label="Adjuntar archivo"
-              className="p-3 border-2 border-gray-300 dark:border-white/10 text-gray-500 dark:text-[#9AAEBE] rounded-xl hover:border-bluegreen-eske hover:text-bluegreen-eske transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-3 border-2 border-gray-300 dark:border-white/10 text-gray-eske-90 dark:text-[#9AAEBE] rounded-xl hover:border-bluegreen-eske hover:text-bluegreen-eske transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <PaperClipIcon className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -355,7 +355,7 @@ export default function ModduloChat({
           style={{ display: "none" }}
           aria-hidden="true"
         />
-        <p className="text-xs font-medium text-gray-500 dark:text-[#9AAEBE] mt-2">
+        <p className="text-xs font-medium text-gray-eske-90 dark:text-[#9AAEBE] mt-2">
           <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-[#112230] border border-gray-300 dark:border-white/10 rounded text-gray-600 dark:text-[#C7D6E0] text-xs">Enter</kbd> para enviar
           {" · "}
           <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-[#112230] border border-gray-300 dark:border-white/10 rounded text-gray-600 dark:text-[#C7D6E0] text-xs">Shift+Enter</kbd> para nueva línea
@@ -398,7 +398,7 @@ function ChatBubble({ message, isStreaming = false }: { message: ChatMessage; is
             <div className="mt-1.5 ml-1">
               <button
                 onClick={() => setReasoningOpen((v) => !v)}
-                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9AAEBE] hover:text-bluegreen-eske transition-colors"
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-eske-90 dark:text-[#9AAEBE] hover:text-bluegreen-eske transition-colors"
               >
                 <svg
                   className={`w-3.5 h-3.5 transition-transform ${reasoningOpen ? "rotate-90" : ""}`}

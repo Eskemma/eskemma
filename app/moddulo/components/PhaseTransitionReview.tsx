@@ -185,7 +185,7 @@ export default function PhaseTransitionReview({
 
           {/* Siguiente fase */}
           {nextPhaseId && (
-            <div className="flex items-center gap-2 text-sm text-gray-eske-50 dark:text-[#9AAEBE] pt-1">
+            <div className="flex items-center gap-2 text-sm text-black-eske-20 dark:text-[#9AAEBE] pt-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>

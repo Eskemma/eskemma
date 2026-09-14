@@ -2,6 +2,7 @@
 import type { PhaseId, ProjectType } from "@/types/moddulo.types";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 import { DIMENSION_PRIORITY_BY_TYPE, type DimensionCode } from "@/lib/moddulo/dimensionPriority";
+import type { InsumoFontana } from "@/lib/fontana/pestelInsumos";
 
 const MODDULO_BASE_IDENTITY = `Eres Moddulo, el Colaborador Estratégico y Copiloto Táctico de la metodología Eskemma.
 Tu función es acompañar al consultor político en la construcción de proyectos estratégicos bajo el modelo XPCTO (Hito, Sujeto, Capacidades, Tiempo, Justificación).
@@ -449,6 +450,35 @@ interface ExpressContext {
     economic?: WebContextResult;
     legal?: WebContextResult;
   };
+  // Integración PESTEL↔Fontana (26-09-13) — Express (mismo runtime
+  // Next.js) importa `resolverCeldasParaTerritorio` directo, sin pasar
+  // por el endpoint interno `/api/fontana/insumos-pestel` (ese endpoint
+  // es solo para la Cloud Function del path Controlado, que sí cruza
+  // runtime). Solo E/S/Ec tienen indicadores de Fontana.
+  fontana?: Partial<Record<"E" | "S" | "Ec", InsumoFontana[]>>;
+}
+
+// Mismo criterio que `formatFontanaData` en
+// functions/src/pestel/classifier/claudePESTL.ts — duplicado aquí
+// deliberadamente (no cross-runtime importable), NO por descuido.
+function formatFontanaInsumos(insumos: InsumoFontana[]): string[] {
+  const lineas: string[] = [];
+  const NO_PROMEDIAR = new Set<string | undefined>(["no_agregable", "narrativo_sintetizado", undefined]);
+  for (const ins of insumos) {
+    if (ins.tipo === "simple") {
+      lineas.push(`- ${ins.nombre}: ${ins.valor}${ins.unidad ? " " + ins.unidad : ""} | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`);
+    } else if (ins.tipo === "sintesis") {
+      const conValor = ins.desglose.filter((d) => d.valor !== undefined);
+      if (conValor.length === 0) continue;
+      const noPromediar = NO_PROMEDIAR.has(ins.tipoCalculo);
+      lineas.push(`- ${ins.nombre} (desglose por unidad territorial — ${conValor.length} unidades${noPromediar ? "; NO promediar, describe el patrón/rango entre ellas" : ""}):`);
+      for (const d of conValor) {
+        lineas.push(`  · ${d.nombre}: ${d.valor}${d.unidad ? " " + d.unidad : ""}`);
+      }
+      lineas.push(`  | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`);
+    }
+  }
+  return lineas;
 }
 
 const INEGI_LABEL: Record<string, string> = {
@@ -550,6 +580,17 @@ function buildSourcesSection(ctx: ExpressContext): string {
     }
   }
 
+  // Fontana (T10) — integración PESTEL↔Fontana (26-09-13). Solo E/S/Ec.
+  const fontanaLineas = [
+    ...(ctx.fontana?.E ? formatFontanaInsumos(ctx.fontana.E) : []),
+    ...(ctx.fontana?.S ? formatFontanaInsumos(ctx.fontana.S) : []),
+    ...(ctx.fontana?.Ec ? formatFontanaInsumos(ctx.fontana.Ec) : []),
+  ];
+  if (fontanaLineas.length > 0) {
+    lines.push("\n[FONTANA — indicadores oficiales verificados, con trazabilidad de fuente]");
+    lines.push(...fontanaLineas);
+  }
+
   // Sefix / INE
   if (ctx.sefix && ctx.sefix.resultadosList.length > 0) {
     lines.push("\n[INE/SEFIX — Resultados electorales por cargo]");
@@ -641,10 +682,11 @@ Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques 
     ? `
 REGLA ABSOLUTA SOBRE FUENTES:
 - El campo "fuente" de cada señal DEBE referenciar una de las fuentes de la sección FUENTES CONSULTADAS.
-  Formatos válidos: "Google News, YYYY-MM", "DOF, YYYY-MM-DD", "INEGI, YYYY-MM", "Banxico, YYYY-MM-DD", "INE/SEFIX, YYYY"
+  Formatos válidos: "Google News, YYYY-MM", "DOF, YYYY-MM-DD", "INEGI, YYYY-MM", "Banxico, YYYY-MM-DD", "INE/SEFIX, YYYY", "<fuente_oficial>, <período>" para datos del bloque FONTANA (usa EXACTAMENTE el texto del campo "fuente_oficial" de la línea citada — ej. "SESNSP", "INEGI", "CONEVAL" — seguido del campo "período" de esa misma línea, ej. "INEGI, 2020"; si esa línea trae "período: sin período", omite la fecha y cita solo el "fuente_oficial" — NUNCA escribas "Fontana" en la cita, es la app que agrega estos datos ya oficiales, no la fuente citable; NUNCA anides el campo "detalle" dentro de la cita, es solo contexto tuyo)
 - Prohibido citar como fuente: "Análisis Moddulo", "inferido del XPCTO", "conocimiento general" o cualquier variante autorreferida.
 - Si una dimensión no tiene señales respaldadas por las fuentes consultadas: deja senalesFavorables, senalesAdversas y senalesInciertas como arrays vacíos y explícalo en 'narrativa'.
-- El campo "nivelConfianza" es "medio" cuando la señal se apoya en datos numéricos (INEGI, Banxico, Sefix) o en artículos de noticias verificables; "bajo" solo para inferencias del XPCTO sin respaldo en las fuentes.
+- El campo "nivelConfianza" es "medio" cuando la señal se apoya en datos numéricos (INEGI, Banxico, Sefix, Fontana) o en artículos de noticias verificables; "bajo" solo para inferencias del XPCTO sin respaldo en las fuentes.
+- Si el bloque FONTANA trae un indicador con desglose por unidad territorial marcado "NO promediar": describe el patrón o rango entre las unidades (ej. "la mayoría de los municipios del distrito muestran X, salvo Y que destaca con Z") — nunca calcules ni menciones un promedio para ese indicador.
 `
     : "";
 

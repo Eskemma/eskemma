@@ -155,7 +155,7 @@ export default function CreateProjectModal({
               htmlFor="project-description"
               className="block text-sm font-semibold text-gray-eske-90 dark:text-[#C7D6E0] mb-2"
             >
-              Descripción <span className="text-gray-eske-50 font-normal">(opcional)</span>
+              Descripción <span className="text-black-eske-20 font-normal">(opcional)</span>
             </label>
             <textarea
               id="project-description"

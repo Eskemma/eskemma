@@ -50,7 +50,7 @@ export default function F3ReporteDIE({ die, rda }: { die: DIE; rda?: Record<stri
 
       <section>
         <h2 className="text-xs lg:text-sm font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 mb-2">6. Inventario de Activos de Inteligencia (IAI)</h2>
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">Fuera de alcance en esta entrega — pendiente.</p>
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">Fuera de alcance en esta entrega — pendiente.</p>
       </section>
 
       <section>

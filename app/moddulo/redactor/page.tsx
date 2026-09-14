@@ -391,7 +391,7 @@ export default function RedactorPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-eske-10 dark:bg-[#0B1620]">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-bluegreen-eske border-t-transparent" />
-          <p className="mt-4 text-gray-eske-70 dark:text-[#9AAEBE]">Cargando Redactor...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando Redactor...</p>
         </div>
       </div>
     );
@@ -445,7 +445,7 @@ export default function RedactorPage() {
               <h1 className="text-3xl max-sm:text-2xl font-bold text-bluegreen-eske">
                 Redactor Político
               </h1>
-              <p className="text-sm text-gray-eske-70 dark:text-[#9AAEBE]">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
                 {currentProject ? currentProject.name : "Genera posts profesionales con IA"}
               </p>
             </div>
@@ -588,7 +588,7 @@ export default function RedactorPage() {
                 <p className="text-gray-eske-60 dark:text-[#9AAEBE] text-lg max-sm:text-base font-medium mb-2">
                   Comienza a generar posts
                 </p>
-                <p className="text-gray-eske-50 dark:text-[#6D8294] text-sm">
+                <p className="text-black-eske-20 dark:text-[#6D8294] text-sm">
                   Completa el formulario y presiona "Generar Posts" para ver tus variantes
                 </p>
               </div>

@@ -593,14 +593,14 @@ function PropositoPageContent() {
             los badges de estado de la Fila 1, que no hacen wrap. */}
         <div className="flex flex-wrap items-center gap-2 mt-2.5">
           {projectTerritory?.nombre && (
-            <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+            <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-black-eske-20 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
               {projectTerritory.nombre}
             </span>
           )}
           <button
             type="button"
             onClick={() => setShowEditTerritory(true)}
-            className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+            className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-black-eske-20 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
           >
             {projectTerritory?.nombre ? "Editar territorio" : "Definir territorio"}
           </button>
@@ -671,7 +671,7 @@ function PropositoPageContent() {
           className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
             mobileTab === "chat"
               ? "border-bluegreen-eske text-bluegreen-eske"
-              : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+              : "border-transparent text-black-eske-20 dark:text-[#9AAEBE]"
           }`}
         >
           {showReport || mode === "completed" || mode === "editing" ? "📋 Reporte F1" : "💬 Chat"}
@@ -684,7 +684,7 @@ function PropositoPageContent() {
               ? "border-bluegreen-eske text-bluegreen-eske"
               : mode !== "editing"
                 ? "border-transparent text-gray-eske-40 dark:text-[#6D8294] opacity-50 cursor-not-allowed"
-                : "border-transparent text-gray-eske-50 dark:text-[#9AAEBE]"
+                : "border-transparent text-black-eske-20 dark:text-[#9AAEBE]"
           }`}
         >
           📝 Variables XPCTO
@@ -963,12 +963,12 @@ function XPCTOFormPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">Variables XPCTO</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-20 dark:text-[#9AAEBE]">Variables XPCTO</h2>
         {readOnly && (
-          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294] italic">Solo lectura</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#6D8294] italic">Solo lectura</span>
         )}
         {!readOnly && (
-          <span className="text-xs text-gray-eske-40 dark:text-[#6D8294]">Auto-rellena via chat</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Auto-rellena via chat</span>
         )}
       </div>
 
@@ -1040,7 +1040,7 @@ function XPCTOFormPanel({
           />
         </div>
         {form.tiempo.duracionMeses > 0 && (
-          <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] text-right">
+          <p className="text-xs text-black-eske-20 dark:text-[#6D8294] text-right">
             {form.tiempo.duracionMeses} {form.tiempo.duracionMeses === 1 ? "mes" : "meses"} desde hoy
           </p>
         )}
@@ -1134,7 +1134,7 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
 
         <ul className="space-y-2 mb-5">
           {affectedPhases.map(({ phaseId, diffs }) => (
-            <li key={phaseId} className="text-sm text-gray-eske-70 dark:text-[#C7D6E0] bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
+            <li key={phaseId} className="text-sm text-black-eske-20 dark:text-[#C7D6E0] bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-orange-500 dark:text-orange-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -1158,7 +1158,7 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
           ))}
         </ul>
 
-        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mb-5 leading-relaxed">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mb-5 leading-relaxed">
           Moddulo ha guardado tus cambios. Te recomendamos revisar el trabajo de cada fase afectada para verificar que las decisiones sigan siendo consistentes con el nuevo Propósito.
         </p>
 
@@ -1246,14 +1246,14 @@ function F1LandingView({
               </span>
             )}
             {projectTerritory?.nombre && (
-              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-gray-eske-70 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
+              <span className="px-2 py-0.5 bg-gray-eske-10 dark:bg-white/10 text-black-eske-20 dark:text-[#C5D8E8] rounded-full text-xs font-medium">
                 {projectTerritory.nombre}
               </span>
             )}
             <button
               type="button"
               onClick={onEditTerritory}
-              className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-gray-eske-70 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+              className="px-2 py-0.5 border border-gray-eske-30 dark:border-white/10 text-black-eske-20 dark:text-[#9AAEBE] rounded-full text-xs font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               {projectTerritory?.nombre ? "Editar territorio" : "Definir territorio"}
             </button>
@@ -1261,7 +1261,7 @@ function F1LandingView({
         </div>
 
         {/* Descripción de F1 */}
-        <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8] leading-relaxed">
+        <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8] leading-relaxed">
           F1 establece el propósito estratégico del proyecto mediante el modelo XPCTO.
           Aquí definirás las cinco variables fundamentales que dan coherencia y dirección
           a todo el trabajo de consultoría: desde quién es el sujeto político hasta cuál
@@ -1270,7 +1270,7 @@ function F1LandingView({
 
         {/* Variables XPCTO */}
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-eske-50 dark:text-[#9AAEBE]">
+          <p className="text-xs font-bold uppercase tracking-widest text-black-eske-20 dark:text-[#9AAEBE]">
             Las cinco variables XPCTO
           </p>
           <div className="space-y-2">
@@ -1291,7 +1291,7 @@ function F1LandingView({
         </div>
 
         {/* Nota informativa */}
-        <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed border-l-2 border-gray-eske-20 dark:border-white/10 pl-3">
           Las variables XPCTO se construyen en conversación con el asistente de IA.
           El formulario de la derecha se llena automáticamente conforme avanza el chat,
           y puedes editarlo directamente en cualquier momento.
@@ -1360,7 +1360,7 @@ function EditTerritoryModal({
           <p className="text-xs text-red-eske mt-3" role="alert">{error}</p>
         )}
         {isSaving && (
-          <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-3">Guardando…</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-3">Guardando…</p>
         )}
       </div>
     </div>

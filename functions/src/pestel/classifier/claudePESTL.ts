@@ -119,6 +119,51 @@ export interface EconomicDataPoint {
   source?: "INEGI" | "Banxico" | "BISE";
 }
 
+// Integración PESTEL↔Fontana (26-09-13) — shape espejo del que devuelve
+// app/api/fontana/insumos-pestel/route.ts (Next.js). `functions/` no
+// puede importar `lib/` (regla del repo), así que este tipo se declara
+// aquí en vez de importarse — mismo patrón ya usado para
+// EconomicDataPoint/DimensionCode, que tampoco se comparten vía import.
+export interface FontanaInsumoSimple {
+  id: string;
+  nombre: string;
+  tipo: "simple";
+  valor: number;
+  unidad?: string;
+  fuenteEtiqueta?: string;
+  // Vintage real (26-09-13, corrección post-verificación) — ya extraído
+  // por `lib/fontana/tabla/insumosPestel.ts` (`extraerPeriodoFuente`) del
+  // texto de `fuenteEtiqueta`, NUNCA inventado aquí. `undefined` cuando la
+  // fuente no publica un año/trimestre reconocible (ej. SESNSP/RNID) — en
+  // ese caso la cita se hace SIN fecha (ver INSTRUCCIONES de citas abajo).
+  periodo?: string;
+  // Fuente OFICIAL del dato (26-09-13, 2ª corrección) — ya extraída por
+  // `extraerFuenteOficial` (lib/fontana/tabla/insumosPestel.ts): nombre de
+  // la agencia (SESNSP/INEGI/CONEVAL/...), NUNCA "Fontana" — Fontana es
+  // solo la app que agrega estos datos ya oficiales, no la fuente citable.
+  fuenteOficial: string;
+}
+export interface FontanaInsumoSintesis {
+  id: string;
+  nombre: string;
+  tipo: "sintesis";
+  // "no_agregable"/"narrativo_sintetizado" (o ausente) → nunca promediar,
+  // describir el patrón/rango. "aditivo"/"tasa_ponderada" con desglose
+  // (sin valor agregado disponible) también puede llegar aquí.
+  tipoCalculo?: string;
+  desglose: { nombre: string; valor?: number; unidad?: string; motivo?: string }[];
+  fuenteEtiqueta?: string;
+  periodo?: string;
+  fuenteOficial: string;
+}
+export interface FontanaInsumoSinDato {
+  id: string;
+  nombre: string;
+  tipo: "sin_dato";
+  motivo: string;
+}
+export type FontanaInsumo = FontanaInsumoSimple | FontanaInsumoSintesis | FontanaInsumoSinDato;
+
 const DIMENSION_NAMES: Record<DimensionCode, string> = {
   P: "Político",
   E: "Económico",
@@ -196,6 +241,44 @@ function formatEconomicData(points: EconomicDataPoint[]): string {
     .join("\n");
 }
 
+const NO_PROMEDIAR_TIPOS = new Set(["no_agregable", "narrativo_sintetizado", undefined]);
+
+/**
+ * Formats Fontana indicator insumos (Económico/Social/Ecológico) for
+ * inclusion in a dimension prompt. Integración PESTEL↔Fontana (26-09-13).
+ * @param {FontanaInsumo[]} insumos Insumos resolved by
+ *   app/api/fontana/insumos-pestel/route.ts
+ * @return {string} Formatted text block
+ */
+function formatFontanaData(insumos: FontanaInsumo[]): string {
+  if (!insumos || insumos.length === 0) return "";
+  const lineas: string[] = [];
+  for (const ins of insumos) {
+    if (ins.tipo === "simple") {
+      lineas.push(
+        `- ${ins.nombre}: ${ins.valor}${ins.unidad ? " " + ins.unidad : ""}` +
+        ` | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`
+      );
+    } else if (ins.tipo === "sintesis") {
+      const conValor = ins.desglose.filter((d) => d.valor !== undefined);
+      if (conValor.length === 0) continue;
+      const noPromediar = NO_PROMEDIAR_TIPOS.has(ins.tipoCalculo);
+      lineas.push(
+        `- ${ins.nombre} (desglose por unidad territorial — ${conValor.length} unidades` +
+        `${noPromediar ? "; NO promediar, describe el patrón/rango entre ellas" : ""}):`
+      );
+      for (const d of conValor) {
+        lineas.push(`  · ${d.nombre}: ${d.valor}${d.unidad ? " " + d.unidad : ""}`);
+      }
+      lineas.push(
+        `  | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`
+      );
+    }
+    // "sin_dato" no se incluye — nada que citar.
+  }
+  return lineas.join("\n");
+}
+
 /**
  * Builds the per-dimension PEST-L analysis prompt.
  * @param {object} params Prompt parameters
@@ -220,10 +303,11 @@ function buildDimensionPrompt(params: {
   inegiData?: EconomicDataPoint[];
   banxicoData?: EconomicDataPoint[];
   biseData?: EconomicDataPoint[];
+  fontanaData?: FontanaInsumo[];
 }): string {
   const {
     code, tipo, territorio, horizonte, variables, rawData,
-    banxicoData, biseData,
+    banxicoData, biseData, fontanaData,
   } = params;
   const dimName = DIMENSION_NAMES[code];
   const tipoDesc = TIPO_DESCRIPTIONS[tipo] ?? tipo;
@@ -253,6 +337,19 @@ function buildDimensionPrompt(params: {
     "\nDATOS DEMOGRÁFICOS (INEGI/BISE — Censo de Población" +
     " y Vivienda, datos quinquenales/decenales):\n" +
     biseText :
+    "";
+
+  // Integración PESTEL↔Fontana (26-09-13) — Económico/Social/Ecológico
+  // ganan datos verificados de Fontana (T10), mismo patrón condicional
+  // que economicBlock/biseBlock. `fontanaData` ya viene con la regla de
+  // "no promediar" declarada en el texto cuando el tipo de agregación lo
+  // exige (ver formatFontanaData) — Claude no necesita adivinarlo.
+  const fontanaText = (code === "E" || code === "S" || code === "Ec") ?
+    formatFontanaData(fontanaData ?? []) :
+    "";
+  const fontanaBlock = fontanaText ?
+    "\nDATOS DE FONTANA (T10 — indicadores oficiales verificados, con " +
+    "trazabilidad de fuente):\n" + fontanaText + "\n" :
     "";
 
   const ecologicoCtx = code === "Ec" ? `
@@ -304,9 +401,14 @@ ${varsText}
 
 DATOS RECOLECTADOS:
 ${rawData || "Sin datos disponibles para este período."}
-${economicBlock}${biseBlock}
+${economicBlock}${biseBlock}${fontanaBlock}
 INSTRUCCIONES:
 - Usa solo terminología vigente para el contexto mexicano.
+- Si el bloque DATOS DE FONTANA trae un indicador con desglose por \
+unidad territorial marcado "NO promediar": describe el patrón o rango \
+entre las unidades (ej. "la mayoría de los municipios del distrito \
+muestran X, salvo Y que destaca con Z") — nunca calcules ni menciones \
+un promedio para ese indicador.
 - CITAS EN NARRATIVA — REGLAS OBLIGATORIAS:
   * Cita solo fuentes presentes en los bloques de datos anteriores.
   * La fecha en la cita debe ser EXACTAMENTE el campo 'período' del \
@@ -315,19 +417,33 @@ actual ni una fecha inferida. Si el dato no tiene período propio, \
 omite la fecha de la cita.
   * Formatos válidos ÚNICAMENTE: 'Banxico, YYYY-MM-DD' | \
 'Google News, YYYY-MM' | 'DOF, YYYY-MM-DD' | \
-'INEGI/BISE, año' (solo datos de población).
+'INEGI/BISE, año' (solo datos de población) | \
+'<fuente_oficial>, <período>' para datos del bloque DATOS DE FONTANA — \
+usa EXACTAMENTE el texto del campo 'fuente_oficial' de la línea citada \
+(ej. 'SESNSP, sin período', 'INEGI, 2020', 'CONEVAL, 2020') seguido del \
+campo 'período' de esa misma línea; si esa línea trae \
+'período: sin período', omite la fecha y cita solo el \
+'fuente_oficial' (sin coma, sin fecha inventada). NUNCA escribas \
+'Fontana' en la cita — Fontana es la app que agrega y verifica estos \
+datos ya oficiales, el usuario necesita saber la fuente oficial real. \
+NUNCA anides el campo 'detalle' dentro de la cita — 'detalle' es solo \
+para tu propio contexto, no es parte del formato de cita.
   * NO cites 'INEGI' ni 'INEGI/Banxico' para datos económicos: \
 esa fuente no tiene datos en esta consulta.
   * Si no puedes atribuir un dato a alguna de esas fuentes, \
 no cites — no inventes fuentes ni fechas.
   * Máx. 3 citas por narrativa.
 - En señalesFavorables/Adversas/Inciertas:
-  * fuente: usa SOLO 'Banxico', 'Google News', 'DOF', o 'INEGI/BISE' \
-(esta última solo para datos de población). Si el dato no proviene \
-de ninguno de esos bloques, deja fuente = ''.
-  * fechaCorte: usa el campo 'período' del dato si es de Banxico o \
-INEGI/BISE, o la fecha de la noticia si es de Google News/DOF. \
-Nunca la fecha actual. Si no hay fecha disponible, escribe 'sin fecha'.
+  * fuente: usa SOLO 'Banxico', 'Google News', 'DOF', 'INEGI/BISE' \
+(esta última solo para datos de población), o EXACTAMENTE el texto del \
+campo 'fuente_oficial' de la línea del bloque DATOS DE FONTANA \
+correspondiente (nunca 'Fontana'). Si el dato no proviene de ninguno \
+de esos bloques, deja fuente = ''.
+  * fechaCorte: usa el campo 'período' del dato si es de Banxico, \
+INEGI/BISE o un insumo de Fontana, o la fecha de la noticia si es de \
+Google News/DOF. Nunca la fecha actual. Si no hay fecha disponible \
+(incluido un insumo de Fontana con 'período: sin período'), escribe \
+'sin fecha'.
   * origenInternacional: true solo si la fuente es extranjera.
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
@@ -384,6 +500,7 @@ export async function analyzeDimension(params: {
   inegiData?: EconomicDataPoint[];
   banxicoData?: EconomicDataPoint[];
   biseData?: EconomicDataPoint[];
+  fontanaData?: FontanaInsumo[];
   anthropicKey: string;
 }): Promise<DimensionAnalysisResult> {
   const {code, anthropicKey} = params;

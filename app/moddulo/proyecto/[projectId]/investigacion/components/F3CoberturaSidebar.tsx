@@ -43,11 +43,11 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
 }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-      <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-80 dark:text-[#9AAEBE]">
+      <p className="text-xs lg:text-sm font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE]">
         Cobertura del PIP
       </p>
       {tareas.length === 0 ? (
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin tablero generado todavía.</p>
+        <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE]">Sin tablero generado todavía.</p>
       ) : (
         <ul className="space-y-2">
           {tareas.map((t) => {
@@ -59,7 +59,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
                   <span aria-hidden="true">{s.icon}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-bluegreen-eske dark:text-blue-eske-20 font-semibold">P{t.numero} {item?.pregunta ?? ""}</span>
-                    <span className="text-black-eske-80 dark:text-[#9AAEBE]">Estado: {s.label}</span>
+                    <span className="text-black-eske-40 dark:text-[#9AAEBE]">Estado: {s.label}</span>
                     <span className="block mt-0.5 space-y-0.5">
                       {(t.asignaciones ?? []).map((a) => {
                         const nombre = asignacionNombreCorto(a);
@@ -68,7 +68,7 @@ export default function F3CoberturaSidebar({ pip, tareas, sintesis, projectId }:
                         // Desactivada: burbuja y texto en gris neutro, sin
                         // mostrar la palabra de estado real aunque exista
                         // internamente — solo el sufijo Activada/Desactivada.
-                        const colorTexto = a.activada ? "text-black-eske-80 dark:text-[#9AAEBE]" : "text-gray-eske-50 dark:text-[#6D8294]";
+                        const colorTexto = a.activada ? "text-black-eske-40 dark:text-[#9AAEBE]" : "text-black-eske-20 dark:text-[#6D8294]";
                         const colorDot = a.activada ? ESTADO_DOT[a.estado] : "bg-gray-eske-40";
                         // Nombre de app en negritas en modo claro; en modo
                         // oscuro mismo color que el resto del texto de la
