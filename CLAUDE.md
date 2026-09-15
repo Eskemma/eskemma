@@ -61,7 +61,7 @@ equipos de campaña y funcionarios públicos en México.
 | `/moddulo` | Moddulo — gestión de proyectos políticos con IA (9 fases) | Activo |
 | `/centinela/pestel` | PESTEL — análisis PEST-L en tiempo real | En desarrollo |
 | `/cursos` | Talleres y cursos interactivos | Activo |
-| `/sefix` | Dashboard electoral (Shiny embebido) | Activo |
+| `/sefix` | Dashboard electoral — Next.js/React/TypeScript nativo, 23 rutas API propias bajo `app/api/sefix/`. Migrado desde el prototipo original en R/Shiny (`docs/sefix_R/`, sin desarrollo activo desde 26-04-12, se conserva solo como artefacto histórico) | Activo |
 | `/blog` | El Baúl de Fouché | Activo |
 
 ---

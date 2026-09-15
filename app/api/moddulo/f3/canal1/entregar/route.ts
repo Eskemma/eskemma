@@ -16,6 +16,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
+import { esStoragePathDeUsuario } from "@/lib/moddulo/storagePathAuth";
 import type { TareaPIP, PIPItem } from "@/types/moddulo.types";
 import type { ResultadoCanal1 } from "@/types/f3.types";
 import type { FontanaSesion } from "@/types/fontana.types";
@@ -46,6 +47,13 @@ export async function POST(request: NextRequest) {
   const { projectId, sesionId, storagePath, reporteStoragePath } = body;
   if (!projectId || !sesionId || !storagePath) {
     return NextResponse.json({ error: "projectId, sesionId y storagePath son requeridos" }, { status: 400 });
+  }
+
+  if (
+    !esStoragePathDeUsuario(storagePath, session.uid, projectId) ||
+    (reporteStoragePath && !esStoragePathDeUsuario(reporteStoragePath, session.uid, projectId))
+  ) {
+    return NextResponse.json({ error: "storagePath no autorizado" }, { status: 403 });
   }
 
   const sesionRef = adminDb.collection("fontana_sesiones").doc(sesionId);
