@@ -688,6 +688,15 @@ estrategia → tactica → gerencia → seguimiento → evaluacion
 ```
 
 - Chat con Claude vía **streaming SSE** en `/api/moddulo/chat/[phaseId]`
+  (sin tools; solo proposito/exploracion/investigacion montan el chat).
+  Lo que el modelo extrae (`xpcto.`/`pestl.`/`semaforo.`/`hipotesis.`) pasa por
+  `lib/moddulo/extractedDataGrounding.ts` ANTES de emitirse al cliente y de
+  escribirse a Firestore: descarta cifras/fechas que el usuario no dio en
+  ninguna forma equivalente (tolera formato, millones, fechas relativas, sumas
+  derivadas). Determinista a propósito. No cubre parafraseos sin cifras ni la
+  omisión de un dato que el usuario sí dio. El prompt base
+  (`lib/ai/phases/prompts.ts`, "LÍMITES DE TU INFORMACIÓN") prohíbe inventar
+  causas técnicas y presentar conocimiento propio como dato verificado.
 - En la fase `exploracion` (F2), Moddulo debe consumir PESTEL para
   generar el análisis PEST-L del territorio del proyecto.
 
@@ -740,6 +749,15 @@ Ver `types/subscription.types.ts` → `PLAN_FEATURES` para detalles completos.
    `"owner" | "co-consultant" | "analyst" | "client"`: `"editor"` no existe,
    así que en la práctica solo el `owner` pasa. Resolver ambos juntos al
    diseñar los permisos del plan colaborativo.
+   **B1 — confirmación antes de `__action` (no construido, 26-09-18):** el
+   chat de Moddulo lanza el análisis express cuando el modelo emite
+   `__action: "start_express"` y el cliente lo ejecuta sin confirmación
+   adicional (`exploracion/page.tsx`). No se agregó un guard: el forense sobre
+   los 11 proyectos reales con chat (todos de UNA cuenta de pruebas interna)
+   encontró 8/8 disparos con instrucción explícita ("express") y 0 con una frase
+   ambigua tipo "hazlo". Revisar si algún día se observa un disparo real sin
+   instrucción explícita, o cuando el volumen de usuarios reales crezca lo
+   suficiente para que esa muestra deje de ser representativa.
 4. Nunca `dangerouslySetInnerHTML` sin sanitizar con DOMPurify.
 5. Las cookies de sesión son HTTP-only — nunca accederlas desde JS cliente.
 6. Nunca ejecutar comandos que impriman valores de variables de entorno o

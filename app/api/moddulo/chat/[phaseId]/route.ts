@@ -7,6 +7,7 @@ import { appendChatMessage, getProject } from "@/lib/moddulo/project";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { extractTextPerFile, isExtractionError } from "@/lib/moddulo/attachments";
 import { sonAdjuntosDeUsuario } from "@/lib/moddulo/storagePathAuth";
+import { construirAvisoRechazo, filtrarExtraccionSinRespaldo } from "@/lib/moddulo/extractedDataGrounding";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PhaseId, ChatRequest, ChatAttachment, XPCTO, PIPItem, TareaPIP } from "@/types/moddulo.types";
@@ -109,9 +110,13 @@ export async function POST(
 
     // Preparar mensaje: si hay adjuntos, extraer texto (una sola vez) e inyectarlo
     let userMessageContent = message;
+    // Texto de los adjuntos de ESTE turno — también es fuente de respaldo del
+    // guard de grounding de lo que el modelo extrae (más abajo).
+    let textoAdjuntos: string[] = [];
     if (attachments && attachments.length > 0) {
       const { content: attachmentTexts, failedFiles, perFileTexts } =
         await extractTextFromAttachments(attachments);
+      textoAdjuntos = perFileTexts;
       if (attachmentTexts) {
         const failedNote = failedFiles.length > 0
           ? `[Nota del sistema: No se pudo procesar: ${failedFiles.join(", ")}]\n\n`
@@ -144,6 +149,21 @@ export async function POST(
       { role: "user" as const, content: userMessageContent },
     ];
 
+    // Documentos que el usuario compartió en turnos ANTERIORES: su texto no se
+    // guarda en el historial, pero sí (a) el borrador XPCTO extraído del
+    // documento en F1 y (b) el texto extraído de los adjuntos de F2. Son
+    // respaldo legítimo para el guard de grounding cuando el usuario dice
+    // "toma los datos del documento" en un turno posterior.
+    const fasesRaw = project.phases as unknown as Record<string, Record<string, unknown> | undefined> | undefined;
+    const textosDeDocumentosPersistidos: string[] = [];
+    if (phaseId === "proposito" && fasesRaw?.proposito?.xpctoBorrador) {
+      textosDeDocumentosPersistidos.push(JSON.stringify(fasesRaw.proposito.xpctoBorrador));
+    }
+    if (phaseId === "exploracion") {
+      const guardados = (fasesRaw?.exploracion?.archivosAdjuntos as { textoExtraido?: string }[] | undefined) ?? [];
+      for (const a of guardados) if (a.textoExtraido) textosDeDocumentosPersistidos.push(a.textoExtraido);
+    }
+
     // Streaming con Claude
     const stream = await anthropic.messages.stream({
       model: CLAUDE_MODEL,
@@ -172,7 +192,53 @@ export async function POST(
         }
 
         // Al terminar el stream, intentar extraer datos estructurados
-        const { extractedData, reasoning } = extractDataFromResponse(fullText, phaseId as PhaseId);
+        let { extractedData, reasoning } = extractDataFromResponse(fullText, phaseId as PhaseId);
+
+        // Guard de grounding: cifras/fechas que el usuario no dio (en ninguna
+        // forma equivalente) se descartan ANTES de emitirse al cliente y de
+        // escribirse a Firestore — la escritura de abajo es el único efecto
+        // irreversible de este chat. La fuente de "lo que el usuario dijo" es el
+        // historial PERSISTIDO (no el chatHistory que manda el cliente).
+        // Forense 26-09-18: "~170,000 representantes" y "2030-06-01" inventados.
+        if (extractedData) {
+          try {
+            const historialFase = project.phases?.[phaseId as PhaseId]?.chatHistory ?? [];
+            const grounding = filtrarExtraccionSinRespaldo(extractedData, {
+              mensajesUsuarioPrevios: historialFase.filter((m) => m.role === "user").map((m) => m.content),
+              mensajeActual: message,
+              textoAdjuntos,
+              textosContexto: [
+                JSON.stringify(mergedXpctoContext ?? {}),
+                JSON.stringify(currentFormData ?? {}),
+                ...textosDeDocumentosPersistidos,
+              ],
+              ultimoMensajeAsistente: [...historialFase].reverse().find((m) => m.role === "assistant")?.content,
+            });
+            if (grounding.rechazados.length > 0) {
+              console.warn(
+                "[chat/route] extractedData sin respaldo descartado:",
+                phaseId,
+                grounding.rechazados.map((r) => `${r.clave} → ${r.sinRespaldo.join(" | ")}`)
+              );
+              // Sin este aviso el modelo habría dicho que registró un dato que
+              // nunca se guardó.
+              const aviso = construirAvisoRechazo(grounding.rechazados);
+              fullText += aviso;
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "text", content: aviso })}\n\n`)
+              );
+              extractedData = Object.keys(grounding.aceptados).length > 0 ? grounding.aceptados : null;
+              if (!extractedData) reasoning = null;
+            }
+          } catch (err) {
+            // Fail-closed: si el guard falla, NO se persiste nada de esta
+            // extracción (el chat sigue). Mejor perder un dato que escribir
+            // uno sin verificar.
+            console.error("[chat/route] Error en guard de grounding — extracción descartada:", err);
+            extractedData = null;
+            reasoning = null;
+          }
+        }
 
         if (extractedData && Object.keys(extractedData).length > 0) {
           controller.enqueue(

@@ -89,6 +89,18 @@ function streamDeUnChunk() {
   };
 }
 
+function streamConTexto(text: string) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield { type: "content_block_delta", delta: { type: "text_delta", text } };
+    },
+  };
+}
+
+/** Respuesta del modelo con su bloque JSON de extracción (como en producción). */
+const respuestaConJson = (prosa: string, datos: Record<string, unknown>) =>
+  `${prosa}\n\n\`\`\`json\n${JSON.stringify({ ...datos, __reasoning: "test" })}\n\`\`\``;
+
 describe("POST /api/moddulo/chat/[phaseId] — adjuntos", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -234,5 +246,106 @@ describe("POST /api/moddulo/chat/[phaseId] — adjuntos", () => {
 
     expect(res.status).toBe(200);
     expect(mockExtractTextPerFile).not.toHaveBeenCalled();
+  });
+});
+
+// Guard de grounding (forense 26-09-18): lo que el modelo extrae y el
+// servidor persiste debe tener respaldo en lo que el usuario dijo. Casos
+// recreados de YgKs7M (cifra inventada + día inventado).
+describe("POST /api/moddulo/chat/[phaseId] — guard de grounding de extractedData", () => {
+  const usuarioPrevio = {
+    id: "u1", role: "user", timestamp: "2026-08-05T10:00:00Z",
+    content:
+      "Defensa del Voto: Cobertura del 100% de las casillas en el país con Representantes de Casilla (RC). Estructura en las 32 entidades. Día D: Junio de 2030.",
+  };
+  const proyecto = () =>
+    ({ type: "electoral", phases: { proposito: { chatHistory: [usuarioPrevio] } } }) as unknown as ModduloProject;
+
+  async function turno(datos: Record<string, unknown>, mensaje = "Continúa.") {
+    mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
+    mockGetProject.mockResolvedValue(proyecto());
+    mockStream.mockReturnValue(
+      streamConTexto(respuestaConJson("Registro lo que compartiste.", datos)) as unknown as ReturnType<typeof anthropic.messages.stream>
+    );
+    const res = await POST(buildRequest({ message: mensaje, projectId: PROJECT_ID }), ctx("proposito"));
+    const cuerpo = await res.text();
+    const eventos = [...cuerpo.matchAll(/^data: (.*)$/gm)].map((m) => JSON.parse(m[1]));
+    return { cuerpo, eventos, escrito: (mockAdminDb.snapshot()[`moddulo_projects/${PROJECT_ID}`] ?? {}) as Record<string, unknown> };
+  }
+
+  it("descarta la cifra inventada: no se emite al cliente ni se escribe a Firestore, y avisa al usuario", async () => {
+    const { cuerpo, eventos, escrito } = await turno({
+      "xpcto.capacidades.humano": "Defensa del Voto con cobertura del 100% de casillas (~170,000 representantes de casilla).",
+    });
+    expect(eventos.some((e) => e.type === "extracted-data")).toBe(false);
+    expect(escrito["xpcto.capacidades.humano"]).toBeUndefined();
+    expect(cuerpo).toContain("Nota del sistema");
+    expect(cuerpo).toContain("170,000");
+  });
+
+  it("descarta el día inventado (usuario: 'Junio de 2030' → modelo: 2030-06-01) junto con la duración derivada", async () => {
+    const { eventos, escrito } = await turno({
+      "xpcto.tiempo.fechaLimite": "2030-06-01",
+      "xpcto.tiempo.duracionMeses": 47,
+    });
+    expect(eventos.some((e) => e.type === "extracted-data")).toBe(false);
+    expect(escrito["xpcto.tiempo.fechaLimite"]).toBeUndefined();
+    expect(escrito["xpcto.tiempo.duracionMeses"]).toBeUndefined();
+  });
+
+  it("los valores con respaldo (formato equivalente) sí se emiten y se escriben; solo se corta el inventado", async () => {
+    const { eventos, escrito } = await turno({
+      "xpcto.capacidades.humano": "Estructura en las 32 entidades. Cobertura del 100% de casillas.",
+      "xpcto.capacidades.logistico": "Bodega y ~170,000 vehículos.",
+      "xpcto.tiempo.fechaLimite": "Junio de 2030",
+    });
+    const extraido = eventos.find((e) => e.type === "extracted-data");
+    expect(Object.keys(extraido.extractedData).sort()).toEqual(["xpcto.capacidades.humano", "xpcto.tiempo.fechaLimite"]);
+    expect(escrito["xpcto.capacidades.humano"]).toContain("32 entidades");
+    expect(escrito["xpcto.tiempo.fechaLimite"]).toBe("Junio de 2030");
+    expect(escrito["xpcto.capacidades.logistico"]).toBeUndefined();
+  });
+
+  it("una confirmación corta ('sí') respalda la fecha que el asistente propuso en el turno anterior", async () => {
+    mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
+    mockGetProject.mockResolvedValue({
+      type: "electoral",
+      phases: { proposito: { chatHistory: [
+        usuarioPrevio,
+        { id: "a1", role: "assistant", content: "¿La jornada es el 2 de junio de 2030?", timestamp: "2026-08-05T10:01:00Z" },
+      ] } },
+    } as unknown as ModduloProject);
+    mockStream.mockReturnValue(
+      streamConTexto(respuestaConJson("Registrada.", { "xpcto.tiempo.fechaLimite": "2030-06-02" })) as unknown as ReturnType<typeof anthropic.messages.stream>
+    );
+    const res = await POST(buildRequest({ message: "Sí, esa es.", projectId: PROJECT_ID }), ctx("proposito"));
+    await res.text();
+    const escrito = mockAdminDb.snapshot()[`moddulo_projects/${PROJECT_ID}`] as Record<string, unknown>;
+    expect(escrito["xpcto.tiempo.fechaLimite"]).toBe("2030-06-02");
+  });
+
+  it("respalda con el borrador XPCTO extraído de un documento compartido en un turno anterior (F1)", async () => {
+    mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
+    mockGetProject.mockResolvedValue({
+      type: "electoral",
+      phases: { proposito: {
+        chatHistory: [usuarioPrevio],
+        xpctoBorrador: { c: { financiero: "Presupuesto total estimado: 3,000,000 de pesos" } },
+      } },
+    } as unknown as ModduloProject);
+    mockStream.mockReturnValue(
+      streamConTexto(respuestaConJson("Listo.", { "xpcto.capacidades.financiero": "Presupuesto total estimado: 3,000,000 de pesos." })) as unknown as ReturnType<typeof anthropic.messages.stream>
+    );
+    const res = await POST(buildRequest({ message: "Toma el contenido del documento.", projectId: PROJECT_ID }), ctx("proposito"));
+    await res.text();
+    const escrito = mockAdminDb.snapshot()[`moddulo_projects/${PROJECT_ID}`] as Record<string, string>;
+    expect(escrito["xpcto.capacidades.financiero"]).toContain("3,000,000");
+  });
+
+  it("la clave `__action` y las claves fuera de los prefijos persistidos no se ven afectadas", async () => {
+    const { eventos } = await turno({ __action: "start_express", "investigacion.insightsClave": "Hallazgo con 87.3%" });
+    const extraido = eventos.find((e) => e.type === "extracted-data");
+    expect(extraido.extractedData.__action).toBe("start_express");
+    expect(extraido.extractedData["investigacion.insightsClave"]).toBe("Hallazgo con 87.3%");
   });
 });

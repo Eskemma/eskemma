@@ -1,52 +1,28 @@
-# Todo: 3 huecos de IDOR restantes (auditoría de patrones, 2026-09-18)
+# Todo: guards de integridad del chat de Moddulo (2026-09-18)
 
-Mismo patrón que el IDOR de Canal 1/Canal 3 (`lib/moddulo/storagePathAuth.ts`).
-No se toca lógica de negocio más allá del guard. NO se tocan:
-`notifications/route.ts`, `auth/find-user`, `test-admin`, `posts/[id]`.
+Base: forense sobre 11 proyectos reales (una sola cuenta de pruebas). B1
+(confirmación antes de `__action`) queda FUERA — sin evidencia; documentado
+en CLAUDE.md junto a la Regla de Oro #3.
 
-## Hallazgos verificados por lectura de código (no asumidos)
+## Task 1: reglas de prompt (cubre el hallazgo más frecuente)
+- [x] `lib/ai/phases/prompts.ts` — bloque "LÍMITES DE TU INFORMACIÓN" en
+  `MODDULO_BASE_IDENTITY` (heredado por las 9 fases): (a) sin acceso →
+  "no tengo ese dato en este momento", sin inventar causa técnica; (b) sin
+  presentar como verificado lo que no viene del contexto/usuario.
+- [x] `prompts.test.ts` (11): las reglas están en las 3 fases con chat y en las 9.
 
-- **H1** `f3/confirm/route.ts`: mismo flujo que Canal 1/3 — el `storagePath`
-  viene de `request-upload` (`moddulo/${uid}/${projectId}/f3/...`). El guard
-  existente aplica tal cual (`projectId` y `session.uid` en scope).
-- **H2** `chat/[phaseId]/route.ts`: `projectId` SÍ está en scope antes de
-  cualquier uso (línea 33; `getProject` en 43). El cliente (único: `ModduloChat.tsx:119`)
-  arma `moddulo/${uid}/${projectId}/fases/${phaseId}/attachments/...` →
-  el prefijo del guard existente aplica. PERO la estructura difiere: es un
-  ARREGLO (`attachments[]`), `storagePath` es OPCIONAL, y `extractTextPerFile`
-  cae a `fetch(attachment.url)` si falta. Un guard que solo valide el
-  `storagePath` "cuando viene" se salta omitiéndolo → hay que exigirlo.
-  Ajuste: helper nuevo que compone `esStoragePathDeUsuario` sobre el
-  arreglo, fail-closed (no-arreglo, elemento malformado o sin storagePath → false).
-- **H3** `pestel/project/route.ts` POST: `modduloProjectId` se usa en 4 sitios
-  (write-back del dedup, lectura del guard de conflicto, lectura de
-  `confirmReplace`, write-back final). Un solo `getProject(modduloProjectId,
-  session.uid)` temprano (copiado de `link-moddulo`) los cubre a todos.
+## Task 2: guard de grounding, versión tolerante a formato
+- [x] `lib/moddulo/extractedDataGrounding.ts` — determinista (justificado en
+  el archivo): cifras (miles/decimales, millones, MDP, palabras), fechas
+  (ISO/dd-mm-aa/texto/relativas/hoy), sumas-productos-conteos derivados.
+- [x] `route.ts` — descarta ANTES de emitir y de escribir; aviso al usuario;
+  respaldo = historial PERSISTIDO + adjuntos del turno + contexto inyectado +
+  borrador XPCTO / adjuntos de F2 guardados + confirmación corta.
+- [x] Tests: 42 unit (casos reales del forense + falsos positivos de formato)
+  + 6 de ruta. Mutación: 3 capas desactivadas → fallan 3/6/6 tests.
+- [x] Replay sobre las conversaciones reales (solo lectura).
 
-## Task 1: helper `sonAdjuntosDeUsuario` (para H2)
-- [ ] `lib/moddulo/storagePathAuth.ts` — compone `esStoragePathDeUsuario`
-- [ ] Acepta `unknown`; false si no es arreglo, si un elemento no es objeto
-  o si `storagePath` no es string que pase el guard
-
-## Task 2: H1 — `confirm/route.ts`
-- [ ] Guard tras validar campos requeridos, antes de `getProject` → 403
-
-## Task 3: H2 — `chat/[phaseId]/route.ts`
-- [ ] Guard tras validar `projectId`, antes de cualquier I/O → 403
-
-## Task 4: H3 — `pestel/project/route.ts` POST
-- [ ] `getProject(modduloProjectId, session.uid)` tras validar `tipo`,
-  antes del dedup → 404 (mismo status/mensaje que `link-moddulo`)
-
-## Task 5: pruebas de regresión (Vitest)
-- [ ] `confirm/route.test.ts`, `chat/[phaseId]/route.test.ts`,
-  `pestel/project/route.test.ts` — 401/400/403|404/200 por endpoint,
-  con assert de cero llamadas downstream en el camino de rechazo
-- [ ] Tests unitarios de `sonAdjuntosDeUsuario`
-
-## Task 6: verificación real (usuarios sintéticos, Firebase real, HTTP real
-del handler) para LOS 3 endpoints; script desechable, limpieza verificada
-
-## Task 7: check-docs-freshness + ¿CLAUDE.md/manifiesto?
-
-## Task 8: code-review-and-quality + tsc --noEmit + next build
+## Fuera de alcance (reportado, no forzado)
+- Omisión de un dato que el usuario sí dio (Kg5tOo, margen <5%).
+- Parafraseo sin cifras/fechas (p. ej. nombre de institución equivocado).
+- Dato ya contaminado en YgKs7M (~170,000): NO se toca sin confirmación.
