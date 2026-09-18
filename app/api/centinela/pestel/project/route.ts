@@ -6,6 +6,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getProject } from "@/lib/moddulo/project";
 import type { PESTELProject } from "@/types/pestel.types";
 
 export async function GET(request: NextRequest) {
@@ -63,6 +64,17 @@ export async function POST(request: NextRequest) {
   const validTypes = ["electoral", "gubernamental", "legislativo", "ciudadano"];
   if (!validTypes.includes(tipo)) {
     return NextResponse.json({ error: "tipo inválido" }, { status: 400 });
+  }
+
+  // Verify Moddulo project ownership BEFORE any use of modduloProjectId: the
+  // dedup write-back, the conflict reads and the final write-back below all
+  // read/write moddulo_projects/{modduloProjectId} via Admin SDK. Same check
+  // as link-moddulo/route.ts.
+  if (modduloProjectId) {
+    const modduloProject = await getProject(modduloProjectId, session.uid);
+    if (!modduloProject) {
+      return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
+    }
   }
 
   // Dedup: if a pestel_project with this modduloProjectId already exists, return it

@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# scripts/git-hooks/pre-push
+#
+# Primera pieza de automatización de pre-push del ecosistema Eskemma —
+# pensada como patrón a replicar en futuras apps (Sefix-AI, etc.).
+# git NO versiona .git/hooks/ de forma nativa, así que este archivo vive
+# aquí (trackeado) y se instala con `npm run install-hooks` (ver
+# package.json) — copia este archivo a .git/hooks/pre-push + chmod +x.
+# Correr install-hooks de nuevo tras editar este archivo para que el
+# cambio surta efecto.
+#
+# Orden y política de bloqueo (por diseño, no accidental):
+#   1. npm run test               → si falla, BLOQUEA el push (exit 1).
+#      Si este paso falla, los pasos 2 y 3 NO corren — no tiene sentido
+#      avisar sobre otras cosas si las pruebas ya están rotas.
+#   2. npm run check-docs-freshness → AVISA si CLAUDE.md quedó atrás del
+#      código, pero NUNCA bloquea el push por esto.
+#   3. Revisión de seguridad (ver nota abajo) → AVISA si encuentra algo,
+#      pero NUNCA bloquea el push por esto.
+#
+# Escape hatch para emergencias reales: `git push --no-verify` salta
+# este hook por completo. Limitación real de git, no de este script: si
+# usas --no-verify, este hook JAMÁS se ejecuta — no hay forma de que dé
+# aviso de que se usó, porque el proceso nunca corre. Lo documentamos
+# aquí y en el mensaje de bloqueo de abajo para que sea una vía de
+# escape conocida y visible, no un secreto — pero no puede dejar rastro
+# de que se usó desde un hook local.
+
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# ---------------------------------------------------------------------
+# Paso 0: calcular qué se va a subir realmente, a partir de los refs
+# que git pasa por stdin al hook (protocolo estándar de pre-push:
+# "<local ref> <local sha1> <remote ref> <remote sha1>" por línea).
+# Con varias líneas (push de varios refs a la vez) nos quedamos con el
+# rango de la ÚLTIMA — simplificación consciente para el caso normal de
+# este repo (un desarrollador, un push a la vez); documentada, no oculta.
+# ---------------------------------------------------------------------
+NULL_SHA="0000000000000000000000000000000000000000"
+RANGE=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  if [ "$local_sha" = "$NULL_SHA" ]; then
+    continue # borrando un ref remoto — nada que revisar
+  fi
+  if [ "$remote_sha" = "$NULL_SHA" ]; then
+    # Rama nueva sin historial remoto previo — comparar contra el
+    # merge-base con develop/main si existe, para no terminar
+    # revisando todo el historial del repo.
+    base="$(git merge-base "$local_sha" origin/develop 2>/dev/null || true)"
+    [ -z "$base" ] && base="$(git merge-base "$local_sha" origin/main 2>/dev/null || true)"
+    if [ -n "$base" ]; then
+      RANGE="${base}..${local_sha}"
+    else
+      RANGE="$local_sha"
+    fi
+  else
+    RANGE="${remote_sha}..${local_sha}"
+  fi
+done
+
+if [ -z "$RANGE" ]; then
+  echo "[pre-push] Nada que revisar (solo borrado de refs remotos)."
+  exit 0
+fi
+
+echo "[pre-push] Rango a revisar: $RANGE"
+echo ""
+
+# ---------------------------------------------------------------------
+# Paso 1 — Tests (Vitest). BLOQUEA el push si falla.
+# ---------------------------------------------------------------------
+echo "[pre-push] 1/3 — npm run test ..."
+if ! npm run test; then
+  echo ""
+  echo "❌ [pre-push] Las pruebas fallaron — push BLOQUEADO."
+  echo "   Corrige las pruebas antes de subir, o si es una emergencia real:"
+  echo "   git push --no-verify   (salta este hook por completo, sin aviso posterior)"
+  exit 1
+fi
+echo "✅ [pre-push] Tests OK."
+echo ""
+
+# ---------------------------------------------------------------------
+# Paso 2 — Frescura de CLAUDE.md vs. código (gap B). AVISA, no bloquea.
+# ---------------------------------------------------------------------
+echo "[pre-push] 2/3 — npm run check-docs-freshness ..."
+if ! npm run check-docs-freshness; then
+  echo ""
+  echo "⚠️  [pre-push] CLAUDE.md tiene secciones desactualizadas (detalle arriba)."
+  echo "   No bloquea el push — considera corregirlo en esta ronda o en la siguiente."
+else
+  echo "✅ [pre-push] CLAUDE.md al día."
+fi
+echo ""
+
+# ---------------------------------------------------------------------
+# Paso 3 — Revisión de seguridad del diff que se va a subir. AVISA, no
+# bloquea.
+#
+# NO invocamos el comando /security-review tal cual: su scoping por
+# defecto compara contra origin/HEAD, que en este repo es `main` — 89+
+# commits detrás de `develop` (confirmado en la evaluación de
+# herramientas de esta misma conversación). Correrlo así reproduciría
+# el mismo diff gigante (5.7MB, todo el backlog develop-vs-main) que
+# tuvimos que acotar a mano la primera vez que se corrió. En su lugar,
+# le pasamos a Claude Code el RANGO REAL que se va a subir, en modo no
+# interactivo (-p), con la misma metodología del skill (categorías de
+# vulnerabilidad, exclusiones de falsos positivos, formato de hallazgo).
+# ---------------------------------------------------------------------
+echo "[pre-push] 3/3 — revisión de seguridad del diff ($RANGE) ..."
+
+CLAUDE_BIN=""
+if command -v claude >/dev/null 2>&1; then
+  CLAUDE_BIN="claude"
+fi
+
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "⚠️  [pre-push] No se encontró 'claude' en el PATH — se usa 'npx' como respaldo"
+  echo "   (más lento la primera vez, resuelve el paquete desde el registro npm)."
+  CLAUDE_BIN="npx -y @anthropic-ai/claude-code"
+fi
+
+DIFF_CONTENT="$(git diff "$RANGE" 2>/dev/null)"
+if [ -z "$DIFF_CONTENT" ]; then
+  echo "•  [pre-push] Sin diff de código para revisar en este rango."
+else
+  SECURITY_PROMPT="Realiza una revisión de seguridad enfocada (misma metodología \
+del skill security-review: vulnerabilidades de alta confianza, sin ruido de DoS/rate-limiting/\
+secretos en disco, categorías de inyección/auth/crypto/exposición de datos) sobre el \
+siguiente diff, que está a punto de subirse a origin. Repórtalo en markdown, breve, \
+severidad + archivo:línea + descripción. Si no hay hallazgos con confianza >= 0.8, dilo \
+explícitamente en una línea y no generes una lista vacía con relleno.
+
+DIFF:
+$DIFF_CONTENT"
+
+  if ! $CLAUDE_BIN -p "$SECURITY_PROMPT" 2>&1; then
+    echo "⚠️  [pre-push] La revisión de seguridad no pudo completarse (ver arriba) — no bloquea el push."
+  fi
+fi
+
+echo ""
+echo "[pre-push] Listo — push continúa (pasos 2 y 3 son solo avisos)."
+exit 0

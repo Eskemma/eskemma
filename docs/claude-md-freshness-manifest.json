@@ -1,0 +1,70 @@
+{
+  "_readme": "Gap B — detector de frescura CLAUDE.md vs. código. Cada entrada declara una afirmación verificable de CLAUDE.md (localizada por texto de ancla, nunca por número de línea — los números se corren con cada edición del archivo) y las rutas de código que la respaldan. scripts/check-docs-freshness.ts compara la fecha del último commit que tocó la línea del ancla contra la fecha del último commit que tocó cada ruta; si el código es más reciente, marca la sección como desactualizada. Agregar una entrada nueva aquí cada vez que se escriba una afirmación de estado verificable en CLAUDE.md — no antes, no 'por si acaso'.",
+  "entries": [
+    {
+      "id": "sefix-modulo",
+      "anchor": "| `/sefix`",
+      "description": "Fila de Sefix en la tabla de módulos (## Qué es Eskemma)",
+      "paths": [
+        "app/sefix",
+        "app/api/sefix"
+      ]
+    },
+    {
+      "id": "pestel-e6",
+      "anchor": "| E6",
+      "description": "Estado de fases PESTEL — E6 Interpretación",
+      "paths": [
+        "app/centinela/pestel/[projectId]/interpretacion",
+        "app/components/centinela/pestel/interpretacion"
+      ]
+    },
+    {
+      "id": "pestel-e7",
+      "anchor": "| E7",
+      "description": "Estado de fases PESTEL — E7 Informes",
+      "paths": [
+        "app/centinela/pestel/[projectId]/informes",
+        "app/components/centinela/pestel/informes"
+      ]
+    },
+    {
+      "id": "pestel-e8",
+      "anchor": "| E8",
+      "description": "Estado de fases PESTEL — E8 Monitoreo",
+      "paths": [
+        "app/centinela/pestel/[projectId]/monitoreo",
+        "app/components/centinela/pestel/monitoreo"
+      ]
+    },
+    {
+      "id": "pestel-integracion-fontana",
+      "anchor": "Integración con Fontana",
+      "description": "Estado de fases PESTEL — integración con Fontana (Económico/Social/Ecológico)",
+      "paths": [
+        "lib/fontana/pestelInsumos.ts",
+        "lib/fontana/tabla/insumosPestel.ts",
+        "app/api/fontana/insumos-pestel"
+      ]
+    },
+    {
+      "id": "pestel-integracion-moddulo-f2",
+      "anchor": "Integración con Moddulo F2",
+      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración), marcada ⏳ Pendiente. Al construir el manifiesto encontré que SÍ existen rutas reales de integración (generate-m1-express genera un MapaPESTEL completo; import-pestel/find-linked-pestel/unlink-pestel vinculan proyectos PESTEL existentes) — no confirmé si esto satisface por completo lo que la fila describe, así que la dejo en el manifiesto para que el detector mismo lo señale con evidencia de fecha, en vez de que yo lo dé por hecho aquí.",
+      "paths": [
+        "app/api/moddulo/f2/generate-m1-express",
+        "app/api/moddulo/f2/import-pestel",
+        "app/api/moddulo/f2/find-linked-pestel",
+        "app/api/moddulo/f2/unlink-pestel"
+      ]
+    },
+    {
+      "id": "api-route-count",
+      "anchor": "API route handlers",
+      "description": "Conteo de route handlers en el árbol de Estructura del Proyecto (## Estructura del Proyecto). Verificable con: find app/api -name route.ts | wc -l. El detector solo compara fechas: si algo bajo app/api cambió después de esta línea, hay que recontar y actualizar el número.",
+      "paths": [
+        "app/api"
+      ]
+    }
+  ]
+}

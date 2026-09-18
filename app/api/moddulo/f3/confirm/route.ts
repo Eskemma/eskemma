@@ -11,6 +11,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
+import { esStoragePathDeUsuario } from "@/lib/moddulo/storagePathAuth";
 import type { MetadatosCargaManual, ResultadoCargaManual } from "@/types/f3.types";
 import type { CoberturaDeclarada } from "@/types/shared.types";
 
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
       { error: "projectId, resultadoId, storagePath, nombre, tipo, metadatosCarga, moduloPIP y cobertura son requeridos" },
       { status: 400 }
     );
+  }
+
+  if (!esStoragePathDeUsuario(storagePath, session.uid, projectId)) {
+    return NextResponse.json({ error: "storagePath no autorizado" }, { status: 403 });
   }
 
   const project = await getProject(projectId, session.uid);

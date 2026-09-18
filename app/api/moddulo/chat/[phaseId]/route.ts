@@ -6,6 +6,7 @@ import { getPhaseSystemPrompt } from "@/lib/ai/phases/prompts";
 import { appendChatMessage, getProject } from "@/lib/moddulo/project";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { extractTextPerFile, isExtractionError } from "@/lib/moddulo/attachments";
+import { sonAdjuntosDeUsuario } from "@/lib/moddulo/storagePathAuth";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PhaseId, ChatRequest, ChatAttachment, XPCTO, PIPItem, TareaPIP } from "@/types/moddulo.types";
@@ -37,6 +38,14 @@ export async function POST(
         { error: "message y projectId son requeridos" },
         { status: 400 }
       );
+    }
+
+    // Los adjuntos llegan del cliente y extractTextPerFile los lee con Admin
+    // SDK (bypasea storage.rules): cada uno debe traer un storagePath dentro
+    // de moddulo/${uid}/${projectId}/. Se exige también su presencia — sin
+    // storagePath, extractTextPerFile haría fetch(attachment.url).
+    if (attachments && attachments.length > 0 && !sonAdjuntosDeUsuario(attachments, session.uid, projectId)) {
+      return NextResponse.json({ error: "storagePath no autorizado" }, { status: 403 });
     }
 
     // Fetch project to get type and phase data for knowledge injection

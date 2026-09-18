@@ -51,6 +51,22 @@ catálogos sin verificarlo con una muestra real.
 
 ---
 
+## Frescura de este documento
+
+Antes de escribir la entrada del Historial de Sprints al cerrar cualquier
+ronda de trabajo, correr `npm run check-docs-freshness` — compara la
+fecha del código real contra la fecha de las secciones de este archivo
+que lo describen (manifiesto: `docs/claude-md-freshness-manifest.json`).
+Si marca algo, corregirlo antes de cerrar la ronda: pedirle a Claude Code
+que lea el código real de la ruta señalada y redacte la corrección de esa
+sección específica — mismo flujo ya usado con las filas de Sefix y PESTEL
+(incidente real, 26-09-15/17, brechas de 99 a 170 días sin detectar).
+Agregar una entrada al manifiesto cada vez que se escriba una afirmación
+de estado nueva y verificable (no para narrativa de "Historial de
+Sprints" o "Deuda Técnica", que ya llevan fecha propia por entrada).
+
+---
+
 ## Qué es Eskemma
 
 Plataforma SaaS de consultoría política con IA, orientada a consultores,
@@ -290,7 +306,7 @@ hasta que haya imagen OG corporativa diseñada.
 ```
 /
 ├── app/
-│   ├── api/                          # 39 API route handlers
+│   ├── api/                          # 142 API route handlers
 │   │   ├── auth/session/             # POST/DELETE/GET sesiones
 │   │   ├── moddulo/                  # CRUD proyectos + chat SSE
 │   │   └── centinela/pestel/        # config, feed, trigger, status
@@ -695,8 +711,35 @@ Ver `types/subscription.types.ts` → `PLAN_FEATURES` para detalles completos.
 1. Nunca hardcodear secrets. Usar `.env` (Next.js) o Firebase Secret Manager
    (Cloud Functions).
 2. Siempre verificar sesión en API routes con `getSessionFromRequest()`.
-3. Siempre validar que el `userId` del token coincide con el recurso
-   solicitado antes de retornar datos.
+3. Todo identificador que llegue del cliente (`storagePath`, `projectId`,
+   `resultadoId`, ids de sesión/análisis, urls) y se use con el Admin SDK
+   (Firestore o Storage) debe validarse contra `session.uid` **antes de
+   usarse**, tanto para LEER como para ESCRIBIR. El Admin SDK ignora
+   `firestore.rules` y `storage.rules`: el endpoint es la única barrera.
+   No basta con que el usuario esté autenticado. Guards existentes
+   (`lib/moddulo/storagePathAuth.ts`, `lib/moddulo/project.ts`):
+   - `esStoragePathDeUsuario(path, uid, projectId)` — un solo `storagePath`.
+   - `sonAdjuntosDeUsuario(adjuntos, uid, projectId)` — arreglos de adjuntos
+     (fail-closed: exige `storagePath` en cada elemento).
+   - `getProject(id, session.uid)` — proyecto Moddulo (null si `uid` no es
+     colaborador); obligatorio antes de leer o escribir
+     `moddulo_projects/{id}` con un id del body.
+   - `esUrlDeDescargaDelBucket(url, bucket)` — allow-list para cualquier
+     `fetch` servidor de una url recibida o persistida desde el cliente
+     (anti-SSRF; solo urls de descarga de nuestro bucket).
+   Incidente real (26-09-15/18): IDOR de `storagePath` en F3
+   (`canal1/entregar`, `canal3/vincular`, `confirm`), en los adjuntos del
+   chat de Moddulo y en `POST /centinela/pestel/project` (escritura
+   cross-tenant vía `modduloProjectId`), más un SSRF encadenado por la
+   `url` persistida en `archivosAdjuntos`.
+   **Política de roles pendiente (no corregida a propósito):** hoy cualquier
+   colaborador de un proyecto Moddulo, incluido el rol `client`, puede
+   vincularlo (`getProject` no distingue rol) — permisivo por diseño hasta
+   definir el plan "colaborativo". Además `import-moddulo-attachments`
+   compara `role === "owner" || "editor"`, pero `CollaboratorRole` es
+   `"owner" | "co-consultant" | "analyst" | "client"`: `"editor"` no existe,
+   así que en la práctica solo el `owner` pasa. Resolver ambos juntos al
+   diseñar los permisos del plan colaborativo.
 4. Nunca `dangerouslySetInnerHTML` sin sanitizar con DOMPurify.
 5. Las cookies de sesión son HTTP-only — nunca accederlas desde JS cliente.
 6. Nunca ejecutar comandos que impriman valores de variables de entorno o
@@ -741,8 +784,20 @@ BANXICO_TOKEN
 ## Comandos Frecuentes
 
 ```bash
+# Después de clonar el repo (una sola vez) — instala el hook de pre-push
+# (tests + frescura de CLAUDE.md + revisión de seguridad del diff, ver
+# scripts/git-hooks/pre-push). Sin Husky deliberadamente — un solo
+# desarrollador, un solo hook, no justifica la dependencia.
+npm run install-hooks
+
 # Desarrollo local
 npm run dev
+
+# Pruebas
+npm run test
+
+# Frescura de CLAUDE.md vs. código real
+npm run check-docs-freshness
 
 # Firestore + Storage rules
 firebase deploy --only firestore:rules

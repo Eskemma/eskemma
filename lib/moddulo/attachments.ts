@@ -9,6 +9,7 @@
 
 import { anthropic } from "@/lib/ai/claude";
 import { adminStorage } from "@/lib/firebase-admin";
+import { esUrlDeDescargaDelBucket } from "@/lib/moddulo/storagePathAuth";
 import type { ChatAttachment } from "@/types/moddulo.types";
 
 const CLAUDE_MODEL = "claude-sonnet-4-6";
@@ -187,7 +188,19 @@ export async function extractTextPerFile(attachment: ChatAttachment): Promise<st
       return `[No se pudo acceder a ${attachment.nombre}]`;
     }
   } else {
-    const res = await fetch(attachment.url);
+    // La url puede venir persistida del cliente: solo se descarga si es una
+    // url de descarga de nuestro bucket (anti-SSRF, ver storagePathAuth.ts) y
+    // sin seguir redirects (una url válida no debe poder saltar a otro host).
+    if (!esUrlDeDescargaDelBucket(attachment.url, process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)) {
+      console.warn(`[attachments] url de adjunto rechazada (fuera del bucket): ${attachment.nombre}`);
+      return `[No se pudo acceder a ${attachment.nombre}]`;
+    }
+    let res: Response;
+    try {
+      res = await fetch(attachment.url, { redirect: "error" });
+    } catch {
+      return `[No se pudo acceder a ${attachment.nombre}]`;
+    }
     if (!res.ok) return `[No se pudo acceder a ${attachment.nombre}]`;
     buffer = Buffer.from(await res.arrayBuffer());
   }

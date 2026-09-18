@@ -59,6 +59,13 @@ yarn-error.log*
 *.sublime-project
 *.sublime-workspace
 
+# Claude Code — estado local/personal, no del equipo (permisos propios,
+# worktrees transitorios de git). .claude/skills/ y .agents/ SÍ se
+# versionan — son las skills adoptadas (code-review-and-quality,
+# planning-and-task-breakdown).
+.claude/settings.local.json
+.claude/worktrees/
+
 # Linting and Formatting
 .eslintcache
 .stylelintcache
