@@ -26,6 +26,7 @@ import { createInterface } from "readline";
 import { initializeApp, cert, App } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import dotenv from "dotenv";
+import { claveAlmacenamiento } from "../lib/geo/estados";
 
 // Load .env from project root
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -133,13 +134,11 @@ function initFirebase(): App {
 // ──────────────────────────────────────────────
 // Normalize entidad name → Storage key
 // ──────────────────────────────────────────────
+// Misma función que usa el runtime (lib/sefix/storage.ts → toStorageKey):
+// la clave que este script ESCRIBE en Storage y la que la app LEE salen de
+// lib/geo/estados.ts (claveAlmacenamiento) — nunca una copia que pueda divergir.
 function toStorageKey(entidad: string): string {
-  if (entidad === EXTRANJERO_KEY) return EXTRANJERO_KEY;
-  return entidad
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^A-Z0-9_]/g, "");
+  return claveAlmacenamiento(entidad);
 }
 
 // ──────────────────────────────────────────────

@@ -18,9 +18,8 @@
 
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
 import { resolverIndicadorIter, resolverNacionalIter } from "@/lib/fontana/ingesta/iter";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import { esValorDisponible } from "@/lib/fontana/ingesta/types";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -82,10 +81,6 @@ interface RemesaCache {
 
 interface BanxicoDatosResponse {
   bmx?: { series?: Array<{ datos?: Array<{ fecha: string; dato: string }> }> };
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 async function fetchRemesasSerie(serieId: string): Promise<{ remesasMillonesUsd: number; fecha: string } | null> {

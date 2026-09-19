@@ -23,10 +23,10 @@
 // CVE de un catálogo con datos indexados por el CVE del otro.
 
 import { readFromBodega } from "@/lib/fontana/bodegaStorage";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import { sumarConteo } from "@/lib/fontana/ingesta/nacionalAgregado";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { NivelFontanaF1, ValorIndicadorFontana, CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -59,10 +59,6 @@ interface PiramideRecord {
 interface UrbanoRuralRecord {
   urbano: number;
   rural: number;
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 function resolverNombreMunicipio(territorio: Territorio): string | undefined {

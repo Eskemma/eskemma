@@ -63,6 +63,7 @@ import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_CONEVAL_POBREZA = "CONEVAL (Medición de la pobreza 2020)";
 export const FUENTE_ETIQUETA_CONEVAL_IRS = "CONEVAL (Índice de Rezago Social 2020)";
@@ -274,10 +275,6 @@ async function cargarRezagoSocial(): Promise<CacheRezagoSocial> {
   } finally {
     enVueloRezagoSocial = null;
   }
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 // Reverso de ESTADO_CVE_MAP — mismo patrón ya usado en eceg.ts/conapoMarginacion.ts.

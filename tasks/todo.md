@@ -1,28 +1,26 @@
-# Todo: guards de integridad del chat de Moddulo (2026-09-18)
+# Todo: helper geográfico único (2026-09-19)
 
-Base: forense sobre 11 proyectos reales (una sola cuenta de pruebas). B1
-(confirmación antes de `__action`) queda FUERA — sin evidencia; documentado
-en CLAUDE.md junto a la Regla de Oro #3.
+Base: diagnóstico 2026-09-18/19 (4 fallos reales confirmados con datos reales).
+Fuera de alcance (anotado en CLAUDE.md): guard de sincronización con la copia de
+CF, canónico formal de distritos, desambiguación de texto libre ("México").
 
-## Task 1: reglas de prompt (cubre el hallazgo más frecuente)
-- [x] `lib/ai/phases/prompts.ts` — bloque "LÍMITES DE TU INFORMACIÓN" en
-  `MODDULO_BASE_IDENTITY` (heredado por las 9 fases): (a) sin acceso →
-  "no tengo ese dato en este momento", sin inventar causa técnica; (b) sin
-  presentar como verificado lo que no viene del contexto/usuario.
-- [x] `prompts.test.ts` (11): las reglas están en las 3 fases con chat y en las 9.
-
-## Task 2: guard de grounding, versión tolerante a formato
-- [x] `lib/moddulo/extractedDataGrounding.ts` — determinista (justificado en
-  el archivo): cifras (miles/decimales, millones, MDP, palabras), fechas
-  (ISO/dd-mm-aa/texto/relativas/hoy), sumas-productos-conteos derivados.
-- [x] `route.ts` — descarta ANTES de emitir y de escribir; aviso al usuario;
-  respaldo = historial PERSISTIDO + adjuntos del turno + contexto inyectado +
-  borrador XPCTO / adjuntos de F2 guardados + confirmación corta.
-- [x] Tests: 42 unit (casos reales del forense + falsos positivos de formato)
-  + 6 de ruta. Mutación: 3 capas desactivadas → fallan 3/6/6 tests.
-- [x] Replay sobre las conversaciones reales (solo lectura).
-
-## Fuera de alcance (reportado, no forzado)
-- Omisión de un dato que el usuario sí dio (Kg5tOo, margen <5%).
-- Parafraseo sin cifras/fechas (p. ej. nombre de institución equivocado).
-- Dato ya contaminado en YgKs7M (~170,000): NO se toca sin confirmación.
+- [x] Paso 0 — investigación de "alcance nacional" (enum `nivel:"nacional"`, estado
+  vacío/"Nacional"/"NACIONAL" en Sefix, clave `NACIONAL` en ENIGH, `nombre`=país
+  "México" en territorios nacionales). Centinela: `resolverEstado("Nacional")` →
+  unión discriminada `esNacional`; vacío NO es nacional en el helper compartido.
+- [x] Paso 1 — `lib/geo/normalizacionGeografica.test.ts`: 18 tests fallaban contra
+  el código anterior (4 bloques), 10 controles pasaban.
+- [x] Paso 2 — `getPadronByGeo` compara por `claveComparacionMunicipio` (canónico +
+  plegado Ñ/Ü). Sin coincidencia → cae al estatal DECLARADO (justificado abajo).
+- [x] Paso 3 — `matchDistrito` compara por clave interna (sin acentos).
+- [x] Paso 4 — `lib/geo/estados.ts` (`resolverEstado`, `resolverEstadoCve`,
+  `esAlcanceNacional`, `claveAlmacenamiento`, catálogo); reemplaza 15 copias de
+  `resolveEstadoCve`, `resolveEstadoName`, `getCveEntidad`; `ESTADO_CVE_MAP` se
+  deriva del catálogo. Copia de CF: solo verificada (divergencias en test).
+- [x] Paso 5 — `toStorageKey` normaliza por dentro; `out_pregenerate-sefix.ts` usa
+  la misma función.
+- [x] Display — `lib/geo/display.ts` (distrito con prefijo/MAYÚSCULAS; estado y
+  municipio sin prefijo, con acentos donde la fuente los tiene).
+- [x] Extra (hallazgo de la verificación real): `getPadronByEstado` devolvía null
+  para los 4 estados con nombre DERFE distinto (MEXICO, COAHUILA DE ZARAGOZA,
+  MICHOACAN DE OCAMPO, VERACRUZ DE IGNACIO DE LA LLAVE).

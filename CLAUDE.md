@@ -212,6 +212,80 @@ en la fuente compartida.
 
 ---
 
+## Geografía compartida — `lib/geo/` (normalización de nombres)
+
+**Punto único para resolver/normalizar nombres geográficos en TODO el ecosistema**
+(Sefix, Fontana, PESTEL, Moddulo y apps futuras). Módulos puros (sin firebase/red):
+`lib/geo/municipioCanonico.ts` (municipios), `lib/geo/estados.ts` (estados),
+`lib/geo/display.ts` (nombre a mostrar). **Antes de escribir cualquier
+`.normalize("NFD")`/`toUpperCase()` sobre un nombre de estado/municipio/distrito,
+usar estos** — el diagnóstico del 2026-09-19 encontró ~18 implementaciones que
+discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estatal,
+`matchDistrito` fallaba con "Tonalá", 4 resolvers de estado contradiciéndose,
+`toStorageKey("Jalisco")` → `"J"`). Tests: `lib/geo/normalizacionGeografica.test.ts`.
+
+**Dos representaciones del mismo dato — nunca colapsadas en una función:**
+- **Clave interna** (comparar/unir/nombrar archivos): MAYÚSCULAS, sin acentos,
+  Ñ/Ü conservadas — `normalizeGeoName`, `claveCanonicaMunicipio(estadoCve, nombre)`,
+  `resolverEstado(x).clave`, `claveAlmacenamiento(x)`.
+- **Nombre a mostrar** (`lib/geo/display.ts`, `nombreEstadoDisplay`):
+  - Distrito electoral → prefijo + cabecera en MAYÚSCULAS sin acento:
+    `"1405 PUERTO VALLARTA"`, `"3103 MERIDA"` (`nombreDistritoDisplay`). El
+    prefijo desambigua cabeceras compartidas (Mérida ×3, Tonalá y Zapopan ×2).
+  - Estado/municipio/ciudad → sin prefijo, capitalización normal, CON acentos:
+    `"Puerto Vallarta"`, `"Michoacán"` (no "…de Ocampo"), `"Veracruz"`,
+    `"Estado de México"`. Los acentos de un municipio NO se pueden inventar: el
+    topojson INE y el padrón DERFE vienen en MAYÚSCULAS sin acentos (2,477/2,477)
+    — `nombreMunicipioDisplay` conserva acentos si el nombre ya los trae y lo
+    declara (`conAcentosGarantizados`) si no.
+
+**Reglas de producto (codificadas, no reinterpretar):**
+- `resolverEstado("México")` → **Estado de México (CVE 15)** (igual que la copia de
+  Cloud Functions y las fuentes DERFE/SESNSP/ENIGH). El PAÍS "México" (selector de
+  país del proyecto, `territorio.pais`, y el `nombre` de un territorio de nivel
+  `"nacional"`) es un contexto aparte: **nunca** pasar `territorio.pais`/`nombre` de
+  un territorio nacional a estas funciones. Verificado 2026-09-19: hoy ningún camino
+  lo hace (los resolvers reciben `territorio.estado`, `undefined` en nacional).
+- **Alcance nacional:** el enum `nivel: "nacional"` sigue siendo la fuente
+  estructural. Para un TEXTO de estado: `resolverEstado("Nacional")` →
+  `{ esNacional: true, cve: null, clave: "NACIONAL", nombre: "Nacional" }` (unión
+  discriminada: nunca un CVE inventado). Vacío/`undefined` **no** es nacional en el
+  helper compartido — Sefix lo trata como nacional en su borde
+  (`!estadoInput || esAlcanceNacional(estadoInput)`); los adaptadores de Fontana
+  como "sin estado". No confundir con el `ámbito: "nacional" | "extranjero"` de
+  Sefix (voto en el extranjero — otro concepto).
+- Resolución de municipio: siempre `claveCanonicaMunicipio` (alias verificados,
+  nunca reglas genéricas de prefijo — ver `claves-geograficas-no-confiables.md`).
+
+**Pendientes registrados (no perder de vista):**
+- **Desambiguación de texto libre/dictado** ("dame la votación en México" — ¿país o
+  Estado de México según el resto de la frase?). NO se resuelve en este helper: es
+  interpretación conversacional, no normalización de catálogos estructurados.
+  Candidato natural: el trabajo de Sefix-AI (T06). Por eso
+  `lib/fontana/geo/resolverTerritorioNombre.ts` (nombres dichos por el usuario en el
+  chat de Fontana) sigue usando `ESTADO_CVE_MAP` directo y NO resuelve "México" a estado.
+- **Guard de sincronización con la copia de Cloud Functions**
+  (`functions/src/utils/estadoCveMap.ts`, no puede importar de `lib/`). Divergencias
+  conocidas hoy (test `lib/geo/estados.test.ts`): CDMX/DF, nombres oficiales largos,
+  espacios de más, `nuevo_leon`.
+- **Canónico formal de distritos.** `matchDistrito` devuelve la PRIMERA opción cuando
+  varios distritos comparten cabecera sin `cve_distrito` (Tonalá 1407/1420, Zapopan
+  1404/1410, Mérida ×3) — comportamiento previo, no corregido.
+- **32 resoluciones inline restantes** de estado (`ESTADO_CVE_MAP[normalizeGeoName(x)]`
+  en adaptadores de Fontana, `lib/fontana/tabla/`, rutas `app/api/fontana/**`); un
+  ratchet en `lib/geo/estados.test.ts` impide que aparezcan nuevas. Migrarlas a
+  `resolverEstadoCve` es mecánico pero toca ~17 archivos.
+- Otros normalizadores propios sin migrar: `exploracion/page.tsx`
+  (`normalizeParaAbrev`, `detectEstadoFromXpcto`, `ESTADOS_ABREV`),
+  `TerritorySelector.tsx` (`normalizarParaComparar`), `territorioHeuristicas.ts`,
+  `SemanalView.tsx` (`normalizeEntidadKey`), y la comparación de municipio de
+  resultados locales en `lib/sefix/storage.ts` (~`:2752`/`:2800`, mismo defecto que
+  tenía el padrón: igualdad exacta sin alias).
+- Restaurar acentos de municipios para display: ningún catálogo estructurado actual
+  los conserva (el ITER solo trae la clave canónica).
+
+---
+
 ## Nomenclatura — pestaña de lienzo/Canvas de apps del ecosistema
 
 **Convención de naming a seguir en toda app del catálogo MMEE que tenga una pestaña

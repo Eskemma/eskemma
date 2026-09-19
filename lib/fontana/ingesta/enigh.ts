@@ -58,6 +58,7 @@ import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_ENIGH = "INEGI (ENIGH 2024, tabulados por entidad federativa)";
 
@@ -207,10 +208,6 @@ async function cargarEnigh(): Promise<CacheEnigh> {
   } finally {
     enVuelo = null;
   }
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 const CVE_ESTADO_NOMBRE: Record<string, string> = Object.fromEntries(

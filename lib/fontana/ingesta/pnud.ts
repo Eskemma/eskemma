@@ -55,7 +55,6 @@
 // aviso. Fecha de verificación: 2026-08-10.
 
 import * as XLSX from "xlsx";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import type { Territorio } from "@/types/shared.types";
@@ -63,6 +62,7 @@ import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_PNUD_IDH = "PNUD México (IDH municipal 2010-2020)";
 export const FUENTE_ETIQUETA_PNUD_SE = "PNUD México (Sub-índice Educación municipal 2020)";
@@ -232,10 +232,6 @@ async function cargarPnud(): Promise<CachePnud> {
   } finally {
     enVuelo = null;
   }
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 // Bug real encontrado en revisión de consistencia (Incremento 4,

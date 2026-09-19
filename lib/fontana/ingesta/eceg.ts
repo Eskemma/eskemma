@@ -22,13 +22,7 @@
 import { ECEG_INDICATOR_MAP } from "@/lib/sefix/ecegConstants";
 import { buildEcegStoragePath, fetchEcegFromStorage, type EcegNivel } from "@/lib/sefix/ecegStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import {
-  resolveMunicipioCve,
-  normalizeGeoName,
-  getMunicipiosOptions,
-  getMunicipiosOptionsNacional,
-  type GeoOptionNacional,
-} from "@/lib/geo/municipios";
+import { resolveMunicipioCve, getMunicipiosOptions, getMunicipiosOptionsNacional, type GeoOptionNacional } from "@/lib/geo/municipios";
 import {
   getDistritosFederalesOptions,
   getDistritosLocalesOptions,
@@ -44,6 +38,7 @@ import {
   calcularPorcentaje,
   promedioPonderado,
 } from "@/lib/fontana/ingesta/nacionalAgregado";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
@@ -107,10 +102,6 @@ function resolverDenominador(registro: Record<string, number>, denominadorKey: s
 
 export const MOTIVO_CONECTOR_PENDIENTE =
   "Conector pendiente — disponible en el siguiente incremento de Fontana";
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
-}
 
 // Regresa hasta 4 celdas (nacional, estatal, distrital, municipal) —
 // nunca una celda vacía sin motivo, mismo criterio ya fijado en la

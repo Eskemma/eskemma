@@ -30,6 +30,7 @@ import * as XLSX from "xlsx";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
@@ -137,10 +138,6 @@ async function cargarMarginacion(): Promise<CacheMarginacion> {
 function wbMunicipioSheet(buf: Buffer) {
   const wb = XLSX.read(buf, { type: "buffer" });
   return wb.Sheets["IMM_2020"] ?? wb.Sheets[wb.SheetNames[1]];
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 // Reverso de ESTADO_CVE_MAP — mismo patrón ya usado en eceg.ts (cada

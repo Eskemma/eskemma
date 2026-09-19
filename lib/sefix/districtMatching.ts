@@ -4,17 +4,25 @@
 // No async — callers are responsible for pre-fetching GeoEleccionesOpcion[].
 
 import type { GeoEleccionesOpcion } from "./storage";
+import { normalizeGeoName, plegarDiacriticosGeo } from "@/lib/geo/municipioCanonico";
+
+// Comparación por CLAVE INTERNA (MAYÚSCULAS, sin acentos; Ñ/Ü plegadas para
+// tolerar "Zuniga"/"Zuñiga"): los nombres de cabecera de Sefix vienen sin
+// acentos ("1407 TONALA"), pero el texto del wizard trae los del usuario
+// ("Tonalá"). El nombre que se DEVUELVE es el de la opción (formato de display
+// de distrito: prefijo + cabecera en MAYÚSCULAS sin acento).
+const clave = (s: string) => plegarDiacriticosGeo(normalizeGeoName(s)).trim();
 
 export function matchDistrito(
   opciones: GeoEleccionesOpcion[],
   territorio: { nombre?: string | null; cve_distrito?: string | null }
 ): string | null {
-  const nombreLower = territorio.nombre?.trim().toLowerCase();
+  const nombreClave = territorio.nombre ? clave(territorio.nombre) : "";
 
   // Strategy 1: exact name match
-  if (nombreLower) {
+  if (nombreClave) {
     const byName = opciones.find(
-      (o) => o.nombre?.trim().toLowerCase() === nombreLower
+      (o) => o.nombre && clave(o.nombre) === nombreClave
     );
     if (byName) return byName.nombre;
   }
@@ -29,12 +37,12 @@ export function matchDistrito(
   // territorio.nombre from the wizard is a full descriptive string like:
   // "Jalisco › Distrito Electoral Federal V con cabecera en Puerto Vallarta, ..."
   // opcion.nombre from the CSV is "{nationalCode} {CITY}" e.g. "1405 PUERTO VALLARTA"
-  if (nombreLower) {
-    const cabeceraMatch = nombreLower.match(/con cabecera en ([^,]+)/);
+  if (nombreClave) {
+    const cabeceraMatch = nombreClave.match(/CON CABECERA EN ([^,]+)/);
     if (cabeceraMatch) {
       const extractedCity = cabeceraMatch[1].trim();
       const byCity = opciones.find((o) => {
-        const cityPart = o.nombre.replace(/^\d+\s+/, "").trim().toLowerCase();
+        const cityPart = clave(o.nombre.replace(/^\d+\s+/, ""));
         return cityPart === extractedCity;
       });
       if (byCity) return byCity.nombre;

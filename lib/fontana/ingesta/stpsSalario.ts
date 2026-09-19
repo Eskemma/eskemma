@@ -45,7 +45,7 @@
 // municipal, STPS no publica este cubo a ese nivel.
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
@@ -117,10 +117,6 @@ async function cargarStpsSalario(): Promise<CacheStpsSalario> {
   } finally {
     enVuelo = null;
   }
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 const CVE_ESTADO_NOMBRE: Record<string, string> = Object.fromEntries(

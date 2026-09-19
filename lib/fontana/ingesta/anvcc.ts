@@ -54,9 +54,9 @@
 // confirmando que la numeración de ANVCC tampoco es intercambiable 1:1
 // con la de Sefix/INE).
 
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
@@ -149,10 +149,6 @@ async function cargarAnvcc(): Promise<CacheAnvcc> {
   } finally {
     enVuelo = null;
   }
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 // Reutilizado por el wrapper de F5-7 (sun.ts) en index.ts — SUN indexa

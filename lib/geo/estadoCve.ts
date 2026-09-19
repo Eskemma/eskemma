@@ -10,12 +10,9 @@
 // Functions, no importable desde el resto del proyecto — esa copia sigue
 // siendo necesaria y no se toca).
 
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 
+/** @deprecated Delegado — usar `resolverEstadoCve` (lib/geo/estados.ts). Se conserva por los importadores existentes. */
 export function getCveEntidad(estadoNombre: string): string | null {
-  const normalized = estadoNombre
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return ESTADO_CVE_MAP[normalized] ?? null;
+  return resolverEstadoCve(estadoNombre);
 }

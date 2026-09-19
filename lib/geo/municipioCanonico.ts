@@ -149,3 +149,16 @@ export function claveCanonicaMunicipio(estadoCve: string, nombre: string): strin
   const normalizado = normalizarNombreMunicipio(nombre);
   return ALIAS_MUNICIPIO[estadoCve]?.[normalizado] ?? normalizado;
 }
+
+// Forma de COMPARACIÓN tolerante (no de join): la clave canónica conserva Ñ/Ü
+// a propósito (así están los catálogos: "TLAJOMULCO DE ZUÑIGA"), pero quien
+// escribe el nombre sin ñ ("Zuniga") no debería perder el match. Se aplica en
+// AMBOS lados de una comparación puntual; las llaves de los mapas (joins de
+// pipelines) siguen siendo `claveCanonicaMunicipio` a secas.
+export function plegarDiacriticosGeo(s: string): string {
+  return s.replace(/Ñ/g, "N").replace(/Ü/g, "U");
+}
+
+export function claveComparacionMunicipio(estadoCve: string, nombre: string): string {
+  return plegarDiacriticosGeo(claveCanonicaMunicipio(estadoCve, nombre));
+}

@@ -4,6 +4,8 @@ import { adminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { createInterface } from "readline";
 import { PARTIDOS_MAPPING } from "@/lib/sefix/eleccionesConstants";
+import { ESTADOS, resolverEstado, resolverEstadoCve, esAlcanceNacional, claveAlmacenamiento } from "@/lib/geo/estados";
+import { claveComparacionMunicipio } from "@/lib/geo/municipioCanonico";
 import { PARTIDOS_MAPPING_LOC } from "@/lib/sefix/eleccionesLocalesConstants";
 import type { NivelTerritorial } from "@/types/pestel.types";
 
@@ -186,6 +188,17 @@ function toDerfeNombre(nombre: string): string {
 }
 
 /**
+ * ¿La fila del CSV DERFE es de este estado? El CSV llama al Estado de México
+ * "MEXICO" y a 3 estados por su nombre constitucional largo (Coahuila de
+ * Zaragoza, Michoacán de Ocampo, Veracruz de Ignacio de la Llave); aceptamos
+ * la clave interna y el nombre DERFE. Sin esto, getPadronByEstado devolvía
+ * null para esos 4 estados (verificado con datos reales, 2026-09-19).
+ */
+function esEntidadDerfe(nombreEntidadFila: string | undefined, estadoClave: string): boolean {
+  return nombreEntidadFila === estadoClave || nombreEntidadFila === toDerfeNombre(estadoClave);
+}
+
+/**
  * Maps UI state name to the estado value used in electoral result CSVs (pef_dip/sen/pdte).
  * Only ESTADO DE MEXICO needs remapping (CSV stores "MEXICO").
  * Coahuila/Michoacán/Veracruz are stored with their short UI names in electoral CSVs,
@@ -196,55 +209,16 @@ function toElectoralEstado(nombre: string): string {
   return nombre;
 }
 
-const ESTADO_MAP: Record<string, string> = {
-  aguascalientes: "AGUASCALIENTES",
-  baja_california: "BAJA CALIFORNIA",
-  baja_california_sur: "BAJA CALIFORNIA SUR",
-  campeche: "CAMPECHE",
-  chiapas: "CHIAPAS",
-  chihuahua: "CHIHUAHUA",
-  coahuila: "COAHUILA",
-  colima: "COLIMA",
-  cdmx: "CIUDAD DE MEXICO",
-  ciudad_de_mexico: "CIUDAD DE MEXICO",
-  df: "CIUDAD DE MEXICO",
-  durango: "DURANGO",
-  estado_de_mexico: "ESTADO DE MEXICO",
-  edomex: "ESTADO DE MEXICO",
-  guanajuato: "GUANAJUATO",
-  guerrero: "GUERRERO",
-  hidalgo: "HIDALGO",
-  jalisco: "JALISCO",
-  michoacan: "MICHOACAN",
-  morelos: "MORELOS",
-  nayarit: "NAYARIT",
-  nuevo_leon: "NUEVO LEON",
-  oaxaca: "OAXACA",
-  puebla: "PUEBLA",
-  queretaro: "QUERETARO",
-  quintana_roo: "QUINTANA ROO",
-  san_luis_potosi: "SAN LUIS POTOSI",
-  sinaloa: "SINALOA",
-  sonora: "SONORA",
-  tabasco: "TABASCO",
-  tamaulipas: "TAMAULIPAS",
-  tlaxcala: "TLAXCALA",
-  veracruz: "VERACRUZ",
-  yucatan: "YUCATAN",
-  zacatecas: "ZACATECAS",
-};
-
-export function normalizeEstado(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
-}
-
+// Resolución de nombre de estado: UNA sola implementación en lib/geo/estados.ts
+// (antes: ESTADO_MAP + normalizeEstado propios, que discrepaban del resto del
+// ecosistema para "México", los nombres oficiales largos y las entradas con
+// espacios). Devuelve la clave interna del estado ("ESTADO DE MEXICO",
+// "NUEVO LEON"…) o null; "Nacional" NO es un estado y devuelve null — cada
+// llamador decide el alcance nacional en su borde (`!estadoInput ||
+// esAlcanceNacional(estadoInput)`).
 export function resolveEstadoName(input: string): string | null {
-  return ESTADO_MAP[normalizeEstado(input)] ?? null;
+  const r = resolverEstado(input);
+  return r && !r.esNacional ? r.clave : null;
 }
 
 // ==========================================
@@ -293,7 +267,7 @@ export async function getResultadosByEstado(
   anioInput?: number
 ): Promise<ResultadosEstado | null> {
   // Empty string or "nacional" → aggregate all states
-  const isNacional = !estadoInput || estadoInput.toLowerCase() === "nacional";
+  const isNacional = !estadoInput || esAlcanceNacional(estadoInput);
   const estadoNombre = isNacional ? null : resolveEstadoName(estadoInput);
   if (!isNacional && !estadoNombre) return null;
 
@@ -464,7 +438,7 @@ export async function getPadronByEstado(
   if (isSemanal) {
     // Semanal _sexo: nombre_entidad, padron_hombres, padron_mujeres, padron_no_binario, padron_electoral, lista_hombres, lista_mujeres, lista_no_binario, lista_nominal
     await streamCsvRows(targetPath, (row) => {
-      if (row.nombre_entidad !== estadoNombre) return;
+      if (!esEntidadDerfe(row.nombre_entidad, estadoNombre)) return;
       padronElectoral      += parseInt(row.padron_electoral  ?? "0") || 0;
       listaNominal         += parseInt(row.lista_nominal     ?? "0") || 0;
       padronHombres        += parseInt(row.padron_hombres    ?? "0") || 0;
@@ -476,7 +450,7 @@ export async function getPadronByEstado(
   } else {
     // Histórico _base: nombre_entidad, padron_nacional_hombres, padron_nacional_mujeres, padron_nacional_no_binario, padron_nacional, lista_nacional, lista_nacional_hombres, lista_nacional_mujeres
     await streamCsvRows(targetPath, (row) => {
-      if (row.nombre_entidad !== estadoNombre) return;
+      if (!esEntidadDerfe(row.nombre_entidad, estadoNombre)) return;
       padronElectoral     += parseInt(row.padron_nacional          ?? "0") || 0;
       listaNominal        += parseInt(row.lista_nacional           ?? "0") || 0;
       padronHombres       += parseInt(row.padron_nacional_hombres  ?? "0") || 0;
@@ -809,15 +783,12 @@ const entidadAnualMemCache = new Map<string, EntidadAnualCache>();
  * Convierte nombre de entidad DERFE al key usado en Storage.
  * "ESTADO DE MEXICO" (DERFE: "MEXICO") → "MEXICO"
  * "JALISCO" → "JALISCO"
- * Espacios → _, quita acentos.
+ * Espacios → _, quita acentos. Normaliza internamente (mayúsculas incluidas):
+ * la lógica vive en lib/geo/estados.ts (`claveAlmacenamiento`) para que los
+ * scripts de pregenerate escriban EXACTAMENTE las claves que este runtime lee.
  */
 export function toStorageKey(derfeNombre: string): string {
-  if (derfeNombre === "__EXTRANJERO__") return "__EXTRANJERO__";
-  return derfeNombre
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^A-Z0-9_]/g, "");
+  return claveAlmacenamiento(derfeNombre);
 }
 
 /** Descarga el archivo anual de una entidad desde Storage */
@@ -1732,7 +1703,7 @@ export async function getHistoricoTablaRows(params: {
   secciones?: string[];
 }): Promise<TablaRow[]> {
   const { ambito, year } = params;
-  const isNacionalView = !params.entidad || params.entidad === "Nacional";
+  const isNacionalView = !params.entidad || esAlcanceNacional(params.entidad);
 
   // Extranjero nacional: usa el agregado __EXTRANJERO__
   if (ambito === "extranjero" && isNacionalView) {
@@ -1773,15 +1744,15 @@ export async function getHistoricoTablaRows(params: {
       .filter((r) => r.padron > 0 || r.lista > 0);
   }
 
-  // Nacional: carga los JSON anuales de todos los estados usando la lista
-  // conocida de ESTADO_MAP. No usamos listStorageFiles porque esa función
+  // Nacional: carga los JSON anuales de todos los estados usando el catálogo
+  // de lib/geo/estados.ts. No usamos listStorageFiles porque esa función
   // filtra exclusivamente archivos .csv y no retornaría los .json de estados.
   const cacheKey = `tabla:nacional:${year}`;
   const cached = getCached<TablaRow[]>(cacheKey);
   if (cached) return cached;
 
-  // Claves únicas de estado (ESTADO_MAP ya normaliza alias como "edomex" → "ESTADO DE MEXICO")
-  const stateNames = [...new Set(Object.values(ESTADO_MAP))];
+  // Claves internas de los 32 estados (el resultado se ordena al final, el orden de carga no importa)
+  const stateNames = ESTADOS.map((e) => e.clave);
 
   const rows: TablaRow[] = [];
   const BATCH = 8;
@@ -2179,7 +2150,7 @@ export async function getResultadosFiltered(params: {
   } = params;
 
   const isVotoExtranjeroFiltro = estadoInput?.toUpperCase() === "VOTO EN EL EXTRANJERO";
-  const isNacional = !estadoInput || estadoInput.toLowerCase() === "nacional" || isVotoExtranjeroFiltro;
+  const isNacional = !estadoInput || esAlcanceNacional(estadoInput) || isVotoExtranjeroFiltro;
   const estadoNombreResolved = isVotoExtranjeroFiltro ? null
     : (isNacional ? null : resolveEstadoName(estadoInput));
   // Normalize to electoral CSV name (only ESTADO DE MEXICO → "MEXICO"; others unchanged)
@@ -3412,15 +3383,21 @@ export async function getPadronByGeo(
   let padronHombres = 0, padronMujeres = 0, padronNoBinario = 0;
   let listaNominalHombres = 0, listaNominalMujeres = 0, listaNominalNoBinario = 0;
 
-  const munNorm = geo.municipioNombre
-    ? stripAccents(geo.municipioNombre.toUpperCase())
+  // Municipio: comparación por CLAVE CANÓNICA (lib/geo/municipioCanonico.ts) en
+  // ambos lados — aplica los alias verificados ("Tlaquepaque" ↔ "SAN PEDRO
+  // TLAQUEPAQUE", "General Escobedo" ↔ "GRAL. ESCOBEDO") además de acentos y
+  // mayúsculas. Antes era una igualdad exacta tras quitar acentos: esos
+  // nombres no coincidían y caía al padrón ESTATAL sin ningún aviso del match.
+  const estadoCve = resolverEstadoCve(estadoNombre) ?? "";
+  const munBuscado = geo.municipioNombre
+    ? claveComparacionMunicipio(estadoCve, geo.municipioNombre)
     : null;
   const cvdInt = geo.cveDistrito ? parseInt(geo.cveDistrito, 10) : NaN;
 
   await streamCsvRows(semanalPath, (row) => {
     if (row.nombre_entidad !== derfeNombre) return;
     if (!isNaN(cvdInt) && parseInt(row.cve_distrito ?? "", 10) !== cvdInt) return;
-    if (munNorm && stripAccents(row.nombre_municipio?.trim().toUpperCase() ?? "") !== munNorm) return;
+    if (munBuscado && claveComparacionMunicipio(estadoCve, row.nombre_municipio ?? "") !== munBuscado) return;
     padronElectoral       += parseInt(row.padron_electoral  ?? "0") || 0;
     listaNominal          += parseInt(row.lista_nominal     ?? "0") || 0;
     padronHombres         += parseInt(row.padron_hombres    ?? "0") || 0;

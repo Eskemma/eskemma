@@ -40,8 +40,8 @@
 // bodega (fontana/bodega/imco_ice/_manifest.json).
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import { readFromBodega } from "@/lib/fontana/bodegaStorage";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
@@ -64,10 +64,6 @@ interface BodegaImcoIce {
 const CVE_ESTADO_NOMBRE: Record<string, string> = Object.fromEntries(
   Object.entries(ESTADO_CVE_MAP).map(([nombre, cve]) => [cve, nombre])
 );
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
-}
 
 function celdaDesdeFila(fila: FilaIce | undefined, motivoVacio: string): CeldaFontana {
   if (!fila) return { nivel: "estatal", motivo: motivoVacio };

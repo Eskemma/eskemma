@@ -77,8 +77,9 @@
 import https from "https";
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { getMunicipiosOptions, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
@@ -288,10 +289,6 @@ async function calcularTotalNacional(
     })
   );
   return totales.reduce((a, b) => a + b, 0);
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 // Reverso de ESTADO_CVE_MAP — mismo patrón ya usado en eceg.ts/conapoMarginacion.ts/coneval.ts.

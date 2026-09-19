@@ -47,9 +47,9 @@
 
 import https from "https";
 import { readFromBodega, writeToBodega } from "@/lib/fontana/bodegaStorage";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve as resolveEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -65,10 +65,6 @@ export const FUENTE_ETIQUETA_CONAPO = `CONAPO (Proyecciones de población, ${ANO
 
 interface RazDepRecord {
   razDep: number;
-}
-
-function resolveEstadoCve(estadoNombre: string): string | null {
-  return ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)] ?? null;
 }
 
 function resolverNombreMunicipio(territorio: Territorio): string | undefined {
