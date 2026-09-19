@@ -26,12 +26,12 @@
 // mismo patrón que transparencyInternational.ts/pnudHdr.ts/rsf.ts.
 
 import * as XLSX from "xlsx";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { claveEstadoDatos, resolverEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_IEP = "Institute for Economics and Peace (Índice de Paz México 2026)";
 
@@ -39,6 +39,15 @@ const IEP_XLSX_URL = "https://indicedepazmexico.org/data/MPI_PublicReleaseData_2
 const HOJA = "MPI";
 const INDICADOR = "overall score";
 const ANIO_REFERENCIA = 2025; // año de datos más reciente en la edición 2026 — ver header.
+
+// El workbook del IEP trae 2 entidades en inglés (verificado 2026-09-19 con los
+// 32 nombres reales de la hoja MPI): alias POR FUENTE, no del catálogo
+// compartido — el resto de nombres coincide con el resolver de estados.
+const ALIAS_ESTADO_IEP: Record<string, string> = {
+  "Mexico City": "Ciudad de México",
+  "Mexico State": "Estado de México",
+};
+const claveEstadoIep = (nombreFila: string) => claveEstadoDatos(ALIAS_ESTADO_IEP[nombreFila] ?? nombreFila);
 
 interface FilaMpi {
   geocode: string;
@@ -81,7 +90,7 @@ function parsearXlsx(buffer: ArrayBuffer): { porEstado: Map<string, number>; nac
       continue;
     }
     if (typeof state !== "string") continue;
-    porEstado.set(normalizeGeoName(state), score);
+    porEstado.set(claveEstadoIep(state), score);
   }
   return { porEstado, nacional };
 }
@@ -127,7 +136,7 @@ export async function resolverIndicePazMexico(territorio: Territorio): Promise<C
   if (!territorio.estado) {
     estatal = { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" };
   } else {
-    const score = datos.porEstado.get(normalizeGeoName(territorio.estado));
+    const score = datos.porEstado.get(claveEstadoDatos(territorio.estado));
     estatal = score != null
       ? { nivel: "estatal", valor: score, unidad: "índice de paz (1-5, 1 = más pacífico)", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_IEP }
       : { nivel: "estatal", motivo: `El IEP no reportó el índice para "${territorio.estado}"` };
@@ -189,7 +198,7 @@ function parsearSerieXlsx(buffer: ArrayBuffer): Omit<SerieIepCache, "expira"> {
       continue;
     }
     if (typeof f[iS] !== "string") continue;
-    const clave = normalizeGeoName(f[iS] as string);
+    const clave = claveEstadoIep(f[iS] as string);
     const rec = porEstado.get(clave) ?? {};
     rec[periodo] = score;
     porEstado.set(clave, rec);
@@ -233,9 +242,9 @@ export async function resolverSerieIep(territorio: Territorio): Promise<Resultad
     territorioLabel = "Nacional";
   } else {
     if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
-    const clave = normalizeGeoName(territorio.estado);
+    const clave = claveEstadoDatos(territorio.estado);
     porAno = datos.porEstado.get(clave);
-    const cve = ESTADO_CVE_MAP[clave];
+    const cve = resolverEstadoCve(territorio.estado);
     territorioLabel = (cve && CVE_ESTADO_NOMBRE_IEP[cve]) ?? territorio.estado;
   }
   if (!porAno || Object.keys(porAno).length === 0) {

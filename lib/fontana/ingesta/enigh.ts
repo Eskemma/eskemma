@@ -108,19 +108,12 @@ function nombreTerritorio(ws: XLSX.WorkSheet, fila: number): string | null {
   return typeof c?.v === "string" ? c.v.trim() : null;
 }
 
-// ENIGH usa el nombre oficial LARGO de INEGI para 4 de las 32
-// entidades — ESTADO_CVE_MAP usa el corto (ej. "COAHUILA", no
-// "COAHUILA DE ZARAGOZA"). Verificado con los 33 nombres reales del
-// archivo (2026-08-10): estos 4 son los únicos que no calzan directo
-// con normalizeGeoName — el resto (28 entidades) sí. Alias explícitos,
-// no fuzzy-matching (mismo criterio que el alias "México"→"Estado de
-// México" ya usado en imco.ts).
-const ALIAS_NOMBRE_ENIGH: Record<string, string> = {
-  "COAHUILA DE ZARAGOZA": "COAHUILA",
-  "MÉXICO": "ESTADO DE MÉXICO",
-  "MICHOACÁN DE OCAMPO": "MICHOACAN",
-  "VERACRUZ DE IGNACIO DE LA LLAVE": "VERACRUZ",
-};
+// ENIGH usa el nombre oficial LARGO de INEGI para 4 de las 32 entidades
+// ("COAHUILA DE ZARAGOZA", "MÉXICO" = Estado de México, "MICHOACÁN DE OCAMPO",
+// "VERACRUZ DE IGNACIO DE LA LLAVE"; verificado con los 33 nombres reales del
+// archivo, 2026-08-10). Esos 4 alias vivían aquí (ALIAS_NOMBRE_ENIGH); ahora
+// están en el resolver compartido (lib/geo/estados.ts) — mismo criterio: alias
+// explícitos, sin fuzzy-matching.
 
 // Resuelve el nombre de fila (ej. "CIUDAD DE MÉXICO", "COAHUILA DE
 // ZARAGOZA") a estadoCve, o null si es "NACIONAL" — separado de
@@ -128,8 +121,7 @@ const ALIAS_NOMBRE_ENIGH: Record<string, string> = {
 // el archivo completo, no un territorio puntual.
 function claveDeFila(nombre: string): string {
   if (normalizeGeoName(nombre) === "NACIONAL") return CLAVE_NACIONAL;
-  const nombreResuelto = ALIAS_NOMBRE_ENIGH[nombre.toUpperCase()] ?? nombre;
-  const cve = ESTADO_CVE_MAP[normalizeGeoName(nombreResuelto)];
+  const cve = resolveEstadoCve(nombre);
   if (!cve) {
     throw new Error(`ENIGH: nombre de territorio "${nombre}" no reconocido en ESTADO_CVE_MAP`);
   }

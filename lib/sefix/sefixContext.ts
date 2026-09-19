@@ -13,7 +13,8 @@ import {
   getPadronNacional,
   getResultadosLocalesFiltered,
 } from "@/lib/sefix/storage";
-import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { buscarDistritoCandidatos, primerCandidatoTemporal, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/pestel.types";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -92,9 +93,10 @@ export function getSefixPriority(tipo: string, nivel: string): SefixCargoKey[] {
 export async function resolveDistrictCabecera(
   estadoNombre: string,
   nivelTerritorial: string,
-  territorio: Pick<Territorio, "nombre" | "cve_distrito">
+  territorio: Pick<Territorio, "nombre" | "cve_distrito" | "estado" | "municipio">
 ): Promise<string | null> {
   if (!estadoNombre) return null;
+  const estadoCve = resolverEstadoCve(estadoNombre) ?? undefined;
   try {
     if (
       nivelTerritorial === "distrito_federal" ||
@@ -105,7 +107,11 @@ export async function resolveDistrictCabecera(
       const latest = await getResultadosByEstado(estadoNombre, "diputados");
       if (!latest) return null;
       const opciones = await getEleccionesGeo("distritos", latest.anio, "dip", estadoNombre);
-      return matchDistrito(opciones, territorio);
+      // TEMPORAL: con >1 candidato se toma el primero (ver primerCandidatoTemporal).
+      return primerCandidatoTemporal(
+        buscarDistritoCandidatos(opciones, territorio, { estadoCve, anio: latest.anio }),
+        `federal ${estadoNombre} ${latest.anio}`
+      );
     }
     if (nivelTerritorial === "distrito_local" || nivelTerritorial === "distrital") {
       const years = await getResultadosLocalesAvailableYears(estadoNombre).catch(
@@ -113,7 +119,13 @@ export async function resolveDistrictCabecera(
       );
       for (const year of [...years].sort((a, b) => b - a)) {
         const opciones = await getEleccionesLocalesGeo("distritos", year, "dip_loc", estadoNombre);
-        if (opciones.length > 0) return matchDistrito(opciones, territorio);
+        if (opciones.length > 0) {
+          // TEMPORAL: con >1 candidato se toma el primero (ver primerCandidatoTemporal).
+          return primerCandidatoTemporal(
+            buscarDistritoCandidatos(opciones, territorio, { estadoCve, anio: year }),
+            `local ${estadoNombre} ${year}`
+          );
+        }
       }
     }
   } catch {

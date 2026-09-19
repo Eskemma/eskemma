@@ -217,7 +217,10 @@ en la fuente compartida.
 **Punto único para resolver/normalizar nombres geográficos en TODO el ecosistema**
 (Sefix, Fontana, PESTEL, Moddulo y apps futuras). Módulos puros (sin firebase/red):
 `lib/geo/municipioCanonico.ts` (municipios), `lib/geo/estados.ts` (estados),
-`lib/geo/display.ts` (nombre a mostrar). **Antes de escribir cualquier
+`lib/geo/display.ts` (nombre a mostrar), `lib/geo/candidatosGeo.ts` (búsqueda por
+nombre que devuelve TODOS los candidatos: Estado/Municipio/Distrito federal/Distrito
+local) y `lib/geo/cabeceraNombres.ts` (comparación de nombres de cabecera).
+**Antes de escribir cualquier
 `.normalize("NFD")`/`toUpperCase()` sobre un nombre de estado/municipio/distrito,
 usar estos** — el diagnóstico del 2026-09-19 encontró ~18 implementaciones que
 discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estatal,
@@ -268,19 +271,109 @@ discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estata
   (`functions/src/utils/estadoCveMap.ts`, no puede importar de `lib/`). Divergencias
   conocidas hoy (test `lib/geo/estados.test.ts`): CDMX/DF, nombres oficiales largos,
   espacios de más, `nuevo_leon`.
-- **Canónico formal de distritos.** `matchDistrito` devuelve la PRIMERA opción cuando
-  varios distritos comparten cabecera sin `cve_distrito` (Tonalá 1407/1420, Zapopan
-  1404/1410, Mérida ×3) — comportamiento previo, no corregido.
-- **32 resoluciones inline restantes** de estado (`ESTADO_CVE_MAP[normalizeGeoName(x)]`
-  en adaptadores de Fontana, `lib/fontana/tabla/`, rutas `app/api/fontana/**`); un
-  ratchet en `lib/geo/estados.test.ts` impide que aparezcan nuevas. Migrarlas a
-  `resolverEstadoCve` es mecánico pero toca ~17 archivos.
+- **Ambigüedad por nombre compartido — capa de DATOS lista (2026-09-19); interfaz de
+  desambiguación PENDIENTE de diseño.** `matchDistrito` ya no existe: la sustituye
+  `buscarDistritoCandidatos()` (`lib/sefix/districtMatching.ts`), que devuelve la LISTA
+  de candidatos (0/1/n; cada uno con `nombre`, `codigo` de 4 dígitos, `anio` y
+  `estrategia`) en vez de "el primero". Estrategias, en orden: (a) `cve_distrito` +
+  estado → código; (b) número (romano/arábigo) del texto legado + estado → código; (c)
+  nombre exacto; (d) cabecera de la frase legada "con cabecera en X" (todas las
+  coincidencias). El código (a/b) solo se acepta si el nombre de cabecera es compatible
+  (contención de palabras: "QUERETARO" ~ "SANTIAGO DE QUERETARO", nunca "NAUCALPAN DE
+  JUAREZ" ~ "AMECAMECA DE JUAREZ"); sin nombre de referencia, solo en la numeración
+  vigente (año ≥ 2024). Los 4 call sites (`exploracion/page.tsx` ×2, `sefixContext.ts`
+  ×2) toman `[0]` vía `primerCandidatoTemporal()` con `console.warn` de medición
+  (TEMPORAL). Núcleo de 4 categorías: `buscarCandidatosPorNombre(texto, {estadoCve,
+  municipios, tipos})` → `CandidatoGeo[]` (tipo, clave, nombre de display,
+  `coincidencia` exacta/parcial, `anio`, `nombresPorAnio`); el catálogo de municipios se
+  inyecta (el de INE es server-only). Hoy ningún call site lo usa: es la base para
+  Sefix-AI/texto libre, junto con `resolverTerritorioNombre` (Estado vs Municipio, que
+  sigue resolviendo por su cuenta).
+  **Hallazgo completo (datos reales, 132 CSV de Storage: federal 2006-2024, local
+  2015-2024; Firestore de proyectos Moddulo):**
+  - *Nombre compartido dentro de un estado (2024):* 37 nombres de cabecera federales y 90
+    locales los comparten varios distritos (Mérida ×3 = 3103/3104/3106; Iztapalapa ×4
+    fed; Ecatepec ×5; Tijuana ×4).
+  - *Cuatro categorías:* 12 estados tienen cabecera con el nombre del Estado en algún año
+    (Aguascalientes, Campeche, Colima, Chihuahua, Durango, Guanajuato, Puebla, Querétaro,
+    San Luis Potosí, Tlaxcala, Veracruz, Zacatecas — 13 fed / 10 loc, según el año) y 13
+    estados tienen un MUNICIPIO homónimo (los 12 + Sinaloa): triple homonimia
+    Estado/Municipio/Distrito. Querétaro = Estado 22 + Municipio + fed 2203/2204/2206 +
+    locales 2201-2206. 14 nombres de cabecera existen en >1 estado (Tonalá, Cuauhtémoc ×3,
+    Guadalupe, Juárez…): se resuelven porque todos los call sites conocen el estado.
+  - *Dimensión temporal (confirmada, grande):* el nombre de la cabecera cambia entre años
+    en 136 de 313 códigos federales (26 estados) y 342 de 692 locales (30 estados)
+    (`lib/geo/cabeceras_historicas.json`, generado por `scripts/geo-cabeceras-historicas.ts`).
+    Una parte son renombres de la MISMA cabecera (QUERETARO ↔ SANTIAGO DE QUERETARO 2006/
+    2015 vs 2009/2012/2018+, CD. ↔ CIUDAD, TOLUCA ↔ TOLUCA DE LERDO); el resto es el mismo
+    CÓDIGO reasignado a otro territorio (Baja California 0206 = Mexicali en 2016, Tecate
+    desde 2019; México 1521 = Naucalpan hasta 2015, Amecameca desde 2018).
+    **Identidad de un distrito = (tipo, año, código de 4 dígitos)**; ni el nombre ni el
+    código solos son estables entre años, y no se afirma continuidad entre años.
+  - *Numeración del selector vs resultados:* federal 300/300 códigos del catálogo 2025
+    (`cabeceras_fed.json`) coinciden con el CSV 2024; **local solo 513/679**: 128 códigos
+    (19 %) son OTRO territorio en el CSV de resultados (Tabasco 19/21, Zacatecas 10/18,
+    Yucatán 9/21, Nayarit 8/18…). Sin la verificación de nombre, un proyecto estructurado
+    con `cve_distrito` local habría recibido en silencio los resultados de otro distrito.
+    Coahuila y Tamaulipas no tienen archivo local 2024 (el bucle por años de
+    `resolveDistrictCabecera` lo cubre).
+  - *Dos bugs reales de `matchDistrito`, corregidos:* (1) el territorio ESTRUCTURADO del
+    wizard nuevo (`cve_distrito:"027"`, `municipio:"IZTAPALAPA"`; proyecto real
+    `nZvpYu…`) nunca resolvía (la opción trae cve === nombre, "0927 IZTAPALAPA", así que
+    comparar con "027" jamás coincidía) y Sefix caía en silencio a nivel estatal: ahora →
+    `0927 IZTAPALAPA`; (2) el número del texto legado se ignoraba ("… IV … Mérida" daba
+    3103, el primero): ahora → 3104. Los 2 proyectos legados reales (Puerto Vallarta "V")
+    no cambian. Además `matchDistrito` no reparaba mojibake (25 cabeceras locales reales
+    como "TLAJOMULCO DE ZU" + "Ã" + U+0091 + "IGA").
+  - *Calidad de dato:* el CSV local de Colima 2015 trae "NO ESTABLECIDO ACUERDO 27/NNNN"
+    (370 filas) en lugar de la cabecera; se excluye de `cabeceras_historicas.json`.
+  - *Superficie relacionada NO tocada:* 15 adaptadores de Fontana pasan de distrito a
+    municipio con `extraerCiudadCabecera()` (`lib/moddulo/territorioLabel.ts`); 88 de 361
+    cabeceras federales NO son nombre de municipio (CIUDAD DEL CARMEN, VICTORIA DE DURANGO…).
+  **Pendiente:** la interfaz de notificación/desambiguación al usuario (qué se le muestra
+  cuando hay >1 candidato, cómo elige, cómo se recuerda) queda sin diseñar, ligada al
+  trabajo de interpretación de texto libre/Sefix-AI ya anotado arriba; aquí solo se
+  preparó el terreno de datos. Cuando exista, los call sites TEMPORAL usan la lista completa.
+- **Resoluciones inline de estado — MIGRADAS (2026-09-19).** Las 32 (17 archivos:
+  adaptadores de Fontana, `lib/fontana/tabla/`, rutas `app/api/fontana/**` y
+  `app/api/geo/resolver-municipio`) ahora usan `resolverEstadoCve`; el ratchet de
+  `lib/geo/estados.test.ts` está en **0**. Un test de propiedad prueba que toda
+  entrada que resolvía la expresión vieja da el MISMO CVE con el resolver nuevo (solo
+  cambian los casos que antes fallaban: "México", nombres oficiales largos, CDMX).
+  Caso real verificado: F3-1 (homicidios) con "México" resuelve como F1-1 (7.4, Edomex).
+  Excepciones deliberadas (documentadas en el código): (a) `resolverTerritorioNombre.ts`
+  línea del lookup de texto libre sigue con `ESTADO_CVE_MAP[norm]` (ambigüedad "México"
+  → pendiente Sefix-AI, ver arriba); (b) fuentes indexadas por NOMBRE de estado usan
+  `claveEstadoDatos` (canonicaliza ambos lados) y conservan alias PROPIOS de la
+  fuente (IEP: nombres en inglés; SHCP: `ALIAS_ENTIDAD_SHCP`). Al migrar aparecieron
+  fallos silenciosos reales, ya corregidos: STPS devolvía 0 (no error) para estados
+  con nombre largo (F3-16), ENVIPE fallaba en 4 estados, IEP no resolvía CDMX/Edomex.
+- **Resultados locales de Sefix — CORREGIDO (2026-09-19).** `getResultadosLocalesFiltered`
+  compara el municipio con `claveComparacionMunicipio` en ambos lados (alias + plegado
+  Ñ/Ü) y repara con `repararMojibakeGeo` la Ñ mal codificada que trae el CSV real de
+  Jalisco ("ZUÃ\x91IGA"). Antes: Tlaquepaque/Gral. Escobedo/Tlajomulco → 0 votos;
+  ahora 284,031 / 168,321 / 225,030. Tests: `lib/sefix/resultadosLocalesMunicipio.test.ts`.
+- **Resultados FEDERALES de Sefix — CORREGIDO (2026-09-19).** `getResultadosFiltered`
+  compara el municipio con `claveComparacionMunicipio` en ambos lados (el CVE de estado sale
+  del estado pedido o, en alcance nacional, de `cve_estado` de la fila). Evidencia real: 12
+  municipios cambian de nombre CRUDO entre años en los CSV federales (TLAQUEPAQUE 2006-2012
+  ↔ SAN PEDRO TLAQUEPAQUE 2015+, SILAO ↔ SILAO DE LA VICTORIA, MEDELLIN ↔ MEDELLIN DE
+  BRAVO, ACAMBAY ↔ ACAMBAY DE RUIZ CASTAÑEDA, varios de Oaxaca) y `allYears` pasa la MISMA
+  cadena a todos los años → 0 votos en silencio en los años con otro nombre. Antes/después:
+  Tlaquepaque 2006-2024 0 → 203,330 / 179,932 / 252,951 / 188,134 / 258,865 / 285,854;
+  Silao 2009 0 → 52,152; Medellín de Bravo 2018 0 → 28,989; Gral. Escobedo 2024 0 → 169,095;
+  control (ZAPOPAN 2024, nombre idéntico) 677,614 = 677,614. No se aplica
+  `repararMojibakeGeo` (0 municipios federales con mojibake; sí en los locales). No tocados:
+  la cascada geo (`getEleccionesGeo` / `getEleccionesLocalesGeo`, filtro `row.municipio ===
+  municipio` de secciones), que recibe la cadena de la opción del mismo año; la local además
+  compara con opciones ya limpiadas por `cleanGeoName` (quita '?') contra la fila cruda: 1
+  caso real (CA?ITAS DE FELIPE PESCADOR, 2016).
 - Otros normalizadores propios sin migrar: `exploracion/page.tsx`
   (`normalizeParaAbrev`, `detectEstadoFromXpcto`, `ESTADOS_ABREV`),
   `TerritorySelector.tsx` (`normalizarParaComparar`), `territorioHeuristicas.ts`,
-  `SemanalView.tsx` (`normalizeEntidadKey`), y la comparación de municipio de
-  resultados locales en `lib/sefix/storage.ts` (~`:2752`/`:2800`, mismo defecto que
-  tenía el padrón: igualdad exacta sin alias).
+  `SemanalView.tsx` (`normalizeEntidadKey`), y los lookups directos
+  `ESTADO_CVE_MAP[x]` en hooks de UI de Sefix (reciben valores canónicos del selector,
+  no texto libre).
 - Restaurar acentos de municipios para display: ningún catálogo estructurado actual
   los conserva (el ITER solo trae la clave canónica).
 

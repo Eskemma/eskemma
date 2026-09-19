@@ -27,8 +27,8 @@
 // no por request.
 
 import JSZip from "jszip";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { Territorio } from "@/types/shared.types";
@@ -146,7 +146,7 @@ async function fetchConteoEstado(cve: string): Promise<ConteoDenueEstado> {
 
 export async function resolverActividadEconomica(territorio: Territorio): Promise<CeldaFontana[]> {
   if (!territorio.estado) return [];
-  const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const cve = resolverEstadoCve(territorio.estado);
   if (!cve) return [{ nivel: "estatal", motivo: "Estado no reconocido para DENUE" }];
 
   let conteo: ConteoDenueEstado;
@@ -245,7 +245,7 @@ export async function resolverDetalleGiros(
   if (!territorio.estado || !territorio.municipio) {
     return { items: [], total: 0, offset, hasMore: false };
   }
-  const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const cve = resolverEstadoCve(territorio.estado);
   if (!cve) return { items: [], total: 0, offset, hasMore: false };
 
   const conteo = await fetchConteoEstado(cve);

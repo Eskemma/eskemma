@@ -18,9 +18,9 @@
 
 import { resolverIndicadorFontana } from "@/lib/fontana/ingesta";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { getMunicipiosOptions } from "@/lib/geo/municipios";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -43,7 +43,7 @@ export async function resolverValoresMunicipiosDelDistrito(
   if (territorio.nivel !== "distrito_federal" && territorio.nivel !== "distrito_local") return null;
   if (!territorio.estado) return null;
 
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return null;
 
   const numeroDistrito = extraerNumeroDistrito(territorio.municipio ?? territorio.nombre, territorio.cve_distrito);

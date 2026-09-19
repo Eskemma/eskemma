@@ -5,7 +5,7 @@ import { getStorage } from "firebase-admin/storage";
 import { createInterface } from "readline";
 import { PARTIDOS_MAPPING } from "@/lib/sefix/eleccionesConstants";
 import { ESTADOS, resolverEstado, resolverEstadoCve, esAlcanceNacional, claveAlmacenamiento } from "@/lib/geo/estados";
-import { claveComparacionMunicipio } from "@/lib/geo/municipioCanonico";
+import { claveComparacionMunicipio, repararMojibakeGeo } from "@/lib/geo/municipioCanonico";
 import { PARTIDOS_MAPPING_LOC } from "@/lib/sefix/eleccionesLocalesConstants";
 import type { NivelTerritorial } from "@/types/pestel.types";
 
@@ -2171,6 +2171,30 @@ export async function getResultadosFiltered(params: {
       ? new Set(partidos)
       : null;
 
+  // Municipio: comparación por CLAVE CANÓNICA en ambos lados (alias, acentos,
+  // mayúsculas), igual que getResultadosLocalesFiltered/getPadronByGeo. Antes:
+  // `===` exacto. Evidencia real (CSV federales 2006-2024): 12 municipios cambian
+  // de nombre CRUDO entre años (TLAQUEPAQUE → SAN PEDRO TLAQUEPAQUE en 2015,
+  // SILAO → SILAO DE LA VICTORIA, MEDELLIN → MEDELLIN DE BRAVO, ACAMBAY →
+  // ACAMBAY DE RUIZ CASTAÑEDA…) y `allYears` pasa la MISMA cadena a todos los
+  // años, así que los años con otro nombre daban 0 en silencio. No hace falta
+  // repararMojibakeGeo aquí: 0 municipios federales con mojibake o '?'
+  // (verificado 2026-09-19; sí ocurre en los CSV locales).
+  // El CVE de estado sale del estado pedido o, en alcance nacional, de la fila.
+  const estadoCveFed = estadoNombreResolved ? resolverEstadoCve(estadoNombreResolved) ?? "" : "";
+  const claveMunCache = new Map<string, string>();
+  const claveMun = (cve: string, nombre: string): string => {
+    const k = `${cve}|${nombre}`;
+    let v = claveMunCache.get(k);
+    if (v === undefined) { v = claveComparacionMunicipio(cve, nombre); claveMunCache.set(k, v); }
+    return v;
+  };
+  const esMunicipioPedido = (rowMunicipio: string | undefined, rowCveEstado: string | undefined): boolean => {
+    if (!municipio || !rowMunicipio) return false;
+    const cve = estadoCveFed || (rowCveEstado ?? "").trim().padStart(2, "0");
+    return claveMun(cve, rowMunicipio) === claveMun(cve, municipio);
+  };
+
   // Accumulators for main filter
   const totals: Record<string, number> = {};
   let totalVotos = 0;
@@ -2249,13 +2273,13 @@ export async function getResultadosFiltered(params: {
         if (secFilter && !secFilter.has(rowSeccion)) return;
         // Track redistricting ONLY for the target geo rows (secciones > municipio in precedence).
         // Rows from other municipios/sections in the same district must NOT influence these flags.
-        const isTarget = secFilter ? secFilter.has(rowSeccion) : rowMunicipio === municipio;
+        const isTarget = secFilter ? secFilter.has(rowSeccion) : esMunicipioPedido(rowMunicipio, row.cve_estado);
         if (rowCabecera && isTarget) redistritacionCabeceras.add(rowCabecera);
       } else {
         votosDist += tvSafe; lneDist += lneSafe;
         // Mark district match only for the target geo rows so that other municipios/sections
         // in the same district do not mask a redistricted target municipio or section.
-        if (municipio) { if (rowMunicipio === municipio) districtMatchFound = true; }
+        if (municipio) { if (esMunicipioPedido(rowMunicipio, row.cve_estado)) districtMatchFound = true; }
         else if (secFilter) { if (secFilter.has(rowSeccion)) districtMatchFound = true; }
         else { districtMatchFound = true; }
       }
@@ -2263,7 +2287,7 @@ export async function getResultadosFiltered(params: {
 
     // Apply municipio filter + accumulate municipal totals
     if (municipio) {
-      if (rowMunicipio !== municipio) return;
+      if (!esMunicipioPedido(rowMunicipio, row.cve_estado)) return;
       votosMun += tvSafe; lneMun += lneSafe;
     }
 
@@ -2758,9 +2782,14 @@ export async function getResultadosLocalesFiltered(params: {
     tipoEleccion, principio, cabecera, municipio, secciones, partidos,
   } = params;
 
-  // Normalize municipio for case/accent-insensitive comparison (CSV stores uppercase without accents)
+  // Municipio: comparación por CLAVE CANÓNICA en ambos lados (alias verificados,
+  // acentos, mayúsculas) — igual que getPadronByGeo. Antes: igualdad exacta tras
+  // quitar acentos, que daba 0 votos para "Tlaquepaque" (el CSV dice "SAN PEDRO
+  // TLAQUEPAQUE"), "General Escobedo" ("GRAL. ESCOBEDO") y "Tlajomulco de Zúñiga"
+  // (el CSV de Jalisco trae la Ñ doblemente codificada → se repara del lado de la fila).
+  const estadoCveLoc = resolverEstadoCve(estadoNombre) ?? "";
   const municipioNorm = municipio
-    ? stripAccents(municipio.trim().toUpperCase())
+    ? claveComparacionMunicipio(estadoCveLoc, municipio)
     : undefined;
 
   const locKeys = getLocKeys(estadoNombre);
@@ -2808,7 +2837,7 @@ export async function getResultadosLocalesFiltered(params: {
 
     const rowCabecera = row.cabecera?.trim();
     const rowMunicipio = row.municipio
-      ? stripAccents(row.municipio.trim().toUpperCase())
+      ? claveComparacionMunicipio(estadoCveLoc, repararMojibakeGeo(row.municipio))
       : undefined;
 
     if (cabecera) {
@@ -3348,10 +3377,6 @@ export async function getLneByDistrito(
 export interface PadronGeoFilter {
   cveDistrito?: string;
   municipioNombre?: string;
-}
-
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 export async function getPadronByGeo(

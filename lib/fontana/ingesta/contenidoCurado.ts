@@ -24,9 +24,9 @@
 // coneval.ts/conapoMarginacion.ts/bienestar.ts/icmm.ts/anvcc.ts.
 
 import { readFromBodega } from "@/lib/fontana/bodegaStorage";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -143,7 +143,7 @@ async function cargarContenidoCurado(): Promise<CacheContenidoCurado> {
 
       if (nivel === "estatal") {
         if (!cruda.estado) continue;
-        const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(cruda.estado)];
+        const estadoCve = resolverEstadoCve(cruda.estado);
         if (!estadoCve) continue;
         const entrada: EntradaContenidoCurado = { ...base, cveEnt: cruda.cve_ent, estado: cruda.estado };
         porEstadoPorNombre.set(estadoCve, entrada);
@@ -155,7 +155,7 @@ async function cargarContenidoCurado(): Promise<CacheContenidoCurado> {
       if (!cruda.territorio) continue;
       const partes = parsearTerritorio(cruda.territorio);
       if (!partes) continue;
-      const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(partes.estado)];
+      const estadoCve = resolverEstadoCve(partes.estado);
       if (!estadoCve) continue;
       const entrada: EntradaContenidoCurado = { ...base, cveMun: cruda.cve_mun, estado: partes.estado, municipio: partes.municipio };
       porMunicipioPorNombre.set(`${estadoCve}|${claveCanonicaMunicipio(estadoCve, partes.municipio)}`, entrada);
@@ -185,7 +185,7 @@ function resolverNombreMunicipio(territorio: Territorio): string | undefined {
 // resolverNombreMunicipio para distrito_federal/distrito_local).
 async function resolverEntrada(territorio: Territorio): Promise<{ entrada: EntradaContenidoCurado | null; nivel: "estatal" | "municipal"; motivo: string | null }> {
   if (!territorio.estado) return { entrada: null, nivel: "municipal", motivo: "El proyecto no tiene un estado definido en su territorio" };
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return { entrada: null, nivel: "municipal", motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
 
   if (territorio.nivel === "estatal") {

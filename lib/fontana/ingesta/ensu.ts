@@ -35,8 +35,7 @@
 //   3. Si cruzan más de un área, o mezclan municipios dentro y fuera de
 //      alguna → MOTIVO_ENSU_CRUZA_AREAS, nunca un valor combinado.
 
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { getMunicipiosOptions } from "@/lib/geo/municipios";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
@@ -44,6 +43,7 @@ import { resolverAreaDeMunicipio, areaEsMultiMunicipio, resolverProrrateoEstado,
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import percepcionData from "@/data/fontana/ensu_percepcion_2026t2.json";
 import { MOTIVO_ENSU_CRUZA_AREAS } from "@/lib/fontana/ingesta/types";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -120,7 +120,7 @@ export async function resolverPercepcionInseguridadEnsu(territorio: Territorio):
 
   let distrital: CeldaFontana;
   if (territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local") {
-    const estadoCve = territorio.estado ? ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)] : undefined;
+    const estadoCve = resolverEstadoCve(territorio.estado);
     const numeroDistrito = extraerNumeroDistrito(territorio.municipio ?? territorio.nombre, territorio.cve_distrito);
     const tipoDistrito = territorio.nivel === "distrito_federal" ? "federal" : "local";
     if (!estadoCve || !numeroDistrito) {
@@ -140,7 +140,7 @@ export async function resolverPercepcionInseguridadEnsu(territorio: Territorio):
   if (!territorio.estado || !municipioNombre) {
     municipal = { nivel: "municipal", motivo: "El proyecto no tiene un estado o municipio definido en su territorio" };
   } else {
-    const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+    const estadoCve = resolverEstadoCve(territorio.estado);
     if (!estadoCve) {
       municipal = { nivel: "municipal", motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
     } else {

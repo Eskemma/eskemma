@@ -75,6 +75,7 @@ import { normalizeGeoName, getMunicipiosOptions, claveCanonicaMunicipio } from "
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
 import { resolverPoblacionEstatal, resolverPoblacionMunicipal } from "@/lib/fontana/ingesta/conapo";
 import { resolverCveOficialMunicipio } from "@/lib/fontana/ingesta/anvcc";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -218,7 +219,7 @@ async function resolverSesnspGenerico(
     const motivo = "El proyecto no tiene un estado definido en su territorio";
     return [{ nivel: "nacional", motivo: "SESNSP no publica un total nacional agregado en este dataset — solo por entidad/municipio" }, { nivel: "estatal", motivo }, distrital, { nivel: "municipal", motivo }];
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
     return [{ nivel: "nacional", motivo: "SESNSP no publica un total nacional agregado en este dataset — solo por entidad/municipio" }, { nivel: "estatal", motivo }, distrital, { nivel: "municipal", motivo }];

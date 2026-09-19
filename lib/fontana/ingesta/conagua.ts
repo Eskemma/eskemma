@@ -26,8 +26,8 @@
 // Sin caché en Storage — catálogo y normales cacheados en memoria de
 // proceso (TTL 24h, single-flight), mismo patrón que coneval.ts.
 
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { Territorio } from "@/types/shared.types";
 
@@ -123,7 +123,7 @@ async function fetchNormalEstacion(abrev: string, id: string): Promise<{ tempMed
 
 export async function resolverClima(territorio: Territorio): Promise<CeldaFontana[]> {
   if (!territorio.estado || !territorio.municipio) return [];
-  const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const cve = resolverEstadoCve(territorio.estado);
   const abrev = cve ? ABREV_POR_CVE[cve] : undefined;
   if (!cve || !abrev) return [{ nivel: "municipal", motivo: "Estado no reconocido para el catálogo de CONAGUA" }];
 

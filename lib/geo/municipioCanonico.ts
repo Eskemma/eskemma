@@ -162,3 +162,20 @@ export function plegarDiacriticosGeo(s: string): string {
 export function claveComparacionMunicipio(estadoCve: string, nombre: string): string {
   return plegarDiacriticosGeo(claveCanonicaMunicipio(estadoCve, nombre));
 }
+
+// Repara texto UTF-8 que se leyó como latin1 ("Ñ" → "Ã" + U+0091). Existe en
+// datos REALES: los CSV de resultados locales del INE en Storage traen
+// "TLAJOMULCO DE ZUÃ\u0091IGA" (verificado 2026-09-19). Solo actúa si el texto
+// tiene el patrón inequívoco (un "Ã" seguido de un byte de continuación) y
+// todos sus caracteres caben en un byte; si la decodificación no es UTF-8
+// válido, devuelve el texto tal cual. Puro y sin Buffer (corre en navegador).
+export function repararMojibakeGeo(s: string): string {
+  if (!/\u00C3[\u0080-\u00BF]/.test(s)) return s;
+  const bytes = Uint8Array.from(s, (c) => c.charCodeAt(0));
+  if (bytes.some((b, i) => s.charCodeAt(i) > 0xff)) return s;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return s;
+  }
+}

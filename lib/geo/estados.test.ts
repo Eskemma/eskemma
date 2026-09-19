@@ -11,6 +11,7 @@ import {
   ESTADOS,
   ESTADO_NACIONAL_CLAVE,
   claveAlmacenamiento,
+  claveEstadoDatos,
   esAlcanceNacional,
   nombreEstadoDisplay,
   resolverEstado,
@@ -188,23 +189,73 @@ describe("paridad con la copia de Cloud Functions (functions/src/utils/estadoCve
   });
 });
 
-describe("ratchet de resoluciones inline pendientes", () => {
-  // Además de las 15 copias con nombre, el mismo cuerpo aparece INLINE
-  // (`ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)]`) en adaptadores de
-  // Fontana, tabla y rutas API. No estaban en el alcance de esta ronda y siguen
-  // resolviendo el estado con la regla anterior (sin alias de "México", nombres
-  // largos ni "CDMX"). Este ratchet impide que APAREZCAN NUEVAS mientras se
-  // migran: al bajar el número, actualízalo; nunca debe subir.
-  const PENDIENTES_INLINE = 32;
+describe("claveEstadoDatos — fuentes que traen los estados por NOMBRE", () => {
+  it("el nombre de la fuente y el del proyecto convergen en la misma clave", () => {
+    // STPS ("México", "Distrito Federal"), ENVIPE/ENIGH (nombres oficiales largos), como aparecen en los datos reales.
+    const pares: [string, string][] = [
+      ["México", "Estado de México"],
+      ["Distrito Federal", "Ciudad de México"],
+      ["Michoacán de Ocampo", "Michoacán"],
+      ["Coahuila de Zaragoza", "Coahuila"],
+      ["Veracruz de Ignacio de la Llave", "Veracruz"],
+    ];
+    for (const [fuente, proyecto] of pares) expect(claveEstadoDatos(fuente)).toBe(claveEstadoDatos(proyecto));
+  });
 
-  it("no aumenta el número de resoluciones inline de estado (deuda registrada, ver CLAUDE.md)", () => {
+  it("'NACIONAL' y los nombres ajenos al catálogo se conservan normalizados (comportamiento previo)", () => {
+    expect(claveEstadoDatos("NACIONAL")).toBe("NACIONAL");
+    // Los alias POR FUENTE (p. ej. los nombres en inglés del IEP) se aplican antes, en su adaptador.
+    expect(claveEstadoDatos("Mexico City")).toBe("MEXICO CITY");
+  });
+});
+
+describe("migración de las resoluciones inline: NO cambia ningún caso que ya resolvía bien", () => {
+  // La expresión anterior, tal cual estaba en los 32 sitios.
+  const anterior = (x: string): string | undefined => ESTADO_CVE_MAP[normalizeGeoName(x)];
+  const entradas = [
+    ...ESTADOS.flatMap((e) => [e.clave, e.nombre, e.nombre.toUpperCase(), e.nombre.toLowerCase(), e.clave.toLowerCase()]),
+    "Nacional", "NACIONAL", "México", "Estados Unidos Mexicanos", "Narnia", "", " ", "Distrito Federal",
+    "Coahuila de Zaragoza", "Michoacán de Ocampo", "Veracruz de Ignacio de la Llave", "CDMX", "  Jalisco", "Jalisco  ",
+    "JALISCO.", "Baja  California", "San Luis Potosi", "NUEVO LEÓN", "QUERÉTARO", "yucatán",
+  ];
+
+  it("todo lo que la expresión anterior resolvía, el resolver compartido lo resuelve IGUAL", () => {
+    for (const x of entradas) {
+      const viejo = anterior(x);
+      if (viejo !== undefined) expect(resolverEstadoCve(x), `entrada ${JSON.stringify(x)}`).toBe(viejo);
+    }
+  });
+
+  it("solo AGREGA resoluciones documentadas (alias, espacios, puntuación): lo desconocido sigue null", () => {
+    expect(resolverEstadoCve("Narnia")).toBeNull();
+    expect(resolverEstadoCve("Estados Unidos Mexicanos")).toBeNull();
+    expect(resolverEstadoCve("Nacional")).toBeNull();
+    // y cada entrada que antes NO resolvía y ahora sí, es una de las variantes esperadas
+    const nuevos = entradas
+      .filter((x) => anterior(x) === undefined && resolverEstadoCve(x) !== null)
+      .map((x) => normalizeGeoName(x.trim().replace(/\.$/, "").replace(/\s+/g, " ")));
+    const esperadas = new Set(["MEXICO", "DISTRITO FEDERAL", "COAHUILA DE ZARAGOZA", "MICHOACAN DE OCAMPO", "VERACRUZ DE IGNACIO DE LA LLAVE", "CDMX", "JALISCO", "BAJA CALIFORNIA"]);
+    for (const x of nuevos) expect(esperadas.has(x), `resolución nueva inesperada: ${x}`).toBe(true);
+  });
+});
+
+describe("ratchet de resoluciones inline", () => {
+  // Las 32 resoluciones inline (`ESTADO_CVE_MAP[normalizeGeoName(x)]`) y las
+  // búsquedas por nombre normalizado a mano (`normalizeGeoName(territorio.estado)`)
+  // se migraron a lib/geo/estados.ts (2026-09-19). El tope es 0: cualquier
+  // resolución nueva de estado debe usar `resolverEstadoCve`/`claveEstadoDatos`.
+  // Excepción documentada: `resolverTerritorioNombre` usa `ESTADO_CVE_MAP[norm]`
+  // (texto libre del chat; ver CLAUDE.md) — no coincide con este patrón a propósito.
+  const PENDIENTES_INLINE = 0;
+
+  it("no hay resoluciones inline de estado fuera de lib/geo/estados.ts", () => {
     const fs = require("node:fs") as typeof import("node:fs");
     const cuenta = (dir: string): number =>
       fs.readdirSync(dir, { withFileTypes: true }).reduce((n, d) => {
         const ruta = join(dir, d.name);
         if (d.isDirectory()) return d.name === "node_modules" || d.name.startsWith(".") ? n : n + cuenta(ruta);
         if (!/\.(ts|tsx)$/.test(d.name) || /\.test\./.test(d.name)) return n;
-        return n + (readFileSync(ruta, "utf8").match(/ESTADO_CVE_MAP\[normalizeGeoName\(/g)?.length ?? 0);
+        return n + (readFileSync(ruta, "utf8").match(/ESTADO_CVE_MAP\[normalizeGeoName\(|normalizeGeoName\(territorio\.estado\)/g)?.length ?? 0);
       }, 0);
     const total = cuenta(join(process.cwd(), "lib")) + cuenta(join(process.cwd(), "app"));
     expect(total).toBeLessThanOrEqual(PENDIENTES_INLINE);

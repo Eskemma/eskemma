@@ -12,9 +12,9 @@
 // de Storage no debe colgar la petición del cliente indefinidamente.
 
 import { type NextRequest, NextResponse } from "next/server";
-import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto, normalizeGeoName } from "@/lib/geo/municipios";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto } from "@/lib/geo/municipios";
 import { withTimeout } from "@/lib/utils/withTimeout";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 
 const TIMEOUT_MS = 15000;
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Faltan 'estado' o 'nombre'" }, { status: 400 });
   }
 
-  const estado = ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)];
+  const estado = resolverEstadoCve(estadoNombre);
   if (!estado) {
     return NextResponse.json({ error: `Estado "${estadoNombre}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }

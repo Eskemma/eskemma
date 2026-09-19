@@ -27,12 +27,12 @@
 // ya exigido para claves municipales.
 
 import https from "https";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { claveEstadoDatos, resolverEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_STPS_HUELGAS = "STPS (Huelgas, datos.gob.mx)";
 
@@ -121,7 +121,7 @@ async function cargarConteos(): Promise<Map<string, Map<string, number>>> {
       if (!r.anio_estallamiento || r.entidad_federativa == null) continue;
       const nombre = ENTIDAD_STPS_A_NOMBRE[r.entidad_federativa];
       if (!nombre) continue; // 34/35/36 — sin estado real, se excluyen
-      const clave = normalizeGeoName(nombre);
+      const clave = claveEstadoDatos(nombre);
       if (!porAnioEstado.has(r.anio_estallamiento)) porAnioEstado.set(r.anio_estallamiento, new Map());
       const porEstado = porAnioEstado.get(r.anio_estallamiento)!;
       porEstado.set(clave, (porEstado.get(clave) ?? 0) + 1);
@@ -175,7 +175,7 @@ export async function resolverHuelgasStps(territorio: Territorio): Promise<Celda
   if (!territorio.estado) {
     estatal = { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" };
   } else {
-    const valor = porEstado.get(normalizeGeoName(territorio.estado));
+    const valor = porEstado.get(claveEstadoDatos(territorio.estado));
     estatal = valor != null
       ? { nivel: "estatal", valor, unidad: "huelgas", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_STPS_HUELGAS }
       : { nivel: "estatal", valor: 0, unidad: "huelgas", naturaleza: "dato_directo", fuenteEtiqueta: FUENTE_ETIQUETA_STPS_HUELGAS };
@@ -242,8 +242,8 @@ export async function resolverSerieHuelgas(territorio: Territorio): Promise<Resu
     territorioLabel = "Nacional";
   } else {
     if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
-    claveEstado = normalizeGeoName(territorio.estado);
-    const cve = ESTADO_CVE_MAP[claveEstado];
+    claveEstado = claveEstadoDatos(territorio.estado);
+    const cve = resolverEstadoCve(territorio.estado);
     territorioLabel = (cve && CVE_ESTADO_NOMBRE_HUELGAS[cve]) ?? territorio.estado;
   }
 

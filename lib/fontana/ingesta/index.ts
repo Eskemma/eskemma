@@ -53,7 +53,6 @@ import {
 } from "@/lib/fontana/ingesta/eceg";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { esValorDisponible } from "@/lib/fontana/ingesta/types";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
@@ -175,6 +174,7 @@ import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { resolveMunicipioCve, diagnosticarMunicipioNoResuelto, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 
 const MOTIVO_NIVEL_NO_CUBIERTO_ITER_COMPENDIO_ETC =
   "Nivel no cubierto — mecanismo de agregación no disponible para esta fuente";
@@ -191,7 +191,7 @@ async function resolverIndicadorSun(territorio: Territorio): Promise<CeldaFontan
     const motivo = "El proyecto no tiene un estado definido en su territorio";
     return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
     return [{ nivel: "estatal", motivo }, { nivel: "municipal", motivo }];
@@ -254,7 +254,7 @@ async function conCeldaDistritalPropia(
 ): Promise<CeldaFontana[]> {
   if (territorio.nivel !== "distrito_federal" && territorio.nivel !== "distrito_local") return celdasBase;
   if (!territorio.estado) return celdasBase;
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return celdasBase;
   const numeroDistrito = extraerNumeroDistrito(territorio.municipio ?? territorio.nombre, territorio.cve_distrito);
   if (!numeroDistrito) return celdasBase;
@@ -1073,7 +1073,7 @@ async function agruparUnidadesPorEstado(
           : [];
 
     for (const m of municipiosConEstado) {
-      const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(m.estado)];
+      const estadoCve = resolverEstadoCve(m.estado);
       if (!estadoCve) {
         noResueltas.push({ nombre: m.nombre, estado: m.estado, motivo: `Estado "${m.estado}" no reconocido en el catálogo INEGI` });
         continue;
@@ -1105,7 +1105,7 @@ async function agruparUnidadesPorEstado(
         noResueltas.push({ nombre: d.nombre, estado: estadoNombre ?? "", motivo: "El estado de este distrito no está definido" });
         continue;
       }
-      const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(estadoNombre)];
+      const estadoCve = resolverEstadoCve(estadoNombre);
       if (!estadoCve) {
         noResueltas.push({ nombre: d.nombre, estado: estadoNombre, motivo: `Estado "${estadoNombre}" no reconocido en el catálogo INEGI` });
         continue;

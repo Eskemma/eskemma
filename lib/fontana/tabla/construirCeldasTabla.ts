@@ -27,7 +27,7 @@ import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 import { tieneSerie } from "@/lib/fontana/series/seriesDisponibles";
 import { buildEcegStoragePath, fetchEcegFromStorage } from "@/lib/sefix/ecegStorage";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, getMunicipiosOptions, resolveMunicipioCve, getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
+import { getMunicipiosOptions, resolveMunicipioCve, getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
 import {
   getDistritosFederalesOptions,
   getDistritosLocalesOptions,
@@ -44,6 +44,7 @@ import {
   type NivelTablaFontana,
   type DesgloseEstatal,
 } from "@/lib/fontana/tablaColumnas";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { ProjectType } from "@/types/moddulo.types";
 
@@ -262,7 +263,7 @@ async function contarMunicipiosEnDistrito(territorio: Territorio): Promise<numbe
   if (territorio.nivel !== "distrito_federal" && territorio.nivel !== "distrito_local") return null;
   if (!territorio.estado) return null;
 
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return null;
 
   const numeroDistrito = extraerNumeroDistrito(territorio.municipio ?? territorio.nombre, territorio.cve_distrito);
@@ -288,7 +289,7 @@ async function calcularDesglosesEstado(territorio: Territorio): Promise<Desglose
   if (territorio.nivel !== "estatal" || !territorio.estado) {
     return { municipal: null, distrital: null };
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return { municipal: null, distrital: null };
 
   try {
@@ -348,7 +349,7 @@ async function prepararContextoMunicipal(
   territorio: Territorio
 ): Promise<{ estadoCve: string; municipioCve: string } | null> {
   if (territorio.nivel !== "municipal" || !territorio.estado || !territorio.municipio) return null;
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) return null;
   try {
     const municipioCve = await resolveMunicipioCve(estadoCve, territorio.municipio);

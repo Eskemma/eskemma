@@ -27,9 +27,9 @@
 // desglose reconstruible (F2-3/F2-4).
 
 import envipeData from "@/data/fontana/envipe_tasa_victimizacion.json";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
+import { claveEstadoDatos } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_ENVIPE = "INEGI (ENVIPE 2025, Reporte de Resultados 33/25)";
 
@@ -40,7 +40,7 @@ const DATA = envipeData as { _anioReferencia: number; tasas: Record<string, numb
 let indice: Map<string, number> | null = null;
 function obtenerIndice(): Map<string, number> {
   if (indice) return indice;
-  indice = new Map(Object.entries(DATA.tasas).map(([nombre, valor]) => [normalizeGeoName(nombre), valor]));
+  indice = new Map(Object.entries(DATA.tasas).map(([nombre, valor]) => [claveEstadoDatos(nombre), valor]));
   return indice;
 }
 
@@ -61,7 +61,7 @@ export async function resolverVictimizacionEnvipe(territorio: Territorio): Promi
   const NATURALEZA_ENVIPE = "estimacion_modelada" as const;
 
   const nacional: CeldaFontana = (() => {
-    const valor = idx.get(normalizeGeoName("NACIONAL"));
+    const valor = idx.get(claveEstadoDatos("NACIONAL"));
     return valor != null
       ? { nivel: "nacional", valor, unidad: `víctimas por cada 100,000 habitantes (${anio})`, naturaleza: NATURALEZA_ENVIPE, fuenteEtiqueta: FUENTE_ETIQUETA_ENVIPE }
       : { nivel: "nacional", motivo: "ENVIPE no reportó el valor nacional para el año de referencia" };
@@ -74,7 +74,7 @@ export async function resolverVictimizacionEnvipe(territorio: Territorio): Promi
     return [nacional, { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" }, distrital, municipal];
   }
 
-  const valorEstatal = idx.get(normalizeGeoName(territorio.estado));
+  const valorEstatal = idx.get(claveEstadoDatos(territorio.estado));
   const estatal: CeldaFontana = valorEstatal != null
     ? { nivel: "estatal", valor: valorEstatal, unidad: `víctimas por cada 100,000 habitantes (${anio})`, naturaleza: NATURALEZA_ENVIPE, fuenteEtiqueta: FUENTE_ETIQUETA_ENVIPE }
     : { nivel: "estatal", motivo: `ENVIPE no reportó el valor para "${territorio.estado}"` };

@@ -33,11 +33,11 @@ import {
   resolverDesgloseMunicipiosNacional,
   resolverDesgloseDistritosNacional,
 } from "@/lib/fontana/ingesta";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { getMunicipiosOptions, normalizeGeoName, resolveMunicipioCve } from "@/lib/geo/municipios";
 import { extraerNumeroDistrito } from "@/lib/moddulo/distritoElectoral";
 import { esValorDisponible } from "@/lib/fontana/ingesta/types";
 import { UMBRAL_PRECARGA_COMPLETA } from "@/lib/fontana/tablaColumnas";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 
 export const maxDuration = 60;
 
@@ -164,7 +164,7 @@ export async function GET(
     return NextResponse.json({ error: "El proyecto no tiene un estado definido en su territorio" }, { status: 400 });
   }
 
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     return NextResponse.json({ error: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }
@@ -245,7 +245,7 @@ async function handleGetEstado(
   if (!territorio.estado) {
     return NextResponse.json({ error: "El proyecto no tiene un estado definido en su territorio" }, { status: 400 });
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     return NextResponse.json({ error: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }
@@ -379,7 +379,7 @@ async function handleGetMunicipio(
   if (!territorio.estado || !territorio.municipio) {
     return NextResponse.json({ error: "El proyecto no tiene estado/municipio definidos en su territorio" }, { status: 400 });
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     return NextResponse.json({ error: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }
@@ -447,7 +447,7 @@ export async function POST(
   if (!territorio.estado) {
     return NextResponse.json({ error: "El proyecto no tiene un estado definido en su territorio" }, { status: 400 });
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     return NextResponse.json({ error: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }, { status: 400 });
   }

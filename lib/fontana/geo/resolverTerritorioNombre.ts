@@ -16,6 +16,7 @@ import {
   claveCanonicaMunicipio,
   getMunicipiosOptionsNacional,
 } from "@/lib/geo/municipios";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { IndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 
@@ -64,6 +65,12 @@ export async function resolverTerritorioNombre(
   const norm = normalizeGeoName(nombre);
 
   // 1) ¿Es un ESTADO? (salvo que el usuario haya pedido explícitamente municipal)
+  // EXCEPCIÓN DELIBERADA a lib/geo/estados.ts: `nombre` es TEXTO LIBRE dicho por
+  // el usuario en el chat — "México" ahí puede ser el país o el Estado de
+  // México, y esa desambiguación conversacional NO se resuelve en el helper
+  // (queda pendiente para Sefix-AI, ver CLAUDE.md "Geografía compartida").
+  // Por eso aquí se busca solo la clave exacta del catálogo, sin alias. El
+  // `estadoHint` de abajo SÍ es un campo tipado como estado → usa el resolver.
   const cveEstadoDirecto = ESTADO_CVE_MAP[norm];
   if (cveEstadoDirecto && nivelHint !== "municipal" && !estadoHint) {
     const label = nombre.trim();
@@ -72,7 +79,7 @@ export async function resolverTerritorioNombre(
 
   // 2) Municipio — búsqueda nacional, join disciplinado por clave canónica.
   const todos = await getMunicipiosOptionsNacional();
-  const hintCve = estadoHint ? ESTADO_CVE_MAP[normalizeGeoName(estadoHint)] : null;
+  const hintCve = estadoHint ? resolverEstadoCve(estadoHint) : null;
   const matches = todos.filter((o) => {
     if (hintCve && o.estadoCve !== hintCve) return false;
     return claveCanonicaMunicipio(o.estadoCve, o.nombre) === claveCanonicaMunicipio(o.estadoCve, nombre);

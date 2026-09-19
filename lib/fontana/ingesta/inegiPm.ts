@@ -69,12 +69,12 @@
 // límite de concurrencia — mismo criterio que resolverDesgloseMunicipiosNacional.
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName } from "@/lib/geo/municipios";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { ResultadoSerie } from "@/lib/fontana/series/tipos";
 import { nivelObjetivoSerie } from "@/lib/fontana/series/tipos";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 
 export const FUENTE_ETIQUETA_INEGI_PM = "INEGI (Pobreza Multidimensional 2024)";
 
@@ -120,7 +120,7 @@ async function resolverCeldaNacionalEstatal(
   if (!territorio.estado) {
     return [nacional, { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" }];
   }
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     return [nacional, { nivel: "estatal", motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` }];
   }
@@ -251,7 +251,7 @@ export async function resolverSerieInegiPm(
     territorioLabel = "Nacional";
   } else {
     if (!territorio.estado) return { ok: false, motivo: "El proyecto no tiene un estado definido en su territorio" };
-    const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+    const cve = resolverEstadoCve(territorio.estado);
     if (!cve) return { ok: false, motivo: `Estado "${territorio.estado}" no reconocido en el catálogo INEGI` };
     area = cve;
     territorioLabel = CVE_ESTADO_NOMBRE[cve] ?? territorio.estado;

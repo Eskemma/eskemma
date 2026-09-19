@@ -32,6 +32,7 @@ import https from "https";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "@/lib/geo/municipios";
 import { resolverPoblacionEstatal } from "@/lib/fontana/ingesta/conapo";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 
@@ -170,7 +171,7 @@ export async function resolverGastoFederalizadoPerCapita(territorio: Territorio)
   if (!territorio.estado) {
     estatal = { nivel: "estatal", motivo: "El proyecto no tiene un estado definido en su territorio" };
   } else {
-    const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+    const estadoCve = resolverEstadoCve(territorio.estado);
     const gastoMilesPesos = datos.porEntidadMilesPesos.get(nombreShcpCanonico(territorio.estado));
     if (!estadoCve || gastoMilesPesos == null) {
       estatal = { nivel: "estatal", motivo: `SHCP no reportó gasto federalizado para "${territorio.estado}"` };

@@ -185,3 +185,17 @@ export function claveAlmacenamiento(entidad: string): string {
     .replace(/\s+/g, "_")
     .replace(/[^A-Z0-9_ÑÜ]/g, "");
 }
+
+/**
+ * Clave para indexar/consultar datos de una FUENTE que trae los estados por
+ * NOMBRE ("México", "Distrito Federal", "Michoacán de Ocampo"…): la clave
+ * interna del estado si se reconoce, o el nombre normalizado si no (p. ej.
+ * "NACIONAL" ya es una clave válida; un nombre ajeno se conserva tal cual).
+ * Se usa en AMBOS lados — al construir el índice con los nombres del archivo y
+ * al consultarlo con el territorio del proyecto — para que "Estado de México"
+ * encuentre la fila que la fuente llama "México". Antes cada lado normalizaba
+ * por su cuenta y esos nombres no coincidían (huelgas de Edomex → 0 silencioso).
+ */
+export function claveEstadoDatos(nombre: string): string {
+  return resolverEstado(nombre)?.clave ?? normalizarNombreMunicipio(nombre);
+}

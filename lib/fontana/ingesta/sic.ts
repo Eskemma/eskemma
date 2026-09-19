@@ -27,7 +27,8 @@
 // proceso (TTL 24h, single-flight).
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio } from "@/lib/geo/municipios";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
 import type { Territorio } from "@/types/shared.types";
 
@@ -98,7 +99,7 @@ async function fetchTabla(estadoIdSic_: string, tabla: Tabla): Promise<FilaSic[]
 
 export async function resolverTradicionesFiestas(territorio: Territorio): Promise<CeldaFontana[]> {
   if (!territorio.estado) return [];
-  const cve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const cve = resolverEstadoCve(territorio.estado);
   if (!cve) return [{ nivel: "estatal", motivo: "Estado no reconocido para el catálogo del SIC" }];
   const idSic = estadoIdSic(cve);
 

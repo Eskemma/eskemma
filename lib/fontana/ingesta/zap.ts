@@ -37,9 +37,9 @@
 // ronda futura si el patrón se repite.
 
 import zapData from "@/data/fontana/zap_rural_2026.json";
-import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
-import { normalizeGeoName, claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
+import { claveCanonicaMunicipio, getMunicipiosOptions } from "@/lib/geo/municipios";
 import { extraerCiudadCabecera } from "@/lib/moddulo/territorioLabel";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import type { ElementoDeEstado } from "@/lib/fontana/ingesta/eceg";
 import type { Territorio } from "@/types/shared.types";
 import type { CeldaFontana } from "@/lib/fontana/ingesta/types";
@@ -90,7 +90,7 @@ export async function resolverZonaAtencionPrioritaria(territorio: Territorio): P
     return [nacional, { nivel: "estatal", motivo }, { nivel: "distrital", motivo: "DOF no publica Zonas de Atención Prioritaria por distrito electoral" }, { nivel: "municipal", motivo: "El proyecto no tiene un municipio definido en su territorio" }];
   }
 
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(territorio.estado)];
+  const estadoCve = resolverEstadoCve(territorio.estado);
   if (!estadoCve) {
     const motivo = `Estado "${territorio.estado}" no reconocido en el catálogo INEGI`;
     return [nacional, { nivel: "estatal", motivo }, { nivel: "distrital", motivo: "DOF no publica Zonas de Atención Prioritaria por distrito electoral" }, { nivel: "municipal", motivo }];
@@ -179,7 +179,7 @@ export async function resolverDetalleZapMunicipios(
   offset = 0,
   limit = PAGE_SIZE_ZAP
 ): Promise<DetalleZapResultado> {
-  const estadoCve = ESTADO_CVE_MAP[normalizeGeoName(estado)];
+  const estadoCve = resolverEstadoCve(estado);
   if (!estadoCve) return { items: [], total: 0, offset, hasMore: false };
   const todos = await resolverMunicipiosEstadoZap(estadoCve);
   const designados = todos

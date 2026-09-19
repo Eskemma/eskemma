@@ -34,7 +34,8 @@ import {
   diffTerritorioEscalar,
   type TerritorioFieldDiff,
 } from "@/lib/territorio/staleness";
-import { matchDistrito, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { buscarDistritoCandidatos, primerCandidatoTemporal, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
+import { resolverEstadoCve } from "@/lib/geo/estados";
 import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
@@ -3044,7 +3045,11 @@ async function resolveGeoFilter(
       if (!res.ok) return null;
       const json = await res.json();
       const opciones: { cve: string; nombre: string }[] = json?.opciones ?? [];
-      const cabecera = matchDistrito(opciones, territorio);
+      // TEMPORAL: con >1 candidato se toma el primero (ver primerCandidatoTemporal).
+      const cabecera = primerCandidatoTemporal(
+        buscarDistritoCandidatos(opciones, territorio, { estadoCve: resolverEstadoCve(estado), anio }),
+        `${key} ${estado} ${anio}`
+      );
       if (cabecera) return { cabecera };
     } catch { /* no-op */ }
     return null;
@@ -3057,7 +3062,11 @@ async function resolveGeoFilter(
       if (!res.ok) return null;
       const json = await res.json();
       const opciones: { cve: string; nombre: string }[] = json?.opciones ?? [];
-      const cabecera = matchDistrito(opciones, territorio);
+      // TEMPORAL: con >1 candidato se toma el primero (ver primerCandidatoTemporal).
+      const cabecera = primerCandidatoTemporal(
+        buscarDistritoCandidatos(opciones, territorio, { estadoCve: resolverEstadoCve(estado), anio }),
+        `${key} ${estado} ${anio}`
+      );
       if (cabecera) return { cabecera };
     } catch { /* no-op */ }
     return null;
