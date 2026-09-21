@@ -673,7 +673,7 @@ export default function TerritorySelector({
                 )}
                 {(candidatosPorEstado[estadoNombre]?.length ?? 0) > 0 && (
                   <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-gray-eske-10/60 dark:bg-white/5">
-                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                       Nombre ambiguo — ¿cuál de estos quisiste decir?
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -885,7 +885,7 @@ export default function TerritorySelector({
               <div className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-green-eske/5 border border-green-eske/20">
                 <p className="text-xs font-medium text-green-eske">✓ Verificado con fuentes reales</p>
                 {resultadoAsistente.indicadores.map((ind, i) => (
-                  <div key={i} className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                  <div key={i} className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                     <p>{ind.valor}</p>
                     <a href={ind.url} target="_blank" rel="noopener noreferrer" className="text-bluegreen-eske dark:text-blue-eske-20 hover:underline">
                       {ind.fuente}{ind.fecha ? ` — ${ind.fecha}` : ""}

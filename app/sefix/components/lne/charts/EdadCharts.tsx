@@ -275,7 +275,7 @@ function MetodologiaModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Cerrar modal de metodología"
-            className="text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+            className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -324,7 +324,7 @@ function MetodologiaModal({ onClose }: { onClose: () => void }) {
             </ul>
           </div>
 
-          <p className="text-xs text-black-eske-60 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
+          <p className="text-xs text-black-eske-10 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
             Esta es una herramienta de referencia. Los datos oficiales son los publicados por el INE.
           </p>
         </div>
@@ -374,7 +374,7 @@ export function E1SerieChart({ serie, ambito }: E1Props) {
 
   if (serie.length < 2) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
         Sin datos de serie temporal suficientes para proyección (se necesitan al menos 2 cortes).
       </p>
     );
@@ -444,10 +444,10 @@ export function E1SerieChart({ serie, ambito }: E1Props) {
       <div className="mb-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] p-3">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-semibold text-black-eske-60 dark:text-[#9AAEBE] mb-2">Rangos de edad:</p>
+            <p className="text-[11px] font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-2">Rangos de edad:</p>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-1.5">
               {RANGOS_EDAD.map((r) => (
-                <label key={r} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-80 dark:text-[#C7D6E0]">
+                <label key={r} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-40 dark:text-[#C7D6E0]">
                   <input
                     type="checkbox"
                     checked={rangosActivos.has(r)}
@@ -462,7 +462,7 @@ export function E1SerieChart({ serie, ambito }: E1Props) {
           <div className="flex flex-col gap-1.5 shrink-0 pt-4">
             <button
               onClick={() => setRangosActivos(new Set(RANGOS_EDAD))}
-              className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
+              className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
             >
               ↺ Restablecer
             </button>
@@ -522,7 +522,7 @@ export function E1SerieChart({ serie, ambito }: E1Props) {
         </LineChart>
       </ResponsiveContainer>
 
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center mt-1">
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center mt-1">
         Líneas punteadas = proyección estimada hasta diciembre.
       </p>
 
@@ -585,7 +585,7 @@ export function E3GruposSerieChart({ serie, ambito }: E3Props) {
 
   if (serie.length < 2) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
         Sin datos suficientes para proyección por grupo etario.
       </p>
     );
@@ -642,10 +642,10 @@ export function E3GruposSerieChart({ serie, ambito }: E3Props) {
       <div className="mb-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] p-3">
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <p className="text-[11px] font-semibold text-black-eske-60 dark:text-[#9AAEBE] mb-2">Grupos etarios:</p>
+            <p className="text-[11px] font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-2">Grupos etarios:</p>
             <div className="flex flex-wrap gap-x-6 gap-y-1">
               {grupoKeys.map((g) => (
-                <label key={g} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-80 dark:text-[#C7D6E0]">
+                <label key={g} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-40 dark:text-[#C7D6E0]">
                   <input
                     type="checkbox"
                     checked={gruposActivos.has(g)}
@@ -660,7 +660,7 @@ export function E3GruposSerieChart({ serie, ambito }: E3Props) {
           <div className="flex flex-col gap-1.5 shrink-0">
             <button
               onClick={() => setGruposActivos(new Set(grupoKeys))}
-              className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
+              className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
             >
               ↺ Restablecer
             </button>
@@ -711,7 +711,7 @@ export function E3GruposSerieChart({ serie, ambito }: E3Props) {
         </LineChart>
       </ResponsiveContainer>
 
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center mt-1">
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center mt-1">
         Líneas punteadas = proyección estimada hasta diciembre.
       </p>
 

@@ -22,8 +22,8 @@ const SELECT_CLS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske " +
   "w-full sm:w-auto sm:min-w-[140px]";
 
-const LABEL_CLS = "text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]";
-const LABEL_DISABLED_CLS = "text-xs font-medium text-black-eske-60/50 dark:text-[#6D8294]";
+const LABEL_CLS = "text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]";
+const LABEL_DISABLED_CLS = "text-xs font-medium text-black-eske-10/50 dark:text-[#6D8294]";
 const RADIO_CLS = "flex items-center gap-1.5 text-xs text-black-eske dark:text-[#EAF2F8] cursor-pointer";
 
 interface Props {
@@ -109,7 +109,7 @@ export default function EleccionesLocalesFilters({
 
       {/* Fila 0: Scope + Restablecer */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] font-medium">
+        <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] font-medium">
           {scopeLabel}
         </span>
         <button

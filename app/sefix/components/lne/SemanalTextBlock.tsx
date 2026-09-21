@@ -61,7 +61,7 @@ export default function SemanalTextBlock({
               className="w-8 h-8 border-4 border-gray-eske-20 border-t-blue-eske rounded-full animate-spin"
               aria-hidden="true"
             />
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Procesando análisis…</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Procesando análisis…</p>
           </div>
         )}
         <div className="bg-gray-eske-10 dark:bg-blue-eske/10 rounded-lg p-4 animate-pulse h-40" aria-hidden="true" />
@@ -86,7 +86,7 @@ export default function SemanalTextBlock({
         <OrigenTexts data={data} ambito={ambito} fecha={fecha} scopeLabel={scopeLabel} />
       )}
 
-      <p className="text-[11px] text-black-eske-60 dark:text-[#9AAEBE] text-center mt-1">
+      <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] text-center mt-1">
         Fuente: INE. Estadística de Padrón Electoral y Lista Nominal del Electorado.
       </p>
     </aside>
@@ -111,7 +111,7 @@ function EdadTexts({
             {texts.titulo}
           </p>
           {fecha && (
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
           )}
         </div>
       )}
@@ -151,7 +151,7 @@ function SexoTexts({
             {texts.titulo}
           </p>
           {fecha && (
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
           )}
         </div>
       )}
@@ -197,7 +197,7 @@ function OrigenTexts({
             {texts.titulo}
           </p>
           {fecha && (
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] text-center mt-0.5">Corte: {fecha}</p>
           )}
         </div>
       )}

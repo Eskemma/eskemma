@@ -195,7 +195,7 @@ export default function InfoTooltip({
           }}
         >
           {/* Unificado al estilo estándar de texto secundario del cuerpo de
-              la app (text-black-eske-80 / dark:text-[#9AAEBE], mismo tono
+              la app (text-black-eske-20 / dark:text-[#9AAEBE], mismo tono
               que usa F3Tablero.tsx fuera de tooltips) — antes usaba
               dark:text-[#C5D8E8], un tono más claro exclusivo de este
               componente que desentonaba con el resto de la UI. */}
@@ -203,7 +203,7 @@ export default function InfoTooltip({
               SÍ hereda de ancestros en el DOM (ej. una tabla o modal con
               text-center) — sin esto, el contenido se veía centrado cuando
               el trigger vivía dentro de un contexto centrado. */}
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1 text-left">{content}</p>
+          <p className="text-xs lg:text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1 text-left">{content}</p>
           {fuente && (
             <p className="text-[10px] lg:text-[12px] italic text-gray-eske-60 dark:text-[#6D8294] text-left">{fuente}</p>
           )}

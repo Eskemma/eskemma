@@ -34,7 +34,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="p-4 rounded-lg border border-red-eske/30 bg-red-eske/5 text-center">
-          <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-3">
+          <p className="text-xs lg:text-sm text-black-eske-20 dark:text-[#9AAEBE] mb-3">
             {this.props.fallbackLabel ?? "Algo salió mal al mostrar esta sección."}
           </p>
           <button

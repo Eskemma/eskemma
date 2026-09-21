@@ -65,7 +65,7 @@ export default function MobileFirstVisitHint() {
         <button
           type="button"
           onClick={dismiss}
-          className="mt-4 w-full py-2 text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] text-center border border-gray-eske-20 dark:border-white/10 rounded-lg hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+          className="mt-4 w-full py-2 text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] text-center border border-gray-eske-20 dark:border-white/10 rounded-lg hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
         >
           Entendido
         </button>

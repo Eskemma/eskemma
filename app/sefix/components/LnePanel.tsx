@@ -86,7 +86,7 @@ export default function LnePanel() {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
                   isActive
                     ? "border-orange-eske text-orange-eske bg-white-eske dark:bg-[#18324A]"
-                    : "border-transparent text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#C7D6E0] hover:bg-gray-eske-20 dark:hover:bg-[#112230]",
+                    : "border-transparent text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#C7D6E0] hover:bg-gray-eske-20 dark:hover:bg-[#112230]",
                 ].join(" ")}
                 aria-selected={isActive}
                 role="tab"

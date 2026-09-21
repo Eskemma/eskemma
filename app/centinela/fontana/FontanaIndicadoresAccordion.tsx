@@ -245,7 +245,7 @@ export default function FontanaIndicadoresAccordion({
           style={{ borderTopColor: familiaMeta.color }}
         >
           <h3 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">{familiaMeta.nombre}</h3>
-          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mb-4">{familiaMeta.descripcion}</p>
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mb-4">{familiaMeta.descripcion}</p>
 
           {/* + Añadir indicador, y a la derecha: Añadir todos / Limpiar */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -324,13 +324,13 @@ export default function FontanaIndicadoresAccordion({
             />
           )}
 
-          <div className="mt-6 text-[11px] text-black-eske-80 dark:text-[#9AAEBE] flex items-center gap-1">
+          <div className="mt-6 text-[11px] text-black-eske-20 dark:text-[#9AAEBE] flex items-center gap-1">
             <span>Los indicadores con candado son requeridos por el Programa de Investigación Profunda de tu proyecto.</span>
             <InfoTooltip content="Los indicadores mínimos no pueden eliminarse de la sesión." />
           </div>
         </div>
       ) : (
-        <div className="mt-4 text-sm text-black-eske-80 dark:text-[#9AAEBE] border border-dashed border-gray-eske-20 dark:border-white/10 rounded-xl p-8 text-center">
+        <div className="mt-4 text-sm text-black-eske-20 dark:text-[#9AAEBE] border border-dashed border-gray-eske-20 dark:border-white/10 rounded-xl p-8 text-center">
           Selecciona una familia para ver su tabla comparativa.
         </div>
       )}

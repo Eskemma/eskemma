@@ -1,17 +1,17 @@
 // lib/design/tokensColor.test.ts
-// Guard anti-regresión del design system de color (ratchet, mismo patrón que estados.test.ts).
+// Guard anti-regresión del design system de color.
 //
 // Dos clases de bug que NO truenan en `tsc` ni en `next build` (una clase de Tailwind es solo un
 // string) y son no-op silencioso en runtime:
-//   1. Tokens -eske que NO existen en globals.css (p. ej. el paso 50 de gray-eske, o black-eske-60):
-//      el texto hereda el color del ancestro. Incidentes reales: 26-09-12 (badges "Archivado" casi
-//      invisibles en modo oscuro) y 26-09-13 (~150 ocurrencias en Moddulo). Sub-ronda 26-09-20:
-//      el paso 50 llegó a 0 en todo el repo.
+//   1. Tokens -eske que NO existen en globals.css (p. ej. el paso 50, `black-eske-60`/`-80` o
+//      `blue-eske-900`): el texto hereda el color del ancestro. Incidentes reales: 26-09-12 (badges
+//      "Archivado" casi invisibles en modo oscuro), 26-09-13 (~150 ocurrencias en Moddulo) y la
+//      auditoría 26-09-20/21. Desde 26-09-21 NO hay remanentes tolerados: cualquier token -eske que
+//      no esté definido en globals.css rompe el test (sin ratchet, sin topes).
 //   2. Colores genéricos de la escala numérica de Tailwind (`bg-red-50`, `text-gray-400`…) en
 //      componentes ya migrados al design system (PESTEL, sub-ronda 26-09-20).
 //
-// Se lee globals.css como fuente de verdad de qué tokens existen. Los remanentes CONOCIDOS de la
-// clase 1 están en TOPE_REMANENTE: pueden bajar (y deben, bajando también el tope), nunca subir.
+// Se lee globals.css como fuente de verdad de qué tokens existen.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -36,59 +36,64 @@ const tokensDefinidos = new Set(
   [...readFileSync(join(RAIZ, "app/globals.css"), "utf8").matchAll(/--color-([a-z]+-eske(?:-\d+)?):/g)].map((m) => m[1])
 );
 
-/** {archivo → {token indefinido → ocurrencias}} */
-function tokensIndefinidos(dirs: string[]): Record<string, Record<string, number>> {
+/** Ocurrencias de tokens -eske NO definidos en un texto: {token → n}. Pura, para poder probar el escáner. */
+export function tokensIndefinidosEnTexto(texto: string, definidos: Set<string> = tokensDefinidos): Record<string, number> {
   // Sin lookbehind de "-": el token va PRECEDIDO por "-" (`text-` + color-eske-paso). Sí exige que no lo
   // preceda una letra/dígito (así "bluegreen-eske" no se lee como "green-eske").
   const re = new RegExp(`(?<![a-zA-Z0-9])((?:${COLORES_ESKE})-eske(?:-\\d+)?)(?![\\w-])`, "g");
-  const out: Record<string, Record<string, number>> = {};
-  for (const f of dirs.flatMap((d) => archivos(d))) {
-    for (const m of readFileSync(join(RAIZ, f), "utf8").matchAll(re)) {
-      if (tokensDefinidos.has(m[1])) continue;
-      ((out[f] ??= {})[m[1]] ??= 0);
-      out[f][m[1]]++;
-    }
+  const out: Record<string, number> = {};
+  for (const m of texto.matchAll(re)) {
+    if (definidos.has(m[1])) continue;
+    out[m[1]] = (out[m[1]] ?? 0) + 1;
   }
   return out;
 }
 
-function totalPorToken(r: Record<string, Record<string, number>>): Record<string, number> {
-  const t: Record<string, number> = {};
-  for (const porToken of Object.values(r)) for (const [tok, n] of Object.entries(porToken)) t[tok] = (t[tok] ?? 0) + n;
-  return t;
+/** {archivo → {token indefinido → ocurrencias}} */
+function tokensIndefinidos(dirs: string[]): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const f of dirs.flatMap((d) => archivos(d))) {
+    const t = tokensIndefinidosEnTexto(readFileSync(join(RAIZ, f), "utf8"));
+    if (Object.keys(t).length) out[f] = t;
+  }
+  return out;
 }
 
-// Remanentes conocidos (2026-09-20), pendientes de sus propias sub-rondas: Sefix (`black-eske-60`, 224),
-// Fontana (`black-eske-80`, 131) y el resto del sitio. BAJAR estos topes al corregir; nunca subirlos.
-const TOPE_REMANENTE: Record<string, number> = {
-  "black-eske-60": 252,
-  "black-eske-80": 148,
-  "blue-eske-900": 1,
-};
+// Todo el código de la app. (Cloud Functions no usa clases de Tailwind; el resto de directorios raíz con
+// código —context, types, utils— se incluye para que un token inexistente no se esconda fuera de app/lib.)
+const DIRS_CODIGO = ["app", "lib", "context", "types", "utils"];
 
-describe("tokens -eske: todo lo que se usa existe en globals.css", () => {
-  const global = tokensIndefinidos(["app", "lib"]);
-
-  it("el paso 50 no existe y NO se usa en ningún archivo (llegó a 0 el 2026-09-20)", () => {
-    const con50 = Object.entries(global).filter(([, t]) => Object.keys(t).some((k) => /-50$/.test(k)));
-    expect(con50.map(([f]) => f)).toEqual([]);
+describe("tokens -eske: todo lo que se usa existe en globals.css (sin remanentes tolerados)", () => {
+  it("NINGÚN token -eske indefinido en todo el código (repo entero = 0)", () => {
+    expect(tokensIndefinidos(DIRS_CODIGO)).toEqual({});
   });
 
-  it("el escáner funciona: ve los remanentes conocidos (evita un pase vacuo si el regex se rompe)", () => {
-    const totales = totalPorToken(global);
-    for (const tok of Object.keys(TOPE_REMANENTE)) expect(totales[tok] ?? 0, tok).toBeGreaterThan(0);
+  it("los tokens que nunca existieron siguen prohibidos por nombre: paso 50, black-eske-60/-70/-80 y blue-eske-900", () => {
+    const usados = Object.values(tokensIndefinidos(DIRS_CODIGO)).flatMap((t) => Object.keys(t));
+    const prohibidos = usados.filter((t) => /-50$/.test(t) || /^black-eske-(50|60|70|80)$/.test(t) || t === "blue-eske-900");
+    expect(prohibidos).toEqual([]);
   });
 
-  it("no aparecen tokens inexistentes NUEVOS (fuera de los remanentes conocidos) y los remanentes no crecen", () => {
-    const totales = totalPorToken(global);
-    const nuevos = Object.keys(totales).filter((t) => !(t in TOPE_REMANENTE));
-    expect(nuevos).toEqual([]);
-    for (const [tok, tope] of Object.entries(TOPE_REMANENTE)) expect(totales[tok] ?? 0, tok).toBeLessThanOrEqual(tope);
+  it("el escáner funciona: detecta los tokens fantasma históricos y no marca los reales (evita un pase vacuo)", () => {
+    const muestra =
+      'className="text-black-eske-60 text-black-eske-80 dark:text-[#9AAEBE] text-blue-eske-900 text-gray-eske-50 ' +
+      'text-black-eske-20 text-black-eske-10 text-blue-eske-90 bg-bluegreen-eske text-black-eske"' +
+      ' fill="var(--color-black-eske-60)" hover:text-black-eske-80/50';
+    expect(tokensIndefinidosEnTexto(muestra)).toEqual({
+      "black-eske-60": 2,
+      "black-eske-80": 2,
+      "blue-eske-900": 1,
+      "gray-eske-50": 1,
+    });
   });
 
-  it("PESTEL no usa NINGÚN token inexistente (ni siquiera los remanentes conocidos)", () => {
-    const pestel = tokensIndefinidos(["app/centinela/pestel", "app/components/centinela/pestel"]);
-    expect(pestel).toEqual({});
+  it("globals.css define los tokens del mapeo por rol y NO define los fantasma (la fuente de verdad es la correcta)", () => {
+    for (const t of ["black-eske", "black-eske-10", "black-eske-20", "black-eske-40", "black-eske-90", "blue-eske-90", "gray-eske-90"]) {
+      expect(tokensDefinidos.has(t), t).toBe(true);
+    }
+    for (const t of ["black-eske-50", "black-eske-60", "black-eske-70", "black-eske-80", "blue-eske-900", "gray-eske-50"]) {
+      expect(tokensDefinidos.has(t), t).toBe(false);
+    }
   });
 });
 

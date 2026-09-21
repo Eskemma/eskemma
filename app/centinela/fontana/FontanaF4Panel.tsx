@@ -65,7 +65,7 @@ function Celda({ celda, indicadorId }: { celda: CeldaComparativaPais; indicadorI
       : celda.estadoConsulta === "fuente_no_disponible" ? "Fuente no disponible"
       : "Sin dato";
     return (
-      <div className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+      <div className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
         <p className="italic">{texto}</p>
         {celda.motivo && <p className="text-[10px] mt-0.5">{celda.motivo}</p>}
       </div>
@@ -78,14 +78,14 @@ function Celda({ celda, indicadorId }: { celda: CeldaComparativaPais; indicadorI
       {unidadEsRank ? (
         <>
           <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">Rank {celda.valor}</p>
-          <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">{celda.unidad!.split(" — ")[1]}</p>
+          <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE]">{celda.unidad!.split(" — ")[1]}</p>
         </>
       ) : (
         <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">{formatearValor(celda.valor, celda.unidad)}</p>
       )}
       {celda.naturaleza && <NaturalezaBadge naturaleza={celda.naturaleza} />}
-      {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{celda.fuenteEtiqueta}</p>}
-      {celda.notaAclaratoria && <p className="text-[10px] italic text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">{celda.notaAclaratoria}</p>}
+      {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{celda.fuenteEtiqueta}</p>}
+      {celda.notaAclaratoria && <p className="text-[10px] italic text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{celda.notaAclaratoria}</p>}
       {INDICADORES_FMI_NO_DISPONIBLE.has(indicadorId) && <CoberturaAdvertencia nivel="fmi_no_disponible" />}
     </div>
   );
@@ -95,7 +95,7 @@ export default function FontanaF4Panel({ sesionId, indicadores, paisPrincipal, p
   const [modalIndicador, setModalIndicador] = useState<{ id: string; nombre: string; definicion?: string } | null>(null);
 
   if (indicadores.length === 0) {
-    return <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin indicadores seleccionados en esta familia.</p>;
+    return <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">Sin indicadores seleccionados en esta familia.</p>;
   }
 
   return (
@@ -121,13 +121,13 @@ export default function FontanaF4Panel({ sesionId, indicadores, paisPrincipal, p
                   <span className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] break-words min-w-0">{ind.nombre}</span>
                   {ind.definicion && <InfoTooltip content={ind.definicion} />}
                   {ind.esMinimo && (
-                    <span aria-hidden="true" title="Indicador mínimo del proyecto" className="text-black-eske-60 dark:text-[#6D8294]">
+                    <span aria-hidden="true" title="Indicador mínimo del proyecto" className="text-black-eske-10 dark:text-[#6D8294]">
                       🔒
                     </span>
                   )}
                 </div>
                 {FAMILIA4_POLARIDAD[ind.id] === "menor_mejor" && (
-                  <p className="text-[10px] italic text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">Valor bajo = mejor posición</p>
+                  <p className="text-[10px] italic text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">Valor bajo = mejor posición</p>
                 )}
                 {FAMILIA4_POLARIDAD[ind.id] && (
                   <button
@@ -167,7 +167,7 @@ export default function FontanaF4Panel({ sesionId, indicadores, paisPrincipal, p
         </tbody>
       </table>
 
-      <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-3 leading-snug">
+      <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-3 leading-snug">
         El asistente compara tu país con Colombia, Chile, Brasil y Argentina por
         defecto. Puedes pedirle que agregue o quite países de la comparación
         (por ejemplo: «añade Perú a la serie» o «quítame Argentina»).

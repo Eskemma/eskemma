@@ -55,7 +55,7 @@ export default function EleccionesDynamicText({ data, committed, isLoading, onCl
 
   if (!data) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-4">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-4">
         Ejecuta una consulta para ver el análisis.
       </p>
     );
@@ -85,7 +85,7 @@ export default function EleccionesDynamicText({ data, committed, isLoading, onCl
             type="button"
             onClick={onClose}
             aria-label="Cerrar panel de análisis"
-            className="text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded p-1"
+            className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded p-1"
           >
             ✕
           </button>
@@ -98,7 +98,7 @@ export default function EleccionesDynamicText({ data, committed, isLoading, onCl
           {titulo.esExtraordinaria ? "Elección Federal Extraordinaria" : "Elecciones Federales"}{" "}
           <span className="text-blue-eske dark:text-[#7B8FD4]">{titulo.anio}</span>
         </p>
-        <p className="text-sm text-black-eske-60 dark:text-[#9AAEBE] text-center mt-0.5">
+        <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] text-center mt-0.5">
           {titulo.cargo}
         </p>
       </div>

@@ -120,7 +120,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
       {/* Controles superiores */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm">
-          <label htmlFor="ef-tabla-pagesize" className="text-black-eske-60 dark:text-[#9AAEBE]">
+          <label htmlFor="ef-tabla-pagesize" className="text-black-eske-20 dark:text-[#9AAEBE]">
             Mostrar
           </label>
           <select
@@ -131,10 +131,10 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
           >
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <span className="text-black-eske-60 dark:text-[#9AAEBE]">registros</span>
+          <span className="text-black-eske-20 dark:text-[#9AAEBE]">registros</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <label htmlFor="ef-tabla-search" className="text-black-eske-60 dark:text-[#9AAEBE]">Buscar:</label>
+          <label htmlFor="ef-tabla-search" className="text-black-eske-20 dark:text-[#9AAEBE]">Buscar:</label>
           <input
             id="ef-tabla-search"
             type="text"
@@ -168,7 +168,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={allCols.length} className="px-3 py-8 text-center text-black-eske-60 dark:text-[#6D8294]">
+                <td colSpan={allCols.length} className="px-3 py-8 text-center text-black-eske-10 dark:text-[#6D8294]">
                   Sin datos para esta consulta
                 </td>
               </tr>
@@ -202,7 +202,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
 
       {/* Paginación y descarga */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
           {total > 0 ? `${total.toLocaleString("es-MX")} registros en total` : ""}
         </p>
         <div className="flex items-center gap-2 text-sm">
@@ -215,7 +215,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
           >
             ‹
           </button>
-          <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             {page} / {totalPages}
           </span>
           <button
@@ -232,7 +232,7 @@ export default function EleccionesDataTable({ committed, queryVersion }: Props) 
 
       {/* Fuente + botón descarga — centrados */}
       <div className="flex flex-col items-center gap-2 pt-1">
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center">
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center">
           Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Federales
         </p>
         <button

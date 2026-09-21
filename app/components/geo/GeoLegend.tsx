@@ -23,10 +23,10 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
           aria-hidden="true"
         />
         <div className="flex justify-between mt-0.5">
-          <span className="text-[9px] text-black-eske-60 dark:text-[#C8D8E8] leading-none">
+          <span className="text-[9px] text-black-eske-40 dark:text-[#C8D8E8] leading-none">
             {fmt(colorRamp.min)}
           </span>
-          <span className="text-[9px] text-black-eske-60 dark:text-[#C8D8E8] leading-none">
+          <span className="text-[9px] text-black-eske-40 dark:text-[#C8D8E8] leading-none">
             {fmt(colorRamp.max)}
           </span>
         </div>
@@ -58,7 +58,7 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
           return (
             <span
               key={i}
-              className="text-[10px] text-black-eske-60 dark:text-[#C8D8E8] leading-none"
+              className="text-[10px] text-black-eske-40 dark:text-[#C8D8E8] leading-none"
             >
               {fmt(val)}
             </span>
@@ -72,7 +72,7 @@ export function GeoLegend({ colorRamp, label, formatValue, compact = false }: Ge
             style={{ background: colorRamp.noDataColor }}
             aria-hidden="true"
           />
-          <span className="text-[10px] text-black-eske-60 dark:text-[#C8D8E8]">Sin datos</span>
+          <span className="text-[10px] text-black-eske-40 dark:text-[#C8D8E8]">Sin datos</span>
         </div>
       )}
     </div>

@@ -244,7 +244,7 @@ export default function CursoPage() {
             ) : (
               <Link
                 href="/suscripciones"
-                className="inline-block bg-yellow-eske hover:bg-yellow-eske/90 text-blue-eske-900 font-semibold px-8 py-4 rounded-lg transition-colors text-lg"
+                className="inline-block bg-yellow-eske hover:bg-yellow-eske/90 text-blue-eske-90 font-semibold px-8 py-4 rounded-lg transition-colors text-lg"
               >
                 Ver planes de suscripción
               </Link>

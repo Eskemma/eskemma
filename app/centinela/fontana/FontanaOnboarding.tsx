@@ -35,7 +35,7 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
         <h1 className="text-xl md:text-2xl font-semibold text-bluegreen-eske dark:text-blue-eske-20">
           Fontana — datos abiertos para tu proyecto
         </h1>
-        <p className="mt-2 text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+        <p className="mt-2 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
           Vas a consultar indicadores de datos abiertos para el siguiente proyecto:
         </p>
 
@@ -58,7 +58,7 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
           <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8]">
             Indicadores mínimos identificados: {minimosPreview.length}
           </p>
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1">
             Se consultarán automáticamente al confirmar — no podrán eliminarse de la sesión.
           </p>
           {minimosPreview.length > 0 ? (
@@ -73,7 +73,7 @@ export default function FontanaOnboarding({ proyecto, minimosPreview, onConfirma
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">
+            <p className="mt-3 text-xs text-black-eske-20 dark:text-[#9AAEBE] italic">
               No se identificaron indicadores mínimos para esta tarea — podrás explorar libremente.
             </p>
           )}

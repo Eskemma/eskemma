@@ -49,7 +49,7 @@ export default function IframePanel({
               <div className="absolute inset-0 border-4 border-gray-eske-20 rounded-full" />
               <div className="absolute inset-0 border-4 border-blue-eske rounded-full animate-spin border-t-transparent" />
             </div>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE] text-sm font-medium">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm font-medium">
               Cargando dashboard...
             </p>
           </div>
@@ -84,7 +84,7 @@ export default function IframePanel({
             <h2 className="text-xl font-semibold text-black-eske dark:text-[#C7D6E0] mb-2">
               Error al cargar
             </h2>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE] text-sm mb-4">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm mb-4">
               No se pudo conectar con el servidor del dashboard.
             </p>
             <button

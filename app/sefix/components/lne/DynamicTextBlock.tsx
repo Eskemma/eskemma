@@ -54,7 +54,7 @@ export default function DynamicTextBlock({ texts }: Props) {
       {/* ── Alcance (sobreescrito en HistoricoView con subtituloConCorte) ── */}
       {texts.alcance && (
         <Block label="Alcance">
-          <p className="leading-relaxed text-black-eske-60 dark:text-[#9AAEBE] text-xs">{texts.alcance}</p>
+          <p className="leading-relaxed text-black-eske-20 dark:text-[#9AAEBE] text-xs">{texts.alcance}</p>
         </Block>
       )}
 
@@ -81,7 +81,7 @@ export default function DynamicTextBlock({ texts }: Props) {
 
       {/* ── Fuente ── */}
       {texts.fuente && (
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center mt-1">
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center mt-1">
           {texts.fuente}
         </p>
       )}

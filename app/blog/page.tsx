@@ -153,7 +153,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
               Artículos del blog
             </h2>
 
-            <p className="text-center text-black-eske-80 dark:text-[#C7D6E0] mb-8 text-lg">
+            <p className="text-center text-black-eske-40 dark:text-[#C7D6E0] mb-8 text-lg">
               Explora nuestros artículos sobre estrategia, análisis electoral y
               comunicación política.
             </p>

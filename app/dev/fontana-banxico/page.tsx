@@ -27,12 +27,12 @@ export default async function FontanaBanxicoSandboxPage() {
       <h1 className="text-2xl font-bold text-black-eske dark:text-white mb-1">
         Sandbox Banxico SIE — Fontana (F1-17, remesas)
       </h1>
-      <p className="text-sm text-black-eske-60 dark:text-white/50 mb-1 max-w-2xl">
+      <p className="text-sm text-black-eske-20 dark:text-white/50 mb-1 max-w-2xl">
         Diagnóstico de conexión real al Sistema de Información Económica de
         Banxico. No es una página de producto — solo prueba de viabilidad
         técnica de las series de remesas por entidad federativa (cuadro CA79).
       </p>
-      <p className="text-xs font-mono text-black-eske-60 dark:text-white/40 mb-5">
+      <p className="text-xs font-mono text-black-eske-10 dark:text-white/40 mb-5">
         API: SIE REST v1 · series SE29670-SE29702 (CA79) · ejecutado: {ranAt}
       </p>
 
@@ -51,7 +51,7 @@ export default async function FontanaBanxicoSandboxPage() {
               <span className="font-semibold text-black-eske dark:text-white">
                 {r.ok ? "✅" : "❌"} {r.case.label}
               </span>
-              <span className="text-xs font-mono text-black-eske-60 dark:text-white/50">
+              <span className="text-xs font-mono text-black-eske-20 dark:text-white/50">
                 {r.case.serieId} · {r.case.entidad} · {Math.round(r.responseTimeMs)}ms
               </span>
             </div>
@@ -70,10 +70,10 @@ export default async function FontanaBanxicoSandboxPage() {
             )}
 
             <details className="mt-2">
-              <summary className="text-xs text-black-eske-60 dark:text-white/50 cursor-pointer">
+              <summary className="text-xs text-black-eske-20 dark:text-white/50 cursor-pointer">
                 Ver JSON crudo y URL de solicitud
               </summary>
-              <p className="mt-2 text-xs font-mono break-all text-black-eske-60 dark:text-white/40">
+              <p className="mt-2 text-xs font-mono break-all text-black-eske-10 dark:text-white/40">
                 {r.requestUrl || "(sin solicitud — token ausente)"}
               </p>
               <pre className="mt-1 text-xs bg-gray-eske-10 dark:bg-white/5 p-2 rounded overflow-x-auto text-black-eske dark:text-white/80">
@@ -84,7 +84,7 @@ export default async function FontanaBanxicoSandboxPage() {
         ))}
       </div>
 
-      <p className="mt-6 text-xs text-black-eske-60 dark:text-black-eske-40">
+      <p className="mt-6 text-xs text-black-eske-20 dark:text-black-eske-40">
         Página temporal de diagnóstico. Eliminar antes de producción.
       </p>
     </div>

@@ -407,12 +407,12 @@ export default function FontanaReportePanel({
       <div className="px-4 md:px-8 py-14">
         <div className="max-w-xl mx-auto text-center flex flex-col items-center gap-4">
           <p className="text-black-eske dark:text-[#EAF2F8] font-medium">Reporte de sesión</p>
-          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed">
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed">
             Organiza en un solo documento los indicadores heredados y consultados de esta sesión
             con la lectura estratégica de cada uno. El reporte generado por Fontana podrás
             editarlo y descargarlo.
           </p>
-          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed">
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed">
             Si esta sesión viene de un proyecto, podrás entregar el reporte a Moddulo. En caso
             contrario, si así lo decides, podrás iniciar un nuevo proyecto o vincularlo con
             alguno existente dentro de Moddulo.
@@ -432,7 +432,7 @@ export default function FontanaReportePanel({
                 Generar reporte
               </button>
               {nadaQueGenerar && (
-                <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+                <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                   Esta sesión no tiene indicadores todavía: agrega alguno en la pestaña Indicadores
                   o consulta uno en el chat para poder generar el reporte.
                 </p>
@@ -466,7 +466,7 @@ export default function FontanaReportePanel({
             >
               {editMode ? "Guardar cambios" : "Editar texto"}
             </button>
-            {guardado === "guardando" && <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">Guardando…</span>}
+            {guardado === "guardando" && <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Guardando…</span>}
             {guardado === "guardado" && <span className="text-xs text-green-eske">Guardado</span>}
             {guardado === "error" && <span className="text-xs text-red-eske">No se guardó — reintenta</span>}
           </div>
@@ -574,7 +574,7 @@ export default function FontanaReportePanel({
               <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">
                 ¿Eliminar el reporte de sesión?
               </h3>
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
                 La pestaña Reporte volverá a su estado vacío y los botones para entregar o vincular
                 a Moddulo quedarán deshabilitados hasta que generes uno nuevo. Un reporte que ya
                 hayas entregado a Moddulo no se ve afectado.

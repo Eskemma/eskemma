@@ -184,7 +184,7 @@ function BloqueAgregacionPlural({
   return (
     <div className="space-y-0.5">
       {etiquetaTipo && (
-        <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">
+        <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE]">
           Combinado · {etiquetaTipo} de {desglosePorUnidad.length} unidad{desglosePorUnidad.length === 1 ? "" : "es"}
         </p>
       )}
@@ -263,10 +263,10 @@ function Celda({
       <div className="space-y-1">
         <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
           {celda.valor.toLocaleString("es-MX")}
-          {celda.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{celda.unidad}</span> : null}
+          {celda.unidad ? <span className="ml-1 font-normal text-xs text-black-eske-20 dark:text-[#9AAEBE]">{celda.unidad}</span> : null}
         </p>
         {celda.naturaleza && <NaturalezaBadge naturaleza={celda.naturaleza} />}
-        {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">{celda.fuenteEtiqueta}</p>}
+        {celda.fuenteEtiqueta && <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE]">{celda.fuenteEtiqueta}</p>}
         {(celda.nivel === "nacional" || celda.nivel === "estatal") && INDICADORES_FUENTE_MIXTA_INEGI_PM.has(indicadorId) && (
           <CoberturaAdvertencia nivel="fuente_mixta" />
         )}
@@ -321,7 +321,7 @@ function Celda({
   }
   return (
     <div className="space-y-1">
-      <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{celda.motivo}</p>
+      <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic">{celda.motivo}</p>
       {esColumnaDistritalInvertida && celda.municipioCoberturaPct !== undefined && (
         <CoberturaAdvertencia
           nivel="municipio_propio"
@@ -364,7 +364,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
   if (indicadores.length === 0) {
     return (
       <div className="p-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10/40 dark:bg-[#112230] text-center">
-        <p className="text-xs lg:text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+        <p className="text-xs lg:text-sm text-black-eske-20 dark:text-[#9AAEBE]">
           Aún no hay indicadores en esta sesión. Usa &quot;Añadir indicador&quot; para empezar a explorar.
         </p>
       </div>
@@ -406,7 +406,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
                 if (!celda) return null;
                 return (
                   <div key={nivel}>
-                    <p className="text-[10px] uppercase tracking-wide text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                    <p className="text-[10px] uppercase tracking-wide text-black-eske-20 dark:text-[#9AAEBE] mb-1">
                       {NOMBRE_NIVEL_TABLA[nivel]}
                     </p>
                     <Celda
@@ -433,9 +433,9 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
         <table className="w-full text-left">
           <thead className="bg-gray-eske-10/60 dark:bg-[#112230]">
             <tr>
-              <th className="px-3 py-2 text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE]">Indicador</th>
+              <th className="px-3 py-2 text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Indicador</th>
               {columnas.map((nivel) => (
-                <th key={nivel} className="px-3 py-2 text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE]">
+                <th key={nivel} className="px-3 py-2 text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">
                   {NOMBRE_NIVEL_TABLA[nivel]}
                 </th>
               ))}
@@ -528,7 +528,7 @@ export default function FontanaComparativeTable({ sesionId, columnas, indicadore
 
 function LockIcon() {
   return (
-    <svg className="w-3.5 h-3.5 text-black-eske-80 dark:text-[#9AAEBE] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-3.5 h-3.5 text-black-eske-20 dark:text-[#9AAEBE] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v2" />
     </svg>
   );

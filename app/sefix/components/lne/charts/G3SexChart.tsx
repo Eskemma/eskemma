@@ -201,13 +201,13 @@ export default function G3SexChart({ data, ambito = "nacional", nbLatest, nbAnnu
           >
             <p className="font-semibold text-purple-700 mb-0.5">⚧ No Binario</p>
             {nbDisplay && (
-              <p className="text-black-eske-60 dark:text-[#9AAEBE] font-medium">{nbDisplay.year}</p>
+              <p className="text-black-eske-20 dark:text-[#9AAEBE] font-medium">{nbDisplay.year}</p>
             )}
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Padrón:{" "}
               <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(nbDisplay.padron)}</span>
             </p>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Lista:{" "}
               <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(nbDisplay.lista)}</span>
             </p>
@@ -227,7 +227,7 @@ export default function G3SexChart({ data, ambito = "nacional", nbLatest, nbAnnu
               </p>
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-black-eske-60 dark:text-[#9AAEBE]">
+                  <tr className="text-black-eske-20 dark:text-[#9AAEBE]">
                     <th className="pr-2 font-medium pb-1">Año</th>
                     <th className="pr-2 font-medium pb-1">Padrón</th>
                     <th className="font-medium pb-1">Lista</th>
@@ -236,7 +236,7 @@ export default function G3SexChart({ data, ambito = "nacional", nbLatest, nbAnnu
                 <tbody>
                   {nbTableRows.map((r) => (
                     <tr key={r.year}>
-                      <td className="pr-2 text-black-eske-60 dark:text-[#9AAEBE]">{r.year}</td>
+                      <td className="pr-2 text-black-eske-20 dark:text-[#9AAEBE]">{r.year}</td>
                       <td className="pr-2 text-black-eske dark:text-[#C7D6E0]">{FMT.format(r.padron)}</td>
                       <td className="text-black-eske dark:text-[#C7D6E0]">{FMT.format(r.lista)}</td>
                     </tr>

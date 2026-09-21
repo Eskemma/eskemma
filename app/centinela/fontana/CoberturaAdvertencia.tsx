@@ -73,7 +73,7 @@ function complemento(pct: number): number {
 
 const CHIP_CLASS =
   "mt-1.5 inline-flex items-center gap-1 px-1.5 py-1 rounded border border-blue-eske " +
-  "text-[10px] text-black-eske-80 dark:text-[#9AAEBE] cursor-pointer";
+  "text-[10px] text-black-eske-20 dark:text-[#9AAEBE] cursor-pointer";
 
 export default function CoberturaAdvertencia(props: Props) {
   const etiqueta =

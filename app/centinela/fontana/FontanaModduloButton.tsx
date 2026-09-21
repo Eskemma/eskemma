@@ -115,7 +115,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
         </div>
 
         {!confirmTarget && (
-          <p className="px-5 pt-4 text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+          <p className="px-5 pt-4 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
             Elige el proyecto de Moddulo al que quieres vincular este resultado de Fontana.
           </p>
         )}
@@ -123,7 +123,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
         {confirmTarget && (
           <div className="p-5 flex flex-col gap-4">
             {confirmTarget.territoryMatch === "exact" ? (
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
                 Vas a vincular esta exploración de Fontana al proyecto
                 {" "}<span className="font-semibold text-black-eske dark:text-[#EAF2F8]">"{confirmTarget.name}"</span>.
               </p>
@@ -171,7 +171,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
             )}
             {fetchError && <p className="text-sm text-red-eske text-center py-8">{fetchError}</p>}
             {!loading && !fetchError && projects.length === 0 && (
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] text-center py-8">No tienes proyectos en Moddulo todavía.</p>
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] text-center py-8">No tienes proyectos en Moddulo todavía.</p>
             )}
             {linkError && (
               <div className="mx-2 mb-2 p-3 rounded-lg bg-red-eske/10 border border-red-eske/20 text-sm text-red-eske">{linkError}</div>
@@ -187,7 +187,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
                 >
                   <div className="flex-1 min-w-0">
                     <span className="block font-medium text-sm text-black-eske dark:text-[#EAF2F8] truncate">{p.name}</span>
-                    <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 truncate">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 truncate">
                       {TIPO_LABELS[p.type] ?? p.type}
                       {p.territorio?.nombre ? ` · ${p.territorio.nombre}` : ""}
                     </p>

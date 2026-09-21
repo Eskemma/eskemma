@@ -51,7 +51,7 @@ export default function Tabs({
             ? `px-4 py-2.5 border-b-2 -mb-px ${
                 active
                   ? "border-blue-eske text-black-eske dark:text-[#EAF2F8]"
-                  : "border-transparent text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske-80 dark:hover:text-[#C7D6E0]"
+                  : "border-transparent text-gray-eske-60 dark:text-[#9AAEBE] hover:text-black-eske-40 dark:hover:text-[#C7D6E0]"
               }`
             : `px-3.5 py-2 rounded-lg border ${
                 active

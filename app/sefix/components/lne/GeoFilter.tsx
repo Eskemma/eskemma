@@ -340,7 +340,7 @@ export default function GeoFilter({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE] font-medium">{geoLabel}</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] font-medium">{geoLabel}</span>
           {geoState.status !== "idle" && (
             <button
               onClick={handleReset}
@@ -357,7 +357,7 @@ export default function GeoFilter({
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end">
         {/* Entidad */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="geo-entidad" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Entidad</label>
+          <label htmlFor="geo-entidad" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Entidad</label>
           <select
             id="geo-entidad"
             value={entidadNombre ?? ""}
@@ -374,7 +374,7 @@ export default function GeoFilter({
         {/* Distrito (activo si hay entidad) — SOLO en modo nacional */}
         {pendingAmbito === "nacional" && geoState.status !== "idle" && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="geo-distrito" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <label htmlFor="geo-distrito" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Distrito {loadingDistritos && <span className="text-red-eske">(cargando…)</span>}
             </label>
             <select
@@ -397,8 +397,8 @@ export default function GeoFilter({
         {/* Badge estático RESIDENTES EXTRANJERO — solo modo extranjero con entidad seleccionada */}
         {pendingAmbito === "extranjero" && geoState.status !== "idle" && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Distrito</span>
-            <div className="text-sm border border-gray-eske-20 dark:border-white/10 rounded-md px-2 py-1.5 bg-gray-eske-10 dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] w-full sm:w-auto sm:min-w-[220px] select-none">
+            <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Distrito</span>
+            <div className="text-sm border border-gray-eske-20 dark:border-white/10 rounded-md px-2 py-1.5 bg-gray-eske-10 dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] w-full sm:w-auto sm:min-w-[220px] select-none">
               RESIDENTES EXTRANJERO
             </div>
           </div>
@@ -407,7 +407,7 @@ export default function GeoFilter({
         {/* Municipio (activo si hay distrito) — SOLO en modo nacional */}
         {pendingAmbito === "nacional" && cveDistrito && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="geo-municipio" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <label htmlFor="geo-municipio" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Municipio {loadingMunicipios && <span className="text-red-eske">(cargando…)</span>}
             </label>
             <select
@@ -428,7 +428,7 @@ export default function GeoFilter({
         {/* Sección — tags + popover flotante — SOLO en modo nacional */}
         {pendingAmbito === "nacional" && cveMunicipio && (
           <div ref={seccionContainerRef} className="relative flex flex-col gap-1">
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Sección{" "}
               {loadingSecciones && <span className="text-red-eske">(cargando…)</span>}
               {seccionesSeleccionadas.length > 0 && (
@@ -495,7 +495,7 @@ export default function GeoFilter({
                     role="option"
                     aria-selected={false}
                     onClick={() => { dispatch({ type: "SELECT_SECCION", seccion: [] }); setSeccionSearch(""); setSeccionOpen(false); }}
-                    className="w-full text-left px-2 py-1 text-xs text-black-eske-60 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-white/5 border-b border-gray-eske-10 dark:border-white/10"
+                    className="w-full text-left px-2 py-1 text-xs text-black-eske-20 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-white/5 border-b border-gray-eske-10 dark:border-white/10"
                   >
                     Todas (limpiar selección)
                   </button>

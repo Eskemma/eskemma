@@ -17,18 +17,18 @@ export default async function FontanaIterSandboxPage() {
       <h1 className="text-2xl font-bold text-black-eske dark:text-white mb-1">
         Sandbox ITER — Fontana (Familia 1)
       </h1>
-      <p className="text-sm text-black-eske-60 dark:text-white/50 mb-1 max-w-2xl">
+      <p className="text-sm text-black-eske-20 dark:text-white/50 mb-1 max-w-2xl">
         Diagnóstico de descarga + parseo local del ITER (Censo de Población y Vivienda 2020).
         Segundo mecanismo de acceso de Familia 1 — no usa token ni endpoint HTTP por indicador.
       </p>
-      <p className="text-xs font-mono text-black-eske-60 dark:text-white/40 mb-5">
+      <p className="text-xs font-mono text-black-eske-10 dark:text-white/40 mb-5">
         Fuente: archivo real Jalisco (MUN=14) · ejecutado: {ranAt}
       </p>
 
       {!diag.archivoEncontrado || diag.error ? (
         <div className="rounded border border-red-eske/30 bg-red-eske/5 p-4">
           <p className="font-semibold text-red-eske">❌ {diag.error}</p>
-          <p className="mt-2 text-xs font-mono break-all text-black-eske-60 dark:text-white/40">
+          <p className="mt-2 text-xs font-mono break-all text-black-eske-10 dark:text-white/40">
             {diag.rutaArchivo}
           </p>
         </div>
@@ -38,7 +38,7 @@ export default async function FontanaIterSandboxPage() {
             <p className="font-semibold text-black-eske dark:text-white">
               ✅ Archivo parseado — {diag.totalFilas?.toLocaleString("es-MX")} filas totales
             </p>
-            <p className="mt-1 text-xs font-mono break-all text-black-eske-60 dark:text-white/40">
+            <p className="mt-1 text-xs font-mono break-all text-black-eske-10 dark:text-white/40">
               {diag.rutaArchivo}
             </p>
           </div>
@@ -90,7 +90,7 @@ export default async function FontanaIterSandboxPage() {
                     {p.diferencia !== 0 && " (POB_EDADNE — no está en ITER, esperado)"}
                   </p>
                   <details className="mt-2">
-                    <summary className="text-xs text-black-eske-60 dark:text-white/50 cursor-pointer">
+                    <summary className="text-xs text-black-eske-20 dark:text-white/50 cursor-pointer">
                       Ver los 18 grupos
                     </summary>
                     <pre className="mt-1 text-xs bg-gray-eske-10 dark:bg-white/5 p-2 rounded overflow-x-auto text-black-eske dark:text-white/80">
@@ -104,7 +104,7 @@ export default async function FontanaIterSandboxPage() {
         </div>
       )}
 
-      <p className="mt-6 text-xs text-black-eske-60 dark:text-black-eske-40">
+      <p className="mt-6 text-xs text-black-eske-20 dark:text-black-eske-40">
         Página temporal de diagnóstico. Eliminar antes de producción.
       </p>
     </div>

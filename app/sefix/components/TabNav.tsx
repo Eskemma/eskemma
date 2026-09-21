@@ -33,7 +33,7 @@ export default function TabNav({ activeTab, onTabChange }: TabNavProps) {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
                   isActive
                     ? "text-blue-eske border-b-2 border-blue-eske"
-                    : "text-black-eske-60 dark:text-[#9AAEBE] hover:text-blue-eske border-b-2 border-transparent",
+                    : "text-black-eske-20 dark:text-[#9AAEBE] hover:text-blue-eske border-b-2 border-transparent",
                 ].join(" ")}
               >
                 {tab.label}

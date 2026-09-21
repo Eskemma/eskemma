@@ -204,7 +204,7 @@ const SELECT_CLS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske " +
   "disabled:opacity-40 disabled:cursor-not-allowed w-full sm:w-auto sm:min-w-[160px]";
 
-const LABEL_CLS = "block text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] mb-1";
+const LABEL_CLS = "block text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE] mb-1";
 
 function scopeLabel(fuente: GeoFuente, p: GeoNavPending): string {
   if (!p.estado_id) return "Nacional";
@@ -415,7 +415,7 @@ export function GeoNavegador({
                     ? f === "ine"
                       ? "bg-blue-eske text-white-eske border-blue-eske"
                       : "bg-red-500 text-white border-red-500"
-                    : "bg-white-eske dark:bg-[#18324A] text-black-eske-60 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
+                    : "bg-white-eske dark:bg-[#18324A] text-black-eske-20 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
                 }`}
               >
                 {f === "ine" ? "Vista Electoral" : "Datos Generales"}
@@ -424,7 +424,7 @@ export function GeoNavegador({
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] font-medium">
+            <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] font-medium">
               {scopeLabel(fuente, committed)}
             </span>
             <button
@@ -471,7 +471,7 @@ export function GeoNavegador({
                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske ${
                       pending.modo === m
                         ? "bg-blue-eske text-white-eske border-blue-eske"
-                        : "bg-white-eske dark:bg-[#18324A] text-black-eske-60 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
+                        : "bg-white-eske dark:bg-[#18324A] text-black-eske-20 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
                     }`}
                   >
                     {m === "municipio" ? "Municipio" : m === "distrito_fed" ? "Distrito Electoral Federal" : "Distrito Electoral Local"}

@@ -196,9 +196,9 @@ function ChartCard({ titulo, scopeLabel, children }: ChartCardProps) {
   return (
     <div className="bg-white-eske dark:bg-[#18324A] rounded-lg border border-gray-eske-20 dark:border-white/10 px-2 sm:px-4 pt-3 sm:pt-4 pb-2 sm:pb-3">
       <h3 className="text-sm font-bold text-black-eske dark:text-[#C7D6E0] text-center leading-snug">{titulo}</h3>
-      {scopeLabel && <p className="text-[11px] text-black-eske-60 dark:text-[#9AAEBE] text-center mt-0.5">{scopeLabel}</p>}
+      {scopeLabel && <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] text-center mt-0.5">{scopeLabel}</p>}
       <div className="mt-3">{children}</div>
-      <p className="text-[10px] text-black-eske-60 dark:text-[#9AAEBE] text-center mt-3 pt-2 border-t border-gray-eske-10 dark:border-white/10">
+      <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] text-center mt-3 pt-2 border-t border-gray-eske-10 dark:border-white/10">
         {FUENTE}
       </p>
     </div>
@@ -519,7 +519,7 @@ function OrigenPanel({ ambito, entidad, cveDistrito, cveMunicipio, secciones, sc
 
           {/* Top-N selector */}
           <div className="flex items-center gap-2">
-            <label htmlFor="topn-select" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Mostrar:</label>
+            <label htmlFor="topn-select" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Mostrar:</label>
             <select
               id="topn-select"
               value={topN}
@@ -783,7 +783,7 @@ function SemanalFilterPanel({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] font-medium">{geoLabel}</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] font-medium">{geoLabel}</span>
           {geoState.status !== "idle" && (
             <button
               onClick={() => dispatch({ type: "RESET" })}
@@ -801,7 +801,7 @@ function SemanalFilterPanel({
 
         {/* Estado */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="semanal-entidad" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Estado</label>
+          <label htmlFor="semanal-entidad" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Estado</label>
           <select
             id="semanal-entidad"
             value={entidadNombre ?? ""}
@@ -818,7 +818,7 @@ function SemanalFilterPanel({
         {/* Distrito (solo nacional con entidad) */}
         {pendingAmbito === "nacional" && geoState.status !== "idle" && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="semanal-distrito" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <label htmlFor="semanal-distrito" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Distrito{" "}
               {loadingDistritos && <span className="text-red-eske">(cargando…)</span>}
             </label>
@@ -842,8 +842,8 @@ function SemanalFilterPanel({
         {/* Badge "Residentes Extranjero" en modo extranjero + entidad */}
         {pendingAmbito === "extranjero" && geoState.status !== "idle" && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Distrito</span>
-            <div className="text-sm border border-gray-eske-20 dark:border-white/10 rounded-md px-2 py-1.5 bg-gray-eske-10 dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] w-full sm:w-auto sm:min-w-[220px] select-none">
+            <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Distrito</span>
+            <div className="text-sm border border-gray-eske-20 dark:border-white/10 rounded-md px-2 py-1.5 bg-gray-eske-10 dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] w-full sm:w-auto sm:min-w-[220px] select-none">
               RESIDENTES EXTRANJERO
             </div>
           </div>
@@ -852,7 +852,7 @@ function SemanalFilterPanel({
         {/* Municipio (solo nacional con distrito) */}
         {pendingAmbito === "nacional" && cveDistrito && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="semanal-municipio" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <label htmlFor="semanal-municipio" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Municipio{" "}
               {loadingMunicipios && <span className="text-red-eske">(cargando…)</span>}
             </label>
@@ -874,7 +874,7 @@ function SemanalFilterPanel({
         {/* Sección — tags + popover (solo nacional con municipio) */}
         {pendingAmbito === "nacional" && cveMunicipio && (
           <div ref={seccionContainerRef} className="relative flex flex-col gap-1">
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               Sección{" "}
               {loadingSecciones && <span className="text-red-eske">(cargando…)</span>}
               {seccionesSeleccionadas.length > 0 && (
@@ -933,7 +933,7 @@ function SemanalFilterPanel({
                     role="option"
                     aria-selected={false}
                     onClick={() => { dispatch({ type: "SELECT_SECCION", seccion: [] }); setSeccionSearch(""); setSeccionOpen(false); }}
-                    className="w-full text-left px-2 py-1 text-xs text-black-eske-60 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-[#21425E] border-b border-gray-eske-10 dark:border-white/10"
+                    className="w-full text-left px-2 py-1 text-xs text-black-eske-20 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-[#21425E] border-b border-gray-eske-10 dark:border-white/10"
                   >
                     Todas (limpiar selección)
                   </button>
@@ -1091,7 +1091,7 @@ export default function SemanalView() {
               "px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors border whitespace-nowrap shrink-0",
               desglose === d.id
                 ? "bg-blue-eske text-white-eske border-blue-eske"
-                : "bg-white-eske dark:bg-[#18324A] text-black-eske-60 dark:text-[#C7D6E0] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
+                : "bg-white-eske dark:bg-[#18324A] text-black-eske-40 dark:text-[#C7D6E0] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
             ].join(" ")}
           >
             {d.label}

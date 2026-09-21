@@ -155,13 +155,13 @@ export default function SemanalDataTable({
           Ámbito:{" "}
           <span className="font-bold">{ambitoLabel}</span>
           {fecha && (
-            <span className="text-black-eske-60 dark:text-[#6D8294] font-normal ml-2">
+            <span className="text-black-eske-10 dark:text-[#6D8294] font-normal ml-2">
               — Corte: {fecha}
             </span>
           )}
         </p>
         {scopeLabel && (
-          <p className="text-xs text-black-eske-60 dark:text-[#6D8294]">{scopeLabel}</p>
+          <p className="text-xs text-black-eske-10 dark:text-[#6D8294]">{scopeLabel}</p>
         )}
       </div>
 
@@ -170,7 +170,7 @@ export default function SemanalDataTable({
         <div className="flex items-center gap-2">
           <label
             htmlFor="semanal-tabla-pagesize"
-            className="text-xs text-black-eske-60 dark:text-[#9AAEBE] whitespace-nowrap"
+            className="text-xs text-black-eske-20 dark:text-[#9AAEBE] whitespace-nowrap"
           >
             Mostrar
           </label>
@@ -184,11 +184,11 @@ export default function SemanalDataTable({
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          <span className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">entradas</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">entradas</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="semanal-tabla-search" className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          <label htmlFor="semanal-tabla-search" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             Buscar:
           </label>
           <input
@@ -236,7 +236,7 @@ export default function SemanalDataTable({
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={cols.length} className="px-3 py-6 text-center text-sm text-black-eske-60 dark:text-[#6D8294]">
+                <td colSpan={cols.length} className="px-3 py-6 text-center text-sm text-black-eske-10 dark:text-[#6D8294]">
                   Sin datos para los filtros seleccionados.
                 </td>
               </tr>
@@ -261,13 +261,13 @@ export default function SemanalDataTable({
         </table>
       </div>
       {/* Indicador de scroll horizontal */}
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center sm:hidden">
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center sm:hidden">
         ← Desliza horizontalmente para ver todas las columnas →
       </p>
 
       {/* Paginación */}
       {!isLoading && (
-        <div className="flex items-center justify-between text-xs text-black-eske-60 dark:text-[#6D8294]">
+        <div className="flex items-center justify-between text-xs text-black-eske-10 dark:text-[#6D8294]">
           <span>
             {total === 0
               ? "Sin resultados"

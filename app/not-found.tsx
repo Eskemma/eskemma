@@ -16,7 +16,7 @@ export default function NotFound() {
       <h1 className="text-2xl font-semibold text-black-eske dark:text-[#EAF2F8] mb-3">
         Página no encontrada
       </h1>
-      <p className="text-black-eske-60 dark:text-[#9AAEBE] max-w-sm mb-8">
+      <p className="text-black-eske-20 dark:text-[#9AAEBE] max-w-sm mb-8">
         La dirección que buscas no existe o fue movida. Puedes volver al inicio
         o explorar el contenido disponible.
       </p>

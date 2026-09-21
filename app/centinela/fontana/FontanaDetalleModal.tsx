@@ -148,13 +148,13 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
             <h2 id="f5-detalle-modal-title" className="text-base font-semibold text-bluegreen-eske dark:text-blue-eske-20">
               {indicadorNombre}
             </h2>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">{config.encabezado}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1">{config.encabezado}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -171,7 +171,7 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
                   className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${
                     m.municipio === municipioActivo.municipio && m.estado === municipioActivo.estado
                       ? "border-bluegreen-eske bg-bluegreen-eske/10 text-bluegreen-eske dark:text-blue-eske-20"
-                      : "border-gray-eske-20 dark:border-white/10 text-black-eske-80 dark:text-[#9AAEBE]"
+                      : "border-gray-eske-20 dark:border-white/10 text-black-eske-20 dark:text-[#9AAEBE]"
                   }`}
                 >
                   {m.municipio}
@@ -202,7 +202,7 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
           {cargando ? (
             <p className="text-sm text-red-eske">Cargando…</p>
           ) : items.length === 0 ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">{config.vacio}</p>
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">{config.vacio}</p>
           ) : (
             <>
               <ol className="flex flex-col gap-2">
@@ -211,7 +211,7 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
                     {esGiro(item) ? (
                       <>
                         <span className="text-sm text-black-eske dark:text-[#EAF2F8]">
-                          <span className="text-black-eske-60 dark:text-[#6D8294] mr-1.5">{i + 1}.</span>
+                          <span className="text-black-eske-10 dark:text-[#6D8294] mr-1.5">{i + 1}.</span>
                           {item.giro}
                         </span>
                         <span className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] shrink-0">
@@ -221,9 +221,9 @@ export default function FontanaDetalleModal({ sesionId, indicadorId, indicadorNo
                     ) : (
                       <>
                         <span className="text-sm text-black-eske dark:text-[#EAF2F8]">
-                          <span className="text-black-eske-60 dark:text-[#6D8294] mr-1.5">{i + 1}.</span>
+                          <span className="text-black-eske-10 dark:text-[#6D8294] mr-1.5">{i + 1}.</span>
                           {item.nombre}
-                          <span className="block text-[10px] italic text-black-eske-80 dark:text-[#9AAEBE]">{item.grado}</span>
+                          <span className="block text-[10px] italic text-black-eske-20 dark:text-[#9AAEBE]">{item.grado}</span>
                         </span>
                         <span className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] shrink-0">
                           {item.poblacion.toLocaleString("es-MX")} hab.

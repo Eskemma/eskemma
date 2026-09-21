@@ -41,7 +41,7 @@ function LevelCells({ d, isIndex }: { d: NivelData | null; isIndex: boolean }) {
     <>
       <td className={`${TD} text-black-eske-20 dark:text-[#6D8294]`}>{fmtTotal(d.denominador)}</td>
       <td className={`${TD} font-medium text-black-eske dark:text-[#EAF2F8]`}>{fmtValor(d.valor, isIndex)}</td>
-      <td className={`${TD} text-black-eske-60 dark:text-[#9AAEBE]`}>{fmtPct(d.porcentaje)}</td>
+      <td className={`${TD} text-black-eske-20 dark:text-[#9AAEBE]`}>{fmtPct(d.porcentaje)}</td>
     </>
   );
 }
@@ -151,7 +151,7 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
         <h3 className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
           Perfil ECEG 2020
         </h3>
-        <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
           {scopeText}
           {rows.length > 0 && <span className="ml-1 opacity-60">({rows.length} indicadores)</span>}
         </p>

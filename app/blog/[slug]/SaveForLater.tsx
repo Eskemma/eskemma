@@ -218,7 +218,7 @@ export default function SaveForLater({
                 Debes iniciar sesión para guardar posts
               </h3>
 
-              <p className="text-black-eske-80 dark:text-[#C7D6E0] mb-6">
+              <p className="text-black-eske-40 dark:text-[#C7D6E0] mb-6">
                 Si aún no tienes tu usuario y contraseña, te invitamos a
                 registrarte en nuestra comunidad de Eskemma.
               </p>

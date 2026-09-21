@@ -188,14 +188,14 @@ function HeatmapGrid({ matrix, palette, dataKey, label, isDark }: GridProps) {
   const { origins, receptors, lneMatrix, padMatrix, maxLne, maxPad, maxDif } = matrix;
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
-  const axisColor = isDark ? "#C7D6E0" : "var(--color-black-eske-60)";
+  const axisColor = isDark ? "#C7D6E0" : "var(--color-black-eske-20)";
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "var(--color-gray-eske-20)";
   const singleCol = receptors.length <= 1;
 
   return (
     <div>
       {label && (
-        <p className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE] mb-1 text-center">{label}</p>
+        <p className="text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-1 text-center">{label}</p>
       )}
 
       {/* React hover tooltip — fixed position */}
@@ -335,7 +335,7 @@ function HeatmapGrid({ matrix, palette, dataKey, label, isDark }: GridProps) {
           className="flex flex-col items-center gap-1 shrink-0"
           style={{ paddingTop: 70 }}
         >
-          <span className="text-[9px] text-black-eske-60 dark:text-[#6D8294] leading-none">Mayor</span>
+          <span className="text-[9px] text-black-eske-10 dark:text-[#6D8294] leading-none">Mayor</span>
           <div
             style={{
               width: 10,
@@ -344,7 +344,7 @@ function HeatmapGrid({ matrix, palette, dataKey, label, isDark }: GridProps) {
               borderRadius: 2,
             }}
           />
-          <span className="text-[9px] text-black-eske-60 dark:text-[#6D8294] leading-none">Menor</span>
+          <span className="text-[9px] text-black-eske-10 dark:text-[#6D8294] leading-none">Menor</span>
         </div>
       </div>
     </div>
@@ -367,7 +367,7 @@ export function O1HeatmapChart({ porEntidad, topN = 5, ambito = "nacional" }: He
 
   if (!matrix.origins.length) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
         Sin datos de origen disponibles.
       </p>
     );
@@ -377,11 +377,11 @@ export function O1HeatmapChart({ porEntidad, topN = 5, ambito = "nacional" }: He
     <div className="space-y-2">
       <HeatmapGrid matrix={matrix} palette={palette} dataKey="lne" isDark={isDark} />
       {matrix.receptors.length > 1 && (
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center sm:hidden">
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center sm:hidden">
           ← Desliza horizontalmente para ver todas las entidades →
         </p>
       )}
-      <p className="text-[10px] text-black-eske-60 dark:text-[#6D8294] leading-relaxed text-center">
+      <p className="text-[10px] text-black-eske-10 dark:text-[#6D8294] leading-relaxed text-center">
         <strong>LN87</strong>: ciudadanos mexicanos nacidos en el extranjero (código especial INE).{" "}
         <strong>LN88</strong>: ciudadanos naturalizados mexicanos (código especial INE).
       </p>
@@ -399,7 +399,7 @@ export function O1HeatmapChart({ porEntidad, topN = 5, ambito = "nacional" }: He
         </button>
       </div>
       {showNota && (
-        <p className="text-[10px] text-black-eske-60 dark:text-[#6D8294] leading-relaxed text-center bg-gray-eske-10 dark:bg-[#21425E] rounded-lg px-3 py-2 border border-gray-eske-20 dark:border-white/10">
+        <p className="text-[10px] text-black-eske-10 dark:text-[#6D8294] leading-relaxed text-center bg-gray-eske-10 dark:bg-[#21425E] rounded-lg px-3 py-2 border border-gray-eske-20 dark:border-white/10">
           Cada celda muestra la LNE de ciudadanos cuyo origen es la entidad de la fila y que residen en la entidad receptora de la columna.
           El análisis textual lateral reporta los totales nacionales por entidad de origen (suma de todas las entidades receptoras).
         </p>
@@ -425,7 +425,7 @@ export function O2PadronLneChart({ porEntidad, topN = 5, ambito = "nacional" }: 
 
   if (!matrix.origins.length) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
         Sin datos de origen disponibles.
       </p>
     );
@@ -457,7 +457,7 @@ export function O2PadronLneChart({ porEntidad, topN = 5, ambito = "nacional" }: 
               "px-3 py-1 text-xs font-medium rounded-full transition-colors border",
               vista === v.id
                 ? "bg-blue-eske text-white-eske border-blue-eske"
-                : "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
+                : "bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
             ].join(" ")}
           >
             {v.label}
@@ -473,7 +473,7 @@ export function O2PadronLneChart({ porEntidad, topN = 5, ambito = "nacional" }: 
         isDark={isDark}
       />
       {matrix.receptors.length > 1 && (
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center sm:hidden">
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center sm:hidden">
           ← Desliza horizontalmente para ver todas las entidades →
         </p>
       )}
@@ -492,7 +492,7 @@ export function O2PadronLneChart({ porEntidad, topN = 5, ambito = "nacional" }: 
         </button>
       </div>
       {showNota && (
-        <p className="text-[10px] text-black-eske-60 dark:text-[#6D8294] leading-relaxed text-center bg-gray-eske-10 dark:bg-[#21425E] rounded-lg px-3 py-2 border border-gray-eske-20 dark:border-white/10">
+        <p className="text-[10px] text-black-eske-10 dark:text-[#6D8294] leading-relaxed text-center bg-gray-eske-10 dark:bg-[#21425E] rounded-lg px-3 py-2 border border-gray-eske-20 dark:border-white/10">
           <strong>PAD87 / LN87</strong>: Padrón o LNE de ciudadanos mexicanos nacidos en el extranjero.{" "}
           <strong>PAD88 / LN88</strong>: Padrón o LNE de ciudadanos naturalizados mexicanos.
         </p>
@@ -644,7 +644,7 @@ function SeccionMultiSelect({ secciones, isLoading, value, onChange, disabled }:
             <button
               type="button" role="option" aria-selected={false}
               onClick={() => { onChange([]); setSearch(""); setOpen(false); }}
-              className="w-full text-left px-2 py-1 text-xs text-black-eske-60 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-white/5 border-b border-gray-eske-10 dark:border-white/5"
+              className="w-full text-left px-2 py-1 text-xs text-black-eske-20 dark:text-[#9AAEBE] italic hover:bg-gray-eske-10 dark:hover:bg-white/5 border-b border-gray-eske-10 dark:border-white/5"
             >
               Todas (limpiar selección)
             </button>
@@ -780,7 +780,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
       : (ambito === "extranjero" ? COLOR_PAD_EXT : COLOR_PAD_NAC);
 
   const yLabel = committed.vistaO3 === "lne" ? "Lista Nominal Electoral" : "Padrón Electoral";
-  const axisLabelColor = isDark ? "#C7D6E0" : "var(--color-black-eske-60)";
+  const axisLabelColor = isDark ? "#C7D6E0" : "var(--color-black-eske-20)";
 
   // Scope label with full human-readable format
   const o3ScopeLabel = useMemo(() => {
@@ -807,7 +807,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
       {/* Filtros geo propios del O3 */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">Entidad receptora</label>
+          <label className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">Entidad receptora</label>
           <select
             className={SEL_CLS}
             value={receptorEntidad}
@@ -821,7 +821,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          <label className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             Distrito{" "}
             {distritosLoading && <span className="text-red-eske">(cargando…)</span>}
           </label>
@@ -839,7 +839,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          <label className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             Municipio{" "}
             {municipiosLoading && <span className="text-red-eske">(cargando…)</span>}
           </label>
@@ -857,7 +857,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE]">
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             Sección{" "}
             {seccionesLoading && <span className="text-red-eske">(cargando…)</span>}
             {receptorSecciones.length > 0 && (
@@ -877,7 +877,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
       {/* Entidad de origen + toggle Vista + Consultar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-          <label htmlFor="o3-origen" className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE]">
+          <label htmlFor="o3-origen" className="text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">
             Entidad de origen:
           </label>
           <select
@@ -893,7 +893,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE]">Vista:</span>
+          <span className="text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Vista:</span>
           {(["lne", "pad"] as const).map((v) => (
             <button
               key={v}
@@ -903,7 +903,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
                 "px-3 py-1 text-xs font-medium rounded-full transition-colors border",
                 vistaO3 === v
                   ? "bg-blue-eske text-white-eske border-blue-eske"
-                  : "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
+                  : "bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] border-gray-eske-30 dark:border-white/10 hover:border-blue-eske hover:text-blue-eske",
               ].join(" ")}
             >
               {v === "lne" ? "Lista Nominal Electoral" : "Padrón Electoral"}
@@ -921,17 +921,17 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
       </div>
 
       {/* Scope label del O3 */}
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center">{o3ScopeLabel}</p>
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center">{o3ScopeLabel}</p>
 
       {/* Gráfica */}
       {isLoading ? (
         <div className="h-[300px] flex items-center justify-center">
-          <span className="text-sm text-black-eske-60 dark:text-[#6D8294]">Cargando datos…</span>
+          <span className="text-sm text-black-eske-10 dark:text-[#6D8294]">Cargando datos…</span>
         </div>
       ) : error ? (
         <p className="text-sm text-red-eske text-center py-6">{error}</p>
       ) : !hasData ? (
-        <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+        <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
           Sin datos para la combinación seleccionada.
         </p>
       ) : (
@@ -976,20 +976,20 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
 
       {/* Footnotes dinámicas */}
       {committed.origenKey === "87" && (
-        <p className="text-[10px] text-black-eske-60 dark:text-[#6D8294] text-center">
+        <p className="text-[10px] text-black-eske-10 dark:text-[#6D8294] text-center">
           {committed.vistaO3 === "lne"
             ? "LN87: Lista Nominal de ciudadanos mexicanos nacidos en el extranjero y que residen en la entidad."
             : "PAD87: Padrón Electoral de ciudadanos mexicanos nacidos en el extranjero y que residen en la entidad."}
         </p>
       )}
       {committed.origenKey === "88" && (
-        <p className="text-[10px] text-black-eske-60 dark:text-[#6D8294] text-center">
+        <p className="text-[10px] text-black-eske-10 dark:text-[#6D8294] text-center">
           {committed.vistaO3 === "lne"
             ? "LN88: Lista Nominal de ciudadanos naturalizados y que residen en la entidad."
             : "PAD88: Padrón Electoral de ciudadanos naturalizados y que residen en la entidad."}
         </p>
       )}
-      <p className="text-[10px] text-black-eske-60 text-center">
+      <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] text-center">
         Fuente: INE. Estadística de Padrón Electoral y Lista Nominal del Electorado.
       </p>
 
@@ -1005,7 +1005,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
               Ámbito:{" "}
               <span className="font-bold">{ambito === "nacional" ? "Nacional" : "Extranjero"}</span>
               {fechaCorte && (
-                <span className="text-black-eske-60 dark:text-[#6D8294] font-normal ml-2">— Corte: {fechaCorte}</span>
+                <span className="text-black-eske-10 dark:text-[#6D8294] font-normal ml-2">— Corte: {fechaCorte}</span>
               )}
             </p>
             <p className="text-[12px] text-black-eske dark:text-[#C7D6E0] font-medium mt-0.5">{o3ScopeLabel}</p>
@@ -1030,7 +1030,7 @@ export function O3OrigenSerieChart({ ambito }: O3Props) {
               <tbody>
                 {tableData.map((row, i) => (
                   <tr key={i} className={i % 2 === 0 ? "bg-white-eske dark:bg-[#18324A]" : "bg-gray-eske-10 dark:bg-[#21425E]"}>
-                    <td className="px-3 py-1.5 text-black-eske-60 dark:text-[#9AAEBE] text-center">{row.label}</td>
+                    <td className="px-3 py-1.5 text-black-eske-20 dark:text-[#9AAEBE] text-center">{row.label}</td>
                     <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] text-right font-medium">{FMT.format(row.pad)}</td>
                     <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] text-right font-medium">{FMT.format(row.lne)}</td>
                     <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] text-right">{fmtPct(row.tasa)}</td>

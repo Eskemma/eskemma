@@ -40,8 +40,8 @@ function SectionHeader({ title, scope, scope2 }: { title: string; scope?: string
   return (
     <div className="mb-3 text-center">
       <h3 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">{title}</h3>
-      {scope && <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scope}</p>}
-      {scope2 && <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scope2}</p>}
+      {scope && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scope}</p>}
+      {scope2 && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scope2}</p>}
     </div>
   );
 }
@@ -237,7 +237,7 @@ export default function EleccionesLocalesPanelContent() {
                 ) : (
                   <PartidosBarChartLoc data={data} />
                 )}
-                <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
+                <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
               </div>
 
               {/* Participación histórica */}
@@ -252,7 +252,7 @@ export default function EleccionesLocalesPanelContent() {
                 ) : (
                   <HistoricoComparison data={chartDataHistorico} />
                 )}
-                <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
+                <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
               </div>
 
               {/* Tabla de datos */}

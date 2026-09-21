@@ -226,7 +226,7 @@ function KebabDescargarCsv({ onDescargar }: { onDescargar: () => void }) {
         type="button"
         aria-label="Opciones"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center w-8 h-8 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+        className="flex items-center justify-center w-8 h-8 rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <circle cx="8" cy="3" r="1.5" />
@@ -322,7 +322,7 @@ function ModalSeleccion({
             <h2 id="seleccion-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
               {etiquetaSeleccion ?? "Ver valores por unidad"} — <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
               Valor individual de cada unidad territorial que seleccionaste para este proyecto.
             </p>
           </div>
@@ -330,7 +330,7 @@ function ModalSeleccion({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -375,7 +375,7 @@ function ModalSeleccion({
 
         <div className="overflow-y-auto flex-1 -mx-1 px-1">
           {filtrados.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               {busqueda ? "Ninguna unidad coincide con la búsqueda." : "Sin unidades para mostrar."}
             </p>
           )}
@@ -406,7 +406,7 @@ function ModalSeleccion({
             </p>
             <ul className="mt-1 space-y-1">
               {noResueltas.map((n) => (
-                <li key={`${n.estado}-${n.nombre}`} className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">
+                <li key={`${n.estado}-${n.nombre}`} className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE]">
                   <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{n.nombre}</span> — {n.motivo}
                 </li>
               ))}
@@ -493,7 +493,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
             <h2 id="municipios-modal-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
               Datos municipales — <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
               Valor por cada municipio que compone el distrito electoral del proyecto.
             </p>
           </div>
@@ -501,7 +501,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -538,7 +538,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
           )}
 
           {!error && municipios && filtrados.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               {busqueda ? "Ningún municipio coincide con la búsqueda." : "Sin municipios para mostrar."}
             </p>
           )}
@@ -574,17 +574,17 @@ function FilaMunicipio({ municipio, tipoDistrito }: { municipio: MunicipioDesglo
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
               {valor.toLocaleString("es-MX")}
-              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{unidad}</span> : null}
+              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-20 dark:text-[#9AAEBE]">{unidad}</span> : null}
             </p>
             {naturaleza && (
               <div className="mt-1 flex justify-end">
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
 
         {coberturaIncompleta && (
@@ -598,7 +598,7 @@ function FilaMunicipio({ municipio, tipoDistrito }: { municipio: MunicipioDesglo
         {sinDominante && (
           <div className="mt-1.5 inline-flex items-start gap-1 px-1.5 py-1 rounded border border-yellow-eske text-left max-w-[240px]">
             <span aria-hidden="true" className="text-yellow-eske text-xs leading-none mt-0.5">▲</span>
-            <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE]">
               Solo el <strong>{pctPobtot}%</strong> de este municipio pertenece a este distrito — el valor mostrado
               corresponde a TODO el municipio, no a esta fracción.
             </p>
@@ -771,7 +771,7 @@ function ModalEstado({
               {tituloTipo.charAt(0).toUpperCase() + tituloTipo.slice(1)} —{" "}
               <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
               {esBuscador
                 ? `Busca y selecciona ${tituloTipo} para cargar su valor.`
                 : ambito === "nacional"
@@ -783,7 +783,7 @@ function ModalEstado({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -868,7 +868,7 @@ function ModalEstado({
           )}
 
           {!error && elementosPrecarga && filtradosPrecarga.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               {busqueda ? `Ningún ${tituloTipo.slice(0, -1)} coincide con la búsqueda.` : "Sin elementos para mostrar."}
             </p>
           )}
@@ -882,7 +882,7 @@ function ModalEstado({
           )}
 
           {!error && indiceBuscador && filtradosIndice.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               {busqueda ? `Ningún ${tituloTipo.slice(0, -1)} coincide con la búsqueda.` : "Sin elementos para mostrar."}
             </p>
           )}
@@ -908,7 +908,7 @@ function ModalEstado({
 
         {esBuscador && (
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-eske-20 dark:border-white/10">
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
               {seleccion.size} seleccionado{seleccion.size === 1 ? "" : "s"}
               {errorSeleccion && <span className="block text-red-eske">{errorSeleccion}</span>}
             </p>
@@ -938,17 +938,17 @@ function FilaElementoPrecarga({ elemento }: { elemento: ElementoEstado }) {
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
               {valor.toLocaleString("es-MX")}
-              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{unidad}</span> : null}
+              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-20 dark:text-[#9AAEBE]">{unidad}</span> : null}
             </p>
             {naturaleza && (
               <div className="mt-1 flex justify-end">
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
       </div>
     </li>
@@ -980,7 +980,7 @@ function FilaElementoBuscador({
         />
         <span className="text-sm text-black-eske dark:text-[#EAF2F8] min-w-0 break-words">
           {nombre}
-          {estadoNombre && <span className="text-black-eske-80 dark:text-[#9AAEBE]"> ({estadoNombre})</span>}
+          {estadoNombre && <span className="text-black-eske-20 dark:text-[#9AAEBE]"> ({estadoNombre})</span>}
         </span>
       </label>
       {valorCargado && (
@@ -990,7 +990,7 @@ function FilaElementoBuscador({
               <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
                 {valorCargado.valor.toLocaleString("es-MX")}
                 {valorCargado.unidad ? (
-                  <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{valorCargado.unidad}</span>
+                  <span className="ml-1 font-normal text-xs text-black-eske-20 dark:text-[#9AAEBE]">{valorCargado.unidad}</span>
                 ) : null}
               </p>
               {valorCargado.naturaleza && (
@@ -999,11 +999,11 @@ function FilaElementoBuscador({
                 </div>
               )}
               {valorCargado.fuenteEtiqueta && (
-                <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{valorCargado.fuenteEtiqueta}</p>
+                <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 break-words">{valorCargado.fuenteEtiqueta}</p>
               )}
             </>
           ) : (
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{valorCargado.motivo}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic break-words">{valorCargado.motivo}</p>
           )}
         </div>
       )}
@@ -1076,7 +1076,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
               {tituloTipo.charAt(0).toUpperCase() + tituloTipo.slice(1)} —{" "}
               <span className="text-bluegreen-eske dark:text-blue-eske-20">{indicadorNombre}</span>
             </h2>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
               Este municipio no tiene un distrito dominante — valor por cada {tituloTipo.slice(0, -1)} que lo toca.
             </p>
           </div>
@@ -1084,7 +1084,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -1121,7 +1121,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
           )}
 
           {!error && distritos && filtrados.length === 0 && (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               {busqueda ? `Ningún ${tituloTipo.slice(0, -1)} coincide con la búsqueda.` : "Sin distritos para mostrar."}
             </p>
           )}
@@ -1149,17 +1149,17 @@ function FilaDistritoDeMunicipio({ distrito }: { distrito: DistritoDeMunicipio }
           <>
             <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
               {valor.toLocaleString("es-MX")}
-              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-80 dark:text-[#9AAEBE]">{unidad}</span> : null}
+              {unidad ? <span className="ml-1 font-normal text-xs text-black-eske-20 dark:text-[#9AAEBE]">{unidad}</span> : null}
             </p>
             {naturaleza && (
               <div className="mt-1 flex justify-end">
                 <NaturalezaBadge naturaleza={naturaleza} />
               </div>
             )}
-            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
+            {fuenteEtiqueta && <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 break-words">{fuenteEtiqueta}</p>}
           </>
         ) : (
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic break-words">{motivo}</p>
         )}
         <p className="text-[10px] italic text-gray-eske-60 dark:text-[#6D8294] mt-1 max-w-[220px]">
           {pctPobtot}% del municipio pertenece a este distrito.

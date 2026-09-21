@@ -137,14 +137,14 @@ export default function GeoElectoralMapContent() {
           <h2 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8]">
             Visualización Geográfica
           </h2>
-          <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
             Resultados electorales federales por demarcación territorial (2024)
           </p>
         </div>
 
         {/* Scope + error */}
         <div className="text-center space-y-1">
-          <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]">
+          <p className="text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]">
             {currentScope}
           </p>
           {error && (
@@ -178,7 +178,7 @@ export default function GeoElectoralMapContent() {
         {/* Party legend + methodological note (same card) */}
         {partidosVisibles.length > 0 && !loadingGanadores && (
           <div className="bg-white-eske dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10 rounded-lg p-4 space-y-2">
-            <h4 className="text-xs font-semibold text-black-eske-60 dark:text-[#9AAEBE] uppercase tracking-wide">
+            <h4 className="text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase tracking-wide">
               Leyenda
             </h4>
             {/* Desktop: legend items left, note right — Mobile: items row, note below */}
@@ -199,7 +199,7 @@ export default function GeoElectoralMapContent() {
                     </li>
                   ))}
               </ul>
-              <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] sm:text-right sm:flex-shrink-0 sm:max-w-[260px]">
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] sm:text-right sm:flex-shrink-0 sm:max-w-[260px]">
                 El color refleja el partido o coalición con mayor número de votos en la demarcación.
               </p>
             </div>
@@ -207,7 +207,7 @@ export default function GeoElectoralMapContent() {
         )}
 
         {/* Source */}
-        <p className="text-xs text-center text-black-eske-60 dark:text-[#9AAEBE]">
+        <p className="text-xs text-center text-black-eske-20 dark:text-[#9AAEBE]">
           Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Federales.
         </p>
       </div>

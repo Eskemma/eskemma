@@ -24,7 +24,7 @@ import { DISTRITO_TODOS } from "@/app/sefix/hooks/useGeoEcegFilters";
 
 const SELECT_PILL_CLS =
   "text-xs border border-gray-eske-30 dark:border-white/10 rounded px-2 py-0.5 " +
-  "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] " +
+  "bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske cursor-pointer";
 
 export default function GeoEcegContent() {
@@ -161,7 +161,7 @@ export default function GeoEcegContent() {
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
               activeGroup === g.id
                 ? "bg-blue-eske text-white-eske"
-                : "bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:text-blue-eske border border-gray-eske-20 dark:border-white/10",
+                : "bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] hover:text-blue-eske border border-gray-eske-20 dark:border-white/10",
             ].join(" ")}
           >
             {g.label}
@@ -180,7 +180,7 @@ export default function GeoEcegContent() {
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske",
               variable === ind.key
                 ? "bg-bluegreen-eske text-white-eske font-medium"
-                : "text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] underline underline-offset-2",
+                : "text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] underline underline-offset-2",
             ].join(" ")}
             title={ind.description}
           >
@@ -256,7 +256,7 @@ export default function GeoEcegContent() {
               onToggleDivergent={() => setDivergentMode((v) => !v)}
             />
           <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
-            <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] mb-2">Indicador</p>
+            <p className="text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE] mb-2">Indicador</p>
             {indicatorSelector}
           </div>
         </div>
@@ -326,13 +326,13 @@ export default function GeoEcegContent() {
               <h2 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8]">
                 Estadísticos Geoelectorales
               </h2>
-              <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
                 Indicadores censales del ECEG 2020 por demarcación electoral
               </p>
             </div>
 
             <div className="text-center space-y-1">
-              <p className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]">
+              <p className="text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]">
                 {scopeLabel}
                 {indicator && (
                   <> — <span className="text-black-eske dark:text-[#EAF2F8]">{indicator.label}</span></>
@@ -354,7 +354,7 @@ export default function GeoEcegContent() {
                     "flex-shrink-0 text-xs px-2.5 py-1 rounded border transition-colors",
                     divergentMode
                       ? "bg-bluegreen-eske text-white-eske border-bluegreen-eske"
-                      : "border-gray-eske-30 dark:border-white/20 text-black-eske-60 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
+                      : "border-gray-eske-30 dark:border-white/20 text-black-eske-20 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
                   ].join(" ")}
                 >
                   {divergentMode ? "● Modo comparativo" : "○ Modo comparativo"}
@@ -392,13 +392,13 @@ export default function GeoEcegContent() {
                 <div className="absolute inset-0 bg-white-eske/75 dark:bg-[#0B1620]/75 z-[1000] flex items-center justify-center rounded-lg">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-10 h-10 border-4 border-gray-eske-20 border-t-blue-eske rounded-full animate-spin" aria-hidden="true" />
-                    <p className="text-sm font-medium text-black-eske-60 dark:text-[#9AAEBE]">Cargando…</p>
+                    <p className="text-sm font-medium text-black-eske-20 dark:text-[#9AAEBE]">Cargando…</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <p className="text-xs text-center text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-xs text-center text-black-eske-20 dark:text-[#9AAEBE]">
               Fuente: INEGI — Estadísticas Censales a Escalas Geoelectorales (ECEG 2020).
             </p>
           </div>

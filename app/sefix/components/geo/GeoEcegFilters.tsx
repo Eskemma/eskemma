@@ -52,7 +52,7 @@ function DivergentActions({
                 "text-xs px-2.5 py-1 rounded border transition-colors",
                 divergentMode
                   ? "bg-bluegreen-eske text-white-eske border-bluegreen-eske"
-                  : "border-gray-eske-30 dark:border-white/20 text-black-eske-60 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
+                  : "border-gray-eske-30 dark:border-white/20 text-black-eske-20 dark:text-[#9AAEBE] hover:border-bluegreen-eske hover:text-bluegreen-eske",
               ].join(" ")}
             >
               {divergentMode ? "● Modo comparativo" : "○ Modo comparativo"}
@@ -82,7 +82,7 @@ function DivergentActions({
       </div>
       {/* Mobile tooltip — visible when button is long-pressed or tapped */}
       {onToggleDivergent && mobileTooltip && (
-        <p className="text-[11px] text-black-eske-60 dark:text-[#9AAEBE] leading-relaxed bg-gray-eske-10 dark:bg-[#112230] rounded p-2 border border-gray-eske-20 dark:border-white/10">
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed bg-gray-eske-10 dark:bg-[#112230] rounded p-2 border border-gray-eske-20 dark:border-white/10">
           {MODO_TOOLTIP}
         </p>
       )}
@@ -101,7 +101,7 @@ const SELECT_CLS =
   "disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
 const LABEL_CLS =
-  "block text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE] mb-0.5 select-none";
+  "block text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE] mb-0.5 select-none";
 
 interface GeoEcegFiltersProps {
   // Pending state

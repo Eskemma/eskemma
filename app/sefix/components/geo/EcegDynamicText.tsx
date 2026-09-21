@@ -57,7 +57,7 @@ export default function EcegDynamicText({
             type="button"
             onClick={onClose}
             aria-label="Cerrar panel de análisis"
-            className="text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded p-1"
+            className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske rounded p-1"
           >
             ✕
           </button>
@@ -71,7 +71,7 @@ export default function EcegDynamicText({
         </p>
         {indicator ? (
           <>
-            <p className="text-[11px] text-black-eske-60 dark:text-[#9AAEBE]">{groupLabel}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE]">{groupLabel}</p>
             <p className="font-semibold text-sm text-black-eske dark:text-[#C7D6E0] leading-tight mt-0.5">
               {indicator.label}
             </p>

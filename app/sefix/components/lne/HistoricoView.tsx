@@ -31,7 +31,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
     <div className="mb-3 text-center">
       <h3 className="text-base font-semibold text-black-eske dark:text-blue-eske-40">{title}</h3>
       {subtitle && (
-        <p className="text-xs text-black-eske-60 dark:text-[#C7D6E0] mt-0.5">{subtitle}</p>
+        <p className="text-xs text-black-eske-40 dark:text-[#C7D6E0] mt-0.5">{subtitle}</p>
       )}
     </div>
   );
@@ -42,7 +42,7 @@ function LoadingState() {
     <div className="flex flex-col items-center py-24" role="status" aria-live="polite">
       <div className="w-10 h-10 border-4 border-gray-eske-20 dark:border-white/20 border-t-blue-eske rounded-full animate-spin mb-4" />
       <p className="text-sm font-medium text-black-eske-10 dark:text-[#C7D6E0] mb-1">Cargando datos de la consulta</p>
-      <p className="text-xs text-black-eske-60 dark:text-[#6D8294] text-center max-w-xs">Por favor, espera.</p>
+      <p className="text-xs text-black-eske-10 dark:text-[#6D8294] text-center max-w-xs">Por favor, espera.</p>
     </div>
   );
 }
@@ -88,7 +88,7 @@ function ModalMetodologia({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Cerrar modal de metodología"
-            className="text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+            className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -137,7 +137,7 @@ function ModalMetodologia({ onClose }: { onClose: () => void }) {
             </ul>
           </div>
 
-          <p className="text-xs text-black-eske-60 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
+          <p className="text-xs text-black-eske-10 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
             Esta es una herramienta de referencia. Los datos oficiales son los publicados por el INE.
           </p>
         </div>
@@ -308,7 +308,7 @@ export default function HistoricoView() {
         </div>
         <div className="flex flex-col items-center py-20 text-center" role="status">
           <p className="text-sm font-medium text-black-eske-10 dark:text-[#C7D6E0] mb-1">Sin datos para este filtro</p>
-          <p className="text-xs text-black-eske-60 dark:text-[#6D8294] max-w-sm">
+          <p className="text-xs text-black-eske-10 dark:text-[#6D8294] max-w-sm">
             No se encontraron registros históricos para{" "}
             <strong>{geoInfo.municipio !== "Todos" ? geoInfo.municipio : geoInfo.entidad}</strong>.
             Intenta con un filtro menos restrictivo.
@@ -334,7 +334,7 @@ export default function HistoricoView() {
           </svg>
         </div>
         <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] font-medium">Error al cargar los datos históricos</p>
-        <p className="text-xs text-black-eske-60 dark:text-[#6D8294] mt-1">{error}</p>
+        <p className="text-xs text-black-eske-10 dark:text-[#6D8294] mt-1">{error}</p>
       </div>
     );
   }
@@ -412,7 +412,7 @@ export default function HistoricoView() {
                     )}
                   </div>
                   {g1Subtitle && (
-                    <p className="text-xs text-black-eske-60 dark:text-[#C7D6E0] mt-0.5">{g1Subtitle}</p>
+                    <p className="text-xs text-black-eske-40 dark:text-[#C7D6E0] mt-0.5">{g1Subtitle}</p>
                   )}
                 </div>
                 {!g1Data ? (
@@ -420,7 +420,7 @@ export default function HistoricoView() {
                 ) : (
                   <G1TrendChart data={g1Data} ambito={ambito} />
                 )}
-                <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">
+                <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">
                   Fuente: INE. Estadística de Padrón Electoral y Lista Nominal del Electorado
                 </p>
               </div>
@@ -438,7 +438,7 @@ export default function HistoricoView() {
                 ) : (
                   <G2BarChart data={g2Data} ambito={ambito} />
                 )}
-                <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">
+                <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">
                   Fuente: INE. Estadística de Padrón Electoral y Lista Nominal del Electorado
                 </p>
               </div>
@@ -470,7 +470,7 @@ export default function HistoricoView() {
                     }
                   />
                 )}
-                <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">
+                <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">
                   Fuente: INE. Estadística de Padrón Electoral y Lista Nominal del Electorado
                 </p>
               </div>

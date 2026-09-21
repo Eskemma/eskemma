@@ -88,7 +88,7 @@ export default function PartidosMultiSelect({
     <div className="flex flex-col gap-1" ref={containerRef}>
       <label
         htmlFor={inputId}
-        className="text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]"
+        className="text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]"
       >
         {label}
         {selectedCount !== null && (
@@ -112,7 +112,7 @@ export default function PartidosMultiSelect({
         aria-labelledby={inputId}
       >
         {isTodos ? (
-          <span className="text-sm text-black-eske-60 dark:text-[#6D8294] select-none">
+          <span className="text-sm text-black-eske-10 dark:text-[#6D8294] select-none">
             {todosLabel}
           </span>
         ) : (
@@ -152,7 +152,7 @@ export default function PartidosMultiSelect({
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={isTodos ? placeholder : ""}
-          className="flex-1 min-w-[80px] text-sm bg-transparent outline-none text-black-eske dark:text-[#EAF2F8] placeholder:text-black-eske-60 dark:placeholder:text-[#6D8294]"
+          className="flex-1 min-w-[80px] text-sm bg-transparent outline-none text-black-eske dark:text-[#EAF2F8] placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]"
           aria-autocomplete="list"
           aria-expanded={open}
           aria-haspopup="listbox"
@@ -177,13 +177,13 @@ export default function PartidosMultiSelect({
               role="option"
               aria-selected={false}
               onClick={() => { onChange([todosLabel]); setSearch(""); setOpen(false); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-black-eske-60 dark:text-[#9AAEBE] hover:bg-blue-eske-10 dark:hover:bg-white/5 italic"
+              className="w-full text-left px-3 py-1.5 text-xs text-black-eske-20 dark:text-[#9AAEBE] hover:bg-blue-eske-10 dark:hover:bg-white/5 italic"
             >
               {todosLabel} (limpiar selección)
             </button>
           )}
           {filteredOptions.length === 0 && (
-            <p className="px-3 py-2 text-xs text-black-eske-60 dark:text-[#6D8294]">Sin resultados</p>
+            <p className="px-3 py-2 text-xs text-black-eske-10 dark:text-[#6D8294]">Sin resultados</p>
           )}
           {filteredOptions.map((o) => (
             <button

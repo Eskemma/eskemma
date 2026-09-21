@@ -124,7 +124,7 @@ export default function G1TrendChart({ data, ambito = "nacional" }: Props) {
           x={mesHoyLabel}
           stroke="var(--color-black-eske-40)"
           strokeDasharray="4 2"
-          label={{ value: "Hoy", position: "top", fontSize: 10, fill: "var(--color-black-eske-60)" }}
+          label={{ value: "Hoy", position: "top", fontSize: 10, fill: isDark ? "#C7D6E0" : "var(--color-black-eske-20)" }}
         />
 
         {/* Datos reales */}

@@ -98,7 +98,7 @@ function MetodologiaModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Cerrar modal de metodología"
-            className="text-black-eske-60 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
+            className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -141,7 +141,7 @@ function MetodologiaModal({ onClose }: { onClose: () => void }) {
               <li>Los datos oficiales del INE prevalecen sobre la proyección.</li>
             </ul>
           </div>
-          <p className="text-xs text-black-eske-60 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
+          <p className="text-xs text-black-eske-10 dark:text-[#6D8294] text-center border-t border-gray-eske-20 dark:border-white/10 pt-3">
             Esta es una herramienta de referencia. Los datos oficiales son los publicados por el INE.
           </p>
         </div>
@@ -207,10 +207,10 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
             aria-label="Datos No Binario"
           >
             <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Padrón: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalPadNB)}</span>
             </p>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalLnNB)}</span>
             </p>
           </div>
@@ -222,13 +222,13 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
               <p className="font-semibold text-black-eske dark:text-[#EAF2F8] mb-1 border-b border-gray-eske-20 dark:border-white/10 pb-1">
                 No Binario — por rango de edad
               </p>
-              <div className="grid grid-cols-3 gap-x-2 text-black-eske-60 dark:text-[#9AAEBE] mb-1">
+              <div className="grid grid-cols-3 gap-x-2 text-black-eske-20 dark:text-[#9AAEBE] mb-1">
                 <span />
                 <span className="font-semibold">Padrón</span>
                 <span className="font-semibold">LNE</span>
               </div>
               {nbPerRango.map(({ label, pad, lne }) => (
-                <div key={label} className="grid grid-cols-3 gap-x-2 text-black-eske-60 dark:text-[#9AAEBE]">
+                <div key={label} className="grid grid-cols-3 gap-x-2 text-black-eske-20 dark:text-[#9AAEBE]">
                   <span>{label}</span>
                   <span className="text-black-eske dark:text-[#EAF2F8]">{FMT.format(pad)}</span>
                   <span className="text-black-eske dark:text-[#EAF2F8]">{FMT.format(lne)}</span>
@@ -285,7 +285,7 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
                         style={{ backgroundColor: isH ? colH : colM }}
                         aria-hidden="true"
                       />
-                      <span className="text-black-eske-60 dark:text-[#9AAEBE]">
+                      <span className="text-black-eske-20 dark:text-[#9AAEBE]">
                         {isH ? "LNE Hombres" : "LNE Mujeres"}:{" "}
                         <strong className="text-black-eske dark:text-[#EAF2F8]">{FMT.format(Math.abs(Number(entry.value)))}</strong>
                       </span>
@@ -358,9 +358,9 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
     <div>
       <div className="mb-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] p-3">
         <div className="flex flex-wrap items-center gap-4">
-          <p className="text-[11px] font-semibold text-black-eske-60 dark:text-[#9AAEBE]">Mostrar:</p>
+          <p className="text-[11px] font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Mostrar:</p>
           {SEXOS_S2.map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-80 dark:text-[#C7D6E0]">
+            <label key={key} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-40 dark:text-[#C7D6E0]">
               <input
                 type="checkbox"
                 checked={activos.has(key)}
@@ -373,7 +373,7 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
           <button
             type="button"
             onClick={() => setActivos(new Set(["hombres", "mujeres"]))}
-            className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
+            className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
           >
             ↺ Restablecer
           </button>
@@ -391,7 +391,7 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
               aria-label="Datos No Binario"
             >
               <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
-              <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+              <p className="text-black-eske-20 dark:text-[#9AAEBE]">
                 LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalLnNBS2)}</span>
               </p>
             </div>
@@ -404,7 +404,7 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
                   No Binario — por grupo etario
                 </p>
                 {nbPerGrupo.map(({ label, lne }) => (
-                  <div key={label} className="flex justify-between text-black-eske-60 dark:text-[#9AAEBE]">
+                  <div key={label} className="flex justify-between text-black-eske-20 dark:text-[#9AAEBE]">
                     <span>{label}</span>
                     <span className="font-medium text-black-eske dark:text-[#EAF2F8] ml-3">{FMT.format(lne)}</span>
                   </div>
@@ -500,7 +500,7 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
 
   if (serie.length < 2) {
     return (
-      <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-6">
+      <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-6">
         Sin datos de serie temporal suficientes para proyección.
       </p>
     );
@@ -545,9 +545,9 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
       {showModal && <MetodologiaModal onClose={() => setShowModal(false)} />}
       <div className="mb-4 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] p-3">
         <div className="flex flex-wrap items-center gap-4">
-          <p className="text-[11px] font-semibold text-black-eske-60 dark:text-[#9AAEBE]">Mostrar:</p>
+          <p className="text-[11px] font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Mostrar:</p>
           {SEXOS_S3.map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-80 dark:text-[#C7D6E0]">
+            <label key={key} className="flex items-center gap-1 cursor-pointer text-xs text-black-eske-40 dark:text-[#C7D6E0]">
               <input
                 type="checkbox"
                 checked={activos.has(key)}
@@ -560,7 +560,7 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
           <button
             type="button"
             onClick={() => setActivos(new Set(["hombres", "mujeres"]))}
-            className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-60 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
+            className="px-2 py-1 text-xs rounded border border-gray-eske-30 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-20 dark:text-[#9AAEBE] hover:border-blue-eske hover:text-blue-eske whitespace-nowrap"
           >
             ↺ Restablecer
           </button>
@@ -574,7 +574,7 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
             </svg>
             Metodología
           </button>
-          <span className="ml-auto text-xs text-black-eske-60 dark:text-[#9AAEBE] border-l border-gray-eske-30 dark:border-white/10 pl-3">
+          <span className="ml-auto text-xs text-black-eske-20 dark:text-[#9AAEBE] border-l border-gray-eske-30 dark:border-white/10 pl-3">
             <span className="font-semibold" style={{ color: isDark ? COL_NB_DARK : COL_NB }}>No Binario:</span>{" "}
             Padrón <strong>{FMT_NB.format(nbPadron)}</strong> · LNE <strong>{FMT_NB.format(nbLista)}</strong>
           </span>
@@ -612,7 +612,7 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
           ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center mt-1">
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center mt-1">
         Líneas punteadas = proyección estimada hasta diciembre.
       </p>
 
@@ -674,10 +674,10 @@ export function S4ParticipacionChart({ data, ambito = "nacional" }: DataAmbitoPr
             aria-label="Datos No Binario"
           >
             <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Padrón: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(nbPadron)}</span>
             </p>
-            <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(nbLista)}</span>
             </p>
           </div>
@@ -688,7 +688,7 @@ export function S4ParticipacionChart({ data, ambito = "nacional" }: DataAmbitoPr
               style={{ zIndex: 40 }}
             >
               <p className="font-semibold text-black-eske dark:text-[#EAF2F8] mb-1 border-b border-gray-eske-20 dark:border-white/10 pb-1">No Binario — detalle</p>
-              <p className="text-black-eske-60 dark:text-[#9AAEBE]">
+              <p className="text-black-eske-20 dark:text-[#9AAEBE]">
                 Tasa inclusión:{" "}
                 <span className="font-medium text-black-eske dark:text-[#EAF2F8]">
                   {nbPadron > 0 ? `${((nbLista / nbPadron) * 100).toFixed(2)}%` : "—"}

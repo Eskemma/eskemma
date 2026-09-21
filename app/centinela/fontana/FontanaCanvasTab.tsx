@@ -45,13 +45,13 @@ export default function FontanaCanvasTab({ items: itemsConEliminados, sesion, on
           <p className="text-black-eske dark:text-[#EAF2F8] font-medium mb-2">
             Te damos la bienvenida a Fontana.
           </p>
-          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed">
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed">
             Aquí van apareciendo las respuestas al chat de Fontana. Pregúntale por
             cualquier indicador de las cinco familias disponibles, por ejemplo,
             población, pobreza, seguridad, comparaciones con otros países o
             características del territorio.
           </p>
-          <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] leading-relaxed mt-3">
+          <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] leading-relaxed mt-3">
             Si prefieres explorar por tu cuenta, la pestaña Indicadores tiene la tabla
             comparativa completa, organizada por familia de indicadores.
           </p>

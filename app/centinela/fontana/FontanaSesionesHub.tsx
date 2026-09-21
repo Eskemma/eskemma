@@ -83,7 +83,7 @@ function EditModal({ sesion, onClose, onSaved }: {
       <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
         <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">Editar exploración</h3>
         <div>
-          <label htmlFor="fontana-edit-nombre" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+          <label htmlFor="fontana-edit-nombre" className="block text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-1">
             Nombre
           </label>
           <input
@@ -95,7 +95,7 @@ function EditModal({ sesion, onClose, onSaved }: {
           />
         </div>
         <div>
-          <label htmlFor="fontana-edit-tipo" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+          <label htmlFor="fontana-edit-tipo" className="block text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-1">
             Tipo de proyecto
           </label>
           <select
@@ -110,7 +110,7 @@ function EditModal({ sesion, onClose, onSaved }: {
           </select>
         </div>
         <div>
-          <p className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">Color</p>
+          <p className="block text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE] mb-1">Color</p>
           <div className="flex items-center gap-2 flex-wrap">
             {COLOR_SWATCHES.map((hex) => (
               <button
@@ -228,14 +228,14 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
         <div className="flex items-start gap-2">
           <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-left">
             <p className="font-semibold text-black-eske dark:text-[#EAF2F8] truncate">{sesion.nombre || labelTerritorio(sesion)}</p>
-            <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 truncate">{labelTerritorio(sesion)}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 truncate">{labelTerritorio(sesion)}</p>
           </button>
           <div className="relative shrink-0" ref={kebabRef}>
             <button
               type="button"
               aria-label="Opciones de la sesión"
               onClick={() => setKebabOpen((o) => !o)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" />
@@ -243,10 +243,10 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
             </button>
             {kebabOpen && (
               <div className="absolute right-0 top-full mt-1 w-40 bg-white-eske dark:bg-[#1E3A52] rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20">
-                <button type="button" onClick={() => { setKebabOpen(false); setEditOpen(true); }} className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
+                <button type="button" onClick={() => { setKebabOpen(false); setEditOpen(true); }} className="w-full text-left px-3 py-2 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
                   Editar
                 </button>
-                <button type="button" onClick={() => handleArchivar(!sesion.archivada)} className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
+                <button type="button" onClick={() => handleArchivar(!sesion.archivada)} className="w-full text-left px-3 py-2 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
                   {sesion.archivada ? "Reactivar" : "Archivar"}
                 </button>
                 <div className="border-t border-gray-eske-10 dark:border-white/10 my-1" />
@@ -258,7 +258,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
           </div>
         </div>
         <button type="button" onClick={onOpen} className="text-left">
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE]">
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
             {new Date(sesion.fechaUltimoGuardado).toLocaleDateString("es-MX")} · {contarIndicadores(sesion)} indicadores seleccionados
           </p>
         </button>
@@ -279,7 +279,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
               <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">
                 ¿Eliminar «{sesion.nombre || labelTerritorio(sesion)}»?
               </h3>
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
                 Esta acción es permanente. Se perderán los indicadores seleccionados en esta exploración.
               </p>
             </div>
@@ -347,7 +347,7 @@ function VinculadaCard({ sesion, onDesvinculada }: {
           <p className="text-xs text-bluegreen-eske dark:text-blue-eske-20 mt-1.5">
             Vinculada a: {sesion.proyectoVinculado?.nombre ?? "proyecto de Moddulo"}
           </p>
-          <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1.5">
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1.5">
             {new Date(sesion.fechaUltimoGuardado).toLocaleDateString("es-MX")}
           </p>
         </button>
@@ -358,7 +358,7 @@ function VinculadaCard({ sesion, onDesvinculada }: {
               aria-label="Opciones de la sesión"
               onClick={() => setKebabOpen((o) => !o)}
               disabled={desvinculando}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" />
@@ -366,7 +366,7 @@ function VinculadaCard({ sesion, onDesvinculada }: {
             </button>
             {kebabOpen && (
               <div className="absolute right-0 top-full mt-1 w-40 bg-white-eske dark:bg-[#1E3A52] rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20">
-                <button type="button" onClick={handleDesvincular} className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
+                <button type="button" onClick={handleDesvincular} className="w-full text-left px-3 py-2 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors">
                   {desvinculando ? "Desvinculando…" : "Desvincular"}
                 </button>
               </div>
@@ -426,7 +426,7 @@ export default function FontanaSesionesHub({
               Tus exploraciones guardadas
             </h2>
             {activas.length > 0 && (
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-0.5">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">
                 {activas.length} {activas.length === 1 ? "sesión" : "sesiones"} sin proyecto de Moddulo vinculado
               </p>
             )}
@@ -447,7 +447,7 @@ export default function FontanaSesionesHub({
               <p className="font-semibold text-black-eske dark:text-[#EAF2F8]">
                 Todavía no tienes exploraciones guardadas
               </p>
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1 max-w-sm">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1 max-w-sm">
                 Elige un territorio para empezar a explorar datos abiertos con Fontana.
               </p>
             </div>
@@ -477,7 +477,7 @@ export default function FontanaSesionesHub({
 
         {vinculadas.length > 0 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-black-eske-80 dark:text-[#9AAEBE] uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase tracking-wide">
               Vinculadas
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -488,7 +488,7 @@ export default function FontanaSesionesHub({
 
         {archivadas.length > 0 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-black-eske-80 dark:text-[#9AAEBE] uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase tracking-wide">
               Archivadas
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

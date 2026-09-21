@@ -18,13 +18,13 @@ const DEFAULT_PARTIDOS = ["PAN", "PRI", "PRD", "MORENA", "MC", "PVEM", "PT", "vo
 const SOURCE = "Fuente: INE — Sistema de Consulta de la Estadística de las Elecciones Locales";
 const FMT_PCT = new Intl.NumberFormat("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const LABEL_CLS = "text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]";
+const LABEL_CLS = "text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]";
 const SELECT_CLS =
   "text-sm border border-gray-eske-30 dark:border-white/10 rounded-md px-2 py-1.5 " +
   "bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-eske w-full sm:w-auto";
 const BTN_NEUTRAL_CLS =
-  "text-xs text-black-eske dark:text-[#EAF2F8] hover:text-black-eske-60 dark:hover:text-white/70 " +
+  "text-xs text-black-eske dark:text-[#EAF2F8] hover:text-black-eske-20 dark:hover:text-white/70 " +
   "underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black-eske rounded";
 const BTN_RESET_CLS =
   "text-xs text-orange-eske hover:text-orange-eske-60 underline " +
@@ -211,7 +211,7 @@ export default function HistoricoPartidosLoc({
   }, [committed, local.cargo, allData]);
 
   const gridStroke = isDark ? "rgba(255,255,255,0.07)" : "var(--color-gray-eske-20)";
-  const tickFill = isDark ? "#C7D6E0" : "var(--color-black-eske-60)";
+  const tickFill = isDark ? "#C7D6E0" : "var(--color-black-eske-20)";
   const tooltipBorder = isDark ? "#2a4255" : "var(--color-gray-eske-20)";
 
   const handleDownloadCsv = useCallback(() => {
@@ -229,7 +229,7 @@ export default function HistoricoPartidosLoc({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-center text-black-eske-60 dark:text-[#9AAEBE]">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-center text-black-eske-20 dark:text-[#9AAEBE]">
         Histórico de votación
       </h2>
 
@@ -293,7 +293,7 @@ export default function HistoricoPartidosLoc({
                 const checked = pending.partidos.includes(pid);
                 const color = getColor(pid, isDark);
                 return (
-                  <label key={pid} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${checked ? "text-black-eske dark:text-[#EAF2F8]" : "text-black-eske-60/60 dark:text-[#6D8294]"}`}>
+                  <label key={pid} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${checked ? "text-black-eske dark:text-[#EAF2F8]" : "text-black-eske-10/60 dark:text-[#6D8294]"}`}>
                     <input type="checkbox" checked={checked} onChange={() => togglePartido(pid)} className="shrink-0 accent-blue-eske" />
                     <span className="shrink-0 w-2.5 h-2.5 rounded-sm border border-black/10 dark:border-white/10" style={{ backgroundColor: color }} aria-hidden="true" />
                     <span className="truncate min-w-0">{getPartidoLabelLoc(pid)}</span>
@@ -311,7 +311,7 @@ export default function HistoricoPartidosLoc({
           <h3 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
             Histórico de votación por partido, candidatura o coalición
           </h3>
-          {scopeSubtitle && <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>}
+          {scopeSubtitle && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>}
         </div>
         {isLoading ? (
           <div className="w-full flex flex-col items-center justify-center gap-3 rounded-lg bg-gray-eske-10 dark:bg-white/10" style={{ height: 320 }}>
@@ -319,7 +319,7 @@ export default function HistoricoPartidosLoc({
             <p className="text-xs text-red-eske">Cargando…</p>
           </div>
         ) : chartData.length === 0 || local.partidos.length === 0 ? (
-          <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-8">
+          <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-8">
             {local.partidos.length === 0 ? "Selecciona al menos un partido para visualizar la gráfica." : "Sin datos para la configuración seleccionada."}
           </p>
         ) : (
@@ -351,7 +351,7 @@ export default function HistoricoPartidosLoc({
             </LineChart>
           </ResponsiveContainer>
         )}
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">{SOURCE}</p>
       </div>
 
       {/* Collapsible data table */}
@@ -361,7 +361,7 @@ export default function HistoricoPartidosLoc({
             <h3 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
               Tabla de Datos de Histórico de Votación por partido, candidatura o coalición
             </h3>
-            {scopeSubtitle && <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>}
+            {scopeSubtitle && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>}
           </div>
           <div className="overflow-x-auto rounded-lg border border-gray-eske-20 dark:border-white/10">
             <table className="w-full text-xs min-w-max">
@@ -385,7 +385,7 @@ export default function HistoricoPartidosLoc({
                       </tr>
                       {isExpanded && [...yearData.partidos].sort((a, b) => b.porcentaje - a.porcentaje).map((p, i) => (
                         <tr key={`${yearData.anio}-${p.partido}`} className={`border-t border-gray-eske-10 dark:border-white/5 ${i % 2 === 0 ? "bg-white-eske dark:bg-[#18324A]" : "bg-gray-eske-10 dark:bg-[#21425E]"} hover:bg-blue-eske-10 dark:hover:bg-white/5`}>
-                          <td className="px-3 py-1.5 whitespace-nowrap font-mono text-black-eske-60 dark:text-[#9AAEBE]">{p.partido}</td>
+                          <td className="px-3 py-1.5 whitespace-nowrap font-mono text-black-eske-20 dark:text-[#9AAEBE]">{p.partido}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap text-black-eske dark:text-[#C7D6E0]">
                             <span className="inline-block w-2 h-2 rounded-sm mr-1.5 border border-black/10 dark:border-white/10 shrink-0 align-middle" style={{ backgroundColor: getColor(p.partido, isDark) }} aria-hidden="true" />
                             {getPartidoLabelLoc(p.partido)}
@@ -400,7 +400,7 @@ export default function HistoricoPartidosLoc({
             </table>
           </div>
           <div className="flex flex-col items-center gap-2 pt-1">
-            <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center">{SOURCE}</p>
+            <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center">{SOURCE}</p>
             <button type="button" onClick={handleDownloadCsv} disabled={allData.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-bluegreen-eske text-white-eske hover:bg-bluegreen-eske-40 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske">
               <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

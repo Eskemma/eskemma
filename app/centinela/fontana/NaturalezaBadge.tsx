@@ -46,7 +46,7 @@ export default function NaturalezaBadge({ naturaleza }: { naturaleza: string }) 
     <InfoTooltip
       content={NATURALEZA_DEFINICION[naturaleza as keyof typeof NATURALEZA_DEFINICION] ?? naturaleza}
       trigger={NATURALEZA_LABEL[naturaleza] ?? naturaleza}
-      triggerClassName={`inline-block px-1.5 py-0.5 rounded border text-[10px] text-black-eske-80 dark:text-[#9AAEBE] cursor-pointer ${
+      triggerClassName={`inline-block px-1.5 py-0.5 rounded border text-[10px] text-black-eske-20 dark:text-[#9AAEBE] cursor-pointer ${
         confiabilidad ? CONFIABILIDAD_BORDE[confiabilidad] : "border-gray-eske-40"
       }`}
     />

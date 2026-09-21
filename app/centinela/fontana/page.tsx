@@ -216,7 +216,7 @@ export default function FontanaPage() {
         <div className="max-w-lg mx-auto bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-gray-eske-20 dark:border-white/10 p-6 flex flex-col gap-5">
           <div>
             <h1 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">Fontana</h1>
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
               Explora datos abiertos por territorio, sin necesidad de un proyecto de Moddulo. Elige el tipo de
               proyecto y el territorio para empezar.
             </p>
@@ -328,7 +328,7 @@ export default function FontanaPage() {
                   type="button"
                   onClick={() => setTerritorioListo(false)}
                   disabled={creandoStandalone}
-                  className="px-4 py-2.5 border border-gray-eske-20 dark:border-white/10 text-black-eske-80 dark:text-[#C7D6E0] rounded-lg text-sm font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="px-4 py-2.5 border border-gray-eske-20 dark:border-white/10 text-black-eske-40 dark:text-[#C7D6E0] rounded-lg text-sm font-medium hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   ← Atrás
                 </button>

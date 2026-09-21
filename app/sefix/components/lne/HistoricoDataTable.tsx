@@ -173,13 +173,13 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
           Ámbito:{" "}
           <span className="font-semibold">{ambitoLabel}</span>
         </p>
-        <p className="text-xs text-black-eske-60 dark:text-[#6D8294] mt-0.5">{scopeLabel}</p>
+        <p className="text-xs text-black-eske-10 dark:text-[#6D8294] mt-0.5">{scopeLabel}</p>
       </div>
 
       {/* ── Controles ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">
         {/* Mostrar N registros */}
-        <div className="flex items-center gap-2 text-sm text-black-eske-60 dark:text-[#9AAEBE]">
+        <div className="flex items-center gap-2 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
           <label htmlFor="htabla-pagesize" className="whitespace-nowrap">Mostrar</label>
           <select
             id="htabla-pagesize"
@@ -195,7 +195,7 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
         </div>
 
         {/* Buscar */}
-        <div className="flex items-center gap-2 text-sm text-black-eske-60 dark:text-[#9AAEBE]">
+        <div className="flex items-center gap-2 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
           <label htmlFor="htabla-search">Buscar:</label>
           <input
             id="htabla-search"
@@ -246,7 +246,7 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
           <tbody>
             {state.isLoading ? (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-sm text-black-eske-60 dark:text-[#6D8294]">
+                <td colSpan={13} className="px-4 py-12 text-center text-sm text-black-eske-10 dark:text-[#6D8294]">
                   <div className="flex items-center justify-center gap-2">
                     <div
                       className="w-4 h-4 border-2 border-gray-eske-20 dark:border-white/20 border-t-blue-eske rounded-full animate-spin"
@@ -264,7 +264,7 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
               </tr>
             ) : state.rows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-8 text-center text-sm text-black-eske-60 dark:text-[#6D8294]">
+                <td colSpan={13} className="px-4 py-8 text-center text-sm text-black-eske-10 dark:text-[#6D8294]">
                   Sin resultados para esta consulta.
                 </td>
               </tr>
@@ -274,11 +274,11 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
                   key={`${r.entidad}-${r.seccion}-${i}`}
                   className={i % 2 === 0 ? "bg-white-eske dark:bg-[#18324A]" : "bg-gray-eske-10 dark:bg-[#21425E]"}
                 >
-                  <td className="px-3 py-1.5 text-black-eske-60 dark:text-[#6D8294] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.year}</td>
+                  <td className="px-3 py-1.5 text-black-eske-10 dark:text-[#6D8294] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.year}</td>
                   <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.entidad}</td>
                   <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.cabecera}</td>
                   <td className="px-3 py-1.5 text-black-eske dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.municipio}</td>
-                  <td className="px-3 py-1.5 text-black-eske-60 dark:text-[#6D8294] text-center whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.seccion}</td>
+                  <td className="px-3 py-1.5 text-black-eske-10 dark:text-[#6D8294] text-center whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{r.seccion}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{fmt(r.padron)}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{fmt(r.padronH)}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums dark:text-[#C7D6E0] whitespace-nowrap border-r border-gray-eske-20 dark:border-white/10">{fmt(r.padronM)}</td>
@@ -295,12 +295,12 @@ export default function HistoricoDataTable({ ambito, geoInfo, year }: Props) {
       </div>
 
       {/* Indicador de scroll horizontal */}
-      <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center sm:hidden py-1">
+      <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center sm:hidden py-1">
         ← Desliza horizontalmente para ver todas las columnas →
       </p>
 
       {/* ── Pie: info + paginación ─────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-2.5 border-t border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] text-xs text-black-eske-60 dark:text-[#6D8294]">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-2.5 border-t border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] text-xs text-black-eske-10 dark:text-[#6D8294]">
         <span>
           {state.total === 0
             ? "Sin resultados"

@@ -126,9 +126,9 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
               {indicadorNombre}
               {fuenteEncabezado && <span className="text-black-eske dark:text-[#EAF2F8]"> — {fuenteEncabezado}</span>}
             </h2>
-            {definicion && <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">{definicion}</p>}
+            {definicion && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1">{definicion}</p>}
             {alcanceLatam && (
-              <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] mt-1">
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1">
                 Datos disponibles para América Latina y el Caribe. Esta fuente no publica este indicador para el resto del mundo.
               </p>
             )}
@@ -137,7 +137,7 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-80 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           >
             ✕
           </button>
@@ -154,7 +154,7 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
         )}
 
         {paises.length > 0 && (
-          <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] -mt-1">
+          <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] -mt-1">
             {esRankOficial
               ? "El número es el rank oficial publicado por la fuente."
               : "El número indica la posición en este listado ordenado por valor — la fuente no publica un rank oficial para este indicador."}
@@ -167,15 +167,15 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
           {cargando ? (
             <p className="text-sm text-red-eske">Cargando…</p>
           ) : paises.length === 0 ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">Sin países con dato real para este indicador.</p>
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">Sin países con dato real para este indicador.</p>
           ) : filtrados.length === 0 ? (
-            <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE]">La fuente no tiene dato para "{busqueda}".</p>
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">La fuente no tiene dato para "{busqueda}".</p>
           ) : (
             <ol className="flex flex-col gap-2">
               {filtrados.map((p) => (
                 <li key={p.iso3} className="flex items-start justify-between gap-3 py-1.5 border-b border-gray-eske-20 dark:border-white/10 last:border-0">
                   <span className="text-sm text-black-eske dark:text-[#EAF2F8]">
-                    <span className="text-black-eske-60 dark:text-[#6D8294] mr-1.5">{numeroPorPais.get(p.iso3)}.</span>
+                    <span className="text-black-eske-10 dark:text-[#6D8294] mr-1.5">{numeroPorPais.get(p.iso3)}.</span>
                     {p.nombre}
                   </span>
                   <span className="text-right shrink-0">
@@ -186,7 +186,7 @@ export default function FontanaF4PaisesModal({ sesionId, indicadorId, indicadorN
                     </span>
                     {p.celda.naturaleza && <NaturalezaBadge naturaleza={p.celda.naturaleza} />}
                     {p.celda.notaAclaratoria && (
-                      <span className="block text-[10px] italic text-black-eske-80 dark:text-[#9AAEBE] mt-0.5 max-w-[180px]">{p.celda.notaAclaratoria}</span>
+                      <span className="block text-[10px] italic text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 max-w-[180px]">{p.celda.notaAclaratoria}</span>
                     )}
                   </span>
                 </li>

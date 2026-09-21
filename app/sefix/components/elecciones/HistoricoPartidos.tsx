@@ -34,7 +34,7 @@ const FMT_PCT = new Intl.NumberFormat("es-MX", {
   maximumFractionDigits: 2,
 });
 
-const LABEL_CLS = "text-xs font-medium text-black-eske-60 dark:text-[#9AAEBE]";
+const LABEL_CLS = "text-xs font-medium text-black-eske-20 dark:text-[#9AAEBE]";
 const SELECT_CLS =
   "text-sm border border-gray-eske-30 dark:border-white/10 rounded-md px-2 py-1.5 " +
   "bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] " +
@@ -43,7 +43,7 @@ const SELECT_CLS =
 
 // "Seleccionar todos" / "Borrar todos": neutral black/white
 const BTN_NEUTRAL_CLS =
-  "text-xs text-black-eske dark:text-[#EAF2F8] hover:text-black-eske-60 dark:hover:text-white/70 " +
+  "text-xs text-black-eske dark:text-[#EAF2F8] hover:text-black-eske-20 dark:hover:text-white/70 " +
   "underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black-eske rounded";
 
 // "Restablecer": orange/red
@@ -307,7 +307,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
   }, [allData, local.partidos]);
 
   const gridStroke = isDark ? "rgba(255,255,255,0.07)" : "var(--color-gray-eske-20)";
-  const tickFill = isDark ? "#C7D6E0" : "var(--color-black-eske-60)";
+  const tickFill = isDark ? "#C7D6E0" : "var(--color-black-eske-20)";
   const tooltipBorder = isDark ? "#2a4255" : "var(--color-gray-eske-20)";
 
   const scopeAnios =
@@ -353,7 +353,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
     <div className="space-y-4">
 
       {/* ── Section heading ── */}
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-center text-black-eske-60 dark:text-[#9AAEBE]">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-center text-black-eske-20 dark:text-[#9AAEBE]">
         Histórico de votación
       </h2>
 
@@ -461,7 +461,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
                     className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${
                       checked
                         ? "text-black-eske dark:text-[#EAF2F8]"
-                        : "text-black-eske-60/60 dark:text-[#6D8294]"
+                        : "text-black-eske-10/60 dark:text-[#6D8294]"
                     }`}
                   >
                     <input
@@ -492,7 +492,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
             Histórico de votación por partido, candidatura o coalición
           </h3>
           {scopeSubtitle && (
-            <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>
           )}
         </div>
 
@@ -505,10 +505,10 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
               className="w-8 h-8 border-4 border-gray-eske-20 border-t-blue-eske rounded-full animate-spin"
               aria-hidden="true"
             />
-            <p className="text-xs text-black-eske-60 dark:text-[#6D8294]">Cargando…</p>
+            <p className="text-xs text-black-eske-10 dark:text-[#6D8294]">Cargando…</p>
           </div>
         ) : chartData.length === 0 || local.partidos.length === 0 ? (
-          <p className="text-sm text-black-eske-60 dark:text-[#6D8294] text-center py-8">
+          <p className="text-sm text-black-eske-10 dark:text-[#6D8294] text-center py-8">
             {local.partidos.length === 0
               ? "Selecciona al menos un partido para visualizar la gráfica."
               : "Sin datos para la configuración seleccionada."}
@@ -594,7 +594,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
           </ResponsiveContainer>
         )}
 
-        <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] mt-2 text-center">
+        <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] mt-2 text-center">
           {SOURCE}
         </p>
       </div>
@@ -607,7 +607,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
               Tabla de Datos de Histórico de Votación por partido, candidatura o coalición
             </h3>
             {scopeSubtitle && (
-              <p className="text-xs text-black-eske-60 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{scopeSubtitle}</p>
             )}
           </div>
 
@@ -654,7 +654,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
                                 key={`${yearData.anio}-${p.partido}`}
                                 className={`border-t border-gray-eske-10 dark:border-white/5 ${rowBg} hover:bg-blue-eske-10 dark:hover:bg-white/5`}
                               >
-                                <td className="px-3 py-1.5 whitespace-nowrap font-mono text-black-eske-60 dark:text-[#9AAEBE]">
+                                <td className="px-3 py-1.5 whitespace-nowrap font-mono text-black-eske-20 dark:text-[#9AAEBE]">
                                   {p.partido}
                                 </td>
                                 <td className="px-3 py-1.5 whitespace-nowrap text-black-eske dark:text-[#C7D6E0]">
@@ -679,7 +679,7 @@ export default function HistoricoPartidos({ committed, queryVersion }: Props) {
           </div>
 
           <div className="flex flex-col items-center gap-2 pt-1">
-            <p className="text-[11px] text-black-eske-60 dark:text-[#6D8294] text-center">{SOURCE}</p>
+            <p className="text-[11px] text-black-eske-10 dark:text-[#6D8294] text-center">{SOURCE}</p>
             <button
               type="button"
               onClick={handleDownloadCsv}

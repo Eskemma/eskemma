@@ -129,7 +129,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] leading-none truncate">{item.titulo}</p>
-          <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-1">Generado desde el chat</p>
+          <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-1">Generado desde el chat</p>
         </div>
 
         {/* Kebab (⋮) */}
@@ -153,7 +153,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
                   type="button"
                   onClick={handleDescargarPdf}
                   disabled={descargando}
-                  className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="w-full text-left px-3 py-2 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   Descargar PDF
                 </button>
@@ -163,7 +163,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
                   <button
                     type="button"
                     onClick={() => setSubmenuDescarga((s) => !s)}
-                    className="w-full text-left px-3 py-2 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors flex items-center justify-between"
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors flex items-center justify-between"
                   >
                     Descargar
                     <span aria-hidden="true">{submenuDescarga ? "▾" : "▸"}</span>
@@ -174,7 +174,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
                         type="button"
                         onClick={() => handleDescargarImagen("png")}
                         disabled={descargando}
-                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                       >
                         PNG
                       </button>
@@ -182,7 +182,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
                         type="button"
                         onClick={() => handleDescargarImagen("jpg")}
                         disabled={descargando}
-                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-80 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                        className="w-full text-left pl-6 pr-3 py-1.5 text-sm text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                       >
                         JPG
                       </button>
@@ -212,17 +212,17 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {item.filas.map((f) => (
             <div key={f.indicadorId} className="rounded-lg bg-gray-eske-10/60 dark:bg-[#112230] border border-gray-eske-20 dark:border-white/10 px-3 py-2">
-              <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">{f.nombre}</p>
+              <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE]">{f.nombre}</p>
               {f.valor !== null ? (
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">{f.valor}</p>
                   {f.naturaleza && <NaturalezaBadge naturaleza={f.naturaleza} />}
                 </div>
               ) : (
-                <p className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic mt-0.5">{f.motivo}</p>
+                <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic mt-0.5">{f.motivo}</p>
               )}
               {f.fuenteEtiqueta && (
-                <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-1">Fuente: {f.fuenteEtiqueta}</p>
+                <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-1">Fuente: {f.fuenteEtiqueta}</p>
               )}
             </div>
           ))}
@@ -233,7 +233,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <GraficaBarras item={item} color={color} />
           {item.fuenteEtiqueta && (
-            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
         </div>
       )}
@@ -242,7 +242,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <ComparacionTerritoriosBarras item={item} color={color} />
           {item.fuenteEtiqueta && (
-            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
         </div>
       )}
@@ -254,8 +254,8 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-eske-10/60 dark:bg-[#112230]">
                 <tr>
-                  <th className="px-3 py-2 text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE]">Unidad</th>
-                  <th className="px-3 py-2 text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE]">Valor</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Unidad</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-black-eske-20 dark:text-[#9AAEBE]">Valor</th>
                 </tr>
               </thead>
               <tbody>
@@ -271,7 +271,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
                           {f.naturaleza && <NaturalezaBadge naturaleza={f.naturaleza} />}
                         </span>
                       ) : (
-                        <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] italic">{f.motivo}</span>
+                        <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] italic">{f.motivo}</span>
                       )}
                     </td>
                   </tr>
@@ -298,7 +298,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <DistribucionBarras item={item} color={color} />
           {item.fuenteEtiqueta && (
-            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
         </div>
       )}
@@ -307,7 +307,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <SerieTemporalGrafica item={item} color={color} />
           {item.fuenteEtiqueta && (
-            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
         </div>
       )}
@@ -316,13 +316,13 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div ref={graficaRef} className="bg-white-eske dark:bg-[#18324A] p-4">
           <SerieInternacionalGrafica item={item} />
           {item.fuenteEtiqueta && (
-            <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
           )}
         </div>
       )}
 
       {item.tipo === "desglose" && item.fuenteEtiqueta && (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-2">Fuente: {item.fuenteEtiqueta}</p>
       )}
 
       {confirmDelete && (
@@ -335,7 +335,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
             <div>
               <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">¿Eliminar «{item.titulo}»?</h3>
-              <p className="text-sm text-black-eske-80 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
                 Dejará de verse en tu Canvas.
               </p>
             </div>
@@ -412,19 +412,19 @@ function PiramideSexo({
                 mucho su carril, nunca invade la columna de la etiqueta.
                 Proporcionalidad exacta entre barras preservada. */}
             <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
-              <span className="text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0 text-right">{abreviarConteo(f.hombres)}</span>
+              <span className="text-black-eske-20 dark:text-[#9AAEBE] tabular-nums shrink-0 text-right">{abreviarConteo(f.hombres)}</span>
               <div className="flex-1 flex justify-end min-w-0">
                 <div className="h-3 rounded-l-sm" style={{ width: `${(f.hombres / max) * 100}%`, background: color }} />
               </div>
             </div>
-            <span className="w-12 shrink-0 text-center text-black-eske-80 dark:text-[#9AAEBE]">
+            <span className="w-12 shrink-0 text-center text-black-eske-20 dark:text-[#9AAEBE]">
               {f.etiqueta.replace(" años", "")}
             </span>
             <div className="flex-1 flex items-center gap-1 min-w-0">
               <div className="flex-1 flex justify-start min-w-0">
                 <div className="h-3 rounded-r-sm" style={{ width: `${(f.mujeres / max) * 100}%`, background: color, opacity: 0.55 }} />
               </div>
-              <span className="text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0">{abreviarConteo(f.mujeres)}</span>
+              <span className="text-black-eske-20 dark:text-[#9AAEBE] tabular-nums shrink-0">{abreviarConteo(f.mujeres)}</span>
             </div>
           </div>
         ))}
@@ -539,11 +539,11 @@ function SerieTemporalGrafica({
           Otro territorio: {item.territorioLabel} — no es tu proyecto
         </p>
       ) : item.esTerritorioDelProyecto ? (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mb-2">
           {item.territorioLabel} — territorio del proyecto
         </p>
       ) : (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mb-2">{item.territorioLabel}</p>
       )}
 
       {/* Nota a nivel de serie — limitación estructural del dato (ej. "serie
@@ -560,7 +560,7 @@ function SerieTemporalGrafica({
           como al exportar como imagen (exportElementAsImage captura el
           recuadro exacto del nodo). */}
       {!hayDatos ? (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
       ) : (
         <div className="relative h-28 mt-6 mb-7 mx-8">
           <svg
@@ -597,7 +597,7 @@ function SerieTemporalGrafica({
                   </span>
                 )}
                 {p.ranking != null && (
-                  <span className="absolute left-1/2 -translate-x-1/2 top-1.5 whitespace-nowrap text-[9px] text-black-eske-80 dark:text-[#9AAEBE]">
+                  <span className="absolute left-1/2 -translate-x-1/2 top-1.5 whitespace-nowrap text-[9px] text-black-eske-20 dark:text-[#9AAEBE]">
                     #{p.ranking}/32
                   </span>
                 )}
@@ -609,7 +609,7 @@ function SerieTemporalGrafica({
             mostrarAnio(i) ? (
               <span
                 key={`x-${p.periodo}`}
-                className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-80 dark:text-[#9AAEBE]"
+                className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-20 dark:text-[#9AAEBE]"
                 style={{ left: `${xAt(i)}%` }}
               >
                 {p.periodo}
@@ -776,7 +776,7 @@ function SerieInternacionalGrafica({
       )}
 
       {!hayDatos ? (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] italic">Sin datos para graficar.</p>
       ) : (
         <div className="relative h-32 mt-6 mb-7 mx-8">
           <svg
@@ -835,7 +835,7 @@ function SerieInternacionalGrafica({
           {aniosTick.map((year) => (
             <span
               key={`x-${year}`}
-              className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-80 dark:text-[#9AAEBE]"
+              className="absolute -bottom-6 -translate-x-1/2 text-[9px] text-black-eske-20 dark:text-[#9AAEBE]"
               style={{ left: `${xAt(year)}%` }}
             >
               {year}
@@ -847,7 +847,7 @@ function SerieInternacionalGrafica({
       {/* Leyenda: un swatch por país con serie */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
         {conSerie.map((p) => (
-          <span key={`leg-${p.iso3}`} className="inline-flex items-center gap-1.5 text-[11px] text-black-eske-80 dark:text-[#9AAEBE]">
+          <span key={`leg-${p.iso3}`} className="inline-flex items-center gap-1.5 text-[11px] text-black-eske-20 dark:text-[#9AAEBE]">
             <span
               className="inline-block rounded-full"
               style={{
@@ -872,7 +872,7 @@ function SerieInternacionalGrafica({
         <div className="mt-3 overflow-x-auto">
           <table className="text-[10px] border-collapse w-full">
             <thead>
-              <tr className="text-black-eske-80 dark:text-[#9AAEBE]">
+              <tr className="text-black-eske-20 dark:text-[#9AAEBE]">
                 <th className="text-left font-medium pr-2 pb-1">Año</th>
                 {conSerie.map((p) => (
                   <th key={`th-${p.iso3}`} className="text-right font-medium px-2 pb-1 whitespace-nowrap">
@@ -888,7 +888,7 @@ function SerieInternacionalGrafica({
             <tbody className="tabular-nums text-black-eske dark:text-[#EAF2F8]">
               {aniosTick.map((year) => (
                 <tr key={`tr-${year}`} className="border-t border-gray-eske-10 dark:border-[#112230]">
-                  <td className="text-left pr-2 py-0.5 text-black-eske-80 dark:text-[#9AAEBE]">{year}</td>
+                  <td className="text-left pr-2 py-0.5 text-black-eske-20 dark:text-[#9AAEBE]">{year}</td>
                   {conSerie.map((p) => {
                     const pt = p.puntos.find((x) => Number(x.periodo) === year);
                     return (
@@ -923,7 +923,7 @@ function SerieInternacionalGrafica({
       )}
 
       {escalaComprimida && (
-        <p className="text-[10px] text-black-eske-80 dark:text-[#9AAEBE] mt-2 leading-snug">
+        <p className="text-[10px] text-black-eske-20 dark:text-[#9AAEBE] mt-2 leading-snug">
           {paisDominante
             ? `${paisDominante} domina la escala vertical por su magnitud muy superior al resto — `
             : "Un país domina la escala vertical por su magnitud muy superior al resto — "}
@@ -969,7 +969,7 @@ function FilaBarraHorizontal({
           {badge}
         </span>
         {valorTexto !== null && (
-          <span className="text-xs text-black-eske-80 dark:text-[#9AAEBE] tabular-nums shrink-0">{valorTexto}</span>
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE] tabular-nums shrink-0">{valorTexto}</span>
         )}
       </div>
       {valorTexto !== null ? (
@@ -977,7 +977,7 @@ function FilaBarraHorizontal({
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, opacity: opacidad }} />
         </div>
       ) : (
-        <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] italic">{motivo}</p>
+        <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] italic">{motivo}</p>
       )}
     </div>
   );
@@ -994,7 +994,7 @@ function GraficaBarras({
   const max = Math.max(...valores, 1);
   return (
     <div>
-      {item.unidad && <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-3">{item.unidad}</p>}
+      {item.unidad && <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mb-3">{item.unidad}</p>}
       <div className="space-y-3">
         {item.barras.map((b) => (
           <FilaBarraHorizontal
@@ -1027,7 +1027,7 @@ function ComparacionTerritoriosBarras({
   const nivelesDistintos = new Set(item.filas.map((f) => f.nivel)).size > 1;
   return (
     <div>
-      {item.unidad && <p className="text-[11px] text-black-eske-80 dark:text-[#9AAEBE] mb-2">{item.unidad}</p>}
+      {item.unidad && <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mb-2">{item.unidad}</p>}
       {nivelesDistintos && (
         <p className="text-[11px] text-orange-eske-60 dark:text-orange-eske-40 mb-3">
           Los territorios comparados no son todos del mismo nivel geográfico (algunos son estados, otros municipios) — el nivel de cada uno se indica junto a su nombre.
@@ -1040,7 +1040,7 @@ function ComparacionTerritoriosBarras({
             etiqueta={`${f.territorioLabel}${nivelesDistintos ? ` (${NOMBRE_NIVEL_TABLA[f.nivel]})` : ""}`}
             badge={
               f.esTerritorioDelProyecto ? (
-                <span className="text-[9px] text-black-eske-80 dark:text-[#9AAEBE] ml-1.5">(tu proyecto)</span>
+                <span className="text-[9px] text-black-eske-20 dark:text-[#9AAEBE] ml-1.5">(tu proyecto)</span>
               ) : undefined
             }
             valorTexto={f.valor !== null ? f.valor.toLocaleString("es-MX") : null}
