@@ -23,6 +23,7 @@ import {
 import { useGeoTerritorios } from "@/app/sefix/hooks/useLneSemanal";
 import { useLneSemanalesSerie } from "@/app/sefix/hooks/useLneSemanalesSerie";
 import { ESTADOS_LIST } from "@/lib/sefix/constants";
+import { ESTADOS, ESTADOS_ALFABETICOS, claveEstadoSnake } from "@/lib/geo/estados";
 import type { Ambito } from "@/lib/sefix/seriesUtils";
 import {
   AZULES,
@@ -61,24 +62,11 @@ const ABREV: Record<string, string> = {
   yucatan: "YUC", zacatecas: "ZAC",
 };
 
-const NOMBRES: Record<string, string> = {
-  aguascalientes: "Aguascalientes", baja_california: "Baja California",
-  baja_california_sur: "Baja California Sur", campeche: "Campeche",
-  chiapas: "Chiapas", chihuahua: "Chihuahua",
-  ciudad_de_mexico: "Ciudad de México", coahuila: "Coahuila",
-  colima: "Colima", durango: "Durango",
-  estado_de_mexico: "Estado de México", guanajuato: "Guanajuato",
-  guerrero: "Guerrero", hidalgo: "Hidalgo",
-  jalisco: "Jalisco", michoacan: "Michoacán",
-  morelos: "Morelos", nayarit: "Nayarit",
-  nuevo_leon: "Nuevo León", oaxaca: "Oaxaca",
-  puebla: "Puebla", queretaro: "Querétaro",
-  quintana_roo: "Quintana Roo", san_luis_potosi: "San Luis Potosí",
-  sinaloa: "Sinaloa", sonora: "Sonora",
-  tabasco: "Tabasco", tamaulipas: "Tamaulipas",
-  tlaxcala: "Tlaxcala", veracruz: "Veracruz",
-  yucatan: "Yucatán", zacatecas: "Zacatecas",
-};
+// Nombre a mostrar por llave "snake" del estado — derivado del catálogo central
+// (antes una copia escrita a mano de los 32).
+const NOMBRES: Record<string, string> = Object.fromEntries(
+  ESTADOS.map((e) => [claveEstadoSnake(e.clave), e.nombre])
+);
 
 const RECEPTOR_ORDER = Object.keys(ABREV);
 
@@ -514,39 +502,10 @@ export function O2PadronLneChart({ porEntidad, topN = 5, ambito = "nacional" }: 
 }
 
 // ─── O3 — Evolución por Origen × Receptor (con filtros propios) ───────────────
+// Los 32 estados (orden alfabético, como ESTADOS_LIST) salen del catálogo central;
+// LN87/LN88 no son estados y se agregan al final.
 const ESTADOS_ORIGEN_KEYS: { key: string; label: string }[] = [
-  { key: "aguascalientes", label: "Aguascalientes" },
-  { key: "baja_california", label: "Baja California" },
-  { key: "baja_california_sur", label: "Baja California Sur" },
-  { key: "campeche", label: "Campeche" },
-  { key: "chiapas", label: "Chiapas" },
-  { key: "chihuahua", label: "Chihuahua" },
-  { key: "ciudad_de_mexico", label: "Ciudad de México" },
-  { key: "coahuila", label: "Coahuila" },
-  { key: "colima", label: "Colima" },
-  { key: "durango", label: "Durango" },
-  { key: "estado_de_mexico", label: "Estado de México" },
-  { key: "guanajuato", label: "Guanajuato" },
-  { key: "guerrero", label: "Guerrero" },
-  { key: "hidalgo", label: "Hidalgo" },
-  { key: "jalisco", label: "Jalisco" },
-  { key: "michoacan", label: "Michoacán" },
-  { key: "morelos", label: "Morelos" },
-  { key: "nayarit", label: "Nayarit" },
-  { key: "nuevo_leon", label: "Nuevo León" },
-  { key: "oaxaca", label: "Oaxaca" },
-  { key: "puebla", label: "Puebla" },
-  { key: "queretaro", label: "Querétaro" },
-  { key: "quintana_roo", label: "Quintana Roo" },
-  { key: "san_luis_potosi", label: "San Luis Potosí" },
-  { key: "sinaloa", label: "Sinaloa" },
-  { key: "sonora", label: "Sonora" },
-  { key: "tabasco", label: "Tabasco" },
-  { key: "tamaulipas", label: "Tamaulipas" },
-  { key: "tlaxcala", label: "Tlaxcala" },
-  { key: "veracruz", label: "Veracruz" },
-  { key: "yucatan", label: "Yucatán" },
-  { key: "zacatecas", label: "Zacatecas" },
+  ...ESTADOS_ALFABETICOS.map((e) => ({ key: claveEstadoSnake(e.clave), label: e.nombre })),
   { key: "87", label: "LN87 — Nacidos en el extranjero" },
   { key: "88", label: "LN88 — Naturalizados" },
 ];

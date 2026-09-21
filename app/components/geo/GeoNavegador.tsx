@@ -10,6 +10,7 @@ import { GeoVisualizador } from "./GeoVisualizador";
 import { useGeoOptions } from "./hooks/useGeoOptions";
 import { clearGeoShapeCache } from "./hooks/useGeoShapes";
 import PartidosMultiSelect from "@/app/sefix/components/elecciones/PartidosMultiSelect";
+import { ESTADOS } from "@/lib/geo/estados";
 import type {
   GeoScopeElectoral,
   GeoLayerConfig,
@@ -18,40 +19,12 @@ import type {
 
 // ─── Estados de México: CVE_ENT (01–32) → nombre oficial ───────────────────
 
-const ENTIDADES: { id: string; nombre: string }[] = [
-  { id: "01", nombre: "AGUASCALIENTES" },
-  { id: "02", nombre: "BAJA CALIFORNIA" },
-  { id: "03", nombre: "BAJA CALIFORNIA SUR" },
-  { id: "04", nombre: "CAMPECHE" },
-  { id: "05", nombre: "COAHUILA" },
-  { id: "06", nombre: "COLIMA" },
-  { id: "07", nombre: "CHIAPAS" },
-  { id: "08", nombre: "CHIHUAHUA" },
-  { id: "09", nombre: "CIUDAD DE MÉXICO" },
-  { id: "10", nombre: "DURANGO" },
-  { id: "11", nombre: "GUANAJUATO" },
-  { id: "12", nombre: "GUERRERO" },
-  { id: "13", nombre: "HIDALGO" },
-  { id: "14", nombre: "JALISCO" },
-  { id: "15", nombre: "ESTADO DE MÉXICO" },
-  { id: "16", nombre: "MICHOACÁN" },
-  { id: "17", nombre: "MORELOS" },
-  { id: "18", nombre: "NAYARIT" },
-  { id: "19", nombre: "NUEVO LEÓN" },
-  { id: "20", nombre: "OAXACA" },
-  { id: "21", nombre: "PUEBLA" },
-  { id: "22", nombre: "QUERÉTARO" },
-  { id: "23", nombre: "QUINTANA ROO" },
-  { id: "24", nombre: "SAN LUIS POTOSÍ" },
-  { id: "25", nombre: "SINALOA" },
-  { id: "26", nombre: "SONORA" },
-  { id: "27", nombre: "TABASCO" },
-  { id: "28", nombre: "TAMAULIPAS" },
-  { id: "29", nombre: "TLAXCALA" },
-  { id: "30", nombre: "VERACRUZ" },
-  { id: "31", nombre: "YUCATÁN" },
-  { id: "32", nombre: "ZACATECAS" },
-];
+// Derivado del catálogo central (antes 32 líneas escritas a mano). El nombre va en
+// MAYÚSCULAS con acentos, como se mostraba antes ("CIUDAD DE MÉXICO").
+const ENTIDADES: { id: string; nombre: string }[] = ESTADOS.map((e) => ({
+  id: e.cve,
+  nombre: e.nombre.toUpperCase(),
+}));
 
 type Modo = "municipio" | "distrito_fed" | "distrito_loc";
 type GeoFuente = "ine" | "inegi";

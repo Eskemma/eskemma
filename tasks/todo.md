@@ -46,3 +46,13 @@ CF, canónico formal de distritos, desambiguación de texto libre ("México").
 - [x] Verificación: 294 tests, tsc, next build, functions build.
 - [ ] Pendiente (diseño): interfaz de desambiguación al usuario (ligada a texto libre/Sefix-AI).
 - [ ] Remanente: guard CF, normalizadores de UI, acentos display, cascada geo (2 sitios exactos).
+
+# Bloque B — normalizadores sueltos + guard de CF (2026-09-20)
+
+- [x] Punto 5 — filas 1,3,4,5,6,7 migradas (abreviatura por CVE, listas y dedup de TerritorySelector,
+  territorioHeuristicas, `checkTerritoryMatch`, Sefix cliente/pipeline semanal). Fuera: abreviaturas,
+  `detectEstadoFromXpcto`, `country.ts`.
+- [x] Punto 6 — copia de CF GENERADA (`npm run sync-geo-cf`) + guard bloqueante por test.
+- [x] Verificación: tests, tsc, next build, functions build, eslint del archivo generado.
+- [ ] Pendiente (diseño): unificar abreviaturas; interpretación de texto libre (detectEstadoFromXpcto);
+  extender el guard a `country.ts`.

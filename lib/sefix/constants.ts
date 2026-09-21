@@ -3,44 +3,15 @@
 // NO importar desde este archivo en lib/sefix/storage.ts para evitar
 // dependencias circulares — storage.ts declara su propio ESTADO_MAP local.
 
+import { ESTADOS, claveEstadoSnake } from "@/lib/geo/estados";
+
 // ============================================================
 // ESTADOS DE LA REPÚBLICA MEXICANA (key normalizado → nombre oficial)
 // ============================================================
 
-export const ESTADO_MAP: Record<string, string> = {
-  aguascalientes: "AGUASCALIENTES",
-  baja_california: "BAJA CALIFORNIA",
-  baja_california_sur: "BAJA CALIFORNIA SUR",
-  campeche: "CAMPECHE",
-  chiapas: "CHIAPAS",
-  chihuahua: "CHIHUAHUA",
-  coahuila: "COAHUILA",
-  colima: "COLIMA",
-  ciudad_de_mexico: "CIUDAD DE MEXICO",
-  durango: "DURANGO",
-  estado_de_mexico: "ESTADO DE MEXICO",
-  guanajuato: "GUANAJUATO",
-  guerrero: "GUERRERO",
-  hidalgo: "HIDALGO",
-  jalisco: "JALISCO",
-  michoacan: "MICHOACAN",
-  morelos: "MORELOS",
-  nayarit: "NAYARIT",
-  nuevo_leon: "NUEVO LEON",
-  oaxaca: "OAXACA",
-  puebla: "PUEBLA",
-  queretaro: "QUERETARO",
-  quintana_roo: "QUINTANA ROO",
-  san_luis_potosi: "SAN LUIS POTOSI",
-  sinaloa: "SINALOA",
-  sonora: "SONORA",
-  tabasco: "TABASCO",
-  tamaulipas: "TAMAULIPAS",
-  tlaxcala: "TLAXCALA",
-  veracruz: "VERACRUZ",
-  yucatan: "YUCATAN",
-  zacatecas: "ZACATECAS",
-};
+export const ESTADO_MAP: Record<string, string> = Object.fromEntries(
+  ESTADOS.map((e) => [claveEstadoSnake(e.clave), e.clave])
+);
 
 export const ESTADOS_LIST = Object.entries(ESTADO_MAP)
   .map(([key, nombre]) => ({ key, nombre }))

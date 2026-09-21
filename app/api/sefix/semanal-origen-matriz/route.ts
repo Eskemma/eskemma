@@ -3,6 +3,7 @@
 // Transforma las claves UPPERCASE del JSON almacenado a lowercase_underscore.
 
 import { NextResponse } from "next/server";
+import { claveEstadoSnake } from "@/lib/geo/estados";
 import { getSemanalOrigenMatriz } from "@/lib/sefix/storage";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET() {
 
   const por_entidad: Record<string, { nacional: Record<string, number>; extranjero: Record<string, number> }> = {};
   for (const [k, v] of Object.entries(raw.por_entidad)) {
-    por_entidad[k.toLowerCase().replace(/\s+/g, "_")] = v;
+    por_entidad[claveEstadoSnake(k)] = v;
   }
 
   return NextResponse.json(

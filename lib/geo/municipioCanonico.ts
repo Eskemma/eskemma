@@ -14,7 +14,7 @@
 // Quita acentos de nombres geográficos, preservando Ñ/Ü — igual criterio
 // que app/api/geo/options/route.ts (GEO_ACCENT_MAP), aplica a NOMGEO del
 // TopoJSON de municipios.
-const GEO_ACCENT_MAP: Record<string, string> = {
+export const GEO_ACCENT_MAP: Record<string, string> = {
   "Á":"A","À":"A","Â":"A","Ä":"A",
   "É":"E","È":"E","Ê":"E","Ë":"E",
   "Í":"I","Ì":"I","Î":"I","Ï":"I",

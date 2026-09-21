@@ -9,6 +9,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "check-docs-freshness": "tsx scripts/check-docs-freshness.ts",
+    "check-geo-cf": "tsx scripts/check-geo-cf-sync.ts",
+    "sync-geo-cf": "tsx scripts/check-geo-cf-sync.ts --write",
     "install-hooks": "mkdir -p .git/hooks && cp scripts/git-hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo 'Hook de pre-push instalado.'"
   },
   "dependencies": {

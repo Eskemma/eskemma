@@ -36,6 +36,7 @@ import {
 } from "@/lib/territorio/staleness";
 import { buscarDistritoCandidatos, primerCandidatoTemporal, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
 import { resolverEstadoCve } from "@/lib/geo/estados";
+import { abreviaturaEstado } from "@/lib/moddulo/abreviaturaEstado";
 import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
@@ -2729,55 +2730,6 @@ function EleccionCard({
 
 // ── Padrón label helpers ───────────────────────────────────────────────────────
 
-function normalizeParaAbrev(s: string): string {
-  return s.toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
-}
-
-const ESTADOS_ABREV: Record<string, string> = {
-  aguascalientes:                  "AGS.",
-  baja_california:                 "BC.",
-  baja_california_sur:             "BCS.",
-  campeche:                        "CAMP.",
-  chiapas:                         "CHIS.",
-  chihuahua:                       "CHIH.",
-  coahuila:                        "COAH.",
-  coahuila_de_zaragoza:            "COAH.",
-  colima:                          "COL.",
-  cdmx:                            "CDMX",
-  ciudad_de_mexico:                "CDMX",
-  df:                              "CDMX",
-  durango:                         "DGO.",
-  estado_de_mexico:                "EDOMEX.",
-  edomex:                          "EDOMEX.",
-  mexico:                          "EDOMEX.",
-  guanajuato:                      "GTO.",
-  guerrero:                        "GRO.",
-  hidalgo:                         "HGO.",
-  jalisco:                         "JAL.",
-  michoacan:                       "MICH.",
-  michoacan_de_ocampo:             "MICH.",
-  morelos:                         "MOR.",
-  nayarit:                         "NAY.",
-  nuevo_leon:                      "NL.",
-  oaxaca:                          "OAX.",
-  puebla:                          "PUE.",
-  queretaro:                       "QRO.",
-  quintana_roo:                    "Q.ROO.",
-  san_luis_potosi:                 "SLP.",
-  sinaloa:                         "SIN.",
-  sonora:                          "SON.",
-  tabasco:                         "TAB.",
-  tamaulipas:                      "TAMS.",
-  tlaxcala:                        "TLAX.",
-  veracruz:                        "VER.",
-  veracruz_de_ignacio_de_la_llave: "VER.",
-  yucatan:                         "YUC.",
-  zacatecas:                       "ZAC.",
-};
-
 function romanToInt(s: string): number | null {
   const map: Record<string, number> = {
     I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000,
@@ -2820,7 +2772,7 @@ function buildPadronLabel(territory: import("@/types/pestel.types").Territorio |
 
   if (nivel === "municipal") {
     const mun = (territory.municipio ?? territory.nombre).toUpperCase();
-    const abrev = ESTADOS_ABREV[normalizeParaAbrev(territory.estado ?? estado)]
+    const abrev = abreviaturaEstado(territory.estado ?? estado)
       ?? (territory.estado ?? estado).slice(0, 3).toUpperCase() + ".";
     return `${mun}, ${abrev}`;
   }

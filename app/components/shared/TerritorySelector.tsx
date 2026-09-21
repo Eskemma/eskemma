@@ -13,20 +13,17 @@ import { resolverPrimerElemento } from "@/lib/moddulo/territorioPlural";
 import { detectarSenalesTexto } from "@/lib/moddulo/territorioHeuristicas";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 import PartidosMultiSelect, { type MultiSelectOption } from "@/app/sefix/components/elecciones/PartidosMultiSelect";
+import { NOMBRES_ESTADO_ORDENADOS } from "@/lib/geo/estados";
+import { claveMunicipioDeEstado } from "@/lib/geo/claveMunicipioEstado";
 
 // ==========================================
 // DATOS GEOGRÁFICOS
 // ==========================================
 
-const ESTADOS_MEXICO = [
-  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
-  "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima",
-  "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo",
-  "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
-  "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
-  "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán",
-  "Zacatecas",
-];
+// Derivada del catálogo central (antes 32 nombres escritos a mano). Son los valores
+// que se GUARDAN en `territorio.estado`: nombre y orden idénticos a la lista anterior
+// (verificado en lib/geo/normalizadoresSueltos.test.ts).
+const ESTADOS_MEXICO = NOMBRES_ESTADO_ORDENADOS;
 
 const ESTADOS_MEXICO_OPTIONS: MultiSelectOption[] = ESTADOS_MEXICO.map((e) => ({ value: e, label: e }));
 
@@ -72,10 +69,6 @@ const PAISES_IBEROAMERICA = [
 // HELPERS DE DEDUPLICACIÓN (Fase 2, 26-08-13 / Decisión 2, 26-08-16)
 // ==========================================
 
-function normalizarParaComparar(s: string): string {
-  return s.trim().toLowerCase();
-}
-
 // Decisión 2 (26-08-16) — MunicipioSeleccionado[] con estado por entrada,
 // dedup por nombre+estado normalizado (mismo criterio que agregarDistrito,
 // cve+estado) — un mismo nombre de municipio es válido en 2 estados
@@ -85,10 +78,10 @@ function agregarMunicipio(
   estado: string,
   nuevoNombre: string
 ): MunicipioSeleccionado[] {
-  const nuevoNorm = normalizarParaComparar(nuevoNombre);
+  const nuevoNorm = claveMunicipioDeEstado(estado, nuevoNombre);
   if (!nuevoNorm) return actual;
   const yaExiste = actual.some(
-    (m) => m.estado === estado && normalizarParaComparar(m.nombre) === nuevoNorm
+    (m) => m.estado === estado && claveMunicipioDeEstado(estado, m.nombre) === nuevoNorm
   );
   if (yaExiste) return actual;
   return [...actual, { nombre: nuevoNombre.trim(), estado }];
@@ -448,7 +441,7 @@ export default function TerritorySelector({
     // Dedup síncrona ANTES de cualquier fetch — un duplicado exacto nunca
     // dispara una llamada de red.
     const yaExiste = municipiosPorEstado.some(
-      (m) => m.estado === estado && normalizarParaComparar(m.nombre) === normalizarParaComparar(texto)
+      (m) => m.estado === estado && claveMunicipioDeEstado(estado, m.nombre) === claveMunicipioDeEstado(estado, texto)
     );
     if (yaExiste) {
       setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));

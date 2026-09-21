@@ -37,6 +37,7 @@ import { createInterface } from "readline";
 import { initializeApp, cert, App } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import dotenv from "dotenv";
+import { resolverEstado } from "../lib/geo/estados";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
@@ -52,21 +53,21 @@ const SERIES_PREFIX = "sefix/pdln/semanal_series";
 const GEO_PATH      = "sefix/pdln/semanal_geo/geo.json";
 const AGG_PREFIX    = "sefix/pdln/semanal_agg";
 
-const CSV_ENTIDAD_NORMALIZER: Record<string, string> = {
-  "COAHUILA DE ZARAGOZA":             "COAHUILA",
-  "MICHOACAN DE OCAMPO":              "MICHOACAN",
-  "VERACRUZ DE IGNACIO DE LA LLAVE":  "VERACRUZ",
-  "MEXICO":                           "ESTADO DE MEXICO",
-};
-
+// Nombre de entidad de los CSV del INE → clave interna del estado (la misma que
+// usa la UI de Sefix). Antes: una tabla propia de 4 alias (COAHUILA DE ZARAGOZA,
+// MICHOACAN DE OCAMPO, VERACRUZ DE IGNACIO DE LA LLAVE, MEXICO) que divergía del
+// resto del ecosistema; ahora resuelve con el helper central (alias verificados,
+// incluye "DISTRITO FEDERAL"/"CDMX"). Un nombre que no se reconoce conserva la
+// clave normalizada de siempre. Verificado 2026-09-20 con los nombres crudos
+// reales de semanal/*.csv (32 estados + TOTALES): mismas claves que la función anterior.
 function normalizeEntidadName(raw: string): string {
   const key = raw
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
-  return CSV_ENTIDAD_NORMALIZER[key] ?? key;
+  return resolverEstado(raw)?.clave ?? key;
 }
 
 // ─────────────────────────────────────────────

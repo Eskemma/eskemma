@@ -14,6 +14,7 @@
 // como filtro mecánico aquí.
 
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
+import { normalizeGeoName, plegarDiacriticosGeo } from "@/lib/geo/municipioCanonico";
 import type { NivelTerritorial } from "@/types/pestel.types";
 
 // Reverso de ESTADO_CVE_MAP (claves en mayúsculas sin acentos) — nombres
@@ -22,11 +23,10 @@ import type { NivelTerritorial } from "@/types/pestel.types";
 // ESTADOS_MEXICO de TerritorySelector.tsx, sin duplicar esa lista aquí).
 const NOMBRES_ESTADO = Object.keys(ESTADO_CVE_MAP);
 
+// Clave de comparación del núcleo compartido (MAYÚSCULAS, sin acentos, Ñ/Ü plegadas):
+// equivale a la NFD-strip local que había aquí para diacríticos latinos.
 function normalizar(s: string): string {
-  return s
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  return plegarDiacriticosGeo(normalizeGeoName(s));
 }
 
 function contienePalabraCompleta(textoNormalizado: string, frase: string): boolean {

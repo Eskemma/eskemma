@@ -219,7 +219,8 @@ en la fuente compartida.
 `lib/geo/municipioCanonico.ts` (municipios), `lib/geo/estados.ts` (estados),
 `lib/geo/display.ts` (nombre a mostrar), `lib/geo/candidatosGeo.ts` (búsqueda por
 nombre que devuelve TODOS los candidatos: Estado/Municipio/Distrito federal/Distrito
-local) y `lib/geo/cabeceraNombres.ts` (comparación de nombres de cabecera).
+local) y `lib/geo/cabeceraNombres.ts` (comparación de nombres de cabecera) y
+`lib/geo/claveMunicipioEstado.ts` (clave de un municipio tecleado dentro de un estado).
 **Antes de escribir cualquier
 `.normalize("NFD")`/`toUpperCase()` sobre un nombre de estado/municipio/distrito,
 usar estos** — el diagnóstico del 2026-09-19 encontró ~18 implementaciones que
@@ -267,10 +268,24 @@ discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estata
   Candidato natural: el trabajo de Sefix-AI (T06). Por eso
   `lib/fontana/geo/resolverTerritorioNombre.ts` (nombres dichos por el usuario en el
   chat de Fontana) sigue usando `ESTADO_CVE_MAP` directo y NO resuelve "México" a estado.
-- **Guard de sincronización con la copia de Cloud Functions**
-  (`functions/src/utils/estadoCveMap.ts`, no puede importar de `lib/`). Divergencias
-  conocidas hoy (test `lib/geo/estados.test.ts`): CDMX/DF, nombres oficiales largos,
-  espacios de más, `nuevo_leon`.
+- **Guard de sincronización con la copia de Cloud Functions — RESUELTO (2026-09-20).**
+  `functions/src/utils/estadoCveMap.ts` (functions/ no puede importar de `lib/`) ya no se
+  mantiene a mano: es un archivo **GENERADO** desde `lib/geo/estados.ts` (catálogo +
+  `ALIAS_ESTADO`) y el mapa de acentos de `municipioCanonico.ts` por
+  `scripts/lib/geoCfSync.ts` (`npm run sync-geo-cf`; `npm run check-geo-cf` solo chequea).
+  Guard **bloqueante**: `lib/geo/estadoCveMapCF.test.ts` falla —y por tanto el paso 1 del
+  pre-push, `npm run test`— si el archivo commiteado difiere byte a byte de lo que genera
+  la fuente, o si una batería de paridad (nombres, claves, alias, mayúsculas, acentos, `_`,
+  espacios, nacional, vacío, no-string) da otra respuesta que `resolverEstadoCve`. Por qué
+  bloquea y no solo avisa: es determinista y local (ms, sin red ni fechas) → sin falsos
+  positivos, a diferencia del detector de frescura; y dejar pasar una divergencia significa
+  un CVE `null` en silencio (scrapers INEGI omitidos en `scrapeAndAnalyze`). La divergencia
+  que había (CDMX/DF, nombres oficiales largos, espacios de más, `nuevo_leon`, y `TypeError`
+  con entradas no-string; 296 entradas de la batería) se corrigió al generar el archivo. El
+  guard se probó contra la lógica anterior (fixture verbatim en el test) y editando a mano un
+  alias. **Remanente:** `country.ts` ↔ `functions/src/utils/country.ts` (país, no estado; 4
+  líneas idénticas salvo comentarios) sigue con sincronización manual — candidato a extender
+  este mismo guard.
 - **Ambigüedad por nombre compartido — capa de DATOS lista (2026-09-19); interfaz de
   desambiguación PENDIENTE de diseño.** `matchDistrito` ya no existe: la sustituye
   `buscarDistritoCandidatos()` (`lib/sefix/districtMatching.ts`), que devuelve la LISTA
@@ -368,12 +383,42 @@ discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estata
   municipio` de secciones), que recibe la cadena de la opción del mismo año; la local además
   compara con opciones ya limpiadas por `cleanGeoName` (quita '?') contra la fila cruda: 1
   caso real (CA?ITAS DE FELIPE PESCADOR, 2016).
-- Otros normalizadores propios sin migrar: `exploracion/page.tsx`
-  (`normalizeParaAbrev`, `detectEstadoFromXpcto`, `ESTADOS_ABREV`),
-  `TerritorySelector.tsx` (`normalizarParaComparar`), `territorioHeuristicas.ts`,
-  `SemanalView.tsx` (`normalizeEntidadKey`), y los lookups directos
-  `ESTADO_CVE_MAP[x]` en hooks de UI de Sefix (reciben valores canónicos del selector,
-  no texto libre).
+- **Otros normalizadores sueltos — MIGRADOS (2026-09-20), con remanente explícito.**
+  Barrido con datos reales (Firestore de proyectos, Storage de Sefix). Migrados (derivan del
+  núcleo, con test contra el fixture anterior verbatim en `lib/geo/normalizadoresSueltos.test.ts`):
+  (1) Moddulo F2 `normalizeParaAbrev`/`ESTADOS_ABREV` → `lib/moddulo/abreviaturaEstado.ts`
+  (tabla por CVE, mismos valores; ahora resuelve "Distrito Federal", "Edo. Méx."…);
+  (3) `TerritorySelector` `ESTADOS_MEXICO` (valores que se GUARDAN en `territorio.estado`) →
+  `NOMBRES_ESTADO_ORDENADOS`; (4) su dedup de municipios tecleados (`trim().toLowerCase()`) →
+  `claveMunicipioDeEstado` (alias verificados + acentos: "San Pedro Tlaquepaque" ya no se
+  agrega tras "Tlaquepaque" — doble conteo en agregación aditiva; 0 duplicados reales aún);
+  (5) `territorioHeuristicas` NFD-strip propio → plegado compartido; (6) **`checkTerritoryMatch`**
+  (`lib/moddulo/linkCompatibility.ts`, puerta de la vinculación Moddulo↔PESTEL/Fontana/Canal 3):
+  comparaba estado/municipio/cve_distrito con `!==` → estado por CVE, municipio por
+  `claveComparacionMunicipio`, distrito por número (`extraerNumeroDistrito`), país plegado.
+  Fallo real corregido: proyecto `nZvpYu…` (Iztapalapa, local 27, estructurado) vs sesión
+  Fontana `1qEjT…` (mismo distrito, texto) daba `"mismatch"`; ahora `"approximate"` (496 pares
+  reales: 495 idénticos, 1 cambia; los 5 mismatch genuinos de municipios distintos se conservan;
+  "exact" sigue exigiendo `cve_distrito` en ambos lados — nunca se concede por interpretar
+  texto); (7) Sefix cliente: `ESTADO_MAP` (`lib/sefix/constants.ts`), la llave "snake"
+  (`claveEstadoSnake`, única definición para `SemanalView`, `semanal-origen-matriz` y el
+  pipeline — 32/32 claves de `por_entidad` en Storage verificadas), `pregenerate-semanal.ts`
+  (33 nombres crudos reales de los CSV: mismas claves que antes), `GeoNavegador` `ENTIDADES` y
+  `OrigenCharts` `NOMBRES`/`ESTADOS_ORIGEN_KEYS`. Ninguno tenía un fallo activo (excepto el 6):
+  eran copias con riesgo latente (si una cambia, el heatmap de origen queda vacío en silencio).
+  **Remanente (decisión de diseño, no se tocó):** (a) las tablas de **abreviaturas** son 3
+  convenciones distintas y visibles (`TAMPS` en OrigenCharts vs `TAMS.` en Moddulo; `MEX` vs
+  `EDOMEX.` vs `Edo. México` en semanalUtils) — unificarlas es decisión de producto;
+  (b) `detectEstadoFromXpcto`/`ESTADOS_MEXICO` de `exploracion/page.tsx`: busca un estado por
+  subcadena en texto libre; 0 fallos en 11 XPCTO reales, pero la subcadena da falsos positivos
+  demostrables ("Miguel Hidalgo", "Ecatepec de Morelos", "Vicente Guerrero") y "México" (país vs
+  Estado) exige decisión → pertenece a la interpretación de texto libre/Sefix-AI; (c)
+  `country.ts` (ver guard CF). No son normalizadores de nombres geográficos y no se migran:
+  plegado de texto genérico de Fontana (`pipMinimos`, modales, encabezados CONEVAL),
+  `extractedDataGrounding`, y los catálogos con numeración propia de la fuente
+  (`stpsHuelgas` 2..33 ≠ CVE INEGI, `sesnsp`, `ESTADO_TO_LOC_KEYS`,
+  `eleccionesLocalesConstants`). Los lookups directos `ESTADO_CVE_MAP[x]` de hooks de UI de
+  Sefix reciben valores canónicos del selector, no texto libre.
 - Restaurar acentos de municipios para display: ningún catálogo estructurado actual
   los conserva (el ITER solo trae la clave canónica).
 
@@ -523,6 +568,7 @@ Cuando se modifique cualquiera de estos archivos, actualizar AMBAS copias simult
 | Google News RSS scraper + tabla de locales por país | `lib/centinela/pestel/scraper/googleNewsRSS.ts` | `functions/src/pestel/scrapers/googleNewsRSS.ts` |
 | Gate de país `isMexico()` | `lib/centinela/pestel/utils/country.ts` | `functions/src/utils/country.ts` |
 | Pesos del escaneo PESTEL por tipo de proyecto (dimensiones prioritarias/seguimiento) | `lib/moddulo/dimensionPriority.ts` | `functions/src/pestel/dimensionPriority.ts` |
+| Resolución de estado → CVE (`getCveEntidad`) | `lib/geo/estados.ts` | `functions/src/utils/estadoCveMap.ts` — **GENERADO**, no editar: `npm run sync-geo-cf`; guard bloqueante en `lib/geo/estadoCveMapCF.test.ts` (pre-push) |
 
 **Checklist obligatorio al sincronizar instrucciones de PROMPT (no solo tablas/funciones)
 entre el path express (una sola llamada a Claude cubre las 6 dimensiones) y el path

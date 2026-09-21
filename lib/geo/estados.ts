@@ -85,7 +85,7 @@ export const ESTADO_CVE_POR_CLAVE: Record<string, string> = Object.fromEntries(
 //     (`storage.ts` DERFE_NOMBRE_MAP, pregenerate-semanal.ts).
 //   · CDMX / DF / DISTRITO FEDERAL / EDOMEX: entradas de usuario y las
 //     claves que ya aceptaba `resolveEstadoName` de Sefix.
-const ALIAS_ESTADO: Record<string, string> = {
+export const ALIAS_ESTADO: Record<string, string> = {
   MEXICO: "15",
   EDOMEX: "15",
   "EDO MEX": "15",
@@ -199,3 +199,30 @@ export function claveAlmacenamiento(entidad: string): string {
 export function claveEstadoDatos(nombre: string): string {
   return resolverEstado(nombre)?.clave ?? normalizarNombreMunicipio(nombre);
 }
+
+/**
+ * Llave "snake" de un estado por su clave interna ("ESTADO DE MEXICO" →
+ * "estado_de_mexico"): la que une el pipeline semanal de Sefix
+ * (`por_entidad` en Storage), la API `semanal-origen-matriz` y los componentes
+ * de la UI (SemanalView, OrigenCharts). UNA sola definición: antes eran tres
+ * copias de `lower + _` (SemanalView, la ruta y `ESTADO_MAP` escrito a mano) y
+ * si una cambiaba el heatmap de origen quedaba vacío en silencio. Verificado
+ * 2026-09-20 contra Storage: las 32 llaves de `por_entidad` (edad/origen/sexo)
+ * coinciden con las de los 32 estados del catálogo.
+ */
+export function claveEstadoSnake(clave: string): string {
+  return clave.toLowerCase().replace(/\s+/g, "_");
+}
+
+/** Los 32 estados en orden alfabético por clave (el orden de los selectores de Sefix). */
+export const ESTADOS_ALFABETICOS: readonly EstadoCatalogo[] = [...ESTADOS].sort((a, b) =>
+  a.clave.localeCompare(b.clave)
+);
+
+/**
+ * Nombres a mostrar de los 32 estados en orden alfabético (es): la lista del selector
+ * de territorio, cuyos valores se GUARDAN en `territorio.estado`.
+ */
+export const NOMBRES_ESTADO_ORDENADOS: readonly string[] = ESTADOS.map((e) => e.nombre).sort((a, b) =>
+  a.localeCompare(b, "es")
+);

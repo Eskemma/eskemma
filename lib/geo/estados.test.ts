@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { getCveEntidad as getCveEntidadCF } from "../../functions/src/utils/estadoCveMap";
 import {
   ESTADO_CVE_POR_CLAVE,
   ESTADOS,
@@ -19,7 +20,6 @@ import {
 } from "./estados";
 import { ESTADO_CVE_MAP } from "@/lib/sefix/eleccionesConstants";
 import { normalizeGeoName } from "./municipioCanonico";
-import { getCveEntidad as getCveEntidadCF } from "../../functions/src/utils/estadoCveMap";
 
 // El literal que vivía en lib/sefix/eleccionesConstants.ts ANTES de derivarlo del catálogo.
 const ESTADO_CVE_MAP_ANTERIOR: Record<string, string> = {
@@ -170,24 +170,8 @@ describe("claveAlmacenamiento", () => {
   });
 });
 
-describe("paridad con la copia de Cloud Functions (functions/src/utils/estadoCveMap.ts)", () => {
-  // La copia de CF no puede importar de lib/. Se VERIFICA cuánto coincide; el guard
-  // de sincronización formal queda para otra ronda. Estas son las divergencias
-  // CONOCIDAS de hoy: si alguien las corrige (o aparece una nueva) este test lo dice.
-  it("coincide en los 32 estados y en 'México'", () => {
-    for (const e of ESTADOS) expect(getCveEntidadCF(e.nombre)).toBe(e.cve);
-    expect(getCveEntidadCF("México")).toBe("15");
-  });
-
-  it("divergencias conocidas: CDMX/DF, nombres oficiales largos, espacios de más y guion bajo", () => {
-    const divergencias = ["CDMX", "Distrito Federal", "Coahuila de Zaragoza", "Michoacán de Ocampo", "Veracruz de Ignacio de la Llave", "  jalisco  ", "nuevo_leon"]
-      .filter((x) => getCveEntidadCF(x) !== resolverEstadoCve(x));
-    expect(divergencias).toEqual([
-      "CDMX", "Distrito Federal", "Coahuila de Zaragoza", "Michoacán de Ocampo",
-      "Veracruz de Ignacio de la Llave", "  jalisco  ", "nuevo_leon",
-    ]);
-  });
-});
+// La paridad con la copia de Cloud Functions (functions/src/utils/estadoCveMap.ts, ahora
+// GENERADA) se verifica en lib/geo/estadoCveMapCF.test.ts.
 
 describe("claveEstadoDatos — fuentes que traen los estados por NOMBRE", () => {
   it("el nombre de la fuente y el del proyecto convergen en la misma clave", () => {

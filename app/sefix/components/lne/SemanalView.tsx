@@ -14,6 +14,7 @@ import { useLneSemanal, useGeoTerritorios } from "@/app/sefix/hooks/useLneSemana
 import { useLneSemanalesSerie } from "@/app/sefix/hooks/useLneSemanalesSerie";
 import { useLneOrigenMatriz } from "@/app/sefix/hooks/useLneOrigenMatriz";
 import { ESTADOS_LIST } from "@/lib/sefix/constants";
+import { claveEstadoSnake } from "@/lib/geo/estados";
 import type { Ambito } from "@/lib/sefix/seriesUtils";
 import type { GeoFilterState, GeoFilterAction } from "@/types/sefix.types";
 import type { GeoInfo } from "./GeoFilter";
@@ -76,7 +77,7 @@ function fmtFechaLarga(iso: string): string {
 // ESTADO_MAP values are ASCII uppercase (e.g., "HIDALGO", "CIUDAD DE MEXICO")
 // porEntidad keys are lowercase+underscore (e.g., "hidalgo", "ciudad_de_mexico")
 function normalizeEntidadKey(nombre: string): string {
-  return nombre.toLowerCase().replace(/\s+/g, "_");
+  return claveEstadoSnake(nombre);
 }
 
 function allSexValuesZero(data: Record<string, number>, rangos: string[]): boolean {
