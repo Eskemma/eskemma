@@ -500,8 +500,8 @@ export default function InformesPage() {
 
         {/* ── Generate error ── */}
         {generateError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-eske/20 dark:border-red-700/40 rounded-xl p-4">
-            <p className="text-sm text-red-eske dark:text-red-300 font-medium">
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/20 dark:border-red-eske/40 rounded-xl p-4">
+            <p className="text-sm text-red-eske dark:text-red-eske-10 font-medium">
               Error al generar el informe
             </p>
             <p className="text-sm text-red-eske/80 mt-1">{generateError}</p>

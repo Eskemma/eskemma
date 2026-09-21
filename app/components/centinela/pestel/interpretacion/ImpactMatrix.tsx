@@ -172,7 +172,7 @@ export default function ImpactMatrix({
           <ul className="space-y-0.5 list-disc pl-4 text-black-eske dark:text-[#9AAEBE]">
             <li><span className="text-red-eske font-medium">Prioridad crítica:</span> alta probabilidad + alto impacto → acción inmediata</li>
             <li><span className="text-violet-700 dark:text-violet-400 font-medium">Vigilar:</span> baja probabilidad + alto impacto → monitoreo estrecho</li>
-            <li><span className="text-black-eske-70 dark:text-[#C5D8E8] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
+            <li><span className="text-black-eske-40 dark:text-[#C5D8E8] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
             <li><span className="text-green-eske font-medium">Monitoreo básico:</span> baja probabilidad + bajo impacto → atención mínima</li>
           </ul>
         </div>
@@ -250,7 +250,7 @@ export default function ImpactMatrix({
                   Monitoreo básico
                 </span>
                 <span className="absolute bottom-2 right-2 text-xs
-                  text-black-eske-70 dark:text-[#C5D8E8] font-bold pointer-events-none text-right"
+                  text-black-eske-40 dark:text-[#C5D8E8] font-bold pointer-events-none text-right"
                   aria-hidden="true">
                   Atención moderada
                 </span>

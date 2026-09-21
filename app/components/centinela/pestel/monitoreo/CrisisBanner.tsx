@@ -41,7 +41,7 @@ export default function CrisisBanner({ alerts, projectId }: Props) {
           router.push(`/centinela/pestel/${projectId}/analisis`)
         }
         className="shrink-0 px-4 py-2 bg-white text-red-eske text-sm font-semibold
-          rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap"
+          rounded-lg hover:bg-red-eske/10 transition-colors whitespace-nowrap"
       >
         Ver análisis →
       </button>

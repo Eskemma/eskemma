@@ -300,7 +300,7 @@ export default function InterpretacionPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Error banner */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-eske/30 dark:border-red-700/40 text-red-eske dark:text-red-300
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske dark:text-red-eske-10
             text-sm px-4 py-2.5 rounded-lg">
             {error}
           </div>
@@ -323,7 +323,7 @@ export default function InterpretacionPage() {
                 "flex-1 justify-center transition-colors",
                 activeSection === s.id
                   ? "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske shadow-sm"
-                  : "text-black-eske-70 dark:text-[#C5D8E8] hover:text-bluegreen-eske dark:hover:text-bluegreen-eske-40",
+                  : "text-black-eske-40 dark:text-[#C5D8E8] hover:text-bluegreen-eske dark:hover:text-bluegreen-eske-40",
               ].join(" ")}
             >
               {s.label}
@@ -368,7 +368,7 @@ export default function InterpretacionPage() {
                       <div
                         key={adj.dimensionCode}
                         className="text-xs text-black-eske dark:text-[#C7D6E0] px-3 py-2
-                          bg-orange-eske/5 dark:bg-orange-900/10 border border-orange-eske/20 dark:border-orange-700/30 rounded-lg"
+                          bg-orange-eske/5 dark:bg-orange-eske/10 border border-orange-eske/20 dark:border-orange-eske/30 rounded-lg"
                       >
                         <span className="font-semibold text-orange-eske mr-1.5">
                           {adj.dimensionCode}

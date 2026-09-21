@@ -544,7 +544,7 @@ export default function FontanaReportePanel({
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           {!editMode && markdown ? (
-            <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] max-w-md">
+            <p className="text-xs text-black-eske-20 dark:text-[#6D8294] max-w-md">
               Pulsa "Editar texto" para ajustar el reporte antes de descargarlo o entregarlo. Los
               cambios se guardan solos.
             </p>

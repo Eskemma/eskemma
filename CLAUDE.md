@@ -144,18 +144,42 @@ Firebase signIn (cliente)
 | `green-eske` | Success |
 | `red-eske` | Errores |
 
-Cada color tiene escala: `-10` `-20` `-30` `-40` `-60` `-70` `-80` `-90`.
-**La escala NO incluye `-50`** — no existe `--color-gray-eske-50` (ni de
-ningún otro color) en `globals.css`. Una clase como `text-gray-eske-50` no
-truena en build ni en `tsc` (es solo un string de className) pero es un
-no-op silencioso en runtime: el texto simplemente hereda el color de su
-ancestro más cercano. Incidente real (26-09-12): 3 badges de "Archivado"
-(PESTEL y Moddulo, hubs de proyectos) usaban `text-gray-eske-50` — en modo
-claro el heredado casualmente se veía legible, pero en modo oscuro el
-mismo fondo claro (`bg-gray-eske-20`, sin variante `dark:`) quedaba con
-texto casi invisible. Antes de usar cualquier token de color, confirmar
-que su escala existe en `globals.css` — nunca asumir por analogía con
-otro color que sí tiene esa variante.
+Cada color tiene escala `-10` `-20` `-30` `-40` `-60` `-70` `-80` `-90`, **salvo
+`black-eske`**, que solo define `-10` `-20` `-30` `-40` y `-90` (y `-10` es el más
+CLARO). **Ninguna escala incluye el paso 50** — ni `black-eske-60`/`-70`/`-80`, ni
+`blue-eske-900`: no existen en `globals.css`. Una clase con un token inexistente no
+truena en build ni en `tsc` (es solo un string de className) pero es un no-op
+silencioso en runtime: el texto hereda el color de su ancestro más cercano.
+Incidentes reales: 26-09-12 (3 badges "Archivado" casi invisibles en modo oscuro),
+26-09-13 (~150 ocurrencias en `app/moddulo/`) y la auditoría de diseño (26-09-20:
+el paso 50 seguía en 32 líneas de PESTEL, Sefix, Fontana, cursos y el selector de
+territorio — por eso el hallazgo estaba "documentado como resuelto, pero no
+cerrado"). Nota: `gray-eske-60` se sobrescribe en un segundo `@theme` a `#9a9a9a`
+(contraste WCAG). **Antes de usar cualquier token, confirmar que su paso existe en
+`globals.css`.** Guard permanente: `lib/design/tokensColor.test.ts` (falla si aparece
+el paso 50 o un token inexistente nuevo, y limita los remanentes conocidos).
+
+**Tinte suave de marca = opacidad del token**, no una escala clara inventada:
+`bg-red-eske/10`, `bg-green-eske/20`, `dark:bg-yellow-eske/10`, `border-orange-eske/30`
+(ya usado en `PESTLPanelV2`). Equivalencias al reemplazar colores genéricos de Tailwind
+(sub-ronda PESTEL 26-09-20): texto rojo/verde/naranja/azul de 600-700 → paso `-60`/`-70`
+del token (contraste ≥ original); texto amarillo en claro → `brown-eske-60` (el amarillo
+no contrasta sobre fondo claro; precedente `NaturalezaBadge`); en oscuro los semánticos
+de `:root` (`--color-danger` = red-eske-20, `--color-success` = green-eske-30,
+`--color-brand-emphasis` = orange-eske-20). Grises: el más cercano que NO baje el
+contraste original (`text-gray-400` → `gray-eske-90`, `-500` → `black-eske-10`).
+Al reemplazar un token inexistente que **no tenía variante `dark:`**, agregar la variante
+oscura (`dark:text-[#9AAEBE]`): un color fijo sin ella dejaría texto oscuro sobre fondo
+oscuro. **No existe equivalente para morado/violeta.**
+
+**Auditoría de diseño — estado (26-09-20).** Sub-ronda 1 (PESTEL + paso 50) cerrada:
+paso 50 = 0 en todo el repo; PESTEL sin tokens inexistentes y sin escala numérica de
+Tailwind salvo el cuadrante "Vigilar" de `ImpactMatrix` (violeta, sin equivalente:
+decisión de diseño pendiente). "Moderado/Media" pasó de morado a `brown-eske-60` /
+`yellow-eske` en `PESTLPanelV2` y `VoicesPanelE6`. **Pendiente (sub-rondas propias, cada
+una pide verificación visual):** `black-eske-60` (252: Sefix 224), `black-eske-80` (148:
+Fontana 131), `blue-eske-900` (1); 9 colores genéricos en Sefix (`SexoCharts`,
+`G3SexChart`, `HistoricoView`); y los colores genéricos del sitio principal (259).
 
 **Regla**: usar siempre colores del design system. No usar colores genéricos
 de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.

@@ -119,7 +119,7 @@ export default function WizardStep3Variables({
           {totalVars} / 30
         </span>
         {totalVars >= 30 && (
-          <span className="text-xs text-red-eske dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">
+          <span className="text-xs text-red-eske dark:text-red-eske-10 bg-red-eske/10 dark:bg-red-eske/20 px-2 py-0.5 rounded">
             Límite alcanzado
           </span>
         )}
@@ -302,7 +302,7 @@ export default function WizardStep3Variables({
                         placeholder="Nombre de la nueva variable"
                         className="flex-1 px-3 py-1.5 border border-gray-eske-30 dark:border-white/10 rounded-lg
                           text-xs focus:outline-none focus-visible:ring-2
-                          focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-50 dark:placeholder-[#6D8294]
+                          focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-90 dark:placeholder-[#6D8294]
                           bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
                         aria-label={`Agregar variable a ${DIMENSION_META[dim.code].label}`}
                       />

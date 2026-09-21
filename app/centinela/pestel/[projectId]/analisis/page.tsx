@@ -299,7 +299,7 @@ export default function AnalisisPage() {
 
         {/* Job error */}
         {(jobStatus === "failed" || error) && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-eske/20 dark:border-red-700/40 rounded-xl p-4 mb-6">
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/20 dark:border-red-eske/40 rounded-xl p-4 mb-6">
             <p className="text-sm text-red-eske font-medium">Error en el análisis</p>
             <p className="text-sm text-red-eske/80 mt-1">
               {jobError ?? error}
@@ -346,7 +346,7 @@ export default function AnalisisPage() {
               </button>
             </div>
             {analysis.status === "PENDING_REVIEW" && (
-              <p className="text-xs text-black-eske-70 dark:text-yellow-eske-70 -mt-1">
+              <p className="text-xs text-black-eske-40 dark:text-yellow-eske-70 -mt-1">
                 Confianza por debajo del umbral recomendado — puedes continuar, pero considera agregar más fuentes primero.
               </p>
             )}

@@ -148,7 +148,7 @@ export default function CourseCard({ course, userRole: userRoleProp }: CourseCar
               </span>
             ))}
             {course.tags.length > 3 && (
-              <span className="text-xs text-gray-eske-50">+{course.tags.length - 3}</span>
+              <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">+{course.tags.length - 3}</span>
             )}
           </div>
         )}

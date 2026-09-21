@@ -83,7 +83,7 @@ export default function BiasCheckPanel({
                 "flex items-start gap-3 px-3 py-2.5 rounded-lg border",
                 alert.acknowledgedAt
                   ? "border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] opacity-60"
-                  : "border-yellow-eske/30 bg-yellow-eske/5 dark:bg-yellow-900/10",
+                  : "border-yellow-eske/30 bg-yellow-eske/5 dark:bg-yellow-eske/10",
               ].join(" ")}
             >
               <span

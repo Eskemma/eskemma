@@ -183,7 +183,7 @@ export default function PESTELAnalisisPage() {
     return (
       <main className="min-h-screen bg-white-eske-40 flex flex-col
         items-center justify-center gap-4 p-6">
-        <p className="text-gray-500 dark:text-[#9AAEBE] text-sm">
+        <p className="text-black-eske-10 dark:text-[#9AAEBE] text-sm">
           No se encontró esta configuración.
         </p>
         <Link
@@ -289,7 +289,7 @@ export default function PESTELAnalisisPage() {
                 style={{width: "55%"}}
               />
             </div>
-            <p className="text-xs text-gray-400 dark:text-[#6D8294] mt-2">
+            <p className="text-xs text-gray-eske-90 dark:text-[#6D8294] mt-2">
               Este proceso tarda entre 1 y 2 minutos. Puedes esperar aquí
               o volver más tarde.
             </p>
@@ -298,8 +298,8 @@ export default function PESTELAnalisisPage() {
 
         {/* Error del job */}
         {job.status === "failed" && job.error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-4">
-            <p className="text-sm text-red-700 dark:text-red-400">{job.error}</p>
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/20 dark:border-red-eske/50 rounded-xl p-4">
+            <p className="text-sm text-red-eske-60 dark:text-red-eske-20">{job.error}</p>
           </div>
         )}
 
@@ -327,7 +327,7 @@ export default function PESTELAnalisisPage() {
         {!feed && !isAnalyzing && !loadingFeed && (
           <div className="text-center py-16 bg-white-eske dark:bg-[#18324A] rounded-xl
             border border-dashed border-gray-eske-30 dark:border-white/10">
-            <p className="text-sm text-gray-400 dark:text-[#9AAEBE] mb-3">
+            <p className="text-sm text-gray-eske-90 dark:text-[#9AAEBE] mb-3">
               Sin análisis para este territorio.
             </p>
             <button

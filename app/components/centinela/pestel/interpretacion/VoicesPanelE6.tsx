@@ -12,7 +12,7 @@ import { DIMENSION_META, DIMENSION_ORDER } from "@/types/pestel.types";
 
 const RELIABILITY_LABELS: Record<ReliabilityLevel, { label: string; color: string }> = {
   HIGH: { label: "Alta", color: "text-green-eske bg-green-eske/10" },
-  MEDIUM: { label: "Media", color: "text-purple-700 dark:text-yellow-eske-60 bg-purple-100 dark:bg-yellow-eske/10" },
+  MEDIUM: { label: "Media", color: "text-brown-eske-60 dark:text-yellow-eske-60 bg-yellow-eske/20 dark:bg-yellow-eske/10" },
   LOW: { label: "Baja", color: "text-red-eske bg-red-eske/10" },
 };
 

@@ -23,9 +23,9 @@ function riskLevel(
 }
 
 const LEVEL_STYLES = {
-  low:    {bar: "bg-green-500",  text: "text-green-600 dark:text-green-400",  bg: "bg-green-50 dark:bg-green-900/20",  label: "Bajo"},
-  medium: {bar: "bg-yellow-400", text: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20", label: "Moderado"},
-  high:   {bar: "bg-red-500",    text: "text-red-600 dark:text-red-400",    bg: "bg-red-50 dark:bg-red-900/20",    label: "Alto"},
+  low:    {bar: "bg-green-eske",  text: "text-green-eske-60 dark:text-green-eske-30",  bg: "bg-green-eske/10 dark:bg-green-eske/20",  label: "Bajo"},
+  medium: {bar: "bg-yellow-eske", text: "text-brown-eske-60 dark:text-yellow-eske", bg: "bg-yellow-eske/10 dark:bg-yellow-eske/20", label: "Moderado"},
+  high:   {bar: "bg-red-eske",    text: "text-red-eske dark:text-red-eske-20",    bg: "bg-red-eske/10 dark:bg-red-eske/20",    label: "Alto"},
 };
 
 function KpiCard({label, value, description, invertColor = false}: KpiCardProps) {
@@ -36,7 +36,7 @@ function KpiCard({label, value, description, invertColor = false}: KpiCardProps)
   return (
     <div className={`flex-1 min-w-0 rounded-xl p-5 ${styles.bg} border border-black/5`}>
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-[#9AAEBE]">
+        <p className="text-xs font-semibold uppercase tracking-wide text-black-eske-10 dark:text-[#9AAEBE]">
           {label}
         </p>
         <span
@@ -49,7 +49,7 @@ function KpiCard({label, value, description, invertColor = false}: KpiCardProps)
 
       <p className={`text-4xl font-bold tabular-nums mb-3 ${styles.text}`}>
         {clamped}
-        <span className="text-lg font-normal text-gray-400 dark:text-[#6D8294] ml-1">/100</span>
+        <span className="text-lg font-normal text-gray-eske-90 dark:text-[#6D8294] ml-1">/100</span>
       </p>
 
       <div className="w-full h-2 bg-black/10 rounded-full overflow-hidden mb-2">
@@ -59,7 +59,7 @@ function KpiCard({label, value, description, invertColor = false}: KpiCardProps)
         />
       </div>
 
-      <p className="text-xs text-gray-500 dark:text-[#9AAEBE] leading-snug">{description}</p>
+      <p className="text-xs text-black-eske-10 dark:text-[#9AAEBE] leading-snug">{description}</p>
     </div>
   );
 }
@@ -71,7 +71,7 @@ export default function RiskVectorWidget({
 }: RiskVectorWidgetProps) {
   return (
     <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-md p-6">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-[#9AAEBE] mb-4">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-eske-90 dark:text-[#9AAEBE] mb-4">
         Índices de riesgo
       </h3>
       <div className="flex flex-col sm:flex-row gap-3">

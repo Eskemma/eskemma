@@ -60,7 +60,7 @@ export default function TerritorioSelector({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="territorio"
-            className="text-sm font-medium text-gray-700 dark:text-[#C7D6E0]"
+            className="text-sm font-medium text-black-eske-30 dark:text-[#C7D6E0]"
           >
             Territorio
           </label>
@@ -80,7 +80,7 @@ export default function TerritorioSelector({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="modo"
-            className="text-sm font-medium text-gray-700 dark:text-[#C7D6E0]"
+            className="text-sm font-medium text-black-eske-30 dark:text-[#C7D6E0]"
           >
             Tipo de análisis
           </label>
@@ -100,7 +100,7 @@ export default function TerritorioSelector({
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+          <p className="text-sm text-red-eske dark:text-red-eske-20 bg-red-eske/10 dark:bg-red-eske/20 px-3 py-2 rounded-lg">
             {error}
           </p>
         )}

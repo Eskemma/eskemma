@@ -613,7 +613,7 @@ export default function TerritorySelector({
       {/* Municipios — un bloque por estado seleccionado (Decisión 2) */}
       {esMexico && nivel === "municipal" && (
         estadosSeleccionados.length === 0 ? (
-          <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+          <p className="text-xs text-black-eske-20 dark:text-[#6D8294] italic">
             Selecciona primero uno o varios estados.
           </p>
         ) : (
@@ -742,7 +742,7 @@ export default function TerritorySelector({
             />
           </label>
           {estadosSeleccionados.length === 0 ? (
-            <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+            <p className="text-xs text-black-eske-20 dark:text-[#6D8294] italic">
               Selecciona primero uno o varios estados.
             </p>
           ) : todosLosEstadosFallaron ? (
@@ -894,7 +894,7 @@ export default function TerritorySelector({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-eske-50 dark:text-[#6D8294] italic">
+              <p className="text-xs text-black-eske-20 dark:text-[#6D8294] italic">
                 No se pudo verificar con fuentes confiables — puedes continuar con el texto que ya escribiste.
               </p>
             )
@@ -912,7 +912,7 @@ export default function TerritorySelector({
             {territorio.nombre}
           </p>
           {territorio.pais && territorio.pais !== "México" && (
-            <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5">{territorio.pais}</p>
+            <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">{territorio.pais}</p>
           )}
         </div>
       )}

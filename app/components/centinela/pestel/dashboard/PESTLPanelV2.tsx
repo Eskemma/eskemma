@@ -27,7 +27,7 @@ const TREND_ICONS = {
 
 const RISK_COLORS = {
   CRÍTICO: "text-red-eske bg-red-eske/10",
-  MODERADO: "text-purple-700 dark:text-yellow-eske-60 bg-purple-100 dark:bg-yellow-eske/10",
+  MODERADO: "text-brown-eske-60 dark:text-yellow-eske-60 bg-yellow-eske/20 dark:bg-yellow-eske/10",
   BAJO: "text-green-eske bg-green-eske/10",
 };
 
@@ -116,7 +116,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               analysis.globalConfidence >= 70
                 ? "text-green-eske"
                 : analysis.globalConfidence >= 50
-                ? "text-purple-700 dark:text-yellow-eske"
+                ? "text-brown-eske-60 dark:text-yellow-eske"
                 : "text-red-eske",
             ].join(" ")}
           >
@@ -130,7 +130,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               analysis.globalConfidence >= 70
                 ? "bg-green-eske"
                 : analysis.globalConfidence >= 50
-                ? "bg-purple-400 dark:bg-yellow-eske"
+                ? "bg-yellow-eske"
                 : "bg-red-eske",
             ].join(" ")}
             style={{ width: `${analysis.globalConfidence}%` }}
@@ -460,7 +460,7 @@ function DimensionPanel({ dim }: { dim: DimensionAnalysis }) {
               dim.confidence >= 70
                 ? "bg-green-eske"
                 : dim.confidence >= 40
-                ? "bg-purple-400 dark:bg-yellow-eske"
+                ? "bg-yellow-eske"
                 : "bg-red-eske",
             ].join(" ")}
             style={{ width: `${dim.confidence}%` }}
@@ -589,7 +589,7 @@ function SignalGroup({
                 <span className={[
                   s.nivelConfianza === "alto" ? "text-green-eske"
                     : s.nivelConfianza === "medio"
-                      ? "text-purple-700 dark:text-yellow-eske-60"
+                      ? "text-brown-eske-60 dark:text-yellow-eske-60"
                     : "text-red-eske",
                 ].join("")}>
                   confianza {
@@ -625,7 +625,7 @@ function BiasAlertCard({
         "flex items-start gap-3 p-4 rounded-xl border",
         isAcknowledged
           ? "border-gray-eske-20 dark:border-white/10 bg-gray-eske-10 dark:bg-[#21425E] opacity-60"
-          : "border-purple-200 bg-purple-50 dark:border-yellow-eske/30 dark:bg-yellow-900/10",
+          : "border-yellow-eske/40 bg-yellow-eske/10 dark:border-yellow-eske/30 dark:bg-yellow-eske/10",
       ].join(" ")}
     >
       <span className="text-lg mt-0.5" aria-hidden="true">
@@ -637,7 +637,7 @@ function BiasAlertCard({
         </p>
         <p className="text-xs text-black-eske dark:text-[#C7D6E0] mt-0.5">{alert.description}</p>
         {isAcknowledged && (
-          <p className="text-xs text-gray-eske-50 mt-1">Revisado</p>
+          <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1">Revisado</p>
         )}
       </div>
       {!isAcknowledged && onAcknowledge && (

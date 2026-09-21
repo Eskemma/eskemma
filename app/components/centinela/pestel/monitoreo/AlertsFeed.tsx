@@ -150,7 +150,7 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
                 type="button"
                 onClick={() => handleMarkRead(alert.id)}
                 disabled={markingRead === alert.id}
-                className="shrink-0 text-xs text-gray-eske-50 dark:text-[#6D8294] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6]
+                className="shrink-0 text-xs text-black-eske-20 dark:text-[#6D8294] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6]
                   transition-colors disabled:opacity-40"
                 aria-label="Marcar como leída"
               >

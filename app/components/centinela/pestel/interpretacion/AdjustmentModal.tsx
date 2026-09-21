@@ -96,14 +96,14 @@ export default function AdjustmentModal({
             className="w-full px-3 py-2.5 border border-gray-eske-30 dark:border-white/10 rounded-lg
               text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
               focus:outline-none focus-visible:ring-2
-              focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]
+              focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]
               resize-none"
             autoFocus
           />
           <p
             className={[
               "text-xs text-right",
-              charCount >= 20 ? "text-green-eske" : "text-gray-eske-50 dark:text-[#6D8294]",
+              charCount >= 20 ? "text-green-eske" : "text-black-eske-20 dark:text-[#6D8294]",
             ].join(" ")}
             aria-live="polite"
           >

@@ -76,13 +76,13 @@ export default function EcegDynamicText({
               {indicator.label}
             </p>
             {indicator.unit && (
-              <p className="text-xs text-black-eske-50 dark:text-[#6D8294] mt-0.5">
+              <p className="text-xs text-black-eske-20 dark:text-[#6D8294] mt-0.5">
                 Unidad: {indicator.unit}
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm text-black-eske-50 dark:text-[#6D8294]">—</p>
+          <p className="text-sm text-black-eske-20 dark:text-[#6D8294]">—</p>
         )}
       </div>
 
@@ -104,7 +104,7 @@ export default function EcegDynamicText({
         ) : error ? (
           <p className="text-xs text-red-eske">{error}</p>
         ) : !contexto ? (
-          <p className="text-sm text-black-eske-50 dark:text-[#6D8294]">
+          <p className="text-sm text-black-eske-20 dark:text-[#6D8294]">
             Ejecuta una consulta para ver el análisis.
           </p>
         ) : indicator ? (

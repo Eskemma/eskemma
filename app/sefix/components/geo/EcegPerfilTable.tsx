@@ -39,7 +39,7 @@ function LevelCells({ d, isIndex }: { d: NivelData | null; isIndex: boolean }) {
   if (!d) return <><td className={TD}>—</td><td className={TD}>—</td><td className={TD}>—</td></>;
   return (
     <>
-      <td className={`${TD} text-black-eske-50 dark:text-[#6D8294]`}>{fmtTotal(d.denominador)}</td>
+      <td className={`${TD} text-black-eske-20 dark:text-[#6D8294]`}>{fmtTotal(d.denominador)}</td>
       <td className={`${TD} font-medium text-black-eske dark:text-[#EAF2F8]`}>{fmtValor(d.valor, isIndex)}</td>
       <td className={`${TD} text-black-eske-60 dark:text-[#9AAEBE]`}>{fmtPct(d.porcentaje)}</td>
     </>
@@ -272,7 +272,7 @@ export default function EcegPerfilTable({ committed, queryVersion }: Props) {
                             <td className="px-2.5 py-1.5 text-xs text-black-eske dark:text-[#C7D6E0] min-w-[160px]">
                               <span title={row.variable}>{row.label}</span>
                             </td>
-                            <td className="px-2.5 py-1.5 text-xs text-black-eske-50 dark:text-[#6D8294] whitespace-nowrap">
+                            <td className="px-2.5 py-1.5 text-xs text-black-eske-20 dark:text-[#6D8294] whitespace-nowrap">
                               {row.unit || "—"}
                             </td>
                             <LevelCells d={row.nacional} isIndex={isIndex} />

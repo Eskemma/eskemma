@@ -498,7 +498,7 @@ export default function DatosPage() {
                     rows={4}
                     className="w-full px-3 py-2.5 border border-gray-eske-30 dark:border-white/10 rounded-lg
                       text-sm focus:outline-none focus-visible:ring-2
-                      focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-50 dark:placeholder-[#6D8294]
+                      focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-90 dark:placeholder-[#6D8294]
                       bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
                       resize-none"
                     required={inputTab === "text"}
@@ -619,7 +619,7 @@ export default function DatosPage() {
                     placeholder="ej. Encuesta propia, Entrevista…"
                     className="px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg text-sm
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-                      placeholder:text-gray-eske-50 dark:placeholder-[#6D8294]
+                      placeholder:text-gray-eske-90 dark:placeholder-[#6D8294]
                       bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
                   />
                 </div>
@@ -677,7 +677,7 @@ export default function DatosPage() {
                       >
                         <span className="text-green-eske font-medium" aria-hidden="true">✓</span>
                         <span className="font-medium truncate max-w-[200px]">{f.name}</span>
-                        <span className="text-gray-eske-50">→</span>
+                        <span className="text-black-eske-20 dark:text-[#9AAEBE]">→</span>
                         <span className="shrink-0">{f.dimension}</span>
                         {f.method === "vision" && (
                           <span className="text-bluegreen-eske shrink-0">(IA)</span>
@@ -760,7 +760,7 @@ export default function DatosPage() {
 
         {/* Error */}
         {error && (
-          <p className="text-sm text-red-eske dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
+          <p className="text-sm text-red-eske dark:text-red-eske-10 bg-red-eske/10 dark:bg-red-eske/20 px-4 py-2 rounded-lg">
             {error}
           </p>
         )}

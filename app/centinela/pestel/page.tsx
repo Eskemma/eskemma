@@ -50,11 +50,11 @@ const STAGE_LABELS: Record<number, string> = {
 
 const PESTEL_STATUS_COLORS: Record<string, string> = {
   active:   "",
-  paused:   "bg-yellow-100 text-yellow-700",
-  // `text-gray-eske-50` no existe como token del design system (sin
-  // --color-gray-eske-50 en globals.css) — quedaba como no-op y el texto
-  // heredaba el color del ancestro, casi invisible en modo oscuro sobre el
-  // mismo `bg-gray-eske-20` claro (26-09-12, contraste reportado por Raúl).
+  paused:   "bg-yellow-eske/20 text-brown-eske-60 dark:bg-yellow-eske/15 dark:text-yellow-eske",
+  // La escala -eske no tiene paso 50 (ver globals.css): un texto con ese token
+  // quedaba como no-op y heredaba el color del ancestro, casi invisible en modo
+  // oscuro sobre el mismo `bg-gray-eske-20` claro (26-09-12, contraste
+  // reportado por Raúl).
   archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]",
 };
 
@@ -218,7 +218,7 @@ function ProjectCard({
               <h3
                 className={`font-semibold transition-colors truncate ${
                   isArchived
-                    ? "text-gray-eske-50"
+                    ? "text-black-eske-20 dark:text-[#9AAEBE]"
                     : "text-bluegreen-eske-60 dark:text-[#6BA4C6] group-hover:text-bluegreen-eske dark:group-hover:text-[#EAF2F8]"
                 }`}
               >
@@ -237,7 +237,7 @@ function ProjectCard({
               type="button"
               aria-label="Opciones del proyecto"
               onClick={() => setKebabOpen((o) => !o)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-80 dark:text-[#9AAEBE]
+              className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-40 dark:text-[#9AAEBE]
                 hover:bg-gray-eske-10 dark:hover:bg-white/5
                 transition-colors focus-visible:opacity-100"
             >
@@ -263,7 +263,7 @@ function ProjectCard({
                       onClick={item.onClick}
                       className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                         item.danger
-                          ? "text-red-eske hover:bg-red-50 dark:hover:bg-red-900/20"
+                          ? "text-red-eske hover:bg-red-eske/10 dark:hover:bg-red-eske/20"
                           : "text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
                       }`}
                     >
@@ -297,7 +297,7 @@ function ProjectCard({
               </span>
             )}
             {project.createdAt && (
-              <span className="text-xs text-gray-eske-50">
+              <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                 {formatDate(project.createdAt)}
               </span>
             )}
@@ -321,7 +321,7 @@ function ProjectCard({
             </h3>
             <div className="flex flex-col gap-4">
               <div>
-                <label htmlFor="pestel-edit-name" className="block text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-1">
+                <label htmlFor="pestel-edit-name" className="block text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-1">
                   Nombre
                 </label>
                 <input
@@ -335,7 +335,7 @@ function ProjectCard({
                 <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mt-0.5">{editName.length}/100</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-black-eske-80 dark:text-[#9AAEBE] mb-2">Color</p>
+                <p className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-2">Color</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   {COLOR_SWATCHES.map((hex) => (
                     <button

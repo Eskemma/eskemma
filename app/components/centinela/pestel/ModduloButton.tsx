@@ -210,7 +210,7 @@ function PickerModal({
               <p className="text-sm text-red-eske text-center py-8">{fetchError}</p>
             )}
             {!loading && !fetchError && projects.length === 0 && (
-              <p className="text-sm text-gray-eske-50 dark:text-[#9AAEBE] text-center py-8">
+              <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] text-center py-8">
                 No tienes proyectos en Moddulo todavía.
               </p>
             )}
@@ -248,7 +248,7 @@ function PickerModal({
                         <span className="shrink-0 text-yellow-eske text-xs" aria-label="Diferencia de territorio">⚠</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-eske-50 dark:text-[#9AAEBE] mt-0.5 truncate">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-0.5 truncate">
                       {TIPO_LABELS[p.type] ?? p.type}
                       {p.territorio?.nombre ? ` · ${p.territorio.nombre}` : ""}
                     </p>

@@ -266,7 +266,7 @@ export default function ConfigurarPage() {
         )}
 
         {saveError && (
-          <p className="mt-4 text-sm text-red-eske dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
+          <p className="mt-4 text-sm text-red-eske dark:text-red-eske-10 bg-red-eske/10 dark:bg-red-eske/20 px-4 py-2 rounded-lg">
             {saveError}
           </p>
         )}

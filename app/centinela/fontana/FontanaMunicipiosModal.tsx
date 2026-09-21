@@ -347,7 +347,7 @@ function ModalSeleccion({
               className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
                 text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-                placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+                placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]"
             />
           )}
           <KebabDescargarCsv
@@ -517,7 +517,7 @@ function ModalDistrito({ sesionId, indicadorId, indicadorNombre, onClose }: Prop
             className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
               text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
               focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+              placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]"
           />
           <KebabDescargarCsv
             onDescargar={() =>
@@ -801,7 +801,7 @@ function ModalEstado({
               text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
               focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
               disabled:opacity-60 disabled:cursor-not-allowed
-              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]
+              placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]
               disabled:placeholder:text-red-eske"
           />
           <KebabDescargarCsv
@@ -1100,7 +1100,7 @@ function ModalMunicipio({ sesionId, indicadorId, indicadorNombre, tipoDistrito, 
             className="flex-1 min-w-0 px-3 py-2 border border-gray-eske-30 dark:border-white/10 rounded-lg
               text-sm bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]
               focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-              placeholder:text-gray-eske-50 dark:placeholder:text-[#6D8294]"
+              placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]"
           />
           <KebabDescargarCsv
             onDescargar={() =>

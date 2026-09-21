@@ -130,11 +130,10 @@ const STATUS_COLORS: Record<ModduloProject["status"], string> = {
   active: "bg-green-100 text-green-700",
   paused: "bg-yellow-100 text-yellow-700",
   completed: "bg-blue-100 text-blue-700",
-  // `text-black-eske-20` no existe como token del design system (sin
-  // --color-gray-eske-50 en globals.css) — quedaba como no-op y el texto
-  // heredaba el color del ancestro, casi invisible en modo oscuro sobre el
-  // mismo `bg-gray-eske-20` claro (mismo bug ya corregido en el hub de
-  // PESTEL, 26-09-12).
+  // La escala -eske no tiene paso 50 (ver globals.css): el token que había aquí
+  // quedaba como no-op y el texto heredaba el color del ancestro, casi invisible
+  // en modo oscuro sobre el mismo `bg-gray-eske-20` claro (mismo bug ya
+  // corregido en el hub de PESTEL, 26-09-12).
   archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]",
 };
 

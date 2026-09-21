@@ -363,7 +363,7 @@ export default function ConfigEditModal({
                 <p className="text-sm text-orange-eske-80 dark:text-orange-eske-40 font-semibold mb-1">
                   Atención
                 </p>
-                <p className="text-sm text-black-eske-80 dark:text-[#C5D8E8]">
+                <p className="text-sm text-black-eske-40 dark:text-[#C5D8E8]">
                   Si modificas las variables o sus pesos, necesitarás ejecutar
                   el análisis nuevamente para que los cambios se reflejen.
                   El análisis PESTEL actual se conservará hasta que generes uno nuevo.

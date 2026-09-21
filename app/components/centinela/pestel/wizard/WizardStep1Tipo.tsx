@@ -124,7 +124,7 @@ export default function WizardStep1Tipo({
           placeholder={selectedType?.placeholder ?? "Nombre del proyecto"}
           className="px-3 py-2.5 border border-gray-eske-30 dark:border-white/10 rounded-lg text-sm
             focus:outline-none focus-visible:ring-2 focus-visible:ring-bluegreen-eske
-            placeholder:text-gray-eske-50 dark:placeholder-[#6D8294]
+            placeholder:text-gray-eske-90 dark:placeholder-[#6D8294]
             bg-white dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8]"
           maxLength={80}
         />
