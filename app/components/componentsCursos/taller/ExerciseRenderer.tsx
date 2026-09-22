@@ -69,8 +69,8 @@ export default function ExerciseRenderer({
               </pre>
             </div>
             {exercise.codeConfig?.solution && showSolution && (
-              <div className="mt-4 p-4 bg-green-eske-10 dark:bg-green-900/20 border border-green-eske dark:border-green-700/40 rounded-lg">
-                <h4 className="font-semibold text-green-eske-80 dark:text-green-400 mb-2">Solución:</h4>
+              <div className="mt-4 p-4 bg-green-eske-10 dark:bg-green-eske/20 border border-green-eske dark:border-green-eske/40 rounded-lg">
+                <h4 className="font-semibold text-green-eske-90 dark:text-green-eske-30 mb-2">Solución:</h4>
                 <pre className="text-sm overflow-x-auto">
                   <code>{exercise.codeConfig.solution}</code>
                 </pre>

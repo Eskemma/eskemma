@@ -93,7 +93,7 @@ export default function WorkshopSidebar({
                   onClick={() => toggleModule(module.id)}
                   className={`
                     w-full flex items-center justify-between p-3 text-left
-                    ${moduleCompleted ? 'bg-green-eske-10 dark:bg-green-900/20' : 'bg-gray-eske-10 dark:bg-[#112230]'}
+                    ${moduleCompleted ? 'bg-green-eske-10 dark:bg-green-eske/20' : 'bg-gray-eske-10 dark:bg-[#112230]'}
                     hover:bg-gray-eske-20 dark:hover:bg-white/5 transition-colors
                     focus-ring-primary
                   `}
@@ -140,7 +140,7 @@ export default function WorkshopSidebar({
                               ${current 
                                 ? 'bg-bluegreen-eske text-white' 
                                 : completed
-                                  ? 'text-green-eske-70 dark:text-green-400 hover:bg-gray-eske-10 dark:hover:bg-white/5'
+                                  ? 'text-green-eske-70 dark:text-green-eske-30 hover:bg-gray-eske-10 dark:hover:bg-white/5'
                                   : 'text-black-eske dark:text-[#C7D6E0] font-normal hover:bg-gray-eske-10 dark:hover:bg-white/5'
                               }
                               transition-colors focus-ring-primary

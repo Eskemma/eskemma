@@ -414,7 +414,7 @@ export function GeoNavegador({
                   fuente === f
                     ? f === "ine"
                       ? "bg-blue-eske text-white-eske border-blue-eske"
-                      : "bg-red-500 text-white border-red-500"
+                      : "bg-red-eske text-white border-red-eske"
                     : "bg-white-eske dark:bg-[#18324A] text-black-eske-20 dark:text-white/60 border-gray-eske-20 hover:border-blue-eske"
                 }`}
               >
@@ -540,7 +540,7 @@ export function GeoNavegador({
                     <>
                       AGEB(s)
                       {loadingAgebs && (
-                        <span className="ml-1 text-[10px] text-red-500 font-normal">(Cargando…)</span>
+                        <span className="ml-1 text-[10px] text-red-eske dark:text-red-eske-20 font-normal">(Cargando…)</span>
                       )}
                     </>
                   }
@@ -605,9 +605,9 @@ export function GeoNavegador({
                   type="button"
                   onClick={handleConsultar}
                   className="px-4 py-1.5 rounded-md text-sm font-medium
-                             bg-red-500 text-white hover:bg-red-600
+                             bg-red-eske text-white hover:bg-red-eske-60
                              transition-colors focus-visible:outline-none
-                             focus-visible:ring-2 focus-visible:ring-red-500"
+                             focus-visible:ring-2 focus-visible:ring-red-eske"
                 >
                   Consultar
                 </button>

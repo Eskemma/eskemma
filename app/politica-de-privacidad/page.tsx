@@ -617,7 +617,7 @@ export default function PoliticaPrivacidad() {
                 </ul>
               </div>
 
-              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
+              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg">
                 <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                   8.2. Gestión de Cookies
                 </h4>

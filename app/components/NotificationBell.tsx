@@ -125,7 +125,7 @@ export default function NotificationBell() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
-        className="relative p-2 text-gray-700 hover:text-bluegreen-eske transition-colors focus-ring-primary rounded dark:text-[#EAF2F8] dark:hover:text-[#6FC3EC]"
+        className="relative p-2 text-black-eske-40 hover:text-bluegreen-eske transition-colors focus-ring-primary rounded dark:text-[#EAF2F8] dark:hover:text-[#6FC3EC]"
         aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ''}`}
         aria-expanded={isOpen}
         aria-controls="notifications-dropdown"
@@ -149,7 +149,7 @@ export default function NotificationBell() {
         {/* Badge de contador */}
         {unreadCount > 0 && (
           <span 
-            className="absolute -top-1 -right-1 bg-red-500 text-white text-xs max-sm:text-[10px] font-bold rounded-full w-5 h-5 max-sm:w-4 max-sm:h-4 flex items-center justify-center"
+            className="absolute -top-1 -right-1 bg-red-eske text-white text-xs max-sm:text-[10px] font-bold rounded-full w-5 h-5 max-sm:w-4 max-sm:h-4 flex items-center justify-center"
             aria-hidden="true"
           >
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -163,12 +163,12 @@ export default function NotificationBell() {
           id="notifications-dropdown"
           role="menu"
           aria-label="Menú de notificaciones"
-          className="absolute right-0 mt-2 w-80 max-sm:w-[calc(100vw-2rem)] max-sm:max-w-sm bg-white rounded-lg shadow-lg border border-gray-200 z-50 dark:bg-[#18324A] dark:border-white/10 dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+          className="absolute right-0 mt-2 w-80 max-sm:w-[calc(100vw-2rem)] max-sm:max-w-sm bg-white rounded-lg shadow-lg border border-gray-eske-20 z-50 dark:bg-[#18324A] dark:border-white/10 dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
           onKeyDown={handleKeyDown}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 max-sm:p-3 border-b">
-            <h3 className="font-semibold text-gray-800 text-base max-sm:text-sm dark:text-[#EAF2F8]">
+            <h3 className="font-semibold text-black-eske text-base max-sm:text-sm dark:text-[#EAF2F8]">
               Notificaciones
             </h3>
             {unreadCount > 0 && (
@@ -186,7 +186,7 @@ export default function NotificationBell() {
           <div className="max-h-96 max-sm:max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div 
-                className="p-4 max-sm:p-3 text-center text-gray-600"
+                className="p-4 max-sm:p-3 text-center text-black-eske-20 dark:text-[#9AAEBE]"
                 role="status"
                 aria-live="polite"
               >
@@ -199,8 +199,8 @@ export default function NotificationBell() {
                     <Link
                       href={`/blog/${notification.postSlug}#comment-${notification.commentId}`}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`block p-4 max-sm:p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b last:border-b-0 border-gray-100 dark:border-white/10 focus-ring-primary ${
-                        !notification.isRead ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                      className={`block p-4 max-sm:p-3 hover:bg-white-eske-40 dark:hover:bg-white/5 transition-colors border-b last:border-b-0 border-gray-eske-10 dark:border-white/10 focus-ring-primary ${
+                        !notification.isRead ? "bg-blue-eske/10 dark:bg-blue-eske/20" : ""
                       }`}
                       role="menuitem"
                       aria-label={`${notification.message}. ${!notification.isRead ? 'No leída' : 'Leída'}`}
@@ -226,10 +226,10 @@ export default function NotificationBell() {
 
                         {/* Contenido */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm max-sm:text-xs text-gray-800 dark:text-[#C7D6E0]" aria-hidden="true">
+                          <p className="text-sm max-sm:text-xs text-black-eske dark:text-[#C7D6E0]" aria-hidden="true">
                             {notification.message}
                           </p>
-                          <p className="text-xs max-sm:text-[10px] text-gray-500 dark:text-[#6D8294] mt-1">
+                          <p className="text-xs max-sm:text-[10px] text-black-eske-10 dark:text-[#6D8294] mt-1">
                             <time dateTime={new Date(notification.createdAt).toISOString()}>
                               {new Date(notification.createdAt).toLocaleDateString(
                                 "es-ES",
@@ -248,7 +248,7 @@ export default function NotificationBell() {
                         {!notification.isRead && (
                           <div className="flex-shrink-0">
                             <div 
-                              className="w-2 h-2 max-sm:w-1.5 max-sm:h-1.5 bg-blue-500 rounded-full"
+                              className="w-2 h-2 max-sm:w-1.5 max-sm:h-1.5 bg-blue-eske-60 rounded-full"
                               aria-label="No leída"
                             ></div>
                           </div>

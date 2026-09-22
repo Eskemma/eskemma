@@ -122,7 +122,7 @@ export default async function CursosPage({ searchParams }: CursosPageProps) {
                 {/* Resumen de resultados */}
                 <div className="mb-8 text-center sm:text-left flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <p className="text-gray-600 dark:text-[#9AAEBE] text-sm">
+                    <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm">
                       Explora <span className="font-semibold text-bluegreen-eske">{totalCourses}</span> cursos disponibles
                     </p>
                   </div>
@@ -170,8 +170,8 @@ export default async function CursosPage({ searchParams }: CursosPageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-2">¡Ups! Algo salió mal</h2>
-          <p className="text-gray-600 dark:text-[#9AAEBE]">No pudimos cargar los cursos en este momento.</p>
+          <h2 className="text-2xl font-bold text-red-eske-60 dark:text-red-eske-20 mb-2">¡Ups! Algo salió mal</h2>
+          <p className="text-black-eske-20 dark:text-[#9AAEBE]">No pudimos cargar los cursos en este momento.</p>
           <a
             href="/cursos"
             className="mt-4 inline-block px-6 py-2 bg-bluegreen-eske text-white rounded-lg"

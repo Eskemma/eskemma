@@ -21,6 +21,11 @@ const RAIZ = process.cwd();
 const COLORES_ESKE = "blue|orange|white|gray|black|bluegreen|yellow|brown|green|red|violet";
 
 function archivos(dir: string, out: string[] = []): string[] {
+  // Acepta también un archivo suelto (p. ej. `app/HomeClient.tsx`), no solo directorios.
+  if (statSync(join(RAIZ, dir)).isFile()) {
+    if (/\.(ts|tsx)$/.test(dir) && !/\.test\.tsx?$/.test(dir)) out.push(dir);
+    return out;
+  }
   for (const nombre of readdirSync(join(RAIZ, dir))) {
     const rel = `${dir}/${nombre}`;
     const abs = join(RAIZ, rel);
@@ -117,7 +122,7 @@ function coloresGenericos(dirs: string[]): string[] {
   return hallazgos;
 }
 
-describe("PESTEL, Sefix y Moddulo: sin colores genéricos de la escala numérica de Tailwind (sin excepciones)", () => {
+describe("PESTEL, Sefix, Moddulo y sitio principal (sub-ronda A): sin colores genéricos de la escala numérica de Tailwind (sin excepciones)", () => {
   it("PESTEL = 0 (el cuadrante 'Vigilar' usa violet-eske desde 26-09-21)", () => {
     expect(coloresGenericos(["app/centinela/pestel", "app/components/centinela/pestel"])).toEqual([]);
   });
@@ -128,6 +133,16 @@ describe("PESTEL, Sefix y Moddulo: sin colores genéricos de la escala numérica
 
   it("Moddulo = 0 (el ámbar 'Requiere ajuste' usa yellow-eske/brown-eske-60 y los chips de país violet-eske, desde 26-09-21)", () => {
     expect(coloresGenericos(["app/moddulo", "app/components/moddulo"])).toEqual([]);
+  });
+
+  it("Sitio principal, sub-ronda A (páginas estáticas y componentes compartidos) = 0", () => {
+    const rutasA = [
+      "app/contacto", "app/politica-de-cookies", "app/politica-de-privacidad", "app/condiciones-de-uso",
+      "app/condiciones-sesiones-diagnostico-gratuitas", "app/cursos", "app/components/componentsCursos",
+      "app/components/shared", "app/components/geo", "app/components/legal", "lib/redactor",
+      "app/HomeClient.tsx", "app/components/Header.tsx", "app/components/NotificationBell.tsx",
+    ];
+    expect(coloresGenericos(rutasA)).toEqual([]);
   });
 
   it("el escáner de genéricos funciona (evita un pase vacuo si el regex se rompe)", () => {

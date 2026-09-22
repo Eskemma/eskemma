@@ -353,8 +353,8 @@ export default function ContactoPage() {
                 {submitStatus.type && (
                   <div
                     className={`p-4 max-sm:p-3 rounded-lg mb-4 max-sm:mb-3 ${submitStatus.type === "success"
-                        ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-400"
-                        : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-400"
+                        ? "bg-green-eske/10 dark:bg-green-eske/20 border border-green-eske/30 dark:border-green-eske/40 text-green-eske-90 dark:text-green-eske-30"
+                        : "bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske-80 dark:text-red-eske-20"
                       }`}
                     role={submitStatus.type === "error" ? "alert" : "status"}
                     aria-live={submitStatus.type === "error" ? "assertive" : "polite"}
@@ -371,7 +371,7 @@ export default function ContactoPage() {
                     htmlFor="name"
                     className="block text-black-eske dark:text-[#C7D6E0] font-medium mb-1 text-base max-sm:text-sm"
                   >
-                    Nombre <span className="text-red-500" aria-label="campo requerido">*</span>
+                    Nombre <span className="text-red-eske dark:text-red-eske-20" aria-label="campo requerido">*</span>
                   </label>
                   <input
                     type="text"
@@ -380,7 +380,7 @@ export default function ContactoPage() {
                     value={formData.name}
                     onChange={handleChange}
                     required
-                    className="mt-1 block w-full border border-gray-300 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 transition-colors bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
+                    className="mt-1 block w-full border border-gray-eske-40 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 transition-colors bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
                     placeholder="Tu nombre completo"
                     aria-describedby={isAuthenticatedUser && formData.name ? "name-hint" : undefined}
                   />
@@ -388,7 +388,7 @@ export default function ContactoPage() {
                   {isAuthenticatedUser && formData.name && (
                     <p
                       id="name-hint"
-                      className="text-xs max-sm:text-[10px] text-gray-400 dark:text-[#6D8294] mt-1"
+                      className="text-xs max-sm:text-[10px] text-black-eske-10 dark:text-[#6D8294] mt-1"
                       role="status"
                     >
                       ℹ️ Prellenado con tu información de perfil (puedes
@@ -403,7 +403,7 @@ export default function ContactoPage() {
                     htmlFor="email"
                     className="block text-black-eske dark:text-[#C7D6E0] font-medium mb-1 text-base max-sm:text-sm"
                   >
-                    Email <span className="text-red-500" aria-label="campo requerido">*</span>
+                    Email <span className="text-red-eske dark:text-red-eske-20" aria-label="campo requerido">*</span>
                   </label>
                   <input
                     type="email"
@@ -412,7 +412,7 @@ export default function ContactoPage() {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="mt-1 block w-full border border-gray-300 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 transition-colors bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
+                    className="mt-1 block w-full border border-gray-eske-40 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 transition-colors bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
                     placeholder="tu@email.com"
                     aria-describedby={isAuthenticatedUser && formData.email ? "email-hint" : undefined}
                   />
@@ -420,7 +420,7 @@ export default function ContactoPage() {
                   {isAuthenticatedUser && formData.email && (
                     <p
                       id="email-hint"
-                      className="text-xs max-sm:text-[10px] text-gray-400 dark:text-[#6D8294] mt-1"
+                      className="text-xs max-sm:text-[10px] text-black-eske-10 dark:text-[#6D8294] mt-1"
                       role="status"
                     >
                       ℹ️ Prellenado con tu información de perfil (puedes
@@ -435,7 +435,7 @@ export default function ContactoPage() {
                     htmlFor="message"
                     className="block text-black-eske dark:text-[#C7D6E0] font-medium mb-1 text-base max-sm:text-sm"
                   >
-                    Mensaje <span className="text-red-500" aria-label="campo requerido">*</span>
+                    Mensaje <span className="text-red-eske dark:text-red-eske-20" aria-label="campo requerido">*</span>
                   </label>
                   <textarea
                     id="message"
@@ -444,7 +444,7 @@ export default function ContactoPage() {
                     onChange={handleChange}
                     rows={4}
                     required
-                    className="mt-1 block w-full border border-gray-300 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
+                    className="mt-1 block w-full border border-gray-eske-40 dark:border-white/10 rounded-md shadow-sm focus-ring-primary px-3 py-2 max-sm:py-1.5 dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
                     placeholder="Escribe tu mensaje aquí..."
                   ></textarea>
                 </div>
@@ -452,10 +452,10 @@ export default function ContactoPage() {
                 {/* ✅ Mensaje para usuarios NO autenticados */}
                 {!isAuthenticatedUser && (
                   <div
-                    className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4 max-sm:p-3 mb-4 max-sm:mb-3 text-center"
+                    className="bg-blue-eske/10 dark:bg-blue-eske/20 border border-blue-eske/30 rounded-lg p-4 max-sm:p-3 mb-4 max-sm:mb-3 text-center"
                     role="note"
                   >
-                    <p className="text-sm max-sm:text-xs text-blue-800 dark:text-blue-200">
+                    <p className="text-sm max-sm:text-xs text-blue-eske-90 dark:text-blue-eske-20">
                       ¿No tienes cuenta?{" "}
                       <button
                         type="button"

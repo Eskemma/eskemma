@@ -108,7 +108,7 @@ export default function PoliticaDeCookiesPage() {
               </p>
 
               <div className="space-y-4 mb-6">
-                <div className="flex items-start gap-3 p-4 bg-green-eske-10 dark:bg-green-900/20 border-2 border-green-eske dark:border-green-700 rounded-lg">
+                <div className="flex items-start gap-3 p-4 bg-green-eske-10 dark:bg-green-eske/20 border-2 border-green-eske dark:border-green-eske/40 rounded-lg">
                   <span className="text-2xl flex-shrink-0">🔒</span>
                   <div>
                     <h4 className="font-bold text-[16px] text-black-eske dark:text-[#EAF2F8] mb-1">
@@ -219,7 +219,7 @@ export default function PoliticaDeCookiesPage() {
                 </table>
               </div>
 
-              <div className="bg-green-eske-10 dark:bg-green-900/20 p-4 rounded-lg border-l-4 border-green-eske dark:border-green-700">
+              <div className="bg-green-eske-10 dark:bg-green-eske/20 p-4 rounded-lg border-l-4 border-green-eske dark:border-green-eske/40">
                 <p className="text-[14px] text-black-eske-20 dark:text-[#C7D6E0]">
                   <strong className="text-green-eske-20">
                     Siempre Activas:
@@ -387,9 +387,9 @@ export default function PoliticaDeCookiesPage() {
                 </table>
               </div>
 
-              <div className="bg-orange-100 dark:bg-orange-900/20 p-4 rounded-lg border-l-4 border-orange-500">
+              <div className="bg-orange-eske/20 p-4 rounded-lg border-l-4 border-orange-eske">
                 <p className="text-[14px] text-black-eske-20 dark:text-[#C7D6E0]">
-                  <strong className="text-orange-600 dark:text-orange-eske-30">
+                  <strong className="text-orange-eske-80 dark:text-orange-eske-30">
                     Consentimiento Requerido:
                   </strong>{" "}
                   Estas cookies solo se activan si das tu consentimiento
@@ -553,7 +553,7 @@ export default function PoliticaDeCookiesPage() {
                         href="https://support.google.com/chrome/answer/95647"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
+                        className="text-blue-eske-70 underline hover:text-blue-eske-80 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
                       >
                         Ver guía completa de Google →
                         <span className="sr-only">
@@ -592,7 +592,7 @@ export default function PoliticaDeCookiesPage() {
                         href="https://support.mozilla.org/es/kb/cookies-informacion-que-los-sitios-web-guardan-en-"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
+                        className="text-blue-eske-70 underline hover:text-blue-eske-80 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
                       >
                         Ver guía completa de Firefox →
                         <span className="sr-only">
@@ -627,7 +627,7 @@ export default function PoliticaDeCookiesPage() {
                         href="https://support.apple.com/es-es/guide/safari/sfri11471/mac"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
+                        className="text-blue-eske-70 underline hover:text-blue-eske-80 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
                       >
                         Ver guía completa de Apple →
                         <span className="sr-only">
@@ -665,7 +665,7 @@ export default function PoliticaDeCookiesPage() {
                         href="https://support.microsoft.com/es-es/microsoft-edge/eliminar-las-cookies-en-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
+                        className="text-blue-eske-70 underline hover:text-blue-eske-80 dark:text-blue-eske-40 hover:dark:text-blue-eske-10 focus-ring-primary rounded"
                       >
                         Ver guía completa de Microsoft →
                         <span className="sr-only">
@@ -678,9 +678,9 @@ export default function PoliticaDeCookiesPage() {
                 </details>
               </div>
 
-              <div className="mt-6 bg-orange-100 p-4 rounded-lg border-l-4 border-orange-500">
-                <p className="text-[14px] text-black-eske-20">
-                  <strong className="text-orange-600 dark:text-orange-eske-30 ">⚠️ Advertencia:</strong>{" "}
+              <div className="mt-6 bg-orange-eske/20 p-4 rounded-lg border-l-4 border-orange-eske">
+                <p className="text-[14px] text-black-eske-20 dark:text-[#C7D6E0]">
+                  <strong className="text-orange-eske-80 dark:text-orange-eske-30 ">⚠️ Advertencia:</strong>{" "}
                   Si desactivas todas las cookies, algunas funciones del sitio
                   web podrían no funcionar correctamente, como el inicio de
                   sesión o la personalización de tu experiencia.

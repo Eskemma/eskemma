@@ -64,7 +64,7 @@ export default function PaginationCursos({
       <Link
         href={buildUrl(Math.max(1, currentPage - 1))}
         className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-          currentPage === 1 ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed" : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske"
+          currentPage === 1 ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed" : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske"
         }`}
         aria-disabled={currentPage === 1}
       >
@@ -74,14 +74,14 @@ export default function PaginationCursos({
       {/* Números */}
       <div className="flex items-center gap-1 sm:gap-2">
         {pageNumbers.map((pageNum, idx) => {
-          if (pageNum === "...") return <span key={idx} className="px-2 py-2 text-gray-500 dark:text-[#9AAEBE] text-sm">•••</span>;
+          if (pageNum === "...") return <span key={idx} className="px-2 py-2 text-black-eske-10 dark:text-[#9AAEBE] text-sm">•••</span>;
           const isActive = pageNum === currentPage;
           return (
             <Link
               key={pageNum}
               href={buildUrl(pageNum as number)}
               className={`flex items-center justify-center min-w-[36px] h-9 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isActive ? "bg-bluegreen-eske text-white-eske shadow-md" : "bg-white-eske dark:bg-[#18324A] text-gray-700 dark:text-[#C7D6E0] border border-gray-300 dark:border-white/10 hover:border-bluegreen-eske"
+                isActive ? "bg-bluegreen-eske text-white-eske shadow-md" : "bg-white-eske dark:bg-[#18324A] text-black-eske-40 dark:text-[#C7D6E0] border border-gray-eske-40 dark:border-white/10 hover:border-bluegreen-eske"
               }`}
             >
               {pageNum}
@@ -94,7 +94,7 @@ export default function PaginationCursos({
       <Link
         href={buildUrl(Math.min(totalPages, currentPage + 1))}
         className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-          currentPage === totalPages ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed" : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske"
+          currentPage === totalPages ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed" : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske"
         }`}
         aria-disabled={currentPage === totalPages}
       >

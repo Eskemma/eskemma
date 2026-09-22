@@ -113,7 +113,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
                     {post.content.substring(0, 160)}...
                   </p>
 
-                  <div className="flex justify-between w-full text-sm max-sm:text-xs text-gray-700 mb-4 max-sm:mb-2 px-2 max-sm:px-1 dark:text-[#9AAEBE]">
+                  <div className="flex justify-between w-full text-sm max-sm:text-xs text-black-eske-40 mb-4 max-sm:mb-2 px-2 max-sm:px-1 dark:text-[#9AAEBE]">
                     <time
                       className="text-gray-eske-60"
                       dateTime={post.updatedAt.toISOString()}
@@ -263,7 +263,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
           <div className="space-y-12 max-sm:space-y-8">
             <figure className="flex flex-col sm:flex-row items-center max-sm:items-start sm:items-start sm:space-x-8 space-y-4 sm:space-y-0">
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-60 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-eske-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-1.jpg"
                     alt=""
@@ -286,7 +286,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
 
             <figure className="flex flex-col sm:flex-row-reverse items-center max-sm:items-end sm:items-start sm:space-x-reverse sm:space-x-8 space-y-4 sm:space-y-0">
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-orange-60 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-orange-eske-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-2.jpg"
                     alt=""
@@ -309,7 +309,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
 
             <figure className="flex flex-col sm:flex-row items-center max-sm:items-start sm:items-start sm:space-x-8 space-y-4 sm:space-y-0">
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-60 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-eske-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-3.jpg"
                     alt=""
@@ -332,7 +332,7 @@ export default function HomeClient({ blogPosts }: HomeClientProps) {
 
             <figure className="flex flex-col sm:flex-row-reverse items-center max-sm:items-end sm:items-start sm:space-x-reverse sm:space-x-8 space-y-4 sm:space-y-0">
               <div className="flex flex-row max-sm:flex-row sm:flex-col items-center sm:items-center gap-3 max-sm:gap-3 sm:gap-2 shrink-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-60 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-eske-60 flex items-center justify-center overflow-hidden shrink-0">
                   <Image
                     src="/images/testimonial-4.jpg"
                     alt=""

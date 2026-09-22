@@ -230,7 +230,7 @@ export default function CursoPage() {
             <h2 className="text-3xl font-bold mb-4">
               ¿Listo para dominar el diagnóstico electoral?
             </h2>
-            <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-eske-20 mb-8 max-w-2xl mx-auto">
               Únete a más de 150 profesionales que ya están aprendiendo con este taller práctico.
             </p>
             

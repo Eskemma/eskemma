@@ -257,7 +257,7 @@ queda a ΔE ≥ 41.2 de cualquiera de los 22 colores de Extranjero vigentes); co
 morado anterior daba 5.12). Pendiente menor: aclararlo (p. ej. `#F4839D`) en ambos ámbitos si se
 quiere cumplir 3:1 estricto.
 
-**Sitio principal — diagnóstico (26-09-21, SIN corregir).** Conteo real: **772 clases
+**Sitio principal — diagnóstico (26-09-21) y estado por sub-ronda.** Conteo real: **772 clases
 (600 líneas, 83 archivos)** con el criterio gray|red|green|yellow|orange|blue|purple|violet-NNN;
 el "259" que circulaba estaba subestimado ~3× y no se sabe con qué criterio se midió. 68 % es
 `gray` (523), 61 % es `text-*`; solo 60 llevan `dark:`. Cero tokens fantasma en todo el repo (ni
@@ -268,17 +268,34 @@ colores de marca de terceros en `blog/[slug]/ShareButtons` (Facebook/X/LinkedIn/
 simulador SERP/OG de `blog/admin/components/SEOPreview` (imita a Google) — excepciones, no
 migrar; (b) identidad por plan/rol: `SubscriptionBadge` y las tarjetas de `suscripciones`
 (basic=azul, premium=**púrpura**, professional=verde) — decisión de diseño, sin equivalente
-para morado; (c) 5 `text-yellow-*` (`suscripciones`, `newsletter/confirm`) → `brown-eske-60`;
-(d) chip morado de filtro en `BlogToolbar`. División propuesta (tokens): **A** estáticas y
-compartidas 143 (cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`,
-`Header`, `NotificationBell`, `lib/redactor`); **B** home + newsletter 197 (incluye
-`RegisterModal`, flujo de registro); **C** blog público + admin 308; **D** cuenta y planes 124
-(`profile`, `suscripciones`, `SubscriptionBadge`), condicionada a la decisión (b). **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
+para morado; (c) 5 `text-yellow-*` (4 en `suscripciones` = sub-ronda D, 1 en `newsletter/confirm` = B; **ninguno en A**) → `brown-eske-60`;
+(d) chip morado de filtro en `BlogToolbar`. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B pendiente, 197** (home + newsletter; incluye `RegisterModal`, flujo de registro, 1 `text-yellow-*`); **C pendiente, 310** (blog público + admin; recontado hoy, eran 308; `ShareButtons` y `SEOPreview` son excepciones); **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). Total pendiente: 631. **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
 abajo. Quedan además 14 clases en Centinela/Fontana (`AppCard`, kebab de Fontana). **Pendiente
-restante:** las 4 sub-rondas A-D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
+restante:** las sub-rondas B, C y D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
 planes sigue abierta: no se extiende el token por inercia), los
 grises `gray-eske-40`/`-70` demasiado claros en `FontanaCanvasItemCard`/`FontanaModduloButton` y
 los ajustes visuales puntuales que Raúl detecte.
+
+**Sub-ronda A (26-09-21) — 143 → 0 en 21 archivos.** Método de siempre: tabla exacta (53 tokens
+distintos, aborta ante lo no mapeado) y verificación: 69 clases nuevas presentes en el CSS compilado,
+0 conflictos de cascada vs HEAD, guard probado en negativo (por directorio y por **archivo suelto**: el
+recorrido del guard ahora acepta rutas de archivo, p. ej. `app/HomeClient.tsx`). **Guard extendido** a las
+rutas de A (`app/contacto`, `politica-*`, `condiciones-*`, `cursos`, `componentsCursos`, `shared`, `geo`,
+`legal`, `lib/redactor`, `HomeClient`, `Header`, `NotificationBell`). **Sin casos de identidad semántica**
+(colores por plan o categoría): todo fue error/éxito/info/advertencia y grises de texto. **Hallazgo:**
+`HomeClient` tenía `bg-blue-60`, `bg-orange-60`, `bg-green-60`, `bg-red-60` (avatares de testimonios): no
+son clases de Tailwind (faltaba `-eske`), o sea el mismo bug de "token que no existe = no-op silencioso";
+la foto los cubre por completo, así que no había efecto visible; ahora `bg-*-eske-60`. El guard de
+genéricos detecta esta familia de typos (paso de 2 dígitos sin `-eske`). **Defectos previos corregidos:**
+caja de advertencia de `politica-de-cookies` con fondo claro fijo y texto naranja claro en oscuro (ahora
+tinte por opacidad + `dark:text`); mensaje vacío de `NotificationBell` sin variante oscura (texto oscuro
+sobre la tarjeta oscura); 8 `dark:text-*` agregados en textos de error/éxito. **Contraste (medido contra
+el original):** `blue-800`/`green-800` sobre tinte pasaron a `-90` (bajarían con `-80`: 8.01 → 6.90 y
+6.81 → 5.75); la advertencia naranja sobre tinte ya era **3.11:1** y con `-60` sería 3.42, así que
+se usó `orange-eske-80` (≈5.18); las notas terciarias `text-gray-400 dark:text-[#6D8294]` van a
+`black-eske-10` (6.38:1) y no a `gray-eske-90` (4.09, no cumple AA en texto pequeño). Los botones
+deshabilitados de `PaginationCursos` conservan `gray-eske-90` (estado deshabilitado). **Deuda previa
+NO tocada:** `text-gray-eske-90` en texto de cuerpo/secundario de `HomeClient` y `contacto` (4.09:1).
 
 **Moddulo — migración (26-09-21, orden invertido a propósito: primero el frente de mayor volumen).**
 `app/moddulo` + `app/components/moddulo`: **315 de 315 clases migradas en 20 archivos** (296 el primer día, 19 púrpuras al día siguiente).
@@ -1298,3 +1315,4 @@ firebase functions:log
 | 26-09-21 | Diseño — ronda 4: token `violet-eske` + Moddulo (296/315) | **Decisión 1:** el violeta "No Binario" se oficializa como token (`violet-eske` `#9b59b6` = `COL_NB`; `-20` `#c585f5` = `COL_NB_DARK`; `-60` `#773e8e` derivado solo para texto en claro, 6.99:1). Migrados los 4 tooltips de Sefix (16 clases) y "Vigilar" de PESTEL; eliminados `COL_NB`/`COL_NB_DARK` y 2 `colNB` sin uso. Guard: `violet` en `COLORES_ESKE`, PESTEL y Sefix en **0 sin excepciones**. **Decisión 2:** Moddulo primero (315 clases). 296 migradas por tabla exacta (99 tokens, aborta ante lo no mapeado), 26 `dark:text-*` agregados, 19 púrpuras retenidos y documentados para decisión. Regresión propia detectada y corregida: `-70` bajaba a AA los chips verde/naranja/azul → `-80`. Verificación: 103 clases nuevas presentes en el CSS compilado, 0 conflictos de cascada vs HEAD, guard probado en negativo (el primer intento fue un no-op de `sed` y se rehízo), `tsc`, `next build` y 329 pruebas. **Sin tocar por instrucción:** E8 (alertas sin generarse) y sub-rondas A-D del sitio principal. |
 | 26-09-21 | Diseño — ronda 5: cierre de Moddulo (315/315) + diagnóstico de la colisión Extranjero/No Binario | **Aprobado y aplicado:** los 15 púrpuras del ámbar "Requiere ajuste" → `brown-eske-60` (claro) / `yellow-eske` (oscuro) con el patrón de `MotoresSequentialView`; los 4 de los chips de país (sin variante oscura) → `violet-eske` con su par claro/oscuro. Moddulo = 0 genéricos; guard de PESTEL, Sefix y Moddulo **sin ninguna excepción**, probado en negativo con edición real. Verificación: `tsc`, `next build`, 329 pruebas, 15 clases nuevas presentes en el CSS compilado. **Investigado y luego resuelto (ronda 6):** ver "Colisión Extranjero vs No Binario — RESUELTA". **Sin tocar por instrucción:** E8 y sub-rondas A-D del sitio principal. |
 | 26-09-21 | Diseño — ronda 6: colisión Extranjero/No Binario resuelta | Mujeres-Extranjero pasa a la paleta rosa/rojo de Mujeres-Nacional en `SexoCharts` (S1-S4) y `G3SexChart` (2 archivos, sin tokens ni hex nuevos). Hombres y las demás gráficas de Extranjero intactos. Verificado: ΔE con No Binario 0 → 50.2 (oscuro) y 41.1 → 42.5 (claro); sin colisión nueva (ΔE ≥ 41.2 contra los 22 colores de Extranjero); ningún texto describe el color. Aviso: `G3SexChart` "Lista Mujeres" oscuro = 2.97:1 (heredado de Nacional). `tsc`, `next build` y 329 pruebas. **Con esto se cierra el punto 4 del plan de extras**, salvo lo documentado: badge `draft` del hub, E8 y sub-rondas A-D del sitio principal. |
+| 26-09-21 | Diseño — ronda 7: sitio principal, sub-ronda A (143 → 0) | 21 archivos (páginas estáticas, cursos, componentes compartidos, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`). Guard extendido (acepta archivos sueltos) y probado en negativo por directorio y por archivo. Hallazgo: 4 clases inexistentes `bg-*-60` en `HomeClient` (no-op silencioso). Ajustes de contraste medidos contra el original (`-90` verde/azul sobre tinte, `orange-eske-80`, notas terciarias a `black-eske-10`); 2 defectos previos de modo oscuro corregidos (caja de cookies, mensaje vacío de notificaciones). Los "5 `text-yellow-*`" no estaban en A (están en B y D). Verificación: `tsc`, `next build`, 330 pruebas, 69 clases presentes en el CSS, 0 conflictos de cascada. **Pendiente:** sub-rondas B (197), C (310), D (124), E8, badge `draft` del hub. |

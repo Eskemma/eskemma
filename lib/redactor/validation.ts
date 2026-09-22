@@ -194,10 +194,10 @@ export function isWithinPostLimit(text: string): boolean {
  */
 export function getCounterColor(count: number): string {
   if (count < POST_MIN_LENGTH) {
-    return "text-red-600"; // Muy corto
+    return "text-red-eske-60 dark:text-red-eske-20"; // Muy corto
   } else if (count >= POST_MIN_LENGTH && count <= POST_MAX_LENGTH) {
-    return "text-green-600"; // Perfecto
+    return "text-green-eske-60 dark:text-green-eske-30"; // Perfecto
   } else {
-    return "text-red-600"; // Muy largo
+    return "text-red-eske-60 dark:text-red-eske-20"; // Muy largo
   }
 }

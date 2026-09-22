@@ -76,7 +76,7 @@ export default function CondicionesDeUso() {
                 </li>
               </ul>
 
-              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
+              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg">
                 <p className="font-semibold mb-2">Nota importante:</p>
                 <p>
                   Las sesiones de diagnóstico gratuitas se rigen por sus propias{" "}
@@ -144,7 +144,7 @@ export default function CondicionesDeUso() {
                   </li>
                 </ul>
 
-                <div className="bg-red-eske-10 dark:bg-red-900/20 p-4 rounded-lg mt-4">
+                <div className="bg-red-eske-10 dark:bg-red-eske/20 p-4 rounded-lg mt-4">
                   <p className="font-semibold mb-2 text-black-eske dark:text-[#EAF2F8]">
                     Para reportar accesos no autorizados:
                   </p>
@@ -302,7 +302,7 @@ export default function CondicionesDeUso() {
                   </li>
                 </ul>
 
-                <div className="bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <div className="bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg">
                   <p className="font-semibold mb-2">
                     Importante sobre precios:
                   </p>
@@ -497,7 +497,7 @@ export default function CondicionesDeUso() {
                 </ul>
               </div>
 
-              <div className="bg-red-eske-10 dark:bg-red-900/20 p-4 rounded-lg">
+              <div className="bg-red-eske-10 dark:bg-red-eske/20 p-4 rounded-lg">
                 <p className="font-semibold mb-2 text-black-eske dark:text-[#EAF2F8]">
                   Consecuencias:
                 </p>
@@ -593,7 +593,7 @@ export default function CondicionesDeUso() {
                 </div>
               </div>
 
-              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
+              <div className="mt-6 mb-6 bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg">
                 <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                   6.3. Limitación Monetaria de Responsabilidad
                 </h4>

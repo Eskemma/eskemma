@@ -188,7 +188,7 @@ export default function CookieBanner() {
               </h2>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="text-gray-700 dark:text-[#C7D6E0] hover:text-red-eske transition-colors focus-ring-primary rounded"
+                className="text-black-eske-40 dark:text-[#C7D6E0] hover:text-red-eske transition-colors focus-ring-primary rounded"
                 aria-label="Cerrar configuración de cookies"
               >
                 <svg

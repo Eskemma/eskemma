@@ -196,7 +196,7 @@ const Header = () => {
             {user && (
               <div className="relative">
                 <button
-                  className="w-10 h-10 max-sm:w-8 max-sm:h-8 bg-orange-400 rounded-full flex items-center justify-center cursor-pointer focus-ring-primary avatar-button"
+                  className="w-10 h-10 max-sm:w-8 max-sm:h-8 bg-orange-eske-20 rounded-full flex items-center justify-center cursor-pointer focus-ring-primary avatar-button"
                   onClick={handleAvatarClick}
                   aria-label={`Menú de ${user.name || 'usuario'}`}
                   aria-expanded={isAvatarMenuOpen}
@@ -209,7 +209,7 @@ const Header = () => {
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-xs max-sm:text-[10px] font-bold text-gray-600">
+                    <span className="text-xs max-sm:text-[10px] font-bold text-black-eske-20">
                       {getUserInitials(user.name, user.lastName)}
                     </span>
                   )}

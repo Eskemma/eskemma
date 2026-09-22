@@ -127,7 +127,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
                 </li>
               </ul>
 
-              <div className="bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg mt-4">
+              <div className="bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg mt-4">
                 <p className="font-semibold mb-2">Nota importante:</p>
                 <p className="mb-2">Este servicio NO sustituye:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
@@ -169,7 +169,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
                   </li>
                 </ul>
 
-                <div className="bg-red-eske-10 dark:bg-red-900/20 p-4 rounded-lg mt-4">
+                <div className="bg-red-eske-10 dark:bg-red-eske/20 p-4 rounded-lg mt-4">
                   <p className="font-semibold mb-2 text-black-eske dark:text-[#EAF2F8]">
                     Restricción de edad - Menores de 18 años:
                   </p>
@@ -430,7 +430,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
                   </ul>
                 </div>
 
-                <div className="bg-yellow-eske-10 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <div className="bg-yellow-eske-10 dark:bg-yellow-eske/10 p-4 rounded-lg">
                   <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                     Puntualidad
                   </h4>
@@ -643,7 +643,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
               title="7. Protección de Menores de Edad (COPPA Compliance)"
               level={2}
             >
-              <div className="bg-red-eske-10 dark:bg-red-900/20 p-6 rounded-lg mb-6">
+              <div className="bg-red-eske-10 dark:bg-red-eske/20 p-6 rounded-lg mb-6">
                 <h4 className="text-[18px] font-bold text-black-eske dark:text-[#EAF2F8] mb-3">
                   Restricción de Edad: Menores de 18 Años
                 </h4>
@@ -750,7 +750,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
               id="naturaleza"
               title="8. Naturaleza del Servicio y Descargos de Responsabilidad"
             >
-              <div className="bg-yellow-eske-10 dark:bg-yellow-900/20 p-6 rounded-lg mb-6">
+              <div className="bg-yellow-eske-10 dark:bg-yellow-eske/10 p-6 rounded-lg mb-6">
                 <h4 className="text-[18px] font-bold text-black-eske dark:text-[#EAF2F8] mb-3">
                   Servicio Informativo, NO Vinculante
                 </h4>
@@ -873,7 +873,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
                   </ul>
                 </div>
 
-                <div className="bg-red-eske-10 dark:bg-red-900/20 p-4 rounded-lg">
+                <div className="bg-red-eske-10 dark:bg-red-eske/20 p-4 rounded-lg">
                   <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                     9.2. Rechazo de Sesiones
                   </h4>
@@ -1023,7 +1023,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
                   </ul>
                 </div>
 
-                <div className="bg-red-eske-10 dark:bg-red-900/20 p-4 rounded-lg">
+                <div className="bg-red-eske-10 dark:bg-red-eske/20 p-4 rounded-lg">
                   <h4 className="text-[16px] font-semibold text-black-eske dark:text-[#EAF2F8] mb-2">
                     11.2. Consecuencias por Mala Conducta
                   </h4>
@@ -1131,7 +1131,7 @@ export default function CondicionesSessionesDiagnosticoGratuitas() {
               id="responsabilidad"
               title="13. Limitación de Responsabilidad"
             >
-              <div className="bg-yellow-eske-10 dark:bg-yellow-900/20 p-6 rounded-lg mb-6">
+              <div className="bg-yellow-eske-10 dark:bg-yellow-eske/10 p-6 rounded-lg mb-6">
                 <p className="font-semibold mb-2">
                   Servicio "TAL CUAL" (As-Is):
                 </p>
