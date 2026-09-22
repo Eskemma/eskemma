@@ -151,7 +151,7 @@ export default function NewsletterSignup() {
             placeholder="Tu nombre"
             required
             disabled={status === "loading" || status === "success"}
-            className="w-full px-4 py-2 rounded-lg border-0 bg-gray-eske-30 dark:bg-[#112230] text-gray-900 dark:text-[#EAF2F8] font-medium placeholder:text-gray-400 dark:placeholder:text-[#6D8294] placeholder:font-normal focus-ring-primary hover:bg-gray-50 dark:hover:bg-white/5 disabled:bg-gray-200 dark:disabled:bg-[#21425E] disabled:cursor-not-allowed transition-colors"
+            className="w-full px-4 py-2 rounded-lg border-0 bg-gray-eske-30 dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] font-medium placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294] placeholder:font-normal focus-ring-primary hover:bg-white-eske-40 dark:hover:bg-white/5 disabled:bg-gray-eske-20 dark:disabled:bg-[#21425E] disabled:cursor-not-allowed transition-colors"
             aria-label="Tu nombre para el newsletter"
           />
         </div>
@@ -169,7 +169,7 @@ export default function NewsletterSignup() {
             placeholder="tu@email.com"
             required
             disabled={status === "loading" || status === "success"}
-            className="w-full px-4 py-2 rounded-lg border-0 bg-gray-eske-30 dark:bg-[#112230] text-gray-900 dark:text-[#EAF2F8] font-medium placeholder:text-gray-400 dark:placeholder:text-[#6D8294] placeholder:font-normal focus-ring-primary hover:bg-gray-50 dark:hover:bg-white/5 disabled:bg-gray-200 dark:disabled:bg-[#21425E] disabled:cursor-not-allowed transition-colors"
+            className="w-full px-4 py-2 rounded-lg border-0 bg-gray-eske-30 dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] font-medium placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294] placeholder:font-normal focus-ring-primary hover:bg-white-eske-40 dark:hover:bg-white/5 disabled:bg-gray-eske-20 dark:disabled:bg-[#21425E] disabled:cursor-not-allowed transition-colors"
             aria-label="Tu correo electrónico para el newsletter"
           />
         </div>
@@ -208,7 +208,7 @@ export default function NewsletterSignup() {
             className={
               status === "success"
                 ? "text-sm px-3 py-2 rounded bg-white/20 text-white"
-                : "text-sm px-3 py-2 rounded bg-red-500/20 text-red-100"
+                : "text-sm px-3 py-2 rounded bg-red-eske/20 text-white-eske"
             }
             role="alert"
             aria-live="assertive"

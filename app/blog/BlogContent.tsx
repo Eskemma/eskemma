@@ -36,7 +36,7 @@ export default function BlogContent({ posts, sortBy }: BlogContentProps) {
       {posts.length === 0 ? (
         <div className="text-center py-12" role="status" aria-live="polite">
           <svg
-            className="mx-auto h-24 w-24 text-gray-400 dark:text-[#6D8294] mb-4"
+            className="mx-auto h-24 w-24 text-gray-eske-90 dark:text-[#6D8294] mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -52,7 +52,7 @@ export default function BlogContent({ posts, sortBy }: BlogContentProps) {
           <p className="text-xl text-gray-eske-60 dark:text-[#6D8294] mb-2">
             No se encontraron resultados
           </p>
-          <p className="text-gray-500 dark:text-[#9AAEBE] mb-4">
+          <p className="text-black-eske-10 dark:text-[#9AAEBE] mb-4">
             Intenta ajustar los filtros o términos de búsqueda
           </p>
           <Link
@@ -117,7 +117,7 @@ export default function BlogContent({ posts, sortBy }: BlogContentProps) {
                       dangerouslySetInnerHTML={{ __html: excerpt }}
                     />
 
-                    <div className="flex justify-between w-full text-sm text-gray-700 dark:text-[#C7D6E0] mb-4 px-2">
+                    <div className="flex justify-between w-full text-sm text-black-eske-40 dark:text-[#C7D6E0] mb-4 px-2">
                       <time
                         className="text-gray-eske-60 dark:text-[#6D8294] text-sm"
                         dateTime={date}
@@ -134,7 +134,7 @@ export default function BlogContent({ posts, sortBy }: BlogContentProps) {
                     </div>
 
                     {sortBy === "popular" && (
-                      <div className="w-full text-xs text-gray-500 dark:text-[#9AAEBE] mb-2 flex items-center justify-center gap-1">
+                      <div className="w-full text-xs text-black-eske-10 dark:text-[#9AAEBE] mb-2 flex items-center justify-center gap-1">
                         <svg
                           className="w-4 h-4"
                           fill="none"

@@ -23,7 +23,7 @@ export default function RelatedPostsSidebar({
       <div className="flex items-center justify-between mb-4">
         <h3 
           id="related-posts-sidebar-title"
-          className="text-lg font-semibold text-gray-800 dark:text-[#EAF2F8] flex items-center gap-2"
+          className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-2"
         >
           <svg
             className="w-5 h-5 text-bluegreen-eske"
@@ -43,7 +43,7 @@ export default function RelatedPostsSidebar({
         </h3>
       </div>
 
-      <p className="text-xs text-gray-600 dark:text-[#9AAEBE] mb-4">
+      <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mb-4">
         Más sobre{" "}
         <span
           className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full text-white"
@@ -99,11 +99,11 @@ export default function RelatedPostsSidebar({
 
               {/* Contenido */}
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-gray-800 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 mb-1">
+                <h4 className="text-sm font-semibold text-black-eske dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 mb-1">
                   {post.title}
                 </h4>
                 <time 
-                  className="text-xs text-gray-600 dark:text-[#6D8294]"
+                  className="text-xs text-black-eske-20 dark:text-[#6D8294]"
                   dateTime={post.updatedAt.toISOString()}
                 >
                   {post.updatedAt.toLocaleDateString("es-ES", {

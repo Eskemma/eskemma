@@ -276,7 +276,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto" aria-hidden="true"></div>
-          <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Cargando...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando...</p>
         </div>
       </div>
     );
@@ -284,7 +284,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-6">
+      <h1 className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mb-6">
         {id === "new" ? "Crear Nuevo Post" : "Editar Post"}
       </h1>
 
@@ -301,7 +301,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="title"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Título <span className="text-red-eske" aria-label="campo requerido">*</span>
                 </label>
@@ -322,7 +322,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="slug"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Slug (URL) <span className="text-red-eske" aria-label="campo requerido">*</span>
                 </label>
@@ -351,7 +351,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 </div>
                 <p 
                   id="slug-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   Se genera automáticamente desde el título, pero puedes editarlo manualmente
                 </p>
@@ -361,7 +361,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="category"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Categoría <span className="text-red-eske" aria-label="campo requerido">*</span>
                 </label>
@@ -386,7 +386,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="content"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Contenido <span className="text-red-eske" aria-label="campo requerido">*</span>
                 </label>
@@ -404,7 +404,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="content-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   Usa Markdown para formatear el contenido
                 </p>
@@ -415,7 +415,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="tags-input"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Tags (Etiquetas)
                 </label>
@@ -429,7 +429,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="keywords"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Palabras clave (SEO)
                 </label>
@@ -445,7 +445,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="keywords-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   Separadas por comas para SEO
                 </p>
@@ -455,7 +455,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="metaTitle"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Meta Title (SEO)
                 </label>
@@ -471,7 +471,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="metaTitle-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   Usa el título del post si se deja vacío
                 </p>
@@ -481,7 +481,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="metaDescription"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Meta Description (SEO)
                 </label>
@@ -498,7 +498,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="metaDescription-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   {formData.metaDescription?.length || 0}/160 caracteres
                 </p>
@@ -508,7 +508,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="featureImage"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Imagen Destacada
                 </label>
@@ -522,7 +522,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="featureImage-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   Imagen principal del post (recomendado: 1200x630px)
                 </p>
@@ -541,7 +541,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="secondaryImages"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Imágenes Secundarias
                 </label>
@@ -556,7 +556,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 />
                 <p 
                   id="secondaryImages-hint"
-                  className="text-xs text-gray-600 dark:text-[#9AAEBE] mt-1"
+                  className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-1"
                 >
                   {uploadingSecondary ? "Subiendo imagen..." : "Sube imágenes y luego insértalas en el contenido"}
                 </p>
@@ -579,7 +579,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label 
                   htmlFor="status"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Estado
                 </label>
@@ -609,7 +609,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 <button
                   type="button"
                   onClick={() => router.push("/blog/admin/blog")}
-                  className="px-6 py-3 bg-gray-eske-40 dark:bg-white/10 text-gray-800 dark:text-[#C7D6E0] rounded-lg hover:bg-gray-eske-60 dark:hover:bg-white/15 transition-colors font-semibold shadow-md focus-ring-primary"
+                  className="px-6 py-3 bg-gray-eske-40 dark:bg-white/10 text-black-eske dark:text-[#C7D6E0] rounded-lg hover:bg-gray-eske-60 dark:hover:bg-white/15 transition-colors font-semibold shadow-md focus-ring-primary"
                   aria-label="Cancelar edición y volver a lista de posts"
                 >
                   Cancelar
@@ -671,7 +671,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                 Tips de SEO
               </h3>
               <ul 
-                className="space-y-2 text-xs text-gray-700 dark:text-[#C7D6E0]"
+                className="space-y-2 text-xs text-black-eske-40 dark:text-[#C7D6E0]"
                 role="list"
                 aria-label="5 consejos de SEO"
               >

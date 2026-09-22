@@ -132,7 +132,7 @@ export default function DownloadableResources({
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="absolute top-4 right-4 text-gray-700 dark:text-[#C7D6E0] hover:text-red-500 transition-colors focus-ring-primary rounded"
+              className="absolute top-4 right-4 text-black-eske-40 dark:text-[#C7D6E0] hover:text-red-eske transition-colors focus-ring-primary rounded"
               onClick={() => {
                 setShowLoginPrompt(false);
                 setSelectedResource(null);
@@ -211,7 +211,7 @@ export default function DownloadableResources({
         <div className="flex items-center justify-between mb-4">
           <h3
             id="resources-title"
-            className="text-lg font-semibold text-gray-800 dark:text-[#EAF2F8] flex items-center gap-2"
+            className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] flex items-center gap-2"
           >
             <svg
               className="w-5 h-5 text-bluegreen-eske"
@@ -231,7 +231,7 @@ export default function DownloadableResources({
           </h3>
         </div>
 
-        <p className="text-xs text-gray-600 dark:text-[#9AAEBE] mb-4">
+        <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mb-4">
           Materiales complementarios para este tema
         </p>
 
@@ -257,10 +257,10 @@ export default function DownloadableResources({
                     {getFileIcon(resource.fileType)}
                   </div>
                   <div>
-                    <span className="text-xs font-medium text-gray-700 dark:text-[#9AAEBE] uppercase">
+                    <span className="text-xs font-medium text-black-eske-40 dark:text-[#9AAEBE] uppercase">
                       {resource.fileType}
                     </span>
-                    <span className="text-xs text-gray-600 dark:text-[#6D8294] ml-2">
+                    <span className="text-xs text-black-eske-20 dark:text-[#6D8294] ml-2">
                       {resource.fileSize}
                     </span>
                   </div>
@@ -268,7 +268,7 @@ export default function DownloadableResources({
 
                 {resource.isFree && (
                   <span
-                    className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded"
+                    className="px-2 py-0.5 bg-green-eske/20 text-green-eske-70 text-xs font-semibold rounded"
                     role="text"
                   >
                     Gratis
@@ -277,12 +277,12 @@ export default function DownloadableResources({
               </div>
 
               {/* Título */}
-              <h4 className="text-sm font-semibold text-gray-800 dark:text-[#C7D6E0] mb-1 line-clamp-2">
+              <h4 className="text-sm font-semibold text-black-eske dark:text-[#C7D6E0] mb-1 line-clamp-2">
                 {resource.title}
               </h4>
 
               {/* Descripción */}
-              <p className="text-xs text-gray-600 dark:text-[#9AAEBE] mb-3 line-clamp-2">
+              <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] mb-3 line-clamp-2">
                 {resource.description}
               </p>
 

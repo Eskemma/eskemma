@@ -34,7 +34,7 @@ export default function ViewToggle({ onViewChange }: ViewToggleProps) {
   if (!mounted) {
     return (
       <div
-        className="flex items-center gap-2 bg-white-eske dark:bg-[#18324A] rounded-lg p-1 border border-gray-300 dark:border-white/10"
+        className="flex items-center gap-2 bg-white-eske dark:bg-[#18324A] rounded-lg p-1 border border-gray-eske-40 dark:border-white/10"
         role="status"
         aria-label="Cargando selector de vista"
       >
@@ -48,7 +48,7 @@ export default function ViewToggle({ onViewChange }: ViewToggleProps) {
 
   return (
     <div
-      className="flex items-center gap-2 bg-white-eske dark:bg-[#18324A] rounded-lg p-1 border border-gray-300 dark:border-white/10 shadow-sm"
+      className="flex items-center gap-2 bg-white-eske dark:bg-[#18324A] rounded-lg p-1 border border-gray-eske-40 dark:border-white/10 shadow-sm"
       role="group"
       aria-label="Selector de vista del blog"
     >
@@ -63,7 +63,7 @@ export default function ViewToggle({ onViewChange }: ViewToggleProps) {
           ${
             viewMode === "grid"
               ? "bg-bluegreen-eske text-white-eske shadow-sm"
-              : "text-gray-700 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+              : "text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           }
         `}
         aria-label="Cambiar a vista en cuadrícula"
@@ -97,7 +97,7 @@ export default function ViewToggle({ onViewChange }: ViewToggleProps) {
           ${
             viewMode === "list"
               ? "bg-bluegreen-eske text-white-eske shadow-sm"
-              : "text-gray-700 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+              : "text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
           }
         `}
         aria-label="Cambiar a vista en lista"

@@ -27,11 +27,11 @@ export default function RelatedPosts({
       <div className="mb-8">
         <h2 
           id="related-posts-heading"
-          className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2"
+          className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2"
         >
           Posts relacionados
         </h2>
-        <p className="text-sm text-gray-600 dark:text-[#9AAEBE]">
+        <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">
           Más sobre{" "}
           <span
             className="inline-block px-2 py-1 text-xs font-semibold rounded-full text-white"
@@ -101,13 +101,13 @@ export default function RelatedPosts({
               </div>
 
               {/* Título */}
-              <h3 className="text-base font-semibold text-gray-800 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 mb-2">
+              <h3 className="text-base font-semibold text-black-eske dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 mb-2">
                 {post.title}
               </h3>
 
               {/* Fecha */}
               <time 
-                className="text-xs text-gray-600 dark:text-[#6D8294] mt-auto"
+                className="text-xs text-black-eske-20 dark:text-[#6D8294] mt-auto"
                 dateTime={post.updatedAt.toISOString()}
               >
                 {post.updatedAt.toLocaleDateString("es-ES", {

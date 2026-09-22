@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto" aria-hidden="true"></div>
-          <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Cargando estadísticas...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando estadísticas...</p>
         </div>
       </div>
     );

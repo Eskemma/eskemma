@@ -143,8 +143,8 @@ export default function CommentForm({
                 id="char-count"
                 className={`text-sm ${
                   remainingChars < 50
-                    ? "text-red-500 font-semibold"
-                    : "text-gray-600 dark:text-[#9AAEBE]"
+                    ? "text-red-eske font-semibold"
+                    : "text-black-eske-20 dark:text-[#9AAEBE]"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -157,7 +157,7 @@ export default function CommentForm({
                 disabled={isSubmitting || !content.trim()}
                 className={`px-6 py-2 rounded-lg font-semibold transition-all duration-300 focus-ring-primary ${
                   isSubmitting || !content.trim()
-                    ? "bg-gray-300 dark:bg-[#21425E] text-gray-500 dark:text-[#6D8294] cursor-not-allowed"
+                    ? "bg-gray-eske-40 dark:bg-[#21425E] text-black-eske-10 dark:text-[#6D8294] cursor-not-allowed"
                     : "bg-bluegreen-eske text-white hover:bg-bluegreen-eske-70"
                 }`}
                 aria-label={
@@ -170,7 +170,7 @@ export default function CommentForm({
 
             {error && (
               <p
-                className="mt-2 text-sm text-red-500"
+                className="mt-2 text-sm text-red-eske"
                 role="alert"
                 aria-live="assertive"
               >

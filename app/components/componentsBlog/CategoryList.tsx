@@ -19,7 +19,7 @@ export default function CategoryList({ categoryCounts }: CategoryListProps) {
       className="bg-white-eske dark:bg-[#18324A] rounded-lg shadow-sm p-6 mb-6"
       aria-label="Categorías de publicaciones"
     >
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-[#C7D6E0] mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-black-eske dark:text-[#C7D6E0] mb-4 flex items-center gap-2">
         <svg
           className="w-5 h-5 text-bluegreen-eske"
           fill="none"
@@ -50,7 +50,7 @@ export default function CategoryList({ categoryCounts }: CategoryListProps) {
                 className={`flex items-center justify-between p-2 rounded-lg transition-colors group focus-ring-primary ${
                   isActive
                     ? "bg-bluegreen-eske/10 border border-bluegreen-eske"
-                    : "hover:bg-gray-50 dark:hover:bg-white/5"
+                    : "hover:bg-white-eske-40 dark:hover:bg-white/5"
                 }`}
                 aria-label={`Ver ${count} publicación${count !== 1 ? "es" : ""} de ${category.label}`}
                 aria-current={isActive ? "page" : undefined}
@@ -65,7 +65,7 @@ export default function CategoryList({ categoryCounts }: CategoryListProps) {
                     className={`text-sm transition-colors ${
                       isActive
                         ? "text-bluegreen-eske font-medium"
-                        : "text-gray-700 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske"
+                        : "text-black-eske-40 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske"
                     }`}
                   >
                     {category.label}
@@ -75,7 +75,7 @@ export default function CategoryList({ categoryCounts }: CategoryListProps) {
                   className={`text-xs font-medium px-2 py-1 rounded-full ${
                     isActive
                       ? "bg-bluegreen-eske text-white-eske"
-                      : "bg-gray-100 dark:bg-[#21425E] text-gray-500 dark:text-[#C7D6E0]"
+                      : "bg-gray-eske-10 dark:bg-[#21425E] text-black-eske-10 dark:text-[#C7D6E0]"
                   }`}
                   aria-label={`${count} publicación${count !== 1 ? "es" : ""}`}
                 >

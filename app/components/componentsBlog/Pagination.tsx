@@ -90,8 +90,8 @@ export default function Pagination({
           transition-all duration-200 focus-ring-primary
           ${
             currentPage === 1
-              ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed"
-              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
+              ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed"
+              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
           }
         `}
         aria-label="Ir a la primera página"
@@ -124,8 +124,8 @@ export default function Pagination({
           transition-all duration-200 focus-ring-primary
           ${
             currentPage === 1
-              ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed"
-              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
+              ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed"
+              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
           }
         `}
         aria-label="Ir a la página anterior"
@@ -156,7 +156,7 @@ export default function Pagination({
             return (
               <span
                 key={`dots-${idx}`}
-                className="px-2 py-2 text-gray-500 dark:text-[#9AAEBE] text-sm"
+                className="px-2 py-2 text-black-eske-10 dark:text-[#9AAEBE] text-sm"
                 aria-hidden="true"
               >
                 •••
@@ -178,7 +178,7 @@ export default function Pagination({
                 ${
                   isActive
                     ? "bg-bluegreen-eske text-white-eske shadow-md scale-105"
-                    : "bg-white-eske dark:bg-[#18324A] text-gray-700 dark:text-[#C7D6E0] border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske-10 hover:border-bluegreen-eske"
+                    : "bg-white-eske dark:bg-[#18324A] text-black-eske-40 dark:text-[#C7D6E0] border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske-10 hover:border-bluegreen-eske"
                 }
               `}
               aria-label={`${isActive ? "Página actual, " : ""}Ir a la página ${pageNum}`}
@@ -199,8 +199,8 @@ export default function Pagination({
           transition-all duration-200 focus-ring-primary
           ${
             currentPage === totalPages
-              ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed"
-              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
+              ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed"
+              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
           }
         `}
         aria-label="Ir a la página siguiente"
@@ -233,8 +233,8 @@ export default function Pagination({
           transition-all duration-200 focus-ring-primary
           ${
             currentPage === totalPages
-              ? "bg-gray-200 dark:bg-[#21425E] text-gray-400 dark:text-[#6D8294] cursor-not-allowed"
-              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-300 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
+              ? "bg-gray-eske-20 dark:bg-[#21425E] text-gray-eske-90 dark:text-[#6D8294] cursor-not-allowed"
+              : "bg-white-eske dark:bg-[#18324A] text-bluegreen-eske border border-gray-eske-40 dark:border-white/10 hover:bg-bluegreen-eske hover:text-white-eske hover:border-bluegreen-eske"
           }
         `}
         aria-label="Ir a la última página"
@@ -260,7 +260,7 @@ export default function Pagination({
 
       {/* Indicador móvil de página actual */}
       <div
-        className="flex sm:hidden items-center justify-center px-3 py-2 bg-gray-100 dark:bg-[#21425E] rounded-lg text-xs text-gray-600 dark:text-[#9AAEBE] ml-2"
+        className="flex sm:hidden items-center justify-center px-3 py-2 bg-gray-eske-10 dark:bg-[#21425E] rounded-lg text-xs text-black-eske-20 dark:text-[#9AAEBE] ml-2"
         role="status"
         aria-label={`Página ${currentPage} de ${totalPages}`}
       >

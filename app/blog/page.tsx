@@ -161,18 +161,18 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             {/* Contador de posts */}
             <div className="mb-8 text-center" role="status" aria-live="polite">
               {totalPosts === 0 ? (
-                <p className="text-gray-600 dark:text-[#9AAEBE] text-sm">
+                <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm">
                   No se encontraron artículos con los filtros seleccionados
                 </p>
               ) : (
-                <p className="text-gray-600 dark:text-[#9AAEBE] text-sm">
+                <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm">
                   Mostrando{" "}
                   <span className="font-semibold text-bluegreen-eske-40">
                     {totalPosts}
                   </span>{" "}
                   {totalPosts === 1 ? "artículo" : "artículos"}
                   {searchTerm && (
-                    <span className="text-gray-700 dark:text-[#C7D6E0]">
+                    <span className="text-black-eske-40 dark:text-[#C7D6E0]">
                       {" "}
                       para{" "}
                       <span className="font-medium">
@@ -234,10 +234,10 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         aria-live="assertive"
       >
         <div className="text-center">
-          <p className="text-xl text-red-500 mb-4">
+          <p className="text-xl text-red-eske mb-4">
             Ocurrió un error al cargar los posts.
           </p>
-          <p className="text-gray-600 dark:text-[#9AAEBE]">
+          <p className="text-black-eske-20 dark:text-[#9AAEBE]">
             Por favor, inténtalo de nuevo más tarde.
           </p>
         </div>

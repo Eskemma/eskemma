@@ -70,7 +70,7 @@ export default function TagsManagementPage() {
             className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto"
             aria-hidden="true"
           ></div>
-          <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Cargando tags...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando tags...</p>
         </div>
       </div>
     );
@@ -107,11 +107,11 @@ export default function TagsManagementPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-600 dark:text-[#9AAEBE] uppercase">
+                <p className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase">
                   Total Tags
                 </p>
                 <p
-                  className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mt-2"
+                  className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mt-2"
                   aria-label={`${tags.length} tags totales`}
                 >
                   {tags.length}
@@ -144,11 +144,11 @@ export default function TagsManagementPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-600 dark:text-[#9AAEBE] uppercase">
+                <p className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase">
                   Usos Totales
                 </p>
                 <p
-                  className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mt-2"
+                  className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mt-2"
                   aria-label={`${totalUsage} usos totales de tags`}
                 >
                   {totalUsage}
@@ -181,11 +181,11 @@ export default function TagsManagementPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-600 dark:text-[#9AAEBE] uppercase">
+                <p className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase">
                   Promedio Uso
                 </p>
                 <p
-                  className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mt-2"
+                  className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mt-2"
                   aria-label={`Promedio de ${tags.length > 0 ? (totalUsage / tags.length).toFixed(1) : 0} usos por tag`}
                 >
                   {tags.length > 0 ? (totalUsage / tags.length).toFixed(1) : 0}
@@ -231,7 +231,7 @@ export default function TagsManagementPage() {
             </label>
             <div className="relative">
               <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-600"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-black-eske-20"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -297,10 +297,10 @@ export default function TagsManagementPage() {
                 d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
               />
             </svg>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">
+            <h3 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
               No se encontraron tags
             </h3>
-            <p className="text-gray-600 dark:text-[#9AAEBE]">
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               {searchTerm
                 ? "Intenta con otro término de búsqueda"
                 : "Comienza agregando tags a tus posts"}
@@ -322,7 +322,7 @@ export default function TagsManagementPage() {
                   role="listitem"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-gray-800 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors">
+                    <span className="text-lg font-bold text-black-eske dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors">
                       #{tag.tag}
                     </span>
                     <span
@@ -347,7 +347,7 @@ export default function TagsManagementPage() {
                     ></div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-gray-600 dark:text-[#9AAEBE]">
+                  <div className="flex items-center justify-between text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                     <span aria-hidden="true">
                       {percentage.toFixed(1)}% del total
                     </span>

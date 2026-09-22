@@ -131,7 +131,7 @@ export default function SaveForLater({
         aria-live="polite"
         aria-label="Verificando estado de guardado"
       >
-        <div className="animate-pulse flex items-center gap-2 text-gray-600 dark:text-[#9AAEBE]">
+        <div className="animate-pulse flex items-center gap-2 text-black-eske-20 dark:text-[#9AAEBE]">
           <svg
             className="w-5 h-5"
             fill="none"
@@ -170,7 +170,7 @@ export default function SaveForLater({
           >
             {/* Botón de cierre */}
             <button
-              className="absolute top-4 right-4 text-gray-700 dark:text-[#C7D6E0] hover:text-red-500 transition-colors focus-ring-primary rounded"
+              className="absolute top-4 right-4 text-black-eske-40 dark:text-[#C7D6E0] hover:text-red-eske transition-colors focus-ring-primary rounded"
               onClick={() => setShowLoginPrompt(false)}
               aria-label="Cerrar modal de inicio de sesión"
             >
@@ -246,7 +246,7 @@ export default function SaveForLater({
           className={`flex items-center gap-3 px-6 py-3 rounded-lg border-2 transition-all duration-300 focus-ring-primary ${
             isSaved
               ? "bg-bluegreen-eske text-white border-bluegreen-eske hover:bg-bluegreen-eske-70"
-              : "bg-white-eske dark:bg-[#18324A] border-gray-eske-30 dark:border-white/10 text-gray-700 dark:text-[#C7D6E0] hover:border-bluegreen-eske-40 hover:text-bluegreen-eske-40"
+              : "bg-white-eske dark:bg-[#18324A] border-gray-eske-30 dark:border-white/10 text-black-eske-40 dark:text-[#C7D6E0] hover:border-bluegreen-eske-40 hover:text-bluegreen-eske-40"
           } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
           aria-label={isSaved ? "Artículo guardado. Clic para quitar de guardados" : "Guardar artículo para leer después"}
           aria-pressed={isSaved}

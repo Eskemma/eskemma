@@ -18,7 +18,7 @@ export default function StatsCard({
     <article className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-md border border-gray-eske-30 dark:border-white/10 overflow-hidden hover:shadow-lg transition-shadow duration-300">
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-600 dark:text-[#9AAEBE] uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-black-eske-20 dark:text-[#9AAEBE] uppercase tracking-wide">
             {title}
           </h3>
           <div 
@@ -31,13 +31,13 @@ export default function StatsCard({
         
         <div className="space-y-1">
           <p 
-            className="text-4xl font-bold text-gray-800 dark:text-[#EAF2F8]"
+            className="text-4xl font-bold text-black-eske dark:text-[#EAF2F8]"
             aria-label={`${value.toLocaleString()} ${title.toLowerCase()}`}
           >
             {value.toLocaleString()}
           </p>
           {subtitle && (
-            <p className="text-sm text-gray-600 dark:text-[#9AAEBE]">{subtitle}</p>
+            <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">{subtitle}</p>
           )}
         </div>
       </div>

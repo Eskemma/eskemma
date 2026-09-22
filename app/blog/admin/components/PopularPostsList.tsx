@@ -55,7 +55,7 @@ export default function PopularPostsList() {
         aria-live="polite"
         aria-label="Cargando posts más populares"
       >
-        <h3 className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-4">
+        <h3 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-4">
           Posts Más Populares
         </h3>
         <div className="space-y-3">
@@ -90,7 +90,7 @@ export default function PopularPostsList() {
       <div className="flex items-center justify-between mb-6">
         <h3
           id="popular-posts-title"
-          className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8]"
+          className="text-xl font-bold text-black-eske dark:text-[#EAF2F8]"
         >
           Posts Más Populares
         </h3>
@@ -104,7 +104,7 @@ export default function PopularPostsList() {
       </div>
 
       {posts.length === 0 ? (
-        <div className="text-center py-8 text-gray-600 dark:text-[#9AAEBE]" role="status">
+        <div className="text-center py-8 text-black-eske-20 dark:text-[#9AAEBE]" role="status">
           <svg
             className="w-16 h-16 mx-auto mb-4 text-gray-eske-40"
             fill="none"
@@ -180,7 +180,7 @@ export default function PopularPostsList() {
                   <Link
                     href={`/blog/${post.slug}`}
                     target="_blank"
-                    className="font-semibold text-gray-800 dark:text-[#EAF2F8] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6] transition-colors line-clamp-1 focus-ring-primary rounded"
+                    className="font-semibold text-black-eske dark:text-[#EAF2F8] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6] transition-colors line-clamp-1 focus-ring-primary rounded"
                     aria-label={`${post.title} (abre en nueva pestaña)`}
                   >
                     {post.title}
@@ -194,7 +194,7 @@ export default function PopularPostsList() {
                       {categoryLabel}
                     </span>
                     <span
-                      className="flex items-center gap-1 text-sm text-gray-600 dark:text-[#9AAEBE]"
+                      className="flex items-center gap-1 text-sm text-black-eske-20 dark:text-[#9AAEBE]"
                       aria-label={`${post.views.toLocaleString()} vistas`}
                     >
                       <svg
@@ -227,7 +227,7 @@ export default function PopularPostsList() {
                 {/* Edit Button */}
                 <Link
                   href={`/blog/admin/blog/edit/${post.id}`}
-                  className="flex-shrink-0 p-2 text-gray-600 dark:text-[#9AAEBE] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6] hover:bg-bluegreen-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-ring-primary"
+                  className="flex-shrink-0 p-2 text-black-eske-20 dark:text-[#9AAEBE] hover:text-bluegreen-eske dark:hover:text-[#6BA4C6] hover:bg-bluegreen-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-ring-primary"
                   aria-label={`Editar post: ${post.title}`}
                 >
                   <svg

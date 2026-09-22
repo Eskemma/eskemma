@@ -37,7 +37,7 @@ export default function ShareButtons({ title, slug }: ShareButtonsProps) {
       role="group"
       aria-label="Opciones para compartir este artículo en redes sociales"
     >
-      <span className="text-sm font-medium text-gray-700 dark:text-[#C7D6E0]">Compartir:</span>
+      <span className="text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0]">Compartir:</span>
 
       {/* Facebook */}
       <a
@@ -114,12 +114,12 @@ export default function ShareButtons({ title, slug }: ShareButtonsProps) {
       {/* Copiar enlace */}
       <button
         onClick={handleCopyLink}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-[#21425E] hover:bg-gray-300 dark:hover:bg-[#2C5273] text-gray-700 dark:text-[#C7D6E0] transition-colors relative focus-ring-primary"
+        className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-eske-20 dark:bg-[#21425E] hover:bg-gray-eske-40 dark:hover:bg-[#2C5273] text-black-eske-40 dark:text-[#C7D6E0] transition-colors relative focus-ring-primary"
         aria-label={copied ? "Enlace copiado al portapapeles" : "Copiar enlace del artículo al portapapeles"}
       >
         {copied ? (
           <svg
-            className="w-5 h-5 text-green-600"
+            className="w-5 h-5 text-green-eske"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

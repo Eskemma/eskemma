@@ -42,7 +42,7 @@ export default function SecondaryImagesManager({
       <div className="flex items-center justify-between mb-4">
         <h4
           id="secondary-images-title"
-          className="text-sm font-bold text-gray-800 dark:text-[#EAF2F8] flex items-center gap-2"
+          className="text-sm font-bold text-black-eske dark:text-[#EAF2F8] flex items-center gap-2"
         >
           <svg
             className="w-4 h-4 text-bluegreen-eske"
@@ -61,7 +61,7 @@ export default function SecondaryImagesManager({
           Galería de Imágenes
         </h4>
         <span
-          className="text-xs text-gray-600 dark:text-[#9AAEBE] bg-white-eske dark:bg-white/10 px-2 py-1 rounded-full"
+          className="text-xs text-black-eske-20 dark:text-[#9AAEBE] bg-white-eske dark:bg-white/10 px-2 py-1 rounded-full"
           aria-label={`${images.length} ${images.length === 1 ? "imagen" : "imágenes"} en galería`}
         >
           {images.length} {images.length === 1 ? "imagen" : "imágenes"}
@@ -69,9 +69,9 @@ export default function SecondaryImagesManager({
       </div>
 
       {images.length === 0 ? (
-        <div className="text-center py-8 text-gray-500 dark:text-[#9AAEBE] text-sm" role="status">
+        <div className="text-center py-8 text-black-eske-10 dark:text-[#9AAEBE] text-sm" role="status">
           <svg
-            className="w-12 h-12 mx-auto mb-2 text-gray-400"
+            className="w-12 h-12 mx-auto mb-2 text-gray-eske-90"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -109,7 +109,7 @@ export default function SecondaryImagesManager({
                       expandedImage === image.id ? null : image.id
                     )
                   }
-                  className="relative h-32 bg-gray-200 cursor-pointer w-full focus-ring-primary"
+                  className="relative h-32 bg-gray-eske-20 cursor-pointer w-full focus-ring-primary"
                   aria-label={`${isInserted ? "Imagen insertada" : "Imagen"}: ${image.filename}. Clic para ampliar`}
                 >
                   <img
@@ -165,7 +165,7 @@ export default function SecondaryImagesManager({
                 {/* Info y acciones */}
                 <div className="p-2">
                   <p
-                    className="text-xs text-gray-700 dark:text-[#C7D6E0] truncate mb-2"
+                    className="text-xs text-black-eske-40 dark:text-[#C7D6E0] truncate mb-2"
                     title={image.filename}
                   >
                     {image.filename}
@@ -182,7 +182,7 @@ export default function SecondaryImagesManager({
                       disabled={isInserted}
                       className={`flex-1 text-xs py-1.5 rounded transition-colors focus-ring-primary ${
                         isInserted
-                          ? "bg-gray-300 dark:bg-white/10 text-gray-500 dark:text-[#6D8294] cursor-not-allowed"
+                          ? "bg-gray-eske-40 dark:bg-white/10 text-black-eske-10 dark:text-[#6D8294] cursor-not-allowed"
                           : "bg-bluegreen-eske text-white hover:bg-bluegreen-eske-70"
                       }`}
                       aria-label={
@@ -201,7 +201,7 @@ export default function SecondaryImagesManager({
                           onDeleteImage(image.id);
                         }
                       }}
-                      className="px-2 py-1.5 bg-red-eske text-white rounded hover:bg-red-600 transition-colors focus-ring-primary"
+                      className="px-2 py-1.5 bg-red-eske text-white rounded hover:bg-red-eske-60 transition-colors focus-ring-primary"
                       aria-label={`Eliminar imagen ${image.filename}`}
                     >
                       <svg
@@ -243,7 +243,7 @@ export default function SecondaryImagesManager({
                     />
                     <button
                       onClick={() => setExpandedImage(null)}
-                      className="absolute top-2 right-2 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-200 focus-ring-primary"
+                      className="absolute top-2 right-2 bg-white text-black-eske rounded-full p-2 hover:bg-gray-eske-20 focus-ring-primary"
                       aria-label="Cerrar vista ampliada"
                     >
                       <svg
@@ -272,7 +272,7 @@ export default function SecondaryImagesManager({
       {/* Información adicional */}
       {images.length > 0 && (
         <div
-          className="mt-3 pt-3 border-t border-gray-eske-30 dark:border-white/10 text-xs text-gray-600 dark:text-[#9AAEBE]"
+          className="mt-3 pt-3 border-t border-gray-eske-30 dark:border-white/10 text-xs text-black-eske-20 dark:text-[#9AAEBE]"
           role="status"
           aria-live="polite"
         >

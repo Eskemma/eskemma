@@ -78,7 +78,7 @@ export default function PostCardList({
         {/* Metadata y botón */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mt-auto">
           {/* Fecha, autor y vistas */}
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-700 dark:text-[#C7D6E0]">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-black-eske-40 dark:text-[#C7D6E0]">
             <div className="flex items-center gap-1">
               <svg
                 className="w-4 h-4 text-gray-eske-60 dark:text-[#6D8294]"

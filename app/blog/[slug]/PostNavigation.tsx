@@ -35,7 +35,7 @@ export default function PostNavigation({ previous, next }: PostNavigationProps) 
           aria-label={`Artículo anterior: ${previous.title}`}
           role="listitem"
         >
-          <div className="flex items-center gap-2 text-sm text-gray-800 dark:text-[#C7D6E0] font-medium mb-3">
+          <div className="flex items-center gap-2 text-sm text-black-eske dark:text-[#C7D6E0] font-medium mb-3">
             <svg
               className="w-5 h-5"
               fill="none"
@@ -72,7 +72,7 @@ export default function PostNavigation({ previous, next }: PostNavigationProps) 
             </span>
           </div>
 
-          <h4 className="text-base font-semibold text-gray-800 dark:text-[#EAF2F8] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2">
+          <h4 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2">
             {previous.title}
           </h4>
         </Link>
@@ -88,7 +88,7 @@ export default function PostNavigation({ previous, next }: PostNavigationProps) 
           aria-label={`Artículo siguiente: ${next.title}`}
           role="listitem"
         >
-          <div className="flex items-center justify-end gap-2 text-sm text-gray-800 dark:text-[#C7D6E0] font-medium mb-3">
+          <div className="flex items-center justify-end gap-2 text-sm text-black-eske dark:text-[#C7D6E0] font-medium mb-3">
             <span>Siguiente</span>
             <svg
               className="w-5 h-5"
@@ -125,7 +125,7 @@ export default function PostNavigation({ previous, next }: PostNavigationProps) 
             </span>
           </div>
 
-          <h4 className="text-base font-semibold text-gray-800 dark:text-[#EAF2F8] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 text-right">
+          <h4 className="text-base font-semibold text-black-eske dark:text-[#EAF2F8] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors line-clamp-2 text-right">
             {next.title}
           </h4>
         </Link>

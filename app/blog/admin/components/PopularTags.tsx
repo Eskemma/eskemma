@@ -50,7 +50,7 @@ export default function PopularTags() {
         aria-live="polite"
         aria-label="Cargando tags populares"
       >
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <h3 className="text-xl font-bold text-black-eske mb-4 flex items-center gap-2">
           <svg
             className="w-6 h-6 text-bluegreen-eske"
             fill="none"
@@ -90,7 +90,7 @@ export default function PopularTags() {
       <div className="flex items-center justify-between mb-6">
         <h3
           id="popular-tags-title"
-          className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] flex items-center gap-2"
+          className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] flex items-center gap-2"
         >
           <svg
             className="w-6 h-6 text-bluegreen-eske"
@@ -118,7 +118,7 @@ export default function PopularTags() {
       </div>
 
       {tags.length === 0 ? (
-        <div className="text-center py-8 text-gray-600 dark:text-[#9AAEBE]" role="status">
+        <div className="text-center py-8 text-black-eske-20 dark:text-[#9AAEBE]" role="status">
           <svg
             className="w-16 h-16 mx-auto mb-4 text-gray-eske-40"
             fill="none"
@@ -155,11 +155,11 @@ export default function PopularTags() {
             return (
               <div key={tag.tag} className="group" role="listitem">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-800 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors">
+                  <span className="text-sm font-medium text-black-eske dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] transition-colors">
                     #{tag.tag}
                   </span>
                   <span
-                    className="text-sm font-bold text-gray-700 dark:text-[#9AAEBE]"
+                    className="text-sm font-bold text-black-eske-40 dark:text-[#9AAEBE]"
                     aria-label={`${tag.count} uso${tag.count !== 1 ? "s" : ""}`}
                   >
                     {tag.count}

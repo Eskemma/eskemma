@@ -69,7 +69,7 @@ export default function AdminBlogPage() {
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto" aria-hidden="true"></div>
-          <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Cargando posts...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando posts...</p>
         </div>
       </div>
     );
@@ -80,8 +80,8 @@ export default function AdminBlogPage() {
       {/* Header con botón */}
       <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8]">Gestión de Posts</h1>
-          <p className="text-gray-600 dark:text-[#9AAEBE] mt-1">Administra todos tus artículos del blog</p>
+          <h1 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8]">Gestión de Posts</h1>
+          <p className="text-black-eske-20 dark:text-[#9AAEBE] mt-1">Administra todos tus artículos del blog</p>
         </div>
         <Link 
           href="/blog/admin/blog/edit/new"
@@ -121,8 +121,8 @@ export default function AdminBlogPage() {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h2 className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">No hay posts aún</h2>
-          <p className="text-gray-600 dark:text-[#9AAEBE] mb-6">Comienza creando tu primer artículo</p>
+          <h2 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">No hay posts aún</h2>
+          <p className="text-black-eske-20 dark:text-[#9AAEBE] mb-6">Comienza creando tu primer artículo</p>
           <Link 
             href="/blog/admin/blog/edit/new"
             className="inline-block px-6 py-3 bg-bluegreen-eske text-white rounded-lg hover:bg-bluegreen-eske-70 transition-colors font-semibold focus-ring-primary"
@@ -149,8 +149,8 @@ export default function AdminBlogPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">{post.title}</h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-[#9AAEBE]">
+                    <h3 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">{post.title}</h3>
+                    <div className="flex items-center gap-4 text-sm text-black-eske-20 dark:text-[#9AAEBE]">
                       <span className="flex items-center gap-1">
                         <svg 
                           className="w-4 h-4" 

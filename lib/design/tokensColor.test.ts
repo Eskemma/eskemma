@@ -150,6 +150,22 @@ describe("PESTEL, Sefix, Moddulo y sitio principal (sub-ronda A): sin colores ge
     expect(coloresGenericos(rutasB)).toEqual([]);
   });
 
+  it("Sitio principal, sub-ronda C (blog): 0 salvo las 12 excepciones de marca de terceros ya declaradas", () => {
+    // ShareButtons.tsx simula los colores reales de Facebook/X/LinkedIn/WhatsApp; SEOPreview.tsx simula
+    // los de Google/Facebook/X en sus pestañas de vista previa — ambos, mismo tratamiento que el
+    // cuadrante "Vigilar" de PESTEL (lista exacta, nunca una omisión silenciosa).
+    const rutasC = ["app/blog", "app/components/componentsBlog"];
+    const esperado = [
+      "bg-blue-600", "hover:bg-blue-700", "hover:bg-gray-800", "bg-blue-700", "hover:bg-blue-800",
+      "bg-green-500", "hover:bg-green-600",
+    ].map((t) => `app/blog/[slug]/ShareButtons.tsx ${t}`).concat(
+      ["border-blue-600", "text-blue-600", "border-sky-500", "text-sky-500", "text-blue-800"].map(
+        (t) => `app/blog/admin/components/SEOPreview.tsx ${t}`
+      )
+    );
+    expect(coloresGenericos(rutasC).sort()).toEqual(esperado.sort());
+  });
+
   it("el escáner de genéricos funciona (evita un pase vacuo si el regex se rompe)", () => {
     const muestra = 'className="bg-violet-100/40 dark:text-purple-400 text-violet-eske-60 bg-red-eske/10 text-gray-400"';
     expect([...muestra.matchAll(ESCALA_GENERICA)].map((m) => m[0])).toEqual(["bg-violet-100/40", "dark:text-purple-400", "text-gray-400"]);

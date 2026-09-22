@@ -176,7 +176,7 @@ export default function CommentsManagementPage() {
         >
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto" aria-hidden="true"></div>
-            <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Cargando comentarios...</p>
+            <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Cargando comentarios...</p>
           </div>
         </div>
       ) : (
@@ -195,7 +195,7 @@ export default function CommentsManagementPage() {
             >
               <div className="flex items-center justify-between">
                 <p 
-                  className="text-sm text-gray-600 dark:text-[#9AAEBE]"
+                  className="text-sm text-black-eske-20 dark:text-[#9AAEBE]"
                   role="status"
                   aria-live="polite"
                 >
@@ -209,13 +209,13 @@ export default function CommentsManagementPage() {
                   <button
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="px-4 py-2 bg-gray-eske-20 dark:bg-white/10 text-gray-800 dark:text-[#C7D6E0] rounded-lg hover:bg-gray-eske-30 dark:hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring-primary"
+                    className="px-4 py-2 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#C7D6E0] rounded-lg hover:bg-gray-eske-30 dark:hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring-primary"
                     aria-label="Ir a página anterior"
                   >
                     Anterior
                   </button>
                   <span
-                    className="px-4 py-2 text-sm text-gray-700 dark:text-[#9AAEBE]"
+                    className="px-4 py-2 text-sm text-black-eske-40 dark:text-[#9AAEBE]"
                     role="status"
                     aria-live="polite"
                     aria-atomic="true"

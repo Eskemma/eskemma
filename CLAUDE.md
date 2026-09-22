@@ -213,9 +213,9 @@ el token es ahora la única fuente). Pasos definidos en `app/globals.css`:
 | `violet-eske-20` | `#c585f5` | Texto en modo oscuro (5.05:1 sobre `#18324A`) |
 | `violet-eske-60` | `#773e8e` | Texto en modo claro (6.99:1 sobre `white-eske`). **Único valor derivado:** mismo matiz y saturación (HSL 282.6° / 38.9 %), luminosidad 40 % |
 
-**Usos oficiales (3, todos por decisión de Raúl):** categoría "No Binario" (Sefix), cuadrante "Vigilar"
-(PESTEL) y chips de país de Moddulo (`ProjectSelector`, `redactor/page`). Cualquier uso nuevo requiere
-decisión de diseño.
+**Usos oficiales (4, todos por decisión de Raúl):** categoría "No Binario" (Sefix), cuadrante "Vigilar"
+(PESTEL), chips de país de Moddulo (`ProjectSelector`, `redactor/page`) y el chip de filtro "orden"
+de `BlogToolbar` (sub-ronda C, 26-09-22). Cualquier uso nuevo requiere decisión de diseño.
 
 El `-60` existe porque la base da **4.45:1** sobre `white-eske` (< AA 4.5 en texto pequeño) y
 sobre las tarjetas oscuras solo 2.82:1. Patrón de uso: `text-violet-eske-60 dark:text-violet-eske-20`,
@@ -269,9 +269,9 @@ simulador SERP/OG de `blog/admin/components/SEOPreview` (imita a Google) — exc
 migrar; (b) identidad por plan/rol: `SubscriptionBadge` y las tarjetas de `suscripciones`
 (basic=azul, premium=**púrpura**, professional=verde) — decisión de diseño, sin equivalente
 para morado; (c) 5 `text-yellow-*` (4 en `suscripciones` = sub-ronda D, 1 en `newsletter/confirm` = B; **ninguno en A**) → `brown-eske-60`;
-(d) chip morado de filtro en `BlogToolbar`. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B ✅ RESUELTA 26-09-22 (197 → 0, 20 archivos: `componentsHome` completo incl. `RegisterModal`, `newsletter/confirm` y `newsletter/unsubscribe`)**; **C pendiente, 310** (blog público + admin; recontado 26-09-21, eran 308; `ShareButtons` y `SEOPreview` son excepciones); **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). Total pendiente (C+D): 434. **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
+(d) chip morado de filtro en `BlogToolbar` — resuelto en C, ver abajo. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B ✅ RESUELTA 26-09-22 (197 → 0, 20 archivos: `componentsHome` completo incl. `RegisterModal`, `newsletter/confirm` y `newsletter/unsubscribe`)**; **C ✅ RESUELTA 26-09-22 (310 → 0, 39 archivos: blog público + admin; `ShareButtons` y `SEOPreview` quedan con 12 clases de marca de terceros como excepción exacta declarada en el guard)**; **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
 abajo. Quedan además 14 clases en Centinela/Fontana (`AppCard`, kebab de Fontana). **Pendiente
-restante:** las sub-rondas C y D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
+restante:** la sub-ronda D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
 planes sigue abierta: no se extiende el token por inercia), los
 grises `gray-eske-40`/`-70` demasiado claros en `FontanaCanvasItemCard`/`FontanaModduloButton` y
 los ajustes visuales puntuales que Raúl detecte.
@@ -325,6 +325,39 @@ Contraste verificado contra el original en los mapeos no triviales (`text-blue-8
 `text-brown-eske-60` 5.37:1, patrón ya aprobado en rondas previas). Verificación: 58 clases nuevas
 presentes en el CSS compilado, 0 conflictos de cascada nuevos vs HEAD, guard probado en negativo con
 edición real, `tsc`, `next build` y 331 pruebas.
+
+**Sub-ronda C (26-09-22) — 310 → 0 en 39 archivos, salvo 12 clases de marca declaradas.** Blog público
+(`app/blog/` excl. `admin/` + `app/components/componentsBlog/`, 156 clases/23 archivos) + admin
+(`app/blog/admin/`, 154 clases/16 archivos). **`ShareButtons` y `SEOPreview` — excepción confirmada,
+pero NO en bloque:** de las 12 clases genuinamente de marca (Facebook/X/LinkedIn/WhatsApp en
+`ShareButtons`; Google/Facebook/X en las pestañas de `SEOPreview`), 5 de `ShareButtons` (label
+"Compartir:", botón "Copiar enlace", check de éxito) y 24 de `SEOPreview` (placeholders de imagen,
+bordes, texto de cuerpo — inconsistentes con el resto del archivo, que ya usaba tokens) NO eran marca
+y sí migraron. Las 12 restantes quedan como **excepción EXACTA en el guard** (lista literal, no
+`toEqual([])`; probado en negativo agregando una clase de marca no declarada — falla igual que quitar
+una de las 12). **Chip morado de `BlogToolbar` (26-09-22, 4º uso oficial de `violet-eske`, decisión de
+Raúl):** investigado a fondo antes de tocarlo — es el 3º de tres indicadores de "filtro activo"
+(categoría/búsqueda/orden), visible solo si `currentSort !== "newest"`; `currentSort` es estado de UI
+local (`searchParams`), sin relación con ninguna categoría/tag/estado editorial del blog (verificado
+contra `types/post.types.ts` y `lib/posts.ts`) — NO es una identidad como "No Binario", pero
+reutilizar `violet-eske` sí era una decisión de diseño nueva (extender su uso oficial a un contexto
+sin relación). Decisión: `violet-eske` para el chip de orden, `blue-eske` para el chip de búsqueda
+(antes azul genérico) — los 3 filtros quedan visualmente distintos
+(categoría=`bluegreen-eske`/búsqueda=`blue-eske`/orden=`violet-eske`). **Otros hallazgos de admin, sin
+requerir decisión:** estado editorial (`admin/blog/page.tsx`) y moderación de comentarios
+(`CommentFilters`/`CommentModal`/`CommentsTable`) **ya usaban tokens**; solo el hover del botón de
+borrar quedó genérico (`dark:hover:bg-red-900/30` → `dark:hover:bg-red-eske/30`, 3 puntos); rol de
+usuario en `CommentItem` solo gatea un permiso, sin color. `lib/constants/categories.ts` (8 categorías
+con hex crudo) queda reportado, fuera de alcance (no son clases Tailwind). **Sin bugs de sufijo
+`-eske` faltante** en este alcance (a diferencia de A/B). **2 casos de contraste no trivial:** banner
+de error de `NewsletterSignup` sobre tarjeta `bg-bluegreen-eske` (no blanco) — `text-red-100` 5.44:1 →
+`text-white-eske` s/ `bg-red-eske/20` **7.30:1**; botón × del chip de categoría
+(`hover:text-gray-200` → `hover:text-white-eske`). El resto reutiliza las correspondencias por paso ya
+verificadas en A/B. **2 pares claro/oscuro colapsados** (mismo criterio de rondas previas: el `dark:`
+del chip de búsqueda ya era `blue-eske/20` desde antes de esta ronda — un token existente, no
+genérico — y coincidió con el nuevo valor de claro). Verificación: 66 clases nuevas presentes en el
+CSS compilado, 0 conflictos de cascada nuevos vs HEAD, guard probado en negativo en AMBOS bloques (el
+de 0 y el de excepciones exactas), `tsc`, `next build` y 332 pruebas.
 
 **Moddulo — migración (26-09-21, orden invertido a propósito: primero el frente de mayor volumen).**
 `app/moddulo` + `app/components/moddulo`: **315 de 315 clases migradas en 20 archivos** (296 el primer día, 19 púrpuras al día siguiente).
@@ -1346,3 +1379,4 @@ firebase functions:log
 | 26-09-21 | Diseño — ronda 6: colisión Extranjero/No Binario resuelta | Mujeres-Extranjero pasa a la paleta rosa/rojo de Mujeres-Nacional en `SexoCharts` (S1-S4) y `G3SexChart` (2 archivos, sin tokens ni hex nuevos). Hombres y las demás gráficas de Extranjero intactos. Verificado: ΔE con No Binario 0 → 50.2 (oscuro) y 41.1 → 42.5 (claro); sin colisión nueva (ΔE ≥ 41.2 contra los 22 colores de Extranjero); ningún texto describe el color. Aviso: `G3SexChart` "Lista Mujeres" oscuro = 2.97:1 (heredado de Nacional). `tsc`, `next build` y 329 pruebas. **Con esto se cierra el punto 4 del plan de extras**, salvo lo documentado: badge `draft` del hub, E8 y sub-rondas A-D del sitio principal. |
 | 26-09-21 | Diseño — ronda 7: sitio principal, sub-ronda A (143 → 0) | 21 archivos (páginas estáticas, cursos, componentes compartidos, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`). Guard extendido (acepta archivos sueltos) y probado en negativo por directorio y por archivo. Hallazgo: 4 clases inexistentes `bg-*-60` en `HomeClient` (no-op silencioso). Ajustes de contraste medidos contra el original (`-90` verde/azul sobre tinte, `orange-eske-80`, notas terciarias a `black-eske-10`); 2 defectos previos de modo oscuro corregidos (caja de cookies, mensaje vacío de notificaciones). Los "5 `text-yellow-*`" no estaban en A (están en B y D). Verificación: `tsc`, `next build`, 330 pruebas, 69 clases presentes en el CSS, 0 conflictos de cascada. **Pendiente:** sub-rondas B (197), C (310), D (124), E8, badge `draft` del hub. |
 | 26-09-22 | Diseño — ronda 8: sitio principal, sub-ronda B (197 → 0) | 20 archivos (`componentsHome` completo, `newsletter/confirm`, `newsletter/unsubscribe`). Recontado antes de tocar código: idéntico al diagnóstico previo. 3 modales de plan de suscripción verificados sin identidad de color (no repiten el patrón de `SubscriptionBadge`), mapeo mecánico sin decisión pendiente. 3 bugs de sufijo `-eske` faltante corregidos (`red-60`, `gray-90`, `gray-20`, mismo patrón que `HomeClient` en A). Caja de advertencia de `newsletter/confirm` → `brown-eske-60`/`yellow-eske`, con `dark:` agregado. 2 gradientes con `dark:` agregado, 2 pares claro/oscuro colapsados por resolver al mismo token. Verificación: `tsc`, `next build`, 331 pruebas, 58 clases presentes en el CSS, 0 conflictos de cascada, guard extendido y probado en negativo. **Pendiente:** sub-rondas C (310), D (124), E8, badge `draft` del hub. |
+| 26-09-22 | Diseño — ronda 9: sitio principal, sub-ronda C (310 → 0, salvo 12 de marca) | Blog público (156/23) + admin (154/16). `ShareButtons`/`SEOPreview`: de sus 41 clases totales, 12 son marca real (Facebook/X/LinkedIn/WhatsApp, pestañas Google/Facebook/X) → excepción **exacta** en el guard (lista literal, probada en negativo agregando una clase no declarada); las otras 29 no eran marca y migraron. Chip morado de `BlogToolbar` investigado a fondo (3er indicador de filtro activo, estado de UI local sin relación con datos del blog) y resuelto con decisión de Raúl: `violet-eske` (4º uso oficial) para el chip de orden, `blue-eske` para el de búsqueda. Estado editorial y moderación de comentarios ya usaban tokens, sin tocar. Sin bugs de sufijo `-eske` en este alcance. Banner de error de `NewsletterSignup` sobre fondo de marca (no blanco) → `text-white-eske`, 7.30:1 vs 5.44:1 original. Verificación: `tsc`, `next build`, 332 pruebas, 66 clases presentes en el CSS, 0 conflictos de cascada, guard probado en negativo en los 2 bloques (cero genéricos y excepciones exactas). **Pendiente:** sub-ronda D (124, condicionada a decisión de plan/color), E8, badge `draft` del hub, `lib/constants/categories.ts` (hex crudo, reportado). |

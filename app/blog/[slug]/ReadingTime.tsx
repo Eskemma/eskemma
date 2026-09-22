@@ -8,7 +8,7 @@ interface ReadingTimeProps {
 export default function ReadingTime({ minutes }: ReadingTimeProps) {
   return (
     <div 
-      className="flex items-center gap-2 text-sm text-gray-600 dark:text-[#9AAEBE]"
+      className="flex items-center gap-2 text-sm text-black-eske-20 dark:text-[#9AAEBE]"
       role="text"
       aria-label={`Tiempo estimado de lectura: ${minutes} minuto${minutes !== 1 ? 's' : ''}`}
     >

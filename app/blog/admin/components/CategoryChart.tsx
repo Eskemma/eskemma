@@ -50,7 +50,7 @@ export default function CategoryChart() {
         aria-live="polite"
         aria-label="Cargando estadísticas de categorías"
       >
-        <h3 className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-4">Posts por Categoría</h3>
+        <h3 className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-4">Posts por Categoría</h3>
         <div className="animate-pulse space-y-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-8 bg-gray-eske-20 rounded" aria-hidden="true"></div>
@@ -69,14 +69,14 @@ export default function CategoryChart() {
     >
       <h3 
         id="category-chart-title"
-        className="text-xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-6"
+        className="text-xl font-bold text-black-eske dark:text-[#EAF2F8] mb-6"
       >
         Posts por Categoría
       </h3>
 
       {categories.length === 0 ? (
         <div 
-          className="text-center py-8 text-gray-600 dark:text-[#9AAEBE]"
+          className="text-center py-8 text-black-eske-20 dark:text-[#9AAEBE]"
           role="status"
         >
           <svg
@@ -118,12 +118,12 @@ export default function CategoryChart() {
                       style={{ backgroundColor: color }}
                       aria-hidden="true"
                     ></div>
-                    <span className="text-sm font-semibold text-gray-800 dark:text-[#EAF2F8]">
+                    <span className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">
                       {label}
                     </span>
                   </div>
                   <span 
-                    className="text-sm text-gray-600 dark:text-[#9AAEBE]"
+                    className="text-sm text-black-eske-20 dark:text-[#9AAEBE]"
                     aria-label={`${cat.count} posts, ${Math.round(percentage)} por ciento del total`}
                   >
                     {cat.count} ({Math.round(percentage)}%)
@@ -155,7 +155,7 @@ export default function CategoryChart() {
             role="listitem"
           >
             <div className="flex items-center justify-between">
-              <span className="font-bold text-gray-800 dark:text-[#EAF2F8]">Total</span>
+              <span className="font-bold text-black-eske dark:text-[#EAF2F8]">Total</span>
               <span 
                 className="font-bold text-bluegreen-eske"
                 aria-label={`Total de ${total} posts`}

@@ -179,7 +179,7 @@ export default function CommentModal({
               Contenido del comentario
             </h3>
             <div className="bg-gray-eske-10 dark:bg-[#112230] rounded-xl p-6 border border-gray-eske-30 dark:border-white/10">
-              <p className="text-gray-800 dark:text-[#C7D6E0] leading-relaxed whitespace-pre-wrap text-base">
+              <p className="text-black-eske dark:text-[#C7D6E0] leading-relaxed whitespace-pre-wrap text-base">
                 {comment.content}
               </p>
             </div>
@@ -246,7 +246,7 @@ export default function CommentModal({
                 onDelete(comment.id, comment.postId);
                 onClose();
               }}
-              className="px-6 py-3 bg-gray-eske-40 dark:bg-white/10 text-gray-800 dark:text-[#C7D6E0] rounded-lg hover:bg-red-eske-20 dark:hover:bg-red-900/30 hover:text-red-eske dark:hover:text-red-400 transition-colors font-semibold shadow-md focus-ring-primary"
+              className="px-6 py-3 bg-gray-eske-40 dark:bg-white/10 text-black-eske dark:text-[#C7D6E0] rounded-lg hover:bg-red-eske-20 dark:hover:bg-red-eske/30 hover:text-red-eske dark:hover:text-red-eske-20 transition-colors font-semibold shadow-md focus-ring-primary"
               aria-label="Eliminar comentario permanentemente"
             >
               <svg 

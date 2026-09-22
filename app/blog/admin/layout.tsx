@@ -75,7 +75,7 @@ export default function AdminLayout({
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bluegreen-eske mx-auto" aria-hidden="true"></div>
-          <p className="mt-4 text-gray-600 dark:text-[#9AAEBE]">Verificando permisos...</p>
+          <p className="mt-4 text-black-eske-20 dark:text-[#9AAEBE]">Verificando permisos...</p>
         </div>
       </div>
     );
@@ -194,7 +194,7 @@ export default function AdminLayout({
             {/* Botón Hamburguesa - Solo Mobile */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-gray-700 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors focus-ring-primary"
+              className="lg:hidden p-2 text-black-eske-40 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors focus-ring-primary"
               aria-label="Abrir menú de navegación"
               aria-expanded={isMobileMenuOpen}
             >
@@ -225,10 +225,10 @@ export default function AdminLayout({
                 </span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="font-bold text-gray-800 dark:text-[#EAF2F8] text-sm lg:text-base">
+                <h1 className="font-bold text-black-eske dark:text-[#EAF2F8] text-sm lg:text-base">
                   Admin Panel
                 </h1>
-                <p className="text-xs text-gray-600 dark:text-[#9AAEBE]">El Baúl de Fouché</p>
+                <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">El Baúl de Fouché</p>
               </div>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function AdminLayout({
                   className={`flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 focus-ring-primary ${
                     isActive
                       ? "bg-bluegreen-eske text-white shadow-md"
-                      : "text-gray-700 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+                      : "text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
                   }`}
                   aria-current={isActive ? "page" : undefined}
                   aria-label={item.badge ? `${item.name} (${item.badge})` : item.name}
@@ -312,7 +312,7 @@ export default function AdminLayout({
                   </div>
                   {item.badge && (
                     <span 
-                      className="text-xs px-2 py-1 bg-yellow-eske-20 text-gray-800 rounded-full"
+                      className="text-xs px-2 py-1 bg-yellow-eske-20 text-black-eske rounded-full"
                       aria-label={item.badge}
                     >
                       {item.badge}
@@ -348,10 +348,10 @@ export default function AdminLayout({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 dark:text-[#EAF2F8] truncate">
+                <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] truncate">
                   {user?.name || "Admin"}
                 </p>
-                <p className="text-xs text-gray-600 dark:text-[#9AAEBE] truncate">{user?.email}</p>
+                <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] truncate">{user?.email}</p>
               </div>
             </div>
           </div>
@@ -387,16 +387,16 @@ export default function AdminLayout({
                   <div>
                     <h2 
                       id="mobile-menu-title"
-                      className="font-bold text-gray-800 dark:text-[#EAF2F8]"
+                      className="font-bold text-black-eske dark:text-[#EAF2F8]"
                     >
                       Admin Panel
                     </h2>
-                    <p className="text-xs text-gray-600 dark:text-[#9AAEBE]">El Baúl de Fouché</p>
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">El Baúl de Fouché</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 text-gray-600 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors focus-ring-primary"
+                  className="p-2 text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 rounded-lg transition-colors focus-ring-primary"
                   aria-label="Cerrar menú de navegación"
                 >
                   <svg
@@ -427,7 +427,7 @@ export default function AdminLayout({
                       className={`flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 focus-ring-primary ${
                         isActive
                           ? "bg-bluegreen-eske text-white shadow-md"
-                          : "text-gray-700 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
+                          : "text-black-eske-40 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
                       }`}
                       aria-current={isActive ? "page" : undefined}
                       aria-label={item.badge ? `${item.name} (${item.badge})` : item.name}
@@ -438,7 +438,7 @@ export default function AdminLayout({
                       </div>
                       {item.badge && (
                         <span 
-                          className="text-xs px-2 py-1 bg-yellow-eske-20 text-gray-800 rounded-full"
+                          className="text-xs px-2 py-1 bg-yellow-eske-20 text-black-eske rounded-full"
                           aria-label={item.badge}
                         >
                           {item.badge}
@@ -474,10 +474,10 @@ export default function AdminLayout({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-[#EAF2F8] truncate">
+                    <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] truncate">
                       {user?.name || "Admin"}
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-[#9AAEBE] truncate">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE] truncate">
                       {user?.email}
                     </p>
                   </div>

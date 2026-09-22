@@ -137,11 +137,11 @@ export default function CommentItem({
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <span className="font-semibold text-gray-800 dark:text-[#EAF2F8]">
+              <span className="font-semibold text-black-eske dark:text-[#EAF2F8]">
                 {comment.author.displayName}
               </span>
               <time
-                className="text-sm text-gray-600 dark:text-[#9AAEBE] ml-2"
+                className="text-sm text-black-eske-20 dark:text-[#9AAEBE] ml-2"
                 dateTime={comment.createdAt.toISOString()}
               >
                 {getTimeAgo(comment.createdAt)}
@@ -164,7 +164,7 @@ export default function CommentItem({
               {canDelete && !showConfirmDelete && (
                 <button
                   onClick={() => setShowConfirmDelete(true)}
-                  className="text-red-500 hover:text-red-700 text-sm font-medium transition-colors focus-ring-primary rounded"
+                  className="text-red-eske hover:text-red-eske-70 text-sm font-medium transition-colors focus-ring-primary rounded"
                   disabled={isDeleting}
                   aria-label={`Eliminar comentario de ${comment.author.displayName}`}
                 >
@@ -174,7 +174,7 @@ export default function CommentItem({
             </div>
           </div>
 
-          <p className="text-gray-700 dark:text-[#C7D6E0] whitespace-pre-wrap break-words">
+          <p className="text-black-eske-40 dark:text-[#C7D6E0] whitespace-pre-wrap break-words">
             {comment.content}
           </p>
 
@@ -204,7 +204,7 @@ export default function CommentItem({
                     setShowReplyForm(false);
                     setReplyContent("");
                   }}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-[#9AAEBE] hover:text-gray-800 dark:hover:text-[#EAF2F8] focus-ring-primary rounded"
+                  className="px-4 py-2 text-sm text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#EAF2F8] focus-ring-primary rounded"
                   aria-label="Cancelar respuesta"
                 >
                   Cancelar
@@ -223,18 +223,18 @@ export default function CommentItem({
 
           {showConfirmDelete && (
             <div
-              className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+              className="mt-4 p-3 bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 rounded-lg"
               role="alert"
               aria-live="assertive"
             >
-              <p className="text-sm text-red-800 dark:text-red-400 mb-3">
+              <p className="text-sm text-red-eske-80 dark:text-red-eske-20 mb-3">
                 ¿Estás seguro de que deseas eliminar este comentario?
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-semibold disabled:opacity-50 focus-ring-primary"
+                  className="px-4 py-2 bg-red-eske text-white rounded-lg hover:bg-red-eske-60 transition-colors text-sm font-semibold disabled:opacity-50 focus-ring-primary"
                   aria-label={
                     isDeleting
                       ? "Eliminando comentario"
@@ -246,7 +246,7 @@ export default function CommentItem({
                 <button
                   onClick={() => setShowConfirmDelete(false)}
                   disabled={isDeleting}
-                  className="px-4 py-2 bg-gray-200 dark:bg-[#21425E] text-gray-700 dark:text-[#C7D6E0] rounded-lg hover:bg-gray-300 dark:hover:bg-[#2C5273] transition-colors text-sm font-semibold focus-ring-primary"
+                  className="px-4 py-2 bg-gray-eske-20 dark:bg-[#21425E] text-black-eske-40 dark:text-[#C7D6E0] rounded-lg hover:bg-gray-eske-40 dark:hover:bg-[#2C5273] transition-colors text-sm font-semibold focus-ring-primary"
                   aria-label="Cancelar eliminación"
                 >
                   Cancelar

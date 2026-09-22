@@ -43,7 +43,7 @@ export default function CommentFilters({
             Buscar comentarios por contenido o autor
           </label>
           <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-600"
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-black-eske-20"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -88,15 +88,15 @@ export default function CommentFilters({
                 className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all duration-200 focus-ring-primary ${
                   isActive
                     ? `${filter.color} text-white border-transparent shadow-md`
-                    : "bg-white dark:bg-[#112230] border-gray-eske-30 dark:border-white/10 text-gray-700 dark:text-[#C7D6E0] hover:border-gray-eske-60 dark:hover:border-white/20"
+                    : "bg-white dark:bg-[#112230] border-gray-eske-30 dark:border-white/10 text-black-eske-40 dark:text-[#C7D6E0] hover:border-gray-eske-60 dark:hover:border-white/20"
                 }`}
               >
                 <div className="text-left">
-                  <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-gray-600 dark:text-[#9AAEBE]"}`}>
+                  <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-black-eske-20 dark:text-[#9AAEBE]"}`}>
                     {filter.label}
                   </p>
                   <p 
-                    className={`text-2xl font-bold ${isActive ? "text-white" : "text-gray-800 dark:text-[#EAF2F8]"}`}
+                    className={`text-2xl font-bold ${isActive ? "text-white" : "text-black-eske dark:text-[#EAF2F8]"}`}
                     aria-hidden="true"
                   >
                     {filter.count}

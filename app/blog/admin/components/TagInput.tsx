@@ -181,7 +181,7 @@ export default function TagInput({ value, onChange }: TagInputProps) {
           >
             <div className="p-2">
               <p
-                className="text-xs text-gray-600 dark:text-[#9AAEBE] px-2 py-1 font-semibold"
+                className="text-xs text-black-eske-20 dark:text-[#9AAEBE] px-2 py-1 font-semibold"
                 role="presentation"
               >
                 Tags sugeridos
@@ -200,11 +200,11 @@ export default function TagInput({ value, onChange }: TagInputProps) {
                   role="option"
                   aria-selected={index === activeSuggestionIndex}
                 >
-                  <span className="text-gray-800 dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] font-medium">
+                  <span className="text-black-eske dark:text-[#C7D6E0] group-hover:text-bluegreen-eske dark:group-hover:text-[#6BA4C6] font-medium">
                     {suggestion.tag}
                   </span>
                   <span
-                    className="text-xs text-gray-500 dark:text-[#9AAEBE] bg-gray-eske-20 dark:bg-white/10 px-2 py-0.5 rounded-full"
+                    className="text-xs text-black-eske-10 dark:text-[#9AAEBE] bg-gray-eske-20 dark:bg-white/10 px-2 py-0.5 rounded-full"
                     aria-label={`${suggestion.count} uso${suggestion.count !== 1 ? "s" : ""}`}
                   >
                     {suggestion.count}
@@ -216,7 +216,7 @@ export default function TagInput({ value, onChange }: TagInputProps) {
         )}
       </div>
 
-      <p id="tag-input-hint" className="text-xs text-gray-600 dark:text-[#9AAEBE]">
+      <p id="tag-input-hint" className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
         💡 Tip: Presiona Enter o coma para agregar. Usa tags existentes para
         mejor organización.
       </p>
