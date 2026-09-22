@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RAIZ = process.cwd();
-const COLORES_ESKE = "blue|orange|white|gray|black|bluegreen|yellow|brown|green|red";
+const COLORES_ESKE = "blue|orange|white|gray|black|bluegreen|yellow|brown|green|red|violet";
 
 function archivos(dir: string, out: string[] = []): string[] {
   for (const nombre of readdirSync(join(RAIZ, dir))) {
@@ -85,10 +85,14 @@ describe("tokens -eske: todo lo que se usa existe en globals.css (sin remanentes
       "blue-eske-900": 1,
       "gray-eske-50": 1,
     });
+    // el color nuevo (violeta) también se vigila: un paso inexistente se detecta, los definidos no
+    expect(tokensIndefinidosEnTexto("text-violet-eske-60 dark:text-violet-eske-20 bg-violet-eske/10 text-violet-eske-70")).toEqual({
+      "violet-eske-70": 1,
+    });
   });
 
   it("globals.css define los tokens del mapeo por rol y NO define los fantasma (la fuente de verdad es la correcta)", () => {
-    for (const t of ["black-eske", "black-eske-10", "black-eske-20", "black-eske-40", "black-eske-90", "blue-eske-90", "gray-eske-90"]) {
+    for (const t of ["black-eske", "black-eske-10", "black-eske-20", "black-eske-40", "black-eske-90", "blue-eske-90", "gray-eske-90", "violet-eske", "violet-eske-20", "violet-eske-60"]) {
       expect(tokensDefinidos.has(t), t).toBe(true);
     }
     for (const t of ["black-eske-50", "black-eske-60", "black-eske-70", "black-eske-80", "blue-eske-900", "gray-eske-50"]) {
@@ -97,22 +101,37 @@ describe("tokens -eske: todo lo que se usa existe en globals.css (sin remanentes
   });
 });
 
-describe("PESTEL: sin colores genéricos de la escala numérica de Tailwind", () => {
-  const ESCALA = new RegExp(
-    "(?<![\\w-])(?:[\\w\\[\\]&>-]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|divide|placeholder|outline|shadow|accent|decoration|caret)-" +
-      "(?:gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3}(?:/\\d+)?(?![\\w/-])",
-    "g"
-  );
-  const dirs = ["app/centinela/pestel", "app/components/centinela/pestel"];
+// Escala numérica de Tailwind fuera del design system (`bg-red-50`, `text-gray-400`…), con prefijos de
+// variante (`dark:`, `hover:`…) y opacidad. Compartida por los guards de PESTEL y Sefix.
+const ESCALA_GENERICA = new RegExp(
+  "(?<![\\w-])(?:[\\w\\[\\]&>-]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|divide|placeholder|outline|shadow|accent|decoration|caret)-" +
+    "(?:gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3}(?:/\\d+)?(?![\\w/-])",
+  "g"
+);
 
-  it("única excepción: el cuadrante 'Vigilar' de ImpactMatrix (violeta, sin equivalente en la paleta -eske; pendiente de decisión de diseño)", () => {
-    const hallazgos: string[] = [];
-    for (const f of dirs.flatMap((d) => archivos(d))) {
-      for (const m of readFileSync(join(RAIZ, f), "utf8").matchAll(ESCALA)) hallazgos.push(`${f} ${m[0]}`);
-    }
-    const esperado = ["text-violet-700", "dark:text-violet-400", "bg-violet-100/40", "dark:bg-violet-900/20", "text-violet-700", "dark:text-violet-400"].map(
-      (t) => `app/components/centinela/pestel/interpretacion/ImpactMatrix.tsx ${t}`
-    );
-    expect(hallazgos).toEqual(esperado);
+function coloresGenericos(dirs: string[]): string[] {
+  const hallazgos: string[] = [];
+  for (const f of dirs.flatMap((d) => archivos(d))) {
+    for (const m of readFileSync(join(RAIZ, f), "utf8").matchAll(ESCALA_GENERICA)) hallazgos.push(`${f} ${m[0]}`);
+  }
+  return hallazgos;
+}
+
+describe("PESTEL, Sefix y Moddulo: sin colores genéricos de la escala numérica de Tailwind (sin excepciones)", () => {
+  it("PESTEL = 0 (el cuadrante 'Vigilar' usa violet-eske desde 26-09-21)", () => {
+    expect(coloresGenericos(["app/centinela/pestel", "app/components/centinela/pestel"])).toEqual([]);
+  });
+
+  it("Sefix = 0 (los tooltips 'No Binario' usan violet-eske desde 26-09-21)", () => {
+    expect(coloresGenericos(["app/sefix", "lib/sefix"])).toEqual([]);
+  });
+
+  it("Moddulo = 0 (el ámbar 'Requiere ajuste' usa yellow-eske/brown-eske-60 y los chips de país violet-eske, desde 26-09-21)", () => {
+    expect(coloresGenericos(["app/moddulo", "app/components/moddulo"])).toEqual([]);
+  });
+
+  it("el escáner de genéricos funciona (evita un pase vacuo si el regex se rompe)", () => {
+    const muestra = 'className="bg-violet-100/40 dark:text-purple-400 text-violet-eske-60 bg-red-eske/10 text-gray-400"';
+    expect([...muestra.matchAll(ESCALA_GENERICA)].map((m) => m[0])).toEqual(["bg-violet-100/40", "dark:text-purple-400", "text-gray-400"]);
   });
 });

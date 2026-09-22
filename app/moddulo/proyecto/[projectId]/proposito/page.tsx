@@ -551,12 +551,12 @@ function PropositoPageContent() {
             <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske shrink-0">F1</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Propósito</h1>
             {mode === "completed" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-eske/20 text-green-eske-80 rounded-full">
                 ✓ Lista
               </span>
             )}
             {mode === "editing" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-eske/20 text-orange-eske-80 rounded-full">
                 Editando
               </span>
             )}
@@ -955,8 +955,8 @@ function XPCTOFormPanel({
     `w-full px-3 py-2 text-sm font-normal rounded-lg border focus:outline-none focus:ring-2 focus:ring-bluegreen-eske/30 focus:border-bluegreen-eske text-black-eske dark:text-[#EAF2F8] bg-white-eske dark:bg-[#112230] disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] disabled:text-black-eske-10 dark:disabled:text-[#9AAEBE] placeholder:text-gray-eske-60 dark:placeholder:text-[#6D8294] ${
       risksByField[field]
         ? risksByField[field].level === "critical"
-          ? "border-red-300 dark:border-red-800"
-          : "border-yellow-300 dark:border-yellow-700"
+          ? "border-red-eske/40"
+          : "border-yellow-eske/50 dark:border-yellow-eske/40"
         : "border-gray-eske-20 dark:border-white/10"
     }`;
 
@@ -1077,7 +1077,7 @@ function FormField({ label, hint, risk, children }: {
       {hint && <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-1">{hint}</p>}
       {children}
       {risk && (
-        <p className={`text-xs mt-1 ${risk.level === "critical" ? "text-red-600 dark:text-red-400" : "text-yellow-700 dark:text-yellow-400"}`}>
+        <p className={`text-xs mt-1 ${risk.level === "critical" ? "text-red-eske-60 dark:text-red-eske-20" : "text-brown-eske-60 dark:text-yellow-eske"}`}>
           {risk.title}
         </p>
       )}
@@ -1088,7 +1088,7 @@ function FormField({ label, hint, risk, children }: {
 function RiskBadge({ level }: { level: "warning" | "critical" }) {
   return (
     <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-      level === "critical" ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
+      level === "critical" ? "bg-red-eske/20 dark:bg-red-eske/30 text-red-eske-60 dark:text-red-eske-20" : "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske"
     }`}>
       {level === "critical" ? "⚠" : "○"}
     </span>
@@ -1119,8 +1119,8 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
       <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
@@ -1134,9 +1134,9 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
 
         <ul className="space-y-2 mb-5">
           {affectedPhases.map(({ phaseId, diffs }) => (
-            <li key={phaseId} className="text-sm text-black-eske-20 dark:text-[#C7D6E0] bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
+            <li key={phaseId} className="text-sm text-black-eske-20 dark:text-[#C7D6E0] bg-orange-eske/10 dark:bg-orange-eske/20 px-3 py-2 rounded-lg">
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500 dark:text-orange-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-orange-eske dark:text-orange-eske-20 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
                 {PHASE_NAMES[phaseId]}

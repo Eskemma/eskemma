@@ -387,7 +387,7 @@ export default function InvestigacionPage() {
               <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 shrink-0">F3</span>
               <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Investigación</h1>
               {isLista && (
-                <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
+                <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30 rounded-full">✓ Lista</span>
               )}
             </div>
             {!showLanding && (

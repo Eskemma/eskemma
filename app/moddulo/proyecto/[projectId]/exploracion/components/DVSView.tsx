@@ -18,7 +18,7 @@ type SubTab = "M2" | "M3" | "M4";
 function VeredictoM2Badge({ v }: { v: ContrasteXPCTO["veredicto"] }) {
   const map = {
     coherente: { label: "Coherente", classes: "border border-green-eske-60 text-green-eske-80" },
-    requiere_ajuste: { label: "Requiere ajuste", classes: "border border-purple-400 text-purple-700 dark:border-yellow-eske-60 dark:text-yellow-eske-70" },
+    requiere_ajuste: { label: "Requiere ajuste", classes: "border border-yellow-eske-60 text-brown-eske-60 dark:text-yellow-eske-70" },
     requiere_investigacion: { label: "Requiere investigación", classes: "border border-red-eske-40 text-red-eske-80" },
   } as const;
   const { label, classes } = map[v];
@@ -34,7 +34,7 @@ function VeredictoM2Badge({ v }: { v: ContrasteXPCTO["veredicto"] }) {
 function NivelRiesgoBadge({ nivel }: { nivel: ActorVetoF2["nivelRiesgo"] }) {
   const map = {
     rojo: { dot: "bg-red-eske", label: "Veto inmediato" },
-    ambar: { dot: "bg-purple-400 dark:bg-yellow-eske-70", label: "Riesgo condicional" },
+    ambar: { dot: "bg-yellow-eske-70", label: "Riesgo condicional" },
     verde: { dot: "bg-green-eske-60", label: "Riesgo bajo" },
   } as const;
   const { dot, label } = map[nivel];
@@ -51,7 +51,7 @@ function NivelRiesgoBadge({ nivel }: { nivel: ActorVetoF2["nivelRiesgo"] }) {
 function NivelBadge({ level, label }: { level: "alta" | "media" | "baja"; label: string }) {
   const colors = {
     alta: "border border-red-eske-40 text-red-eske-80",
-    media: "border border-purple-400 text-purple-700 dark:border-yellow-eske-60 dark:text-yellow-eske-70",
+    media: "border border-yellow-eske-60 text-brown-eske-60 dark:text-yellow-eske-70",
     baja: "border border-green-eske-40 text-green-eske-80",
   } as const;
   return (

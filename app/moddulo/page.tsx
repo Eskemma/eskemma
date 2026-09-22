@@ -127,9 +127,9 @@ export default function ModduloPage() {
 
 const STATUS_COLORS: Record<ModduloProject["status"], string> = {
   draft: "bg-gray-eske-20 text-gray-eske-60",
-  active: "bg-green-100 text-green-700",
-  paused: "bg-yellow-100 text-yellow-700",
-  completed: "bg-blue-100 text-blue-700",
+  active: "bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30",
+  paused: "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske",
+  completed: "bg-blue-eske/20 text-blue-eske-80 dark:text-blue-eske-30",
   // La escala -eske no tiene paso 50 (ver globals.css): el token que había aquí
   // quedaba como no-op y el texto heredaba el color del ancestro, casi invisible
   // en modo oscuro sobre el mismo `bg-gray-eske-20` claro (mismo bug ya
@@ -322,7 +322,7 @@ function ProjectCard({
                   onClick={item.onClick}
                   className={`w-full text-left px-3 py-2 text-sm transition-colors
                     ${item.danger
-                      ? "text-red-eske hover:bg-red-50 dark:hover:bg-red-900/20"
+                      ? "text-red-eske hover:bg-red-eske/10 dark:hover:bg-red-eske/20"
                       : "text-gray-eske-70 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5"
                     }
                     ${i > 0 && menuItems[i - 1]?.danger === false && item.danger
@@ -359,7 +359,7 @@ function ProjectCard({
             <div className="space-y-3">
               <div>
                 <label htmlFor="meta-name" className="block text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] mb-1">
-                  Nombre <span className="text-red-500">*</span>
+                  Nombre <span className="text-red-eske dark:text-red-eske-20">*</span>
                 </label>
                 <input
                   id="meta-name"

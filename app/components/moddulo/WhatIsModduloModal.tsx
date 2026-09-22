@@ -94,7 +94,7 @@ export default function WhatIsModduloModal({ isOpen, onClose }: WhatIsModduloMod
           {/* Lista de planes */}
           <div className="space-y-4">
             {/* Plan Basic */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-sm:p-3">
+            <div className="bg-blue-eske/10 dark:bg-blue-eske/20 rounded-lg p-4 max-sm:p-3">
               <div className="flex items-start gap-3">
                 <div className="bg-blue-eske text-white-eske rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold text-sm">
                   8
@@ -116,7 +116,7 @@ export default function WhatIsModduloModal({ isOpen, onClose }: WhatIsModduloMod
             </div>
 
             {/* Plan Premium */}
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 max-sm:p-3">
+            <div className="bg-orange-eske/10 dark:bg-orange-eske/20 rounded-lg p-4 max-sm:p-3">
               <div className="flex items-start gap-3">
                 <div className="bg-orange-eske text-white-eske rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold text-sm">
                   16
@@ -138,9 +138,9 @@ export default function WhatIsModduloModal({ isOpen, onClose }: WhatIsModduloMod
             </div>
 
             {/* Plan Professional */}
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 max-sm:p-3">
+            <div className="bg-green-eske/10 dark:bg-green-eske/20 rounded-lg p-4 max-sm:p-3">
               <div className="flex items-start gap-3">
-                <div className="bg-green-600 text-white-eske rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold text-sm">
+                <div className="bg-green-eske-60 text-white-eske rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold text-sm">
                   25
                 </div>
                 <div>

@@ -38,7 +38,7 @@ export default function UnderConstructionApp({
         {/* Estado */}
         {isComingSoon ? (
           <>
-            <div className="inline-block bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 px-4 py-2 rounded-full mb-6">
+            <div className="inline-block bg-yellow-eske/20 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske-40 px-4 py-2 rounded-full mb-6">
               <span className="font-medium text-sm">Próximamente</span>
             </div>
             <p className="text-lg max-sm:text-base text-gray-eske-70 dark:text-[#9AAEBE] mb-8">
@@ -47,7 +47,7 @@ export default function UnderConstructionApp({
           </>
         ) : (
           <>
-            <div className="inline-block bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 px-4 py-2 rounded-full mb-6">
+            <div className="inline-block bg-blue-eske/20 text-blue-eske-80 dark:text-blue-eske-30 px-4 py-2 rounded-full mb-6">
               <span className="font-medium text-sm">En Desarrollo</span>
             </div>
             <p className="text-lg max-sm:text-base text-gray-eske-70 dark:text-[#9AAEBE] mb-8">

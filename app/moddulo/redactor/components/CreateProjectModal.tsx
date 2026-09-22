@@ -111,7 +111,7 @@ export default function CreateProjectModal({
         <div className="px-6 py-4 space-y-4">
           {/* Error message */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-900 dark:text-red-300 p-3 rounded-r text-sm">
+            <div className="bg-red-eske/10 dark:bg-red-eske/20 border-l-4 border-red-eske text-red-eske-90 dark:text-red-eske-20 p-3 rounded-r text-sm">
               <p className="font-medium">{error}</p>
             </div>
           )}
@@ -122,7 +122,7 @@ export default function CreateProjectModal({
               htmlFor="project-name"
               className="block text-sm font-semibold text-gray-eske-90 dark:text-[#C7D6E0] mb-2"
             >
-              Nombre del proyecto <span className="text-red-500">*</span>
+              Nombre del proyecto <span className="text-red-eske dark:text-red-eske-20">*</span>
             </label>
             <input
               id="project-name"
@@ -183,8 +183,8 @@ export default function CreateProjectModal({
           </div>
 
           {/* Info */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r">
-            <p className="text-xs text-blue-900 dark:text-blue-300">
+          <div className="bg-blue-eske/10 dark:bg-blue-eske/20 border-l-4 border-blue-eske p-3 rounded-r">
+            <p className="text-xs text-blue-eske-90 dark:text-blue-eske-30">
               <strong>Nota:</strong> Después de crear el proyecto, podrás configurar los detalles
               específicos (candidato, tipo de comunicación, etc.).
             </p>

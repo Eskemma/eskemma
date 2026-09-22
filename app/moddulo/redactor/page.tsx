@@ -473,7 +473,7 @@ export default function RedactorPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 bg-blue-eske/10 dark:bg-blue-eske/20 text-blue-eske-80 dark:text-blue-eske-30 px-3 py-1.5 rounded-full text-xs font-semibold">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                 <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
@@ -483,11 +483,11 @@ export default function RedactorPage() {
             
             {currentProject?.configuration && (
               <>
-                <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-semibold">
+                <div className="inline-flex items-center gap-2 bg-green-eske/10 text-green-eske-80 dark:text-green-eske-30 px-3 py-1.5 rounded-full text-xs font-semibold">
                   {currentProject.configuration.context === "electoral" ? "🗳️ Electoral" : "🏛️ Gubernamental"}
                 </div>
                 
-                <div className="inline-flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full text-xs font-semibold">
+                <div className="inline-flex items-center gap-2 bg-violet-eske/10 text-violet-eske-60 dark:text-violet-eske-20 px-3 py-1.5 rounded-full text-xs font-semibold">
                   {currentProject.configuration.country === "mexico" ? "🇲🇽 México" : currentProject.configuration.country}
                 </div>
               </>
@@ -506,7 +506,7 @@ export default function RedactorPage() {
         )}
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-900 dark:text-red-300 p-4 rounded-r-lg mb-6" role="alert">
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border-l-4 border-red-eske text-red-eske-90 dark:text-red-eske-20 p-4 rounded-r-lg mb-6" role="alert">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />

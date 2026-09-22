@@ -117,14 +117,14 @@ export default function RDAHistoryModal({
                           ? "border-gray-eske-30 bg-gray-eske-10/50 dark:border-white/10 dark:bg-white/5"
                           : item.nivelImpacto === "prioritario"
                             ? "border-red-eske/30 bg-red-eske/5"
-                            : "border-purple-200 bg-purple-50 dark:border-yellow-eske/30 dark:bg-yellow-eske/5"
+                            : "border-yellow-eske/40 bg-yellow-eske/10 dark:border-yellow-eske/30 dark:bg-yellow-eske/5"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <p className={`text-xs font-bold ${
                           mostrarComoAceptado
                             ? "text-black-eske-40 dark:text-[#9AAEBE]"
-                            : item.nivelImpacto === "prioritario" ? "text-red-eske" : "text-purple-700 dark:text-yellow-eske"
+                            : item.nivelImpacto === "prioritario" ? "text-red-eske" : "text-brown-eske-60 dark:text-yellow-eske"
                         }`}>
                           {nombre}
                         </p>

@@ -1204,10 +1204,10 @@ export default function ExploracionPage() {
             <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 shrink-0">F2</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Exploración</h1>
             {dvs !== null && mode !== "editing" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Lista</span>
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30 rounded-full">✓ Lista</span>
             )}
             {mode === "editing" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">Editando</span>
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-eske/20 text-orange-eske-80 dark:text-orange-eske-20 rounded-full">Editando</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -1351,7 +1351,7 @@ export default function ExploracionPage() {
                     {isRegeneratingReport ? (
                       <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Regenerando...</span>
                     ) : (
-                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">Reporte generado</span>
+                      <span className="text-xs text-green-eske-60 dark:text-green-eske-30 font-medium">Reporte generado</span>
                     )}
                     <button
                       onClick={handleRegenerarReporteF2}
@@ -1615,9 +1615,9 @@ export default function ExploracionPage() {
           /* Error express — análisis falló, mostrar panel con Reintentar */
           ) : expressError !== null ? (
             <div className="flex-1 flex items-center justify-center p-4">
-              <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-red-eske/20 dark:border-red-800/30 p-8 flex flex-col items-center gap-4 w-full max-w-md">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-red-eske/20 dark:border-red-eske/30 p-8 flex flex-col items-center gap-4 w-full max-w-md">
+                <div className="w-10 h-10 rounded-full bg-red-eske/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-eske-60 dark:text-red-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                   </svg>
                 </div>
@@ -2150,8 +2150,8 @@ function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
       <SignalGroup
         title="Señales inciertas"
         signals={dim.senalesInciertas}
-        colorClass="text-purple-700 dark:text-yellow-eske"
-        summaryClass="border border-purple-200 dark:border-yellow-eske/20"
+        colorClass="text-brown-eske-60 dark:text-yellow-eske"
+        summaryClass="border border-yellow-eske/40 dark:border-yellow-eske/20"
       />
     </div>
   );
@@ -2288,7 +2288,7 @@ function SectionField({ label, hint, required, children }: {
   return (
     <div>
       <label className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] block mb-1">
-        {label}{required && <span className="ml-1 text-red-500">*</span>}
+        {label}{required && <span className="ml-1 text-red-eske dark:text-red-eske-20">*</span>}
       </label>
       {hint && <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-1">{hint}</p>}
       {children}
@@ -2328,8 +2328,8 @@ function ConfirmReanalisisModal({ onCancel, onConfirm }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
       <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
@@ -2367,8 +2367,8 @@ function ConfirmUnlinkPestelModal({ onCancel, onConfirm }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
       <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
@@ -2633,8 +2633,8 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
       <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
@@ -2645,8 +2645,8 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
         </div>
         <ul className="space-y-2 mb-5">
           {affectedPhases.map((id) => (
-            <li key={id} className="flex items-center gap-2 text-sm text-black-eske-10 dark:text-[#C7D6E0] bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
-              <svg className="w-4 h-4 text-orange-500 dark:text-orange-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <li key={id} className="flex items-center gap-2 text-sm text-black-eske-10 dark:text-[#C7D6E0] bg-orange-eske/10 dark:bg-orange-eske/20 px-3 py-2 rounded-lg">
+              <svg className="w-4 h-4 text-orange-eske dark:text-orange-eske-20 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
               {NAMES[id]}

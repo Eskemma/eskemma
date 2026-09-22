@@ -50,7 +50,7 @@
     {
       "id": "pestel-integracion-moddulo-f2",
       "anchor": "Integración con Moddulo F2",
-      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración), marcada ⏳ Pendiente. Al construir el manifiesto encontré que SÍ existen rutas reales de integración (generate-m1-express genera un MapaPESTEL completo; import-pestel/find-linked-pestel/unlink-pestel vinculan proyectos PESTEL existentes) — no confirmé si esto satisface por completo lo que la fila describe, así que la dejo en el manifiesto para que el detector mismo lo señale con evidencia de fecha, en vez de que yo lo dé por hecho aquí.",
+      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración). Verificado 26-09-21: las 4 rutas existen y las consume exploracion/page.tsx; la fila pasó de Pendiente a Completado.",
       "paths": [
         "app/api/moddulo/f2/generate-m1-express",
         "app/api/moddulo/f2/import-pestel",

@@ -91,7 +91,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
           htmlFor="tema"
           className="block text-sm font-semibold text-bluegreen-eske mb-2"
         >
-          Tema del post <span className="text-red-600">*</span>
+          Tema del post <span className="text-red-eske-60 dark:text-red-eske-20">*</span>
         </label>
         <textarea
           id="tema"
@@ -109,7 +109,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
             focus:outline-none focus:ring-2 focus:ring-bluegreen-eske focus:border-transparent
             disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] disabled:cursor-not-allowed
             bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]
-            ${errors.tema ? "border-red-500" : "border-gray-eske-30 dark:border-white/10"}
+            ${errors.tema ? "border-red-eske" : "border-gray-eske-30 dark:border-white/10"}
           `}
           aria-describedby="tema-error tema-counter"
           aria-invalid={!!errors.tema}
@@ -119,7 +119,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
         <div className="flex items-center justify-between mt-1">
           <div>
             {errors.tema && (
-              <p id="tema-error" className="text-xs text-red-600" role="alert">
+              <p id="tema-error" className="text-xs text-red-eske-60 dark:text-red-eske-20" role="alert">
                 {errors.tema}
               </p>
             )}
@@ -130,7 +130,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
               isTemaTooShort
                 ? "text-orange-eske"
                 : isTemaTooLong
-                ? "text-red-600"
+                ? "text-red-eske-60 dark:text-red-eske-20"
                 : "text-gray-eske-70"
             }`}
           >
@@ -145,7 +145,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
           htmlFor="publico"
           className="block text-sm font-semibold text-bluegreen-eske mb-2"
         >
-          Público objetivo <span className="text-red-600">*</span>
+          Público objetivo <span className="text-red-eske-60 dark:text-red-eske-20">*</span>
         </label>
         <select
           id="publico"
@@ -160,7 +160,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
             transition-colors
             focus:outline-none focus:ring-2 focus:ring-bluegreen-eske focus:border-transparent
             disabled:bg-gray-eske-10 disabled:cursor-not-allowed
-            ${errors.publico ? "border-red-500" : "border-gray-eske-30"}
+            ${errors.publico ? "border-red-eske" : "border-gray-eske-30"}
           `}
           aria-describedby="publico-error"
           aria-invalid={!!errors.publico}
@@ -173,7 +173,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
           ))}
         </select>
         {errors.publico && (
-          <p id="publico-error" className="text-xs text-red-600 mt-1" role="alert">
+          <p id="publico-error" className="text-xs text-red-eske-60 dark:text-red-eske-20 mt-1" role="alert">
             {errors.publico}
           </p>
         )}
@@ -185,7 +185,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
           htmlFor="tono"
           className="block text-sm font-semibold text-bluegreen-eske mb-2"
         >
-          Tono del mensaje <span className="text-red-600">*</span>
+          Tono del mensaje <span className="text-red-eske-60 dark:text-red-eske-20">*</span>
         </label>
         <select
           id="tono"
@@ -200,7 +200,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
             transition-colors
             focus:outline-none focus:ring-2 focus:ring-bluegreen-eske focus:border-transparent
             disabled:bg-gray-eske-10 disabled:cursor-not-allowed
-            ${errors.tono ? "border-red-500" : "border-gray-eske-30"}
+            ${errors.tono ? "border-red-eske" : "border-gray-eske-30"}
           `}
           aria-describedby="tono-error"
           aria-invalid={!!errors.tono}
@@ -213,7 +213,7 @@ export default function RedactorForm({ onSubmit, isGenerating, disabled = false 
           ))}
         </select>
         {errors.tono && (
-          <p id="tono-error" className="text-xs text-red-600 mt-1" role="alert">
+          <p id="tono-error" className="text-xs text-red-eske-60 dark:text-red-eske-20 mt-1" role="alert">
             {errors.tono}
           </p>
         )}

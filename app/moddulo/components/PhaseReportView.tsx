@@ -90,7 +90,7 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   ) : (
-                    <svg className="w-5 h-5 text-purple-600 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Requiere ajuste">
+                    <svg className="w-5 h-5 text-brown-eske-60 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Requiere ajuste">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   )}
@@ -101,7 +101,7 @@ function DictamenSection({ dictamen }: { dictamen: Dictamen | null | undefined }
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       cruce.veredicto === "coherente"
                         ? "bg-green-eske/15 text-green-eske"
-                        : "bg-purple-100 text-purple-700 dark:bg-yellow-eske/20 dark:text-yellow-eske"
+                        : "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske"
                     }`}>
                       {cruce.veredicto === "coherente" ? "Coherente" : "Requiere ajuste"}
                     </span>
@@ -159,7 +159,7 @@ function CriteriosSection({
                 ? "bg-green-eske/15 text-green-eske"
                 : c.nivel === "Prioritario"
                   ? "bg-red-eske/15 text-red-eske"
-                  : "bg-purple-100 text-purple-700 dark:bg-yellow-eske/20 dark:text-yellow-eske"
+                  : "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske"
             }`}>
               {c.estado === "resuelto" ? (
                 <>
@@ -230,17 +230,17 @@ export default function PhaseReportView({
   return (
     <div className={`flex flex-col bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 overflow-hidden ${className}`}>
       {/* Header del reporte */}
-      <div className="shrink-0 px-4 py-3 border-b border-gray-eske-20 dark:border-white/10 flex items-center justify-between bg-green-50 dark:bg-green-900/20">
+      <div className="shrink-0 px-4 py-3 border-b border-gray-eske-20 dark:border-white/10 flex items-center justify-between bg-green-eske/10 dark:bg-green-eske/20">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full bg-green-eske flex items-center justify-center">
             <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <span className="text-sm font-semibold text-green-800 dark:text-green-300">{getReportLabel(phaseId)}</span>
+          <span className="text-sm font-semibold text-green-eske-80 dark:text-green-eske-20">{getReportLabel(phaseId)}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-green-600 font-medium">
+          <span className="text-xs text-green-eske-60 dark:text-green-eske-30 font-medium">
             {isCompleted ? "Fase completada" : "Borrador generado"}
           </span>
           {onRegenerate && !isCompleted && (
@@ -265,49 +265,49 @@ export default function PhaseReportView({
 
       {/* Contenido del reporte — scrollable */}
       <div className="flex-1 overflow-y-auto p-5 min-h-0">
-        <div className="prose prose-sm max-w-none text-gray-800 dark:text-[#C7D6E0]">
+        <div className="prose prose-sm max-w-none text-black-eske dark:text-[#C7D6E0]">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
               h1: ({ children }) => (
-                <h1 className="text-base font-bold text-gray-900 dark:text-[#C7D6E0] mt-4 mb-2 first:mt-0 pb-1 border-b border-gray-200 dark:border-white/10">{children}</h1>
+                <h1 className="text-base font-bold text-black-eske dark:text-[#C7D6E0] mt-4 mb-2 first:mt-0 pb-1 border-b border-gray-eske-20 dark:border-white/10">{children}</h1>
               ),
               h2: ({ children }) => (
-                <h2 className="text-sm font-bold text-gray-800 dark:text-[#C7D6E0] mt-4 mb-2 first:mt-0">{children}</h2>
+                <h2 className="text-sm font-bold text-black-eske dark:text-[#C7D6E0] mt-4 mb-2 first:mt-0">{children}</h2>
               ),
               h3: ({ children }) => (
                 <h3 className="text-sm font-semibold text-bluegreen-eske dark:text-[#6BA4C6] mt-3 mb-1 first:mt-0">{children}</h3>
               ),
               p: ({ children }) => (
-                <p className="text-sm text-gray-700 dark:text-[#C7D6E0] leading-relaxed mb-3 last:mb-0">{children}</p>
+                <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0] leading-relaxed mb-3 last:mb-0">{children}</p>
               ),
               strong: ({ children }) => (
-                <strong className="font-semibold text-gray-900 dark:text-[#C7D6E0]">{children}</strong>
+                <strong className="font-semibold text-black-eske dark:text-[#C7D6E0]">{children}</strong>
               ),
               em: ({ children }) => (
-                <em className="italic text-gray-600 dark:text-[#9AAEBE]">{children}</em>
+                <em className="italic text-black-eske-20 dark:text-[#9AAEBE]">{children}</em>
               ),
               ul: ({ children }) => (
-                <ul className="list-disc list-inside space-y-1 mb-3 text-sm text-gray-700 dark:text-[#C7D6E0]">{children}</ul>
+                <ul className="list-disc list-inside space-y-1 mb-3 text-sm text-black-eske-40 dark:text-[#C7D6E0]">{children}</ul>
               ),
               ol: ({ children }) => (
-                <ol className="list-decimal list-inside space-y-1 mb-3 text-sm text-gray-700 dark:text-[#C7D6E0]">{children}</ol>
+                <ol className="list-decimal list-inside space-y-1 mb-3 text-sm text-black-eske-40 dark:text-[#C7D6E0]">{children}</ol>
               ),
               li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-              hr: () => <hr className="border-gray-200 dark:border-white/10 my-4" />,
+              hr: () => <hr className="border-gray-eske-20 dark:border-white/10 my-4" />,
               table: ({ children }) => (
                 <div className="overflow-x-auto my-3">
                   <table className="text-xs border-collapse w-full">{children}</table>
                 </div>
               ),
               th: ({ children }) => (
-                <th className="border border-gray-300 dark:border-white/10 px-3 py-1.5 bg-gray-100 dark:bg-[#112230] font-semibold text-gray-700 dark:text-[#C7D6E0] text-left">{children}</th>
+                <th className="border border-gray-eske-40 dark:border-white/10 px-3 py-1.5 bg-gray-eske-10 dark:bg-[#112230] font-semibold text-black-eske-40 dark:text-[#C7D6E0] text-left">{children}</th>
               ),
               td: ({ children }) => (
-                <td className="border border-gray-300 dark:border-white/10 px-3 py-1.5 text-gray-700 dark:text-[#C7D6E0]">{children}</td>
+                <td className="border border-gray-eske-40 dark:border-white/10 px-3 py-1.5 text-black-eske-40 dark:text-[#C7D6E0]">{children}</td>
               ),
               blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-bluegreen-eske/40 pl-4 italic text-gray-600 dark:text-[#9AAEBE] my-3">{children}</blockquote>
+                <blockquote className="border-l-4 border-bluegreen-eske/40 pl-4 italic text-black-eske-20 dark:text-[#9AAEBE] my-3">{children}</blockquote>
               ),
             }}
           >
@@ -321,7 +321,7 @@ export default function PhaseReportView({
           return (
             <div className="mt-5 p-4 bg-bluegreen-eske/5 border border-bluegreen-eske/25 rounded-lg">
               <p className="text-xs font-bold uppercase tracking-wide text-bluegreen-eske mb-1">Siguiente paso</p>
-              <p className="text-sm text-gray-700 dark:text-[#C7D6E0] leading-relaxed">
+              <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0] leading-relaxed">
                 Revisa el resultado. Cuando estés conforme, pulsa{" "}
                 <strong className="text-black-eske dark:text-[#C7D6E0]">{action}</strong>{" "}
                 en la parte superior para consolidar el análisis y avanzar a la{" "}

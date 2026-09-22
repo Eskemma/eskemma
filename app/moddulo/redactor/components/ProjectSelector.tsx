@@ -230,7 +230,7 @@ export default function ProjectSelector({
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-900 dark:text-red-300 p-4 rounded-r-lg mb-6">
+          <div className="bg-red-eske/10 dark:bg-red-eske/20 border-l-4 border-red-eske text-red-eske-90 dark:text-red-eske-20 p-4 rounded-r-lg mb-6">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path
@@ -268,7 +268,7 @@ export default function ProjectSelector({
             Crear Nuevo Proyecto
           </button>
           {projects.length >= limits.maxProjects && (
-            <p className="text-sm text-red-600 mt-2">
+            <p className="text-sm text-red-eske-60 dark:text-red-eske-20 mt-2">
               Has alcanzado el límite de proyectos.{" "}
               <Link href="/#suscripciones" className="underline font-medium">
                 Mejora tu plan
@@ -349,7 +349,7 @@ export default function ProjectSelector({
                     )}
                   </div>
                   {project.isActive && (
-                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
+                    <span className="bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30 text-xs font-medium px-2 py-1 rounded-full">
                       Activo
                     </span>
                   )}
@@ -391,8 +391,8 @@ export default function ProjectSelector({
                         text-xs font-medium px-2 py-1 rounded-full
                         ${
                           project.configuration.context === "electoral"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"
+                            ? "bg-blue-eske/20 text-blue-eske-80 dark:text-blue-eske-30"
+                            : "bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30"
                         }
                       `}
                     >
@@ -400,7 +400,7 @@ export default function ProjectSelector({
                         ? "🗳️ Electoral"
                         : "🏛️ Gubernamental"}
                     </span>
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-violet-eske/10 text-violet-eske-60 dark:text-violet-eske-20">
                       {project.configuration.country === "mexico" ? "🇲🇽 México" : project.configuration.country}
                     </span>
                   </div>

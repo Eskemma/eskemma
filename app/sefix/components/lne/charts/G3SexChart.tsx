@@ -25,10 +25,11 @@ const COLORS_NACIONAL = {
   padronHombres: { light: "#003F8A", dark: "#4791B3" },
   listaHombres:  { light: "#001A5E", dark: "#6BA4C6" },
 };
-// Colores fidelizados al Shiny original — Extranjero
+// Colores fidelizados al Shiny original — Extranjero. Mujeres reutiliza la paleta Nacional (rosa/rojo): el
+// morado de Extranjero coincidía con el de la tarjeta "No Binario" (`violet-eske`). Hombres conserva el azul.
 const COLORS_EXTRANJERO = {
-  padronMujeres: { light: "#7206b4", dark: "#B05DD6" },
-  listaMujeres:  { light: "#7f24f7", dark: "#B38EFA" },
+  padronMujeres: COLORS_NACIONAL.padronMujeres,
+  listaMujeres:  COLORS_NACIONAL.listaMujeres,
   padronHombres: { light: "#0163a4", dark: "#4791B3" },
   listaHombres:  { light: "#1d7fe9", dark: "#6BA4C6" },
 };
@@ -196,10 +197,10 @@ export default function G3SexChart({ data, ambito = "nacional", nbLatest, nbAnnu
         >
           {/* Card principal */}
           <div
-            className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+            className="bg-white-eske dark:bg-[#18324A] border border-violet-eske/40 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
             aria-label="Datos No Binario"
           >
-            <p className="font-semibold text-purple-700 mb-0.5">⚧ No Binario</p>
+            <p className="font-semibold text-violet-eske-60 dark:text-violet-eske-20 mb-0.5">⚧ No Binario</p>
             {nbDisplay && (
               <p className="text-black-eske-20 dark:text-[#9AAEBE] font-medium">{nbDisplay.year}</p>
             )}

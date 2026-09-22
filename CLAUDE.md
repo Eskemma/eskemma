@@ -77,7 +77,7 @@ equipos de campaña y funcionarios públicos en México.
 | `/moddulo` | Moddulo — gestión de proyectos políticos con IA (9 fases) | Activo |
 | `/centinela/pestel` | PESTEL — análisis PEST-L en tiempo real | En desarrollo |
 | `/cursos` | Talleres y cursos interactivos | Activo |
-| `/sefix` | Dashboard electoral — Next.js/React/TypeScript nativo, 23 rutas API propias bajo `app/api/sefix/`. Migrado desde el prototipo original en R/Shiny (`docs/sefix_R/`, sin desarrollo activo desde 26-04-12, se conserva solo como artefacto histórico) | Activo |
+| `/sefix` | Dashboard electoral — Next.js/React/TypeScript nativo, 24 rutas API propias bajo `app/api/sefix/`. Migrado desde el prototipo original en R/Shiny (`docs/sefix_R/`, sin desarrollo activo desde 26-04-12, se conserva solo como artefacto histórico) | Activo |
 | `/blog` | El Baúl de Fouché | Activo |
 
 ---
@@ -143,9 +143,10 @@ Firebase signIn (cliente)
 | `yellow-eske` | Warnings |
 | `green-eske` | Success |
 | `red-eske` | Errores |
+| `violet-eske` | Identidad de categoría (ver "Token `violet-eske`"): "No Binario" en Sefix y cuadrante "Vigilar" de PESTEL. **No es un color libre** |
 
 Cada color tiene escala `-10` `-20` `-30` `-40` `-60` `-70` `-80` `-90`, **salvo
-`black-eske`**, que solo define `-10` `-20` `-30` `-40` y `-90` (y `-10` es el más
+`violet-eske`** (solo base, `-20` y `-60`) **y `black-eske`**, que solo define `-10` `-20` `-30` `-40` y `-90` (y `-10` es el más
 CLARO). **Ninguna escala incluye el paso 50**, y **`black-eske-60`/`-70`/`-80` y
 `blue-eske-900` NUNCA existieron**: no son tokens que se perdieron, fueron
 extrapolaciones erróneas del equipo (se asumió que `black-eske-80` era "un gris medio";
@@ -196,7 +197,30 @@ de `:root` (`--color-danger` = red-eske-20, `--color-success` = green-eske-30,
 contraste original (`text-gray-400` → `gray-eske-90`, `-500` → `black-eske-10`).
 Al reemplazar un token inexistente que **no tenía variante `dark:`**, agregar la variante
 oscura (`dark:text-[#9AAEBE]`): un color fijo sin ella dejaría texto oscuro sobre fondo
-oscuro. **No existe equivalente para morado/violeta.**
+oscuro. **El único violeta oficial es `violet-eske`** (abajo); no existe morado/púrpura genérico equivalente y
+no se debe usar `violet-eske` para categorías nuevas sin decisión de diseño.
+
+**Token `violet-eske` (26-09-21).** Identidad de la categoría **"No Binario"** en las gráficas y
+tooltips de Sefix; por decisión de diseño el cuadrante **"Vigilar"** de la matriz de PESTEL
+usa el mismo tono. Se creó porque ese violeta es color de identidad de una serie de datos, no
+decoración, y ninguna escala existente lo cubría. **Origen del valor (exacto, no aproximado):**
+`COL_NB = #9B59B6` y `COL_NB_DARK = #C585F5` de `SexoCharts.tsx` (las constantes hex se eliminaron:
+el token es ahora la única fuente). Pasos definidos en `app/globals.css`:
+
+| Token | Valor | Uso |
+|-------|-------|-----|
+| `violet-eske` | `#9b59b6` | Bordes, rellenos, series, tinte por opacidad (`/10`, `/40`); ≥ 3:1 en ambos temas |
+| `violet-eske-20` | `#c585f5` | Texto en modo oscuro (5.05:1 sobre `#18324A`) |
+| `violet-eske-60` | `#773e8e` | Texto en modo claro (6.99:1 sobre `white-eske`). **Único valor derivado:** mismo matiz y saturación (HSL 282.6° / 38.9 %), luminosidad 40 % |
+
+**Usos oficiales (3, todos por decisión de Raúl):** categoría "No Binario" (Sefix), cuadrante "Vigilar"
+(PESTEL) y chips de país de Moddulo (`ProjectSelector`, `redactor/page`). Cualquier uso nuevo requiere
+decisión de diseño.
+
+El `-60` existe porque la base da **4.45:1** sobre `white-eske` (< AA 4.5 en texto pequeño) y
+sobre las tarjetas oscuras solo 2.82:1. Patrón de uso: `text-violet-eske-60 dark:text-violet-eske-20`,
+`border-violet-eske/40`, `bg-violet-eske/10`. El guard incluye `violet` en `COLORES_ESKE`: un paso
+inexistente (`violet-eske-70`) rompe el test como cualquier otro token.
 
 **Auditoría de diseño — estado (26-09-21).** Sub-ronda 1 (PESTEL + paso 50, 26-09-20)
 y sub-ronda 2 (26-09-21: `black-eske-60` 252 → 0, `black-eske-80` 148 → 0,
@@ -207,13 +231,80 @@ visual en modo claro (subtítulos, etiquetas y notas pasaron de `#2b2b2b` hereda
 gris `#525252`/`#5c5c5c`), arregló el CTA de cursos (blanco sobre amarillo →
 `blue-eske-90`, 7.58:1), los ejes de gráficas (negro puro → `black-eske-20`), las
 etiquetas deshabilitadas (`/50` ya atenúa) y los hovers (`Tabs`, `HistoricoPartidos*`).
-PESTEL sin escala numérica de Tailwind salvo el cuadrante "Vigilar" de `ImpactMatrix`
-(violeta, sin equivalente: decisión de diseño pendiente). **Pendiente (sub-rondas
-propias, cada una pide verificación visual):** 9 colores genéricos de Tailwind en Sefix
-(`SexoCharts`, `G3SexChart`, `HistoricoView`); los colores genéricos del sitio principal
-(259); los grises `gray-eske-40`/`-70` demasiado claros para texto en `FontanaCanvasItemCard`
-y `FontanaModduloButton` (kebab); y los ajustes visuales puntuales que Raúl detecte en
-las verificaciones.
+PESTEL y Sefix con **0** colores genéricos de Tailwind y **sin excepciones** en el guard: el
+cuadrante "Vigilar" (`ImpactMatrix`) y los 4 tooltips "No Binario" (`SexoCharts` ×3, `G3SexChart` ×1;
+16 clases, no 4) usan `violet-eske`. Otros cambios de Sefix: `HistoricoView`
+`dark:bg-red-900/20` → `dark:bg-red-eske/20`; defecto real corregido en `G3SexChart`
+(`text-purple-700` sin `dark:` = 1.89:1 sobre la tarjeta oscura); y en `SexoCharts` se eliminaron
+`COL_NB`/`COL_NB_DARK` y 2 declaraciones `colNB` que nunca se usaban (el texto "No Binario:" pasó
+a clases del token).
+
+**"Vigilar": resuelto.** Raúl confirmó en navegador (ambos temas) el cambio de tono al token
+(283°/39 % vs el violeta de Tailwind 263°/70 %; contraste claro 6.44 → 6.18, oscuro 5.70 → 5.63).
+
+**Colisión Extranjero vs No Binario — RESUELTA (26-09-21).** El morado es la identidad del **ámbito
+Extranjero** en toda la sección LNE (7 archivos / 70 referencias), no una convención de "Mujeres", y
+chocaba con `violet-eske-20` solo en oscuro (`#C585F5`, ΔE 0; en claro ΔE 39-41). Decisión de Raúl
+(recomendación de Claude; su propuesta inicial `#F15F8E` era `red-eske-20` = `--color-danger` en oscuro,
+y ni `-20` ni `-30` cumplen 3:1 en ambos temas): en `SexoCharts` (S1-S4, vía `coloresM` y `getSexosS3`) y
+`G3SexChart`, **Mujeres usa la misma paleta rosa/rojo en ambos ámbitos**; no hay tokens ni hex nuevos
+(G3 referencia `COLORS_NACIONAL`). **Hombres y el resto de la paleta morado/azul de Extranjero no
+cambian** (`EdadCharts`, `G1TrendChart`, `G2BarChart`, `OrigenCharts`, `semanalUtils`). Medido después:
+colisión con No Binario ΔE 0 → **50.2** en oscuro y 41.1 → 42.5 en claro; sin colisión nueva (el rosa
+queda a ΔE ≥ 41.2 de cualquiera de los 22 colores de Extranjero vigentes); contraste de las líneas sobre
+`white-eske` (claro) 4.42-8.66 y sobre `#18324A` (oscuro, fondo real de `ChartCard`) 3.64-5.38, **salvo
+`G3SexChart` "Lista Mujeres" en oscuro `#C45070` = 2.97:1** (0.03 bajo 3:1; ya era así en Nacional, el
+morado anterior daba 5.12). Pendiente menor: aclararlo (p. ej. `#F4839D`) en ambos ámbitos si se
+quiere cumplir 3:1 estricto.
+
+**Sitio principal — diagnóstico (26-09-21, SIN corregir).** Conteo real: **772 clases
+(600 líneas, 83 archivos)** con el criterio gray|red|green|yellow|orange|blue|purple|violet-NNN;
+el "259" que circulaba estaba subestimado ~3× y no se sabe con qué criterio se midió. 68 % es
+`gray` (523), 61 % es `text-*`; solo 60 llevan `dark:`. Cero tokens fantasma en todo el repo (ni
+en los 3 CSS) y el guard ya cubre `app/`, `lib/`, `context/`, `types/`, `utils/` (solo `.ts/.tsx`;
+los CSS se revisaron a mano). Concentración: `app/blog` 237, `componentsHome` 122, `newsletter` 75,
+`componentsBlog` 71, `profile` 67, `suscripciones` 47. **Casos que NO son mapeo mecánico:** (a)
+colores de marca de terceros en `blog/[slug]/ShareButtons` (Facebook/X/LinkedIn/WhatsApp) y el
+simulador SERP/OG de `blog/admin/components/SEOPreview` (imita a Google) — excepciones, no
+migrar; (b) identidad por plan/rol: `SubscriptionBadge` y las tarjetas de `suscripciones`
+(basic=azul, premium=**púrpura**, professional=verde) — decisión de diseño, sin equivalente
+para morado; (c) 5 `text-yellow-*` (`suscripciones`, `newsletter/confirm`) → `brown-eske-60`;
+(d) chip morado de filtro en `BlogToolbar`. División propuesta (tokens): **A** estáticas y
+compartidas 143 (cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`,
+`Header`, `NotificationBell`, `lib/redactor`); **B** home + newsletter 197 (incluye
+`RegisterModal`, flujo de registro); **C** blog público + admin 308; **D** cuenta y planes 124
+(`profile`, `suscripciones`, `SubscriptionBadge`), condicionada a la decisión (b). **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
+abajo. Quedan además 14 clases en Centinela/Fontana (`AppCard`, kebab de Fontana). **Pendiente
+restante:** las 4 sub-rondas A-D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
+planes sigue abierta: no se extiende el token por inercia), los
+grises `gray-eske-40`/`-70` demasiado claros en `FontanaCanvasItemCard`/`FontanaModduloButton` y
+los ajustes visuales puntuales que Raúl detecte.
+
+**Moddulo — migración (26-09-21, orden invertido a propósito: primero el frente de mayor volumen).**
+`app/moddulo` + `app/components/moddulo`: **315 de 315 clases migradas en 20 archivos** (296 el primer día, 19 púrpuras al día siguiente).
+Método: tabla exacta de 99 tokens distintos que aborta ante cualquiera sin mapear, bitácora por
+reemplazo, y verificación posterior: 103 clases nuevas, **todas presentes en el CSS compilado** (una
+clase con token inexistente no truena, simplemente no se genera), 0 conflictos de cascada nuevos vs
+HEAD. Reglas aplicadas: texto gris 600/700/800-900 → `black-eske-20/-40/base`; fondos gris 50/100 →
+`white-eske-40`/`gray-eske-10`; rojo/verde/naranja/azul de texto → paso `-60…-90`; **amarillo de texto
+→ `brown-eske-60`/`-80`**; tintes por opacidad del token (`/10`, `/20`); sólidos con texto blanco →
+`-60` (AA); en oscuro los semánticos (`red-eske-20`, `green-eske-30`, `orange-eske-20`,
+`yellow-eske`). Se **agregó `dark:text-*`** en 26 puntos que no lo tenían (texto de error/éxito y
+chips de estado con tinte; los tintes por opacidad no necesitan `dark:bg`, funcionan en ambos temas).
+**Corregido durante la ronda:** el primer mapeo bajaba a `text-{green,orange,blue}-700` (`-70`) sobre
+tinte por debajo de AA y del original (4.30 / 4.21 vs 4.57 / 4.52); se subió a `-80` (5.22 / 5.18 /
+6.14). **Casos semánticos:** `ConfigWizard` codifica **azul = Electoral, verde = Gubernamental** (dos
+flujos completos): se conserva con `blue-eske`/`green-eske`, sin cambio de identidad; el naranja es un
+patrón consistente de "atención" (diálogos de confirmación, badge "Editando") → `orange-eske`.
+**Los 19 púrpuras (decisión de Raúl):** 15 eran el estado "Requiere ajuste" / semáforo ámbar
+(`PhaseReportView`, `RDAHistoryModal`, `DVSView`, `exploracion/page`): el púrpura era la contraparte en
+claro de un `dark:…yellow-eske` (rodeo por AA del amarillo en claro) → ahora **`brown-eske-60` en claro,
+`yellow-eske` en oscuro**, con el patrón de `MotoresSequentialView` (borde `yellow-eske-60`, punto
+`yellow-eske-70`); los pares light/dark que quedaron idénticos se colapsaron. Los otros 4 son los chips
+de país (`ProjectSelector`, `redactor/page`), que **no tenían variante oscura** → `violet-eske` con su par
+(`text-violet-eske-60 dark:text-violet-eske-20`). Moddulo = **0** genéricos, guard sin excepciones. **No
+tocado y ya defectuoso:** `STATUS_COLORS.draft` del hub (`bg-gray-eske-20 text-gray-eske-60` = ~2.3:1 y
+sin `dark:`).
 
 **Regla**: usar siempre colores del design system. No usar colores genéricos
 de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.
@@ -576,7 +667,7 @@ hasta que haya imagen OG corporativa diseñada.
 ```
 /
 ├── app/
-│   ├── api/                          # 142 API route handlers
+│   ├── api/                          # 142 API route handlers (recontado 26-09-21)
 │   │   ├── auth/session/             # POST/DELETE/GET sesiones
 │   │   ├── moddulo/                  # CRUD proyectos + chat SSE
 │   │   └── centinela/pestel/        # config, feed, trigger, status
@@ -758,11 +849,11 @@ Frontend detecta "completed" → carga análisis → muestra E5
 | E1-E3 | Wizard: tipo, territorio, variables PEST-L | ✅ Completado |
 | E4    | Datos: semáforo cobertura + carga manual | ✅ Completado |
 | E5    | Análisis IA: 5 dims paralelas + sesgos + cadenas | ✅ Completado |
-| E6    | Interpretación: matriz drag-drop, human-in-loop | ⏳ Pendiente |
-| E7    | Informes: 4 formatos, scorecard, escenarios | ⏳ Pendiente |
-| E8    | Monitoreo continuo + alertas | ⏳ Pendiente |
+| E6    | Interpretación: matriz drag-drop (puntero + teclado), panel de sesgos, voces del territorio, comparación con análisis previo; `/approve` responde 422 mientras haya sesgos sin revisar (human-in-loop real) | ✅ Completado (verificado 26-09-21) |
+| E7    | Informes: 4 formatos con streaming (ejecutivo, técnico, FODA-lista, escenarios) + scorecard ponderado + export PDF/DOCX. Falta el 5º formato de la spec 07 (mapa de insights por tipo de proyecto) | 🟡 Parcial — 4 de 5 formatos (verificado 26-09-21) |
+| E8    | Monitoreo continuo + alertas. Hecho: dashboard por dimensión, histórico, cron `scheduledMonitor` cada 6 h para proyectos con `autoMonitorEnabled`, versionado de análisis, UI de alertas/banner de crisis. **NO hecho: nada ESCRIBE `pestel_alerts` (solo se lee/borra) ni `isCrisis`** → el feed y el banner siempre quedan vacíos; umbral fijo en 70 (`vectorRiesgoUmbral`, sin UI para cambiarlo); sin email; frecuencia fija de 6 h (no la de la Etapa 2); `feedSync.ts` (V1) es un stub que lanza "Not implemented" | 🟡 Parcial — UI y cron listos, generación de alertas/crisis sin construir (verificado 26-09-21) |
 | —     | Integración con Fontana (Económico/Social/Ecológico), ambas vías (Express + Controlada) | ✅ Completado 26-09-13 |
-| —     | Integración con Moddulo F2 (exploración) | ⏳ Pendiente |
+| —     | Integración con Moddulo F2 (exploración) — `generate-m1-express` (MapaPESTEL express), `import-pestel` (409 + `confirmReplace`), `find-linked-pestel`, `unlink-pestel`; consumidas por `exploracion/page.tsx` | ✅ Completado (verificado 26-09-21) |
 
 ### Especificaciones funcionales
 
@@ -1203,3 +1294,7 @@ firebase functions:log
 | 26-09-13 | Integración PESTEL↔Fontana — 4ª corrección: la cita "INEGI" colapsaba productos distintos de una misma institución (Censo vs. ENSU) | Raúl verificó el fix anterior (ya no dice "Fontana") pero encontró una imprecisión de fondo: `"(INEGI, 2026-T2)"` para percepción de inseguridad (ENSU) y `"(INEGI, 2020)"` para escolaridad (Censo) citaban distinto dato bajo el mismo nombre — mismo problema de fondo que ya se evitó a propósito en las Notas Metodológicas de Fontana (Censo/ITER/ECEG/ENVIPE/ENSU documentados como productos separados de INEGI, no una fuente genérica). **Investigación (sin implementar hasta aprobación — plan mode):** causa raíz confirmada en `extraerFuenteOficial()` (`lib/fontana/tabla/insumosPestel.ts`): extraía SOLO el texto antes del primer paréntesis de `fuenteEtiqueta`, descartando el producto/encuesta que va dentro. Confirmado que el problema es sistémico vía grep de las ~28 constantes `FUENTE_ETIQUETA_*` reales: INEGI (9 productos — ECEG/Censo, ITER/Censo, ENSU, ENOE, ENVIPE, ENIGH, ICMM, Compendio, Pobreza Multidimensional), CONEVAL (Pobreza vs. Rezago Social vs. GACP), Bienestar (Producción vs. Beca Benito Juárez), PNUD México (4 sub-índices) — todos colapsarían al nombre de la agencia sola. Se evaluaron 2 opciones: (a) parsing genérico del texto entre paréntesis — descartada: un parser mecánico no reproduce la etiqueta humana ya decidida a mano (ej. "INEGI (ITER, Censo 2020)" daría "ITER", no "Censo" como Raúl mismo la nombró); (b) tabla de curación manual — **aprobada por Raúl**. **Implementación:** `lib/fontana/tabla/fuenteOficialCurada.ts` (nuevo) — tabla de 34 patrones (regex anclada al PREFIJO ESTABLE agencia+producto, nunca al string completo con año/trimestre, para sobrevivir el cambio de vintage) → etiqueta corta curada (ej. `/^INEGI \(ENSU/` → `"INEGI/ENSU"`, `/^INEGI \(ITER, Censo 2020\)/` y `/^INEGI \(Censo 2020, vía ECEG\)/` → ambas `"INEGI/Censo"`, `/^CONEVAL \(Medición de la pobreza/` → `"CONEVAL/Pobreza"` vs. `/^CONEVAL \(Índice de Rezago Social/` → `"CONEVAL/Rezago Social"`) + 2 fuentes con formato distinto sin paréntesis inmediato tras la agencia (CONAGUA, ANVCC/INECC) también cubiertas. `extraerFuenteOficial()` consulta esta tabla primero; si ninguna coincide (fuente aún no curada), cae al fallback agencia-sola de siempre — nunca rompe, nunca cita vacío. **Verificado con datos reales:** 34/34 constantes reales de `lib/fontana/ingesta/*.ts` cubiertas por la tabla (script de auditoría); casos exactos de Raúl — ENSU → `"INEGI/ENSU"`, Censo/ECEG → `"INEGI/Censo"`, CONEVAL Pobreza vs. Rezago Social distinguibles; fuente hipotética no curada → cae al fallback sin romper. Llamada REAL a Claude (mismo escenario, ENSU 78.2% + escolaridad Censo 9.4 años) → narrativa citó `"INEGI/ENSU 2026-T2"` y `"(INEGI/Censo, 2020)"`, ambos distinguibles, formato de cita sin cambios. `tsc --noEmit`, `next build` y `cd functions && npm run build` limpios. **Pendiente de Raúl (navegador):** un análisis real con datos de al menos 2 productos INEGI distintos (ej. Censo + ENSU) en la misma dimensión → la narrativa cita cada uno con su etiqueta de producto, nunca ambos como "INEGI" a secas. |
 | 26-09-13 | Integración PESTEL↔Fontana — CIERRE de la ronda de correcciones (contraste + timeout Express + citación curada), verificación final confirmada post-reinicio | Raúl reportó una verificación inicial que parecía mostrar el problema de citación aún presente — **investigado y confirmado como FALSO POSITIVO**: era un análisis reciclado (cacheado en el estado del cliente) generado ANTES de la corrección de la 4ª ronda, no una regresión real. El reinicio del sistema lo evidenció: un análisis nuevo generado después del reinicio, con los mismos datos reales de Guadalajara, mostró la corrección funcionando correctamente — `"1,384,959 habitantes (INEGI, 2020)"` y `"78.2%... (INEGI/ENSU, 2026-T2)"`, Censo y ENSU distinguidos exactamente como se diseñó. **Con esto, la integración PESTEL↔Fontana queda validada end-to-end en la vía Express** (datos reales de Fontana, timeout que no cuelga el análisis, citación precisa por producto/institución, sin alucinaciones ni imprecisiones de las rondas anteriores) — cierre confirmado con evidencia real, no solo con builds limpios. **Fuera de alcance de esta ronda, ya acordado:** la verificación equivalente de la vía Controlada (PESTEL completo E1-E8, Cloud Function) queda para una sesión de trabajo aparte. Sin trabajo pendiente de esta ronda. |
 | 26-09-21 | Diseño — sub-ronda 2: tokens fantasma `black-eske-60`/`-80` y `blue-eske-900` → 0 en todo el repo (Sefix, Fontana, compartidos, cursos, `app/dev`) + guard sin remanentes | **Origen:** diagnóstico de solo lectura (26-09-21) de la familia de tokens inexistentes que la sub-ronda 1 dejó reportada. **Hallazgos con evidencia (CSS del build + Chrome headless, ambos temas):** los 3 tokens NUNCA existieron (git: `black-eske` definido solo con `-10…-40` y `-90` desde el primer commit; `black-eske-80` aparece en Nov-2025 y `-60` en Abr-2026 como extrapolaciones); una clase con token inexistente no genera CSS (verificado en `.next/static/chunks/*.css`) → el texto hereda el color del ancestro (~372 de 375 clases de texto: `#2b2b2b`, jerarquía plana; 2 spans "— Corte" heredaban el azul del encabezado; 5 `fill="var(--color-black-eske-60)"` de ejes de gráfica caían a negro puro `rgb(0,0,0)`; el CTA de cursos con `blue-eske-900` heredaba blanco sobre `bg-yellow-eske`, contraste 1.45:1; 6 etiquetas con `/50·/60·/70` no atenuaban; 3 `hover:` sin efecto). 373/375 tenían contraparte `dark:` correcta → modo oscuro no afectado (salvo ejes y CTA). Intención inferida por la contraparte oscura + el comentario de `InfoTooltip` ("secundario = `text-black-eske-80` / `dark:text-[#9AAEBE]`"): texto secundario/terciario. **Corrección (401 clases, 67 archivos; script con tabla exacta que ABORTA ante cualquier caso no mapeado y detecta conflicto de cascada con otro `text-*` del mismo elemento — 0 conflictos):** mapeo por rol de la contraparte oscura — `#9AAEBE` → `black-eske-20` (7.45:1), `#6D8294` → `black-eske-10` (6.38:1), `#C7D6E0`/`#C8D8E8` → `black-eske-40`; opacidad conservada (`black-eske-10/50·/60·/70`); `blue-eske-900` → `blue-eske-90` (1.45:1 → 7.58:1); 5 `var(--color-black-eske-60)` → `black-eske-20`; hovers: `HistoricoPartidos`/`Loc` `hover:black-eske-20`, `Tabs` `hover:black-eske-40`; las 2 excepciones que heredaban azul pasan a gris; `app/dev` (21) mecánico (`white/40` → `-10`, `white/50·55·60` y `black-eske-40` → `-20`). **Casos con criterio propio (declarados):** (1) `PartidosMultiSelect` placeholder → `placeholder:text-gray-eske-90` y no `black-eske-10` (debe verse más claro que el texto tecleado; precedente sub-ronda 1); (2) `OrigenCharts` (~992), único sin `dark:` → se AGREGÓ `dark:text-[#9AAEBE]` (sin él el texto quedaría oscuro sobre fondo oscuro); (3) `G1TrendChart` "Hoy": `isDark ? "#C7D6E0" : var(--color-black-eske-20)`, consistente con el `tickFill` del mismo archivo (antes negro también en oscuro); (4) hover de `HistoricoPartidos*` a `black-eske-20` (no `-40`) para que el efecto sea perceptible; (5) `GeoNavegador` (`dark:text-white/60`) → `-20`. **Guard (`lib/design/tokensColor.test.ts`):** se eliminó `TOPE_REMANENTE`; ahora CUALQUIER token `-eske` no definido en `globals.css` rompe el test (dirs `app`, `lib`, `context`, `types`, `utils`), con prohibición explícita por nombre y prueba del escáner sobre texto sintético; probado en negativo (reintroducir `hover:text-black-eske-80` en `Tabs.tsx` → 2 tests fallan; revertido). **Verificación:** grep de conteo `black-eske-60` 252→0, `-80` 148→0, `blue-eske-900` 1→0 (código); `tsc --noEmit`, `next build` y `vitest` (326) limpios. **Pendiente de Raúl (navegador, guía visual entregada aparte por frente):** Frente 1 (CTA cursos, etiquetas deshabilitadas, hovers, ejes) y Frente 2 (textos secundarios en Sefix y Fontana, claro/oscuro). **Fuera de alcance, reportado:** 9 genéricos de Sefix, 259 del sitio principal, kebab `gray-eske-40/-70` de `FontanaCanvasItemCard`/`FontanaModduloButton`, `dark:text-black-eske-40` (token válido pero oscuro-sobre-oscuro) en 4 páginas `app/dev`. |
+| 26-09-21 | Diseño — ronda 3: Sefix + diagnóstico del sitio principal; deriva de CLAUDE.md corregida | **Paso 0 (frescura, 6 secciones leídas contra el código real; no eran falsos positivos):** `api-route-count` 142 correcto. `sefix-modulo`: eran **24** rutas, no 23 → corregido. `pestel-e6` ⏳ → ✅ (matriz drag-drop con puntero + teclado, panel de sesgos, voces, comparación; `/approve` responde 422 con sesgos sin revisar). `pestel-e7` ⏳ → 🟡 (4 de 5 formatos de la spec 07: falta "mapa de insights por tipo de proyecto"; scorecard + PDF/DOCX sí). `pestel-e8` ⏳ → 🟡 (dashboard, histórico, cron 6 h, versionado sí; **nada escribe `pestel_alerts` ni `isCrisis`** → feed y banner siempre vacíos; umbral fijo 70; sin email). `pestel-integracion-moddulo-f2` ⏳ → ✅ (4 rutas consumidas por `exploracion/page.tsx`). Las fechas del detector eran de commits de color, pero las filas llevaban meses erradas. **Parte 1:** Sefix 16 → 0 genéricos salvo el púrpura "No Binario", que la ronda 4 (fila siguiente) resolvió con el token `violet-eske`; guard extendido a `app/sefix` + `lib/sefix` con regex compartido (probado en negativo). **Parte 2:** diagnóstico documentado, sin corregir. **Hallazgos sin tocar:** el texto de `monitoreo/page.tsx` afirma que las alertas "se generan cuando el score supera el umbral" (no es cierto hoy); `functions/src/pestel/feedSync.ts` está exportado y lanza `Not implemented` en cada `pestel_feeds` creado por la ruta V1; `app/sefix/components/IframePanel.tsx` es código muerto (0 imports). |
+| 26-09-21 | Diseño — ronda 4: token `violet-eske` + Moddulo (296/315) | **Decisión 1:** el violeta "No Binario" se oficializa como token (`violet-eske` `#9b59b6` = `COL_NB`; `-20` `#c585f5` = `COL_NB_DARK`; `-60` `#773e8e` derivado solo para texto en claro, 6.99:1). Migrados los 4 tooltips de Sefix (16 clases) y "Vigilar" de PESTEL; eliminados `COL_NB`/`COL_NB_DARK` y 2 `colNB` sin uso. Guard: `violet` en `COLORES_ESKE`, PESTEL y Sefix en **0 sin excepciones**. **Decisión 2:** Moddulo primero (315 clases). 296 migradas por tabla exacta (99 tokens, aborta ante lo no mapeado), 26 `dark:text-*` agregados, 19 púrpuras retenidos y documentados para decisión. Regresión propia detectada y corregida: `-70` bajaba a AA los chips verde/naranja/azul → `-80`. Verificación: 103 clases nuevas presentes en el CSS compilado, 0 conflictos de cascada vs HEAD, guard probado en negativo (el primer intento fue un no-op de `sed` y se rehízo), `tsc`, `next build` y 329 pruebas. **Sin tocar por instrucción:** E8 (alertas sin generarse) y sub-rondas A-D del sitio principal. |
+| 26-09-21 | Diseño — ronda 5: cierre de Moddulo (315/315) + diagnóstico de la colisión Extranjero/No Binario | **Aprobado y aplicado:** los 15 púrpuras del ámbar "Requiere ajuste" → `brown-eske-60` (claro) / `yellow-eske` (oscuro) con el patrón de `MotoresSequentialView`; los 4 de los chips de país (sin variante oscura) → `violet-eske` con su par claro/oscuro. Moddulo = 0 genéricos; guard de PESTEL, Sefix y Moddulo **sin ninguna excepción**, probado en negativo con edición real. Verificación: `tsc`, `next build`, 329 pruebas, 15 clases nuevas presentes en el CSS compilado. **Investigado y luego resuelto (ronda 6):** ver "Colisión Extranjero vs No Binario — RESUELTA". **Sin tocar por instrucción:** E8 y sub-rondas A-D del sitio principal. |
+| 26-09-21 | Diseño — ronda 6: colisión Extranjero/No Binario resuelta | Mujeres-Extranjero pasa a la paleta rosa/rojo de Mujeres-Nacional en `SexoCharts` (S1-S4) y `G3SexChart` (2 archivos, sin tokens ni hex nuevos). Hombres y las demás gráficas de Extranjero intactos. Verificado: ΔE con No Binario 0 → 50.2 (oscuro) y 41.1 → 42.5 (claro); sin colisión nueva (ΔE ≥ 41.2 contra los 22 colores de Extranjero); ningún texto describe el color. Aviso: `G3SexChart` "Lista Mujeres" oscuro = 2.97:1 (heredado de Nacional). `tsc`, `next build` y 329 pruebas. **Con esto se cierra el punto 4 del plan de extras**, salvo lo documentado: badge `draft` del hub, E8 y sub-rondas A-D del sitio principal. |

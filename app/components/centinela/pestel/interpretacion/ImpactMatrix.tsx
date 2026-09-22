@@ -171,7 +171,7 @@ export default function ImpactMatrix({
           <p className="font-semibold mt-1">Cuadrantes:</p>
           <ul className="space-y-0.5 list-disc pl-4 text-black-eske dark:text-[#9AAEBE]">
             <li><span className="text-red-eske font-medium">Prioridad crítica:</span> alta probabilidad + alto impacto → acción inmediata</li>
-            <li><span className="text-violet-700 dark:text-violet-400 font-medium">Vigilar:</span> baja probabilidad + alto impacto → monitoreo estrecho</li>
+            <li><span className="text-violet-eske-60 dark:text-violet-eske-20 font-medium">Vigilar:</span> baja probabilidad + alto impacto → monitoreo estrecho</li>
             <li><span className="text-black-eske-40 dark:text-[#C5D8E8] font-medium">Atención moderada:</span> alta probabilidad + bajo impacto → gestión rutinaria</li>
             <li><span className="text-green-eske font-medium">Monitoreo básico:</span> baja probabilidad + bajo impacto → atención mínima</li>
           </ul>
@@ -213,7 +213,7 @@ export default function ImpactMatrix({
                 {/* Quadrant backgrounds */}
                 {/* Top-left: high impact, low probability → Vigilar */}
                 <div className="absolute top-0 left-0 w-1/2 h-1/2
-                  bg-violet-100/40 dark:bg-violet-900/20" aria-hidden="true" />
+                  bg-violet-eske/10" aria-hidden="true" />
                 {/* Top-right: high impact, high probability → Prioridad crítica */}
                 <div className="absolute top-0 right-0 w-1/2 h-1/2
                   bg-red-eske/8" aria-hidden="true" />
@@ -235,7 +235,7 @@ export default function ImpactMatrix({
 
                 {/* Quadrant labels */}
                 <span className="absolute top-2 left-2 text-xs
-                  text-violet-700 dark:text-violet-400 font-bold pointer-events-none"
+                  text-violet-eske-60 dark:text-violet-eske-20 font-bold pointer-events-none"
                   aria-hidden="true">
                   Vigilar
                 </span>

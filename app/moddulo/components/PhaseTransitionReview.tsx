@@ -57,9 +57,9 @@ export default function PhaseTransitionReview({
       <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header con semáforo */}
         <div className={`px-6 py-5 rounded-t-2xl ${
-          integrityLevel === "green" ? "bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800" :
-          integrityLevel === "yellow" ? "bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800" :
-          "bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800"
+          integrityLevel === "green" ? "bg-green-eske/10 dark:bg-green-eske/20 border-b border-green-eske/30 dark:border-green-eske/40" :
+          integrityLevel === "yellow" ? "bg-yellow-eske/10 border-b border-yellow-eske/30" :
+          "bg-red-eske/10 dark:bg-red-eske/20 border-b border-red-eske/30 dark:border-red-eske/40"
         }`}>
           <div className="flex items-center gap-3">
             <IntegrityBadge level={integrityLevel} />
@@ -86,8 +86,8 @@ export default function PhaseTransitionReview({
             <div className="h-2 bg-gray-eske-20 dark:bg-[#112230] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  completionPct === 100 ? "bg-green-500" :
-                  completionPct >= 60 ? "bg-yellow-500" : "bg-red-400"
+                  completionPct === 100 ? "bg-green-eske" :
+                  completionPct >= 60 ? "bg-yellow-eske" : "bg-red-eske"
                 }`}
                 style={{ width: `${completionPct}%` }}
               />
@@ -96,7 +96,7 @@ export default function PhaseTransitionReview({
               {xpctoFields.map((f) => (
                 <div key={f.key} className="flex items-center gap-1.5 text-xs text-gray-eske-60 dark:text-[#9AAEBE]">
                   {f.value && f.value.toString().trim().length > 0 ? (
-                    <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 text-green-eske shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
@@ -229,9 +229,9 @@ export default function PhaseTransitionReview({
 
 function IntegrityBadge({ level }: { level: "green" | "yellow" | "red" }) {
   const config = {
-    green: { bg: "bg-green-500", label: "Verde", icon: "M5 13l4 4L19 7" },
-    yellow: { bg: "bg-yellow-500", label: "Amarillo", icon: "M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" },
-    red: { bg: "bg-red-500", label: "Rojo", icon: "M6 18L18 6M6 6l12 12" },
+    green: { bg: "bg-green-eske", label: "Verde", icon: "M5 13l4 4L19 7" },
+    yellow: { bg: "bg-yellow-eske", label: "Amarillo", icon: "M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" },
+    red: { bg: "bg-red-eske", label: "Rojo", icon: "M6 18L18 6M6 6l12 12" },
   }[level];
 
   return (
@@ -248,20 +248,20 @@ function RiskCard({ risk }: { risk: RiskSignal }) {
   return (
     <div className={`p-3 rounded-lg border text-sm ${
       isCritical
-        ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-        : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+        ? "bg-red-eske/10 dark:bg-red-eske/20 border-red-eske/30 dark:border-red-eske/40"
+        : "bg-yellow-eske/10 border-yellow-eske/30"
     }`}>
       <div className="flex items-start gap-2">
         <span className={`text-xs font-bold uppercase tracking-wide mt-0.5 ${
-          isCritical ? "text-red-600" : "text-yellow-700"
+          isCritical ? "text-red-eske-60 dark:text-red-eske-20" : "text-brown-eske-60 dark:text-yellow-eske"
         }`}>
           {isCritical ? "⚠ Crítico" : "○ Aviso"}
         </span>
       </div>
-      <p className={`font-semibold mt-0.5 ${isCritical ? "text-red-800 dark:text-red-300" : "text-yellow-800 dark:text-yellow-300"}`}>
+      <p className={`font-semibold mt-0.5 ${isCritical ? "text-red-eske-80 dark:text-red-eske-20" : "text-brown-eske-80 dark:text-yellow-eske-40"}`}>
         {risk.title}
       </p>
-      <p className={`text-xs mt-1 leading-relaxed ${isCritical ? "text-red-700 dark:text-red-400" : "text-yellow-700 dark:text-yellow-400"}`}>
+      <p className={`text-xs mt-1 leading-relaxed ${isCritical ? "text-red-eske-70 dark:text-red-eske-20" : "text-brown-eske-60 dark:text-yellow-eske"}`}>
         {risk.description}
       </p>
     </div>

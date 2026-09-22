@@ -77,7 +77,7 @@ export default function PostPreview({
       <div className="flex items-center justify-between mb-3 pb-3 border-t border-gray-eske-20 dark:border-white/10 pt-3">
         <div className="flex items-center gap-2">
           <svg
-            className={`w-4 h-4 ${isValid ? "text-green-600" : "text-red-600"}`}
+            className={`w-4 h-4 ${isValid ? "text-green-eske-60 dark:text-green-eske-30" : "text-red-eske-60 dark:text-red-eske-20"}`}
             fill="currentColor"
             viewBox="0 0 20 20"
             aria-hidden="true"

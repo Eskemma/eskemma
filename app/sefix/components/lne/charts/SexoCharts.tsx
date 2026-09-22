@@ -58,12 +58,12 @@ function coloresH(ambito: Ambito, isDark: boolean) {
   if (isDark) return ambito === "extranjero" ? "#4D9DE8" : "#4791B3";
   return ambito === "extranjero" ? "#0163a4" : "var(--color-blue-eske-60)";
 }
-function coloresM(ambito: Ambito, isDark: boolean) {
-  if (isDark) return ambito === "extranjero" ? "#C585F5" : "#E05F7F";
-  return ambito === "extranjero" ? "#7206b4" : "var(--color-red-eske-30)";
+// Mujeres usa la MISMA paleta en ambos ámbitos (rosa/rojo). Antes en Extranjero era morado, y en oscuro
+// `#C585F5` coincidía exactamente con `violet-eske-20` (la tarjeta "No Binario"). Hombres sí conserva su
+// paleta por ámbito.
+function coloresM(isDark: boolean) {
+  return isDark ? "#E05F7F" : "var(--color-red-eske-30)";
 }
-const COL_NB = "#9B59B6";
-const COL_NB_DARK = "#C585F5";
 
 // ──────────────────────────────────────────────
 // Modal de metodología de proyección (idéntico al de EdadCharts)
@@ -174,8 +174,7 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
   const legendStyle = { fontSize: 12, ...(isDark ? { color: "#C7D6E0" } : {}) };
 
   const colH   = coloresH(ambito, isDark);
-  const colM   = coloresM(ambito, isDark);
-  const colNB  = isDark ? COL_NB_DARK : COL_NB;
+  const colM   = coloresM(isDark);
 
   const chartData = RANGOS.map((r) => ({
     age: RANGOS_LABELS[r],
@@ -203,10 +202,10 @@ export function S1PyramidChart({ data, ambito = "nacional" }: DataAmbitoProps) {
           onMouseLeave={() => setS1NbHovered(false)}
         >
           <div
-            className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+            className="bg-white-eske dark:bg-[#18324A] border border-violet-eske/40 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
             aria-label="Datos No Binario"
           >
-            <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
+            <p className="font-semibold text-violet-eske-60 dark:text-violet-eske-20 mb-0.5">⚧ No Binario</p>
             <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Padrón: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalPadNB)}</span>
             </p>
@@ -318,8 +317,7 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
   const legendStyle = { fontSize: 12, ...(isDark ? { color: "#C7D6E0" } : {}) };
 
   const colH  = coloresH(ambito, isDark);
-  const colM  = coloresM(ambito, isDark);
-  const colNB = isDark ? COL_NB_DARK : COL_NB;
+  const colM  = coloresM(isDark);
 
   const SEXOS_S2 = [
     { key: "hombres", label: "Hombres", color: colH },
@@ -387,10 +385,10 @@ export function S2AgeSexChart({ data, ambito = "nacional" }: DataAmbitoProps) {
             onMouseLeave={() => setS2NbHovered(false)}
           >
             <div
-              className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+              className="bg-white-eske dark:bg-[#18324A] border border-violet-eske/40 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
               aria-label="Datos No Binario"
             >
-              <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
+              <p className="font-semibold text-violet-eske-60 dark:text-violet-eske-20 mb-0.5">⚧ No Binario</p>
               <p className="text-black-eske-20 dark:text-[#9AAEBE]">
                 LNE: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(totalLnNBS2)}</span>
               </p>
@@ -460,12 +458,12 @@ function getSexosS3(ambito: Ambito, isDark: boolean): SexoConfig[] {
   if (isDark) {
     return [
       { key: "hombres", label: "Hombres", colorPad: isExt ? "#4D9DE8" : "#4791B3", colorLne: isExt ? "#87baf0" : "#6BA4C6" },
-      { key: "mujeres", label: "Mujeres", colorPad: isExt ? "#C585F5" : "#E05F7F", colorLne: isExt ? "#dbb4f9" : "#F4839D" },
+      { key: "mujeres", label: "Mujeres", colorPad: "#E05F7F", colorLne: "#F4839D" },
     ];
   }
   return [
     { key: "hombres", label: "Hombres", colorPad: isExt ? "#0163a4" : "#003F8A", colorLne: isExt ? "#2480d4" : "#001A5E" },
-    { key: "mujeres", label: "Mujeres", colorPad: isExt ? "#7206b4" : "#C0306A", colorLne: isExt ? "#8b2bd6" : "#8B1A3D" },
+    { key: "mujeres", label: "Mujeres", colorPad: "#C0306A", colorLne: "#8B1A3D" },
   ];
 }
 
@@ -575,7 +573,7 @@ export function S3SexoSerieChart({ serie, ambito, dataSexo }: S3Props) {
             Metodología
           </button>
           <span className="ml-auto text-xs text-black-eske-20 dark:text-[#9AAEBE] border-l border-gray-eske-30 dark:border-white/10 pl-3">
-            <span className="font-semibold" style={{ color: isDark ? COL_NB_DARK : COL_NB }}>No Binario:</span>{" "}
+            <span className="font-semibold text-violet-eske-60 dark:text-violet-eske-20">No Binario:</span>{" "}
             Padrón <strong>{FMT_NB.format(nbPadron)}</strong> · LNE <strong>{FMT_NB.format(nbLista)}</strong>
           </span>
         </div>
@@ -647,7 +645,7 @@ export function S4ParticipacionChart({ data, ambito = "nacional" }: DataAmbitoPr
   const legendStyle = { fontSize: 12, ...(isDark ? { color: "#C7D6E0" } : {}) };
 
   const colH = coloresH(ambito, isDark);
-  const colM = coloresM(ambito, isDark);
+  const colM = coloresM(isDark);
   const [nbHovered, setNbHovered] = useState(false);
 
   const nbPadron = (data.padron_no_binario as number) ?? 0;
@@ -670,10 +668,10 @@ export function S4ParticipacionChart({ data, ambito = "nacional" }: DataAmbitoPr
           onMouseLeave={() => setNbHovered(false)}
         >
           <div
-            className="bg-white-eske dark:bg-[#18324A] border border-purple-300 dark:border-purple-800/50 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
+            className="bg-white-eske dark:bg-[#18324A] border border-violet-eske/40 rounded-md px-3 py-2 text-xs shadow-sm cursor-default"
             aria-label="Datos No Binario"
           >
-            <p className="font-semibold text-purple-700 dark:text-purple-400 mb-0.5">⚧ No Binario</p>
+            <p className="font-semibold text-violet-eske-60 dark:text-violet-eske-20 mb-0.5">⚧ No Binario</p>
             <p className="text-black-eske-20 dark:text-[#9AAEBE]">
               Padrón: <span className="font-medium text-black-eske dark:text-[#EAF2F8]">{FMT.format(nbPadron)}</span>
             </p>

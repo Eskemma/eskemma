@@ -161,6 +161,17 @@
   --color-red-eske-70: #9a0228;
   --color-red-eske-80: #870021;
   --color-red-eske-90: #72001b;
+
+  /* Violeta — identidad de la categoría "No Binario" en las gráficas de Sefix (y, por decisión de
+     26-09-21, el cuadrante "Vigilar" de la matriz de PESTEL). Valores EXACTOS de la fuente original:
+     base = COL_NB, -20 = COL_NB_DARK (SexoCharts.tsx). El -60 es el único derivado: mismo matiz y
+     saturación (HSL 282.6° / 38.9 %) con luminosidad 40 % para texto sobre fondo claro, porque la
+     base da 4.45:1 sobre white-eske (< AA 4.5 en texto pequeño). Uso por tema:
+       - bordes, rellenos, series, tinte (`/10`, `/40`): base; sirve en ambos temas (≥ 3:1).
+       - texto en claro: -60 (6.99:1 sobre white-eske); en oscuro: -20 (5.05:1 sobre #18324A). */
+  --color-violet-eske: #9b59b6;
+  --color-violet-eske-20: #c585f5;
+  --color-violet-eske-60: #773e8e;
 }
 
 @layer base {

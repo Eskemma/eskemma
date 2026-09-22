@@ -143,7 +143,7 @@ export default function FreemiumBanner({
   // Banner informativo (aún no alcanza el límite)
   return (
     <div
-      className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 text-blue-900 dark:text-blue-200 p-4 rounded-r-lg"
+      className="bg-blue-eske/10 dark:bg-blue-eske/20 border-l-4 border-blue-eske text-blue-eske-90 dark:text-blue-eske-20 p-4 rounded-r-lg"
       role="status"
       aria-live="polite"
     >

@@ -136,7 +136,7 @@ export default function ProjectDropdown({
                     px-4 py-3
                     hover:bg-gray-eske-10 dark:hover:bg-white/5
                     transition-colors
-                    ${isActive ? "bg-blue-50 dark:bg-blue-900/20" : ""}
+                    ${isActive ? "bg-blue-eske/10 dark:bg-blue-eske/20" : ""}
                   `}
                 >
                   <div className="flex items-start justify-between">
@@ -195,7 +195,7 @@ export default function ProjectDropdown({
                 px-3 py-2
                 text-sm font-semibold
                 text-bluegreen-eske
-                hover:bg-blue-50 dark:hover:bg-white/5
+                hover:bg-blue-eske/10 dark:hover:bg-white/5
                 rounded-lg
                 transition-colors
               "
