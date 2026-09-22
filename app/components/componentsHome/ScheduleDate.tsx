@@ -114,7 +114,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
       >
         {/* Botón de Cierre */}
         <button
-          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
+          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
           aria-label="Cerrar formulario de agendamiento"
         >
@@ -139,10 +139,10 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
           Agendar sesión de diagnóstico
         </h2>
         {/* Descripción */}
-        <p className="text-[16px] max-sm:text-sm text-gray-700 dark:text-[#C7D6E0] font-semibold text-center mb-4 max-sm:mb-3">
+        <p className="text-[16px] max-sm:text-sm text-black-eske-40 dark:text-[#C7D6E0] font-semibold text-center mb-4 max-sm:mb-3">
           Sesión de diagnóstico gratuita de 30 minutos en línea.
         </p>
-        <p className="text-[16px] max-sm:text-sm text-gray-700 dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
+        <p className="text-[16px] max-sm:text-sm text-black-eske-40 dark:text-[#C7D6E0] text-center mb-6 max-sm:mb-4">
           Para agendar, favor de llenar el siguiente formulario:
         </p>
         {/* Contenedor con scroll */}
@@ -151,7 +151,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
             {/* Nombre completo */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-fullName"
               >
                 Nombre completo
@@ -166,17 +166,17 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 aria-invalid={!!errors.fullName}
                 aria-describedby={errors.fullName ? "fullName-error" : undefined}
                 className={`w-full px-3 py-2 max-sm:py-1.5 border ${
-                  errors.fullName ? "border-red-60" : "border-gray-300 dark:border-white/10"
+                  errors.fullName ? "border-red-eske-60" : "border-gray-eske-40 dark:border-white/10"
                 } rounded focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               />
               {errors.fullName && (
-                <p id="fullName-error" className="text-[8px] max-sm:text-[7px] text-red-60 mt-1" role="alert">{errors.fullName}</p>
+                <p id="fullName-error" className="text-[8px] max-sm:text-[7px] text-red-eske-60 mt-1" role="alert">{errors.fullName}</p>
               )}
             </div>
             {/* Email */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-email"
               >
                 Email
@@ -191,17 +191,17 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? "email-error" : undefined}
                 className={`w-full px-3 py-2 max-sm:py-1.5 border ${
-                  errors.email ? "border-red-60" : "border-gray-300 dark:border-white/10"
+                  errors.email ? "border-red-eske-60" : "border-gray-eske-40 dark:border-white/10"
                 } rounded focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               />
               {errors.email && (
-                <p id="email-error" className="text-[8px] max-sm:text-[7px] text-red-60 mt-1" role="alert">{errors.email}</p>
+                <p id="email-error" className="text-[8px] max-sm:text-[7px] text-red-eske-60 mt-1" role="alert">{errors.email}</p>
               )}
             </div>
             {/* Teléfono de contacto */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-phone"
               >
                 Teléfono de contacto
@@ -218,17 +218,17 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 aria-invalid={!!errors.phone}
                 aria-describedby={errors.phone ? "phone-error" : undefined}
                 className={`w-full px-3 py-2 max-sm:py-1.5 border ${
-                  errors.phone ? "border-red-60" : "border-gray-300 dark:border-white/10"
+                  errors.phone ? "border-red-eske-60" : "border-gray-eske-40 dark:border-white/10"
                 } rounded focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               />
               {errors.phone && (
-                <p id="phone-error" className="text-[8px] max-sm:text-[7px] text-red-60 mt-1" role="alert">{errors.phone}</p>
+                <p id="phone-error" className="text-[8px] max-sm:text-[7px] text-red-eske-60 mt-1" role="alert">{errors.phone}</p>
               )}
             </div>
             {/* Tema de interés */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-topic"
               >
                 Tema de interés
@@ -243,17 +243,17 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 aria-invalid={!!errors.topic}
                 aria-describedby={errors.topic ? "topic-error" : undefined}
                 className={`w-full px-3 py-2 max-sm:py-1.5 border ${
-                  errors.topic ? "border-red-60" : "border-gray-300 dark:border-white/10"
+                  errors.topic ? "border-red-eske-60" : "border-gray-eske-40 dark:border-white/10"
                 } rounded focus-ring-primary resize-none text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               />
               {errors.topic && (
-                <p id="topic-error" className="text-[8px] max-sm:text-[7px] text-red-60 mt-1" role="alert">{errors.topic}</p>
+                <p id="topic-error" className="text-[8px] max-sm:text-[7px] text-red-eske-60 mt-1" role="alert">{errors.topic}</p>
               )}
             </div>
             {/* Fecha y hora */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-dateTime"
               >
                 Seleccionar fecha y hora
@@ -268,17 +268,17 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                   required
                   aria-invalid={!!errors.dateTime}
                   aria-describedby={errors.dateTime ? "dateTime-error" : undefined}
-                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8]"
+                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8]"
                 />
               </div>
               {errors.dateTime && (
-                <p id="dateTime-error" className="text-[8px] max-sm:text-[7px] text-red-60 mt-1" role="alert">{errors.dateTime}</p>
+                <p id="dateTime-error" className="text-[8px] max-sm:text-[7px] text-red-eske-60 mt-1" role="alert">{errors.dateTime}</p>
               )}
             </div>
             {/* Adjuntar documento (opcional) */}
             <div>
               <label
-                className="block text-left text-[16px] max-sm:text-sm font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-left text-[16px] max-sm:text-sm font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
                 htmlFor="schedule-file"
               >
                 Adjuntar documento (opcional)
@@ -293,7 +293,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 />
                 <label
                   htmlFor="schedule-file"
-                  className="flex items-center space-x-2 cursor-pointer bg-gray-100 dark:bg-[#112230] px-3 py-2 max-sm:py-1.5 rounded border border-gray-300 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-[#18324A] transition-colors duration-300 focus-ring-primary"
+                  className="flex items-center space-x-2 cursor-pointer bg-gray-eske-10 dark:bg-[#112230] px-3 py-2 max-sm:py-1.5 rounded border border-gray-eske-40 dark:border-white/10 hover:bg-gray-eske-20 dark:hover:bg-[#18324A] transition-colors duration-300 focus-ring-primary"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -304,7 +304,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 max-sm:h-4 max-sm:w-4 text-gray-700 dark:text-[#C7D6E0]"
+                    className="h-5 w-5 max-sm:h-4 max-sm:w-4 text-black-eske-40 dark:text-[#C7D6E0]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -317,7 +317,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
                       d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L19 15"
                     />
                   </svg>
-                  <span className="text-[10px] max-sm:text-[9px] text-gray-700 dark:text-[#C7D6E0]">
+                  <span className="text-[10px] max-sm:text-[9px] text-black-eske-40 dark:text-[#C7D6E0]">
                     {formData.file ? formData.file.name : "Seleccionar archivo"}
                   </span>
                 </label>
@@ -330,7 +330,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
               type="submit"
             />
             {/* Términos y condiciones */}
-            <p className="text-[14px] max-sm:text-xs text-gray-700 text-center mt-4 max-sm:mt-3">
+            <p className="text-[14px] max-sm:text-xs text-black-eske-40 text-center mt-4 max-sm:mt-3">
               Consultar{" "}
               <a
                 href="/condiciones-sesiones-diagnostico-gratuitas"
@@ -344,7 +344,7 @@ export default function ScheduleDate({ isOpen, onClose, onSubmitSuccess }: Sched
               .
             </p>
             {/* Condiciones de uso y política de privacidad */}
-            <p className="text-[14px] max-sm:text-xs text-gray-700 text-center mt-2 max-sm:mt-1.5">
+            <p className="text-[14px] max-sm:text-xs text-black-eske-40 text-center mt-2 max-sm:mt-1.5">
               Al agendar la cita acepto las{" "}
               <a
                 href="/condiciones-de-uso"

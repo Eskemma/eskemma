@@ -178,11 +178,11 @@ export default function VerifyEmailModal({
 
         {/* Indicador de verificación automática */}
         <div
-          className="bg-blue-100 dark:bg-blue-900/20 border-l-4 border-blue-eske p-3 max-sm:p-2 mb-4 max-sm:mb-3"
+          className="bg-blue-eske/20 border-l-4 border-blue-eske p-3 max-sm:p-2 mb-4 max-sm:mb-3"
           role="status"
           aria-live="polite"
         >
-          <p className="text-sm max-sm:text-xs text-blue-800 dark:text-blue-300">
+          <p className="text-sm max-sm:text-xs text-blue-eske-90 dark:text-blue-eske-30">
             <span role="img" aria-label="Cargando">🔄</span> Verificando automáticamente cada 3 segundos...
           </p>
         </div>
@@ -209,7 +209,7 @@ export default function VerifyEmailModal({
         <button
           type="button"
           onClick={onClose}
-          className="w-full bg-gray-300 dark:bg-[#21425E] text-black-eske dark:text-[#C7D6E0] py-2 max-sm:py-1.5 rounded hover:bg-gray-400 dark:hover:bg-[#2C5273] transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm"
+          className="w-full bg-gray-eske-40 dark:bg-[#21425E] text-black-eske dark:text-[#C7D6E0] py-2 max-sm:py-1.5 rounded hover:bg-gray-eske-70 dark:hover:bg-[#2C5273] transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm"
         >
           CERRAR
         </button>

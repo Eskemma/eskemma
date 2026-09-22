@@ -72,7 +72,7 @@ export default function PlanesInteractivos() {
               </div>
 
               <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
+                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-eske-20 flex items-center justify-center mr-4 max-sm:mr-2">
                   <Image
                     src="/icons/mx.webp"
                     alt="México"
@@ -126,7 +126,7 @@ export default function PlanesInteractivos() {
               </div>
 
               <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
+                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-eske-20 flex items-center justify-center mr-4 max-sm:mr-2">
                   <Image
                     src="/icons/mx.webp"
                     alt="México"
@@ -181,7 +181,7 @@ export default function PlanesInteractivos() {
               </div>
 
               <div className="flex items-center justify-start mt-6 max-sm:mt-4 mb-6 max-sm:mb-4">
-                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-20 flex items-center justify-center mr-4 max-sm:mr-2">
+                <div className="w-8 h-8 max-sm:w-6 max-sm:h-6 rounded-full bg-gray-eske-20 flex items-center justify-center mr-4 max-sm:mr-2">
                   <Image
                     src="/icons/mx.webp"
                     alt="México"

@@ -132,7 +132,7 @@ export default function UnsubscribeContent() {
 
   if (loadingUserData) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4 py-12">
+      <main className="min-h-screen bg-gradient-to-br from-white-eske-40 to-gray-eske-10 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4 py-12">
         <div
           className="bg-white dark:bg-[#18324A] rounded-2xl shadow-xl p-12 text-center"
           role="status"
@@ -142,15 +142,15 @@ export default function UnsubscribeContent() {
             className="animate-spin rounded-full h-16 w-16 border-b-4 border-bluegreen-eske mx-auto mb-6"
             aria-hidden="true"
           ></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">Cargando...</h2>
-          <p className="text-gray-600 dark:text-[#9AAEBE]">Un momento por favor</p>
+          <h2 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">Cargando...</h2>
+          <p className="text-black-eske-20 dark:text-[#9AAEBE]">Un momento por favor</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4 py-12">
+    <main className="min-h-screen bg-gradient-to-br from-white-eske-40 to-gray-eske-10 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4 py-12">
       <div className="max-w-2xl w-full">
         {/* FORMULARIO */}
         {status === "form" && (
@@ -159,7 +159,7 @@ export default function UnsubscribeContent() {
               <div className="inline-block bg-gradient-to-br from-bluegreen-eske to-bluegreen-eske-70 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
                 El Baúl de Fouché
               </div>
-              <h1 className="text-2xl md:text-4xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-3">
+              <h1 className="text-2xl md:text-4xl font-bold text-black-eske dark:text-[#EAF2F8] mb-3">
                 {firstName && (
                   <span className="block text-bluegreen-eske mb-2">
                     {firstName},
@@ -167,18 +167,18 @@ export default function UnsubscribeContent() {
                 )}
                 <span className="italic">¡Sentimos mucho que te vayas!</span> 😢
               </h1>
-              <p className="text-xl text-gray-600 dark:text-[#9AAEBE] font-medium mb-2">
+              <p className="text-xl text-black-eske-20 dark:text-[#9AAEBE] font-medium mb-2">
                 ¿Podemos pedirte que lo consideres?
               </p>
             </div>
 
-            <div className="bg-blue-50 dark:bg-[#112230] border-l-4 border-bluegreen-eske rounded-lg p-6 mb-8">
-              <p className="text-gray-700 dark:text-[#C7D6E0] leading-relaxed mb-4">
+            <div className="bg-blue-eske/10 dark:bg-[#112230] border-l-4 border-bluegreen-eske rounded-lg p-6 mb-8">
+              <p className="text-black-eske-40 dark:text-[#C7D6E0] leading-relaxed mb-4">
                 Sentimos que quieras dejarnos{firstName && `, ${firstName}`}.
                 Ojalá podamos hacer algo para evitarlo. Si no es así, gracias
                 por el tiempo que nos dedicaste.
               </p>
-              <p className="text-gray-700 dark:text-[#C7D6E0] leading-relaxed">
+              <p className="text-black-eske-40 dark:text-[#C7D6E0] leading-relaxed">
                 Queremos pedirte un último favor: si nos cuentas{" "}
                 <strong>por qué te vas</strong>, será más fácil para nosotros
                 ofrecer un mejor producto a nuestros suscriptores. Y quién
@@ -194,10 +194,10 @@ export default function UnsubscribeContent() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   Confirma tu email{" "}
-                  <span className="text-red-500" aria-label="campo requerido">
+                  <span className="text-red-eske" aria-label="campo requerido">
                     *
                   </span>
                 </label>
@@ -208,13 +208,13 @@ export default function UnsubscribeContent() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-white/10 dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder:text-[#6D8294] rounded-lg focus-ring-primary transition-all"
+                  className="w-full px-4 py-3 border border-gray-eske-40 dark:border-white/10 dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder:text-[#6D8294] rounded-lg focus-ring-primary transition-all"
                   aria-required="true"
                 />
               </div>
 
               <fieldset>
-                <legend className="text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-3">
+                <legend className="text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-3">
                   ¿Por qué decides desuscribirte? (opcional, pero muy valioso
                   para nosotros)
                 </legend>
@@ -226,16 +226,16 @@ export default function UnsubscribeContent() {
                   {UNSUBSCRIBE_REASONS.map((reason) => (
                     <label
                       key={reason}
-                      className="flex items-start p-4 border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors group"
+                      className="flex items-start p-4 border border-gray-eske-20 dark:border-white/10 rounded-lg hover:bg-white-eske-40 dark:hover:bg-white/5 cursor-pointer transition-colors group"
                     >
                       <input
                         type="checkbox"
                         checked={selectedReasons.includes(reason)}
                         onChange={() => handleReasonToggle(reason)}
-                        className="mt-0.5 h-5 w-5 text-bluegreen-eske border-gray-300 rounded focus-ring-primary cursor-pointer"
+                        className="mt-0.5 h-5 w-5 text-bluegreen-eske border-gray-eske-40 rounded focus-ring-primary cursor-pointer"
                         aria-label={reason}
                       />
-                      <span className="ml-3 text-gray-700 dark:text-[#C7D6E0] group-hover:text-gray-900 dark:group-hover:text-[#EAF2F8] transition-colors">
+                      <span className="ml-3 text-black-eske-40 dark:text-[#C7D6E0] group-hover:text-black-eske dark:group-hover:text-[#EAF2F8] transition-colors">
                         {reason}
                       </span>
                     </label>
@@ -246,7 +246,7 @@ export default function UnsubscribeContent() {
               <div>
                 <label
                   htmlFor="otherReason"
-                  className="block text-sm font-semibold text-gray-700 dark:text-[#C7D6E0] mb-2"
+                  className="block text-sm font-semibold text-black-eske-40 dark:text-[#C7D6E0] mb-2"
                 >
                   ¿Hay algo más que quieras decirnos?
                 </label>
@@ -256,12 +256,12 @@ export default function UnsubscribeContent() {
                   onChange={(e) => setOtherReason(e.target.value)}
                   placeholder="Cuéntanos lo que piensas... Toda opinión es bienvenida"
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus-ring-primary transition-all resize-none"
+                  className="w-full px-4 py-3 border border-gray-eske-40 rounded-lg focus-ring-primary transition-all resize-none"
                   aria-describedby="other-reason-hint"
                 />
                 <p
                   id="other-reason-hint"
-                  className="text-xs text-gray-500 dark:text-[#6D8294] mt-2"
+                  className="text-xs text-black-eske-10 dark:text-[#6D8294] mt-2"
                 >
                   Tu feedback nos ayuda a mejorar. No te llevará más de un
                   minuto. 🙏
@@ -270,11 +270,11 @@ export default function UnsubscribeContent() {
 
               {error && (
                 <div
-                  className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+                  className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 rounded-lg p-4"
                   role="alert"
                   aria-live="assertive"
                 >
-                  <p className="text-sm text-red-800">{error}</p>
+                  <p className="text-sm text-red-eske-80">{error}</p>
                 </div>
               )}
 
@@ -296,7 +296,7 @@ export default function UnsubscribeContent() {
               </div>
 
               <div className="text-center pt-4">
-                <p className="text-sm text-gray-500 dark:text-[#6D8294]">
+                <p className="text-sm text-black-eske-10 dark:text-[#6D8294]">
                   Recuerda{firstName && `, ${firstName}`}: siempre puedes volver
                   cuando quieras. Te estaremos esperando. ❤️
                 </p>
@@ -316,10 +316,10 @@ export default function UnsubscribeContent() {
               className="animate-spin rounded-full h-16 w-16 border-b-4 border-bluegreen-eske mx-auto mb-6"
               aria-hidden="true"
             ></div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">
+            <h2 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
               Procesando tu solicitud...
             </h2>
-            <p className="text-gray-600 dark:text-[#9AAEBE]">Un momento por favor</p>
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">Un momento por favor</p>
           </div>
         )}
 
@@ -348,20 +348,20 @@ export default function UnsubscribeContent() {
                 </svg>
               </div>
 
-              <h2 className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-4">
+              <h2 className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mb-4">
                 {firstName && `${firstName}, `}Ya te habías desuscrito
               </h2>
 
-              <p className="text-lg text-gray-700 dark:text-[#C7D6E0] mb-6 leading-relaxed">
+              <p className="text-lg text-black-eske-40 dark:text-[#C7D6E0] mb-6 leading-relaxed">
                 No te preocupes, tu desuscripción ya estaba registrada desde
                 antes.
               </p>
 
-              <div className="bg-gradient-to-br from-blue-50 to-gray-50 dark:from-[#112230] dark:to-[#18324A] border border-blue-200 dark:border-white/10 rounded-xl p-6 mb-8">
-                <p className="text-gray-800 dark:text-[#EAF2F8] font-medium mb-3">
+              <div className="bg-gradient-to-br from-blue-eske/10 to-white-eske-40 dark:from-[#112230] dark:to-[#18324A] border border-blue-eske/30 dark:border-white/10 rounded-xl p-6 mb-8">
+                <p className="text-black-eske dark:text-[#EAF2F8] font-medium mb-3">
                   💙 <strong>¿Cambiaste de opinión?</strong>
                 </p>
-                <p className="text-gray-700 dark:text-[#C7D6E0] text-sm leading-relaxed mb-4">
+                <p className="text-black-eske-40 dark:text-[#C7D6E0] text-sm leading-relaxed mb-4">
                   Si deseas volver a recibir nuestro newsletter, siempre puedes
                   suscribirte de nuevo. Las puertas del Baúl están abiertas para
                   ti.
@@ -377,7 +377,7 @@ export default function UnsubscribeContent() {
 
               <div className="space-y-3 mb-6">
                 <p
-                  className="text-sm text-gray-500 dark:text-[#6D8294]"
+                  className="text-sm text-black-eske-10 dark:text-[#6D8294]"
                   role="timer"
                   aria-live="polite"
                 >
@@ -422,28 +422,28 @@ export default function UnsubscribeContent() {
                 </svg>
               </div>
 
-              <h2 className="text-3xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-4">
+              <h2 className="text-3xl font-bold text-black-eske dark:text-[#EAF2F8] mb-4">
                 {firstName
                   ? `${firstName}, tu suscripción ha sido `
                   : "Suscripción "}
                 cancelada
               </h2>
 
-              <p className="text-lg text-gray-700 dark:text-[#C7D6E0] mb-6 leading-relaxed">
+              <p className="text-lg text-black-eske-40 dark:text-[#C7D6E0] mb-6 leading-relaxed">
                 {message}
               </p>
 
-              <div className="bg-gradient-to-br from-bluegreen-eske-10 to-blue-50 dark:from-[#112230] dark:to-[#18324A] border border-bluegreen-eske-30 dark:border-white/10 rounded-xl p-6 mb-8">
-                <p className="text-gray-800 dark:text-[#EAF2F8] font-medium mb-3">
+              <div className="bg-gradient-to-br from-bluegreen-eske-10 to-blue-eske/10 dark:from-[#112230] dark:to-[#18324A] border border-bluegreen-eske-30 dark:border-white/10 rounded-xl p-6 mb-8">
+                <p className="text-black-eske dark:text-[#EAF2F8] font-medium mb-3">
                   💙 <strong>Gracias por tu contribución</strong>
                 </p>
-                <p className="text-gray-700 dark:text-[#C7D6E0] text-sm leading-relaxed mb-3">
+                <p className="text-black-eske-40 dark:text-[#C7D6E0] text-sm leading-relaxed mb-3">
                   {firstName && `${firstName}, `}tu opinión nos ayuda a crear
                   mejores contenidos para quienes se quedan. Si alguna vez
                   cambias de opinión, las puertas del Baúl siempre están
                   abiertas para ti.
                 </p>
-                <p className="text-gray-600 dark:text-[#9AAEBE] text-sm italic">
+                <p className="text-black-eske-20 dark:text-[#9AAEBE] text-sm italic">
                   &quot;Un político sabio aprende más de sus críticos que de sus
                   aduladores.&quot;
                   <span className="text-xs block mt-1">
@@ -453,10 +453,10 @@ export default function UnsubscribeContent() {
               </div>
 
               <div
-                className="bg-blue-50 dark:bg-[#112230] border border-blue-200 dark:border-white/10 rounded-lg p-4 mb-6"
+                className="bg-blue-eske/10 dark:bg-[#112230] border border-blue-eske/30 dark:border-white/10 rounded-lg p-4 mb-6"
                 role="note"
               >
-                <p className="text-sm text-gray-700 dark:text-[#C7D6E0] mb-2">
+                <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0] mb-2">
                   <strong>¿Cambiaste de opinión?</strong>
                 </p>
                 <Link
@@ -470,7 +470,7 @@ export default function UnsubscribeContent() {
 
               <div className="space-y-3">
                 <p
-                  className="text-sm text-gray-500 dark:text-[#6D8294]"
+                  className="text-sm text-black-eske-10 dark:text-[#6D8294]"
                   role="timer"
                   aria-live="polite"
                 >
@@ -480,7 +480,7 @@ export default function UnsubscribeContent() {
                 </p>
                 <button
                   onClick={() => window.close()}
-                  className="text-gray-600 dark:text-[#9AAEBE] hover:text-gray-800 dark:hover:text-[#C7D6E0] font-medium text-sm underline transition-colors focus-ring-primary rounded"
+                  className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#C7D6E0] font-medium text-sm underline transition-colors focus-ring-primary rounded"
                   aria-label="Cerrar ventana ahora"
                 >
                   Cerrar ahora

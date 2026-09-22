@@ -37,7 +37,7 @@ export default function ConfirmPasswordChange({
       >
         {/* Botón de Cierre */}
         <button
-          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
+          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
           aria-label="Cerrar modal"
         >

@@ -145,6 +145,11 @@ describe("PESTEL, Sefix, Moddulo y sitio principal (sub-ronda A): sin colores ge
     expect(coloresGenericos(rutasA)).toEqual([]);
   });
 
+  it("Sitio principal, sub-ronda B (home y newsletter) = 0", () => {
+    const rutasB = ["app/components/componentsHome", "app/newsletter"];
+    expect(coloresGenericos(rutasB)).toEqual([]);
+  });
+
   it("el escáner de genéricos funciona (evita un pase vacuo si el regex se rompe)", () => {
     const muestra = 'className="bg-violet-100/40 dark:text-purple-400 text-violet-eske-60 bg-red-eske/10 text-gray-400"';
     expect([...muestra.matchAll(ESCALA_GENERICA)].map((m) => m[0])).toEqual(["bg-violet-100/40", "dark:text-purple-400", "text-gray-400"]);

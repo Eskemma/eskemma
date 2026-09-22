@@ -42,7 +42,7 @@ export default function SuscriptionResponseModal({
       >
         {/* Botón de Cierre */}
         <button
-          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
+          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
           aria-label="Cerrar confirmación de suscripción"
         >
@@ -133,7 +133,7 @@ export default function SuscriptionResponseModal({
           />
 
           {/* Línea horizontal */}
-          <hr className="border-gray-300 my-4 max-sm:my-3" />
+          <hr className="border-gray-eske-40 my-4 max-sm:my-3" />
 
           {/* Links adicionales */}
           <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0]">

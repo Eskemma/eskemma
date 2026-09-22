@@ -269,9 +269,9 @@ simulador SERP/OG de `blog/admin/components/SEOPreview` (imita a Google) — exc
 migrar; (b) identidad por plan/rol: `SubscriptionBadge` y las tarjetas de `suscripciones`
 (basic=azul, premium=**púrpura**, professional=verde) — decisión de diseño, sin equivalente
 para morado; (c) 5 `text-yellow-*` (4 en `suscripciones` = sub-ronda D, 1 en `newsletter/confirm` = B; **ninguno en A**) → `brown-eske-60`;
-(d) chip morado de filtro en `BlogToolbar`. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B pendiente, 197** (home + newsletter; incluye `RegisterModal`, flujo de registro, 1 `text-yellow-*`); **C pendiente, 310** (blog público + admin; recontado hoy, eran 308; `ShareButtons` y `SEOPreview` son excepciones); **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). Total pendiente: 631. **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
+(d) chip morado de filtro en `BlogToolbar`. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B ✅ RESUELTA 26-09-22 (197 → 0, 20 archivos: `componentsHome` completo incl. `RegisterModal`, `newsletter/confirm` y `newsletter/unsubscribe`)**; **C pendiente, 310** (blog público + admin; recontado 26-09-21, eran 308; `ShareButtons` y `SEOPreview` son excepciones); **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). Total pendiente (C+D): 434. **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
 abajo. Quedan además 14 clases en Centinela/Fontana (`AppCard`, kebab de Fontana). **Pendiente
-restante:** las sub-rondas B, C y D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
+restante:** las sub-rondas C y D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
 planes sigue abierta: no se extiende el token por inercia), los
 grises `gray-eske-40`/`-70` demasiado claros en `FontanaCanvasItemCard`/`FontanaModduloButton` y
 los ajustes visuales puntuales que Raúl detecte.
@@ -296,6 +296,35 @@ se usó `orange-eske-80` (≈5.18); las notas terciarias `text-gray-400 dark:tex
 `black-eske-10` (6.38:1) y no a `gray-eske-90` (4.09, no cumple AA en texto pequeño). Los botones
 deshabilitados de `PaginationCursos` conservan `gray-eske-90` (estado deshabilitado). **Deuda previa
 NO tocada:** `text-gray-eske-90` en texto de cuerpo/secundario de `HomeClient` y `contacto` (4.09:1).
+
+**Sub-ronda B (26-09-22) — 197 → 0 en 20 archivos.** `app/components/componentsHome/` completo
+(incl. `RegisterModal`, `LoginModal`, `SignInModal`, `RecoverPassword`, `VerifyEmailModal`,
+`ScheduleDate`, los 3 modales de plan de suscripción, `PlanesInteractivos`) + `app/newsletter/confirm`
++ `app/newsletter/unsubscribe`. Mismo método: tabla exacta (44 tokens distintos, aborta ante lo no
+mapeado). **Recontado antes de tocar código: idéntico al diagnóstico del 26-09-21** (`git log` sin
+commits en el área desde entonces). **Sin casos de identidad semántica:** se verificó explícitamente
+que los 3 modales de plan (`SuscriptionBasicModal`/`PremiumModal`/`ProfessioinalModal`) NO repiten el
+patrón de `SubscriptionBadge` (básico=azul/premium=púrpura/profesional=verde) — los 3 usan los mismos
+`bluegreen-eske`/`blue-eske` sin importar el plan; sus únicas clases genéricas son chrome neutro
+(botón de cerrar, separadores). El resto es semántica estándar ya resuelta en rondas previas
+(error=rojo, éxito=verde, info=azul, advertencia=amarillo/marrón); sin colores de marca de terceros.
+**3 bugs de sufijo `-eske` faltante** (mismo patrón que `HomeClient` en A): `border-red-60`/`text-red-60`
+en `ScheduleDate` (6 puntos, bordes/mensajes de validación de formulario, hoy invisibles) →
+`red-eske-60`; `border-gray-90` en los 3 modales de plan (botón "Cambiar método de pago") →
+`gray-eske-90`; `bg-gray-20` en `PlanesInteractivos` (3 círculos de ícono) → `gray-eske-20`.
+**Caja de advertencia en `newsletter/confirm`** (el único `text-yellow-*` del diagnóstico, rama de
+enlace expirado): `text-brown-eske-60` en claro + `dark:text-yellow-eske` agregado (no tenía variante
+oscura), mismo criterio ya establecido. **2 gradientes de página sin variante oscura**
+(`from-gray-50 to-gray-100` en `unsubscribe/page.tsx` — el fallback de `Suspense`, sus hermanos con
+contenido real ya la tenían) → se agregó `dark:from-[#0B1620] dark:to-[#112230]`. **2 pares
+claro/oscuro colapsados** por resolver al mismo token/opacidad por diseño (`bg-yellow-eske/10` y
+`bg-blue-eske/20`, ambos ya lo eran en oscuro por convención de la familia — redundante, no error).
+Contraste verificado contra el original en los mapeos no triviales (`text-blue-800` → `blue-eske-90`
+8.35:1 vs 7.15:1 original; `bg-red-500`/`hover:bg-red-600` con texto blanco 5.45:1/7.38:1 vs
+3.76:1/4.83:1); 2 bajan levemente pero siguen ≥ AA (`dark:text-blue-eske-30` 6.34:1,
+`text-brown-eske-60` 5.37:1, patrón ya aprobado en rondas previas). Verificación: 58 clases nuevas
+presentes en el CSS compilado, 0 conflictos de cascada nuevos vs HEAD, guard probado en negativo con
+edición real, `tsc`, `next build` y 331 pruebas.
 
 **Moddulo — migración (26-09-21, orden invertido a propósito: primero el frente de mayor volumen).**
 `app/moddulo` + `app/components/moddulo`: **315 de 315 clases migradas en 20 archivos** (296 el primer día, 19 púrpuras al día siguiente).
@@ -1316,3 +1345,4 @@ firebase functions:log
 | 26-09-21 | Diseño — ronda 5: cierre de Moddulo (315/315) + diagnóstico de la colisión Extranjero/No Binario | **Aprobado y aplicado:** los 15 púrpuras del ámbar "Requiere ajuste" → `brown-eske-60` (claro) / `yellow-eske` (oscuro) con el patrón de `MotoresSequentialView`; los 4 de los chips de país (sin variante oscura) → `violet-eske` con su par claro/oscuro. Moddulo = 0 genéricos; guard de PESTEL, Sefix y Moddulo **sin ninguna excepción**, probado en negativo con edición real. Verificación: `tsc`, `next build`, 329 pruebas, 15 clases nuevas presentes en el CSS compilado. **Investigado y luego resuelto (ronda 6):** ver "Colisión Extranjero vs No Binario — RESUELTA". **Sin tocar por instrucción:** E8 y sub-rondas A-D del sitio principal. |
 | 26-09-21 | Diseño — ronda 6: colisión Extranjero/No Binario resuelta | Mujeres-Extranjero pasa a la paleta rosa/rojo de Mujeres-Nacional en `SexoCharts` (S1-S4) y `G3SexChart` (2 archivos, sin tokens ni hex nuevos). Hombres y las demás gráficas de Extranjero intactos. Verificado: ΔE con No Binario 0 → 50.2 (oscuro) y 41.1 → 42.5 (claro); sin colisión nueva (ΔE ≥ 41.2 contra los 22 colores de Extranjero); ningún texto describe el color. Aviso: `G3SexChart` "Lista Mujeres" oscuro = 2.97:1 (heredado de Nacional). `tsc`, `next build` y 329 pruebas. **Con esto se cierra el punto 4 del plan de extras**, salvo lo documentado: badge `draft` del hub, E8 y sub-rondas A-D del sitio principal. |
 | 26-09-21 | Diseño — ronda 7: sitio principal, sub-ronda A (143 → 0) | 21 archivos (páginas estáticas, cursos, componentes compartidos, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`). Guard extendido (acepta archivos sueltos) y probado en negativo por directorio y por archivo. Hallazgo: 4 clases inexistentes `bg-*-60` en `HomeClient` (no-op silencioso). Ajustes de contraste medidos contra el original (`-90` verde/azul sobre tinte, `orange-eske-80`, notas terciarias a `black-eske-10`); 2 defectos previos de modo oscuro corregidos (caja de cookies, mensaje vacío de notificaciones). Los "5 `text-yellow-*`" no estaban en A (están en B y D). Verificación: `tsc`, `next build`, 330 pruebas, 69 clases presentes en el CSS, 0 conflictos de cascada. **Pendiente:** sub-rondas B (197), C (310), D (124), E8, badge `draft` del hub. |
+| 26-09-22 | Diseño — ronda 8: sitio principal, sub-ronda B (197 → 0) | 20 archivos (`componentsHome` completo, `newsletter/confirm`, `newsletter/unsubscribe`). Recontado antes de tocar código: idéntico al diagnóstico previo. 3 modales de plan de suscripción verificados sin identidad de color (no repiten el patrón de `SubscriptionBadge`), mapeo mecánico sin decisión pendiente. 3 bugs de sufijo `-eske` faltante corregidos (`red-60`, `gray-90`, `gray-20`, mismo patrón que `HomeClient` en A). Caja de advertencia de `newsletter/confirm` → `brown-eske-60`/`yellow-eske`, con `dark:` agregado. 2 gradientes con `dark:` agregado, 2 pares claro/oscuro colapsados por resolver al mismo token. Verificación: `tsc`, `next build`, 331 pruebas, 58 clases presentes en el CSS, 0 conflictos de cascada, guard extendido y probado en negativo. **Pendiente:** sub-rondas C (310), D (124), E8, badge `draft` del hub. |

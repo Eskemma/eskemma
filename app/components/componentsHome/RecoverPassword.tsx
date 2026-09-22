@@ -40,7 +40,7 @@ export default function RecoverPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-[#0B1620] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-eske-10 dark:bg-[#0B1620] px-4">
       <div className="bg-white-eske dark:bg-[#18324A] rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-8 max-sm:p-6 w-full max-w-md">
         <h1 className="text-2xl max-sm:text-xl font-bold text-bluegreen-eske text-center mb-6 max-sm:mb-4">
           Recuperar Contraseña
@@ -48,7 +48,7 @@ export default function RecoverPassword() {
 
         {message && (
           <p 
-            className="text-green-500 text-sm max-sm:text-xs text-center mb-4 max-sm:mb-3 p-3 max-sm:p-2 bg-green-50 border border-green-200 rounded" 
+            className="text-green-eske text-sm max-sm:text-xs text-center mb-4 max-sm:mb-3 p-3 max-sm:p-2 bg-green-eske/10 border border-green-eske/30 rounded" 
             role="alert"
             aria-live="polite"
           >
@@ -57,7 +57,7 @@ export default function RecoverPassword() {
         )}
         {error && (
           <p 
-            className="text-red-500 text-sm max-sm:text-xs text-center mb-4 max-sm:mb-3 p-3 max-sm:p-2 bg-red-50 border border-red-200 rounded" 
+            className="text-red-eske text-sm max-sm:text-xs text-center mb-4 max-sm:mb-3 p-3 max-sm:p-2 bg-red-eske/10 border border-red-eske/30 rounded" 
             role="alert"
             aria-live="assertive"
           >
@@ -81,7 +81,7 @@ export default function RecoverPassword() {
               required
               disabled={loading}
               placeholder="tu@email.com"
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-100 bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-eske-10 bg-white dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294] text-base max-sm:text-sm"
             />
           </div>
 

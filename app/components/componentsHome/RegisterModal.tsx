@@ -338,7 +338,7 @@ export default function RegisterModal({
         style={{ marginTop: "20px" }}
       >
         <button
-          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
+          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#9AAEBE] hover:text-red-eske transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
           disabled={isSubmitting}
           aria-label="Cerrar modal de registro"
@@ -371,7 +371,7 @@ export default function RegisterModal({
               htmlFor="register-name"
               className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1"
             >
-              Nombre <span className="text-red-500">*</span>
+              Nombre <span className="text-red-eske">*</span>
             </label>
             <input
               type="text"
@@ -381,7 +381,7 @@ export default function RegisterModal({
               onChange={handleChange}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
             />
           </div>
           <div>
@@ -389,7 +389,7 @@ export default function RegisterModal({
               htmlFor="register-lastName"
               className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1"
             >
-              Apellidos <span className="text-red-500">*</span>
+              Apellidos <span className="text-red-eske">*</span>
             </label>
             <input
               type="text"
@@ -399,7 +399,7 @@ export default function RegisterModal({
               onChange={handleChange}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
             />
           </div>
           <div>
@@ -407,7 +407,7 @@ export default function RegisterModal({
               htmlFor="register-userName"
               className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1"
             >
-              Nombre de usuario <span className="text-red-500">*</span>
+              Nombre de usuario <span className="text-red-eske">*</span>
             </label>
             <input
               type="text"
@@ -425,13 +425,13 @@ export default function RegisterModal({
                     ? "userName-suggestion"
                     : undefined
               }
-              className={`w-full px-3 py-2 max-sm:py-1.5 border ${!isUserNameValid ? "border-red-500" : "border-gray-300 dark:border-white/10"
-                } rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm`}
+              className={`w-full px-3 py-2 max-sm:py-1.5 border ${!isUserNameValid ? "border-red-eske" : "border-gray-eske-40 dark:border-white/10"
+                } rounded focus-ring-primary disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm`}
             />
             {!isUserNameValid && (
               <p
                 id="userName-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {userNameError}
@@ -440,7 +440,7 @@ export default function RegisterModal({
             {suggestionMessage && (
               <p
                 id="userName-suggestion"
-                className="text-blue-500 text-sm max-sm:text-xs mt-1"
+                className="text-blue-eske text-sm max-sm:text-xs mt-1"
                 role="status"
               >
                 {suggestionMessage}
@@ -452,7 +452,7 @@ export default function RegisterModal({
               htmlFor="register-sex"
               className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1"
             >
-              Sexo <span className="text-red-500">*</span>
+              Sexo <span className="text-red-eske">*</span>
             </label>
             <select
               id="register-sex"
@@ -461,7 +461,7 @@ export default function RegisterModal({
               onChange={handleChange}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
             >
               <option value="">Selecciona una opción</option>
               <option value="hombre">Hombre</option>
@@ -474,7 +474,7 @@ export default function RegisterModal({
               htmlFor="register-country"
               className="block text-[16px] max-sm:text-sm font-medium text-black-eske dark:text-[#C7D6E0] mb-1"
             >
-              País <span className="text-red-500">*</span>
+              País <span className="text-red-eske">*</span>
             </label>
             <select
               id="register-country"
@@ -483,7 +483,7 @@ export default function RegisterModal({
               onChange={handleChange}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-100 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus-ring-primary disabled:bg-gray-eske-10 dark:disabled:bg-[#21425E] bg-white dark:bg-[#112230] dark:text-[#EAF2F8] text-base max-sm:text-sm"
             >
               <option value="">Selecciona una opción</option>
               {sortedCountries.map((country) => (
@@ -537,7 +537,7 @@ export default function RegisterModal({
                     placeholder="Especifica tu rol"
                     disabled={isSubmitting}
                     aria-label="Especifica otro rol"
-                    className="mt-2 w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 rounded focus-ring-primary disabled:bg-gray-100 text-base max-sm:text-sm"
+                    className="mt-2 w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 rounded focus-ring-primary disabled:bg-gray-eske-10 text-base max-sm:text-sm"
                   />
                 )}
               </div>
@@ -586,7 +586,7 @@ export default function RegisterModal({
                     placeholder="Especifica tu interés"
                     disabled={isSubmitting}
                     aria-label="Especifica otro interés"
-                    className="mt-2 w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 rounded focus-ring-primary disabled:bg-gray-100 text-base max-sm:text-sm"
+                    className="mt-2 w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 rounded focus-ring-primary disabled:bg-gray-eske-10 text-base max-sm:text-sm"
                   />
                 )}
               </div>
@@ -607,7 +607,7 @@ export default function RegisterModal({
               href="/condiciones-de-uso"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 underline cursor-pointer focus-ring-primary rounded"
+              className="text-blue-eske-60 underline cursor-pointer focus-ring-primary rounded"
             >
               condiciones de uso
               <span className="sr-only"> (se abre en nueva ventana)</span>
@@ -617,7 +617,7 @@ export default function RegisterModal({
               href="/politica-de-privacidad"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 underline cursor-pointer focus-ring-primary rounded"
+              className="text-blue-eske-60 underline cursor-pointer focus-ring-primary rounded"
             >
               política de privacidad
               <span className="sr-only"> (se abre en nueva ventana)</span>
@@ -625,7 +625,7 @@ export default function RegisterModal({
             de Eskemma.
           </p>
 
-          <hr className="border-gray-300 my-4 max-sm:my-3" />
+          <hr className="border-gray-eske-40 my-4 max-sm:my-3" />
           <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center">
             ¿Ya tienes cuenta?{" "}
             <button

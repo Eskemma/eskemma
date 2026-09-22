@@ -42,7 +42,7 @@ export default function SuscriptionPremiumModal({
       >
         {/* Botón de Cierre */}
         <button
-          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
+          className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
           onClick={onClose}
           aria-label="Cerrar modal de suscripción premium"
         >
@@ -113,7 +113,7 @@ export default function SuscriptionPremiumModal({
             <div className="flex items-center space-x-2">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6 max-sm:h-5 max-sm:w-5 text-gray-700 dark:text-[#C7D6E0]"
+                className="h-6 w-6 max-sm:h-5 max-sm:w-5 text-black-eske-40 dark:text-[#C7D6E0]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -133,7 +133,7 @@ export default function SuscriptionPremiumModal({
             {/* Botón CAMBIAR - Mantener personalizado */}
             <button
               type="button"
-              className="text-10px max-sm:text-[9px] font-medium text-gray-700 px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-90 rounded hover:bg-blue-eske hover:text-white-eske cursor-pointer transition-colors duration-300 focus-ring-primary"
+              className="text-10px max-sm:text-[9px] font-medium text-black-eske-40 px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-eske-90 rounded hover:bg-blue-eske hover:text-white-eske cursor-pointer transition-colors duration-300 focus-ring-primary"
               aria-label="Cambiar método de pago"
             >
               CAMBIAR
@@ -148,7 +148,7 @@ export default function SuscriptionPremiumModal({
           />
 
           {/* Línea horizontal */}
-          <hr className="border-gray-300 my-4 max-sm:my-3" />
+          <hr className="border-gray-eske-40 my-4 max-sm:my-3" />
 
           {/* Links adicionales */}
           <p className="text-[14px] max-sm:text-xs text-black-eske text-center">

@@ -69,16 +69,16 @@ export default function ConfirmContent() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4">
+    <main className="min-h-screen bg-gradient-to-br from-white-eske-40 to-gray-eske-10 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white dark:bg-[#18324A] rounded-2xl shadow-xl p-8 text-center">
         {/* LOADING */}
         {status === "loading" && (
           <div role="status" aria-live="polite">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-bluegreen-eske mx-auto mb-6" aria-hidden="true"></div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-2">
+            <h1 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
               Confirmando suscripción...
             </h1>
-            <p className="text-gray-600 dark:text-[#9AAEBE]">Por favor, espera un momento</p>
+            <p className="text-black-eske-20 dark:text-[#9AAEBE]">Por favor, espera un momento</p>
           </div>
         )}
 
@@ -101,31 +101,31 @@ export default function ConfirmContent() {
               ¡Suscripción confirmada!
             </h1>
 
-            <p className="text-lg text-gray-700 dark:text-[#C7D6E0] mb-6 leading-relaxed">
+            <p className="text-lg text-black-eske-40 dark:text-[#C7D6E0] mb-6 leading-relaxed">
               {message}
             </p>
 
-            <div className="bg-gradient-to-br from-bluegreen-eske-10 to-blue-50 dark:from-[#112230] dark:to-[#18324A] border border-bluegreen-eske-30 dark:border-white/10 rounded-xl p-6 mb-6">
-              <p className="text-gray-800 dark:text-[#EAF2F8] font-medium mb-2">
+            <div className="bg-gradient-to-br from-bluegreen-eske-10 to-blue-eske/10 dark:from-[#112230] dark:to-[#18324A] border border-bluegreen-eske-30 dark:border-white/10 rounded-xl p-6 mb-6">
+              <p className="text-black-eske dark:text-[#EAF2F8] font-medium mb-2">
                 <strong>¡Te damos la bienvenida al Baúl de Fouché!</strong>
               </p>
-              <p className="text-gray-700 dark:text-[#C7D6E0] text-sm leading-relaxed">
+              <p className="text-black-eske-40 dark:text-[#C7D6E0] text-sm leading-relaxed">
                 Recibirás nuestros mejores artículos sobre análisis político, estrategia electoral y comunicación política directamente en tu correo.
               </p>
             </div>
 
             <div 
-              className="bg-blue-50 dark:bg-[#112230] border border-blue-200 dark:border-white/10 rounded-lg p-4 mb-6"
+              className="bg-blue-eske/10 dark:bg-[#112230] border border-blue-eske/30 dark:border-white/10 rounded-lg p-4 mb-6"
               role="note"
             >
-              <p className="text-sm text-gray-700 dark:text-[#C7D6E0]">
+              <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0]">
                 <strong>Revisa tu bandeja de entrada</strong> para ver el email de bienvenida con más detalles sobre lo que puedes esperar.
               </p>
             </div>
 
             <div className="space-y-3">
               <p 
-                className="text-sm text-gray-500 dark:text-[#6D8294]"
+                className="text-sm text-black-eske-10 dark:text-[#6D8294]"
                 role="timer"
                 aria-live="polite"
               >
@@ -157,19 +157,19 @@ export default function ConfirmContent() {
               </svg>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-[#EAF2F8] mb-3">
+            <h1 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-3">
               Error al confirmar
             </h1>
 
-            <p className="text-gray-600 mb-6 leading-relaxed">
+            <p className="text-black-eske-20 mb-6 leading-relaxed">
               {message}
             </p>
 
             <div 
-              className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/40 rounded-lg p-4 mb-6"
+              className="bg-yellow-eske/10 border border-yellow-eske/30 dark:border-yellow-eske/40 rounded-lg p-4 mb-6"
               role="note"
             >
-              <p className="text-sm text-yellow-800">
+              <p className="text-sm text-brown-eske-60 dark:text-yellow-eske">
                 <strong>¿Qué puedo hacer?</strong><br/>
                 El enlace puede haber expirado o ya fue usado. Intenta suscribirte de nuevo desde el blog.
               </p>
@@ -183,10 +183,10 @@ export default function ConfirmContent() {
               >
                 Ir al blog
               </Link>
-              <p className="text-sm text-gray-500 dark:text-[#6D8294]" aria-hidden="true">o</p>
+              <p className="text-sm text-black-eske-10 dark:text-[#6D8294]" aria-hidden="true">o</p>
               <button
                 onClick={() => window.close()}
-                className="text-gray-600 dark:text-[#9AAEBE] hover:text-gray-800 dark:hover:text-[#C7D6E0] font-medium text-sm underline transition-colors focus-ring-primary rounded"
+                className="text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske dark:hover:text-[#C7D6E0] font-medium text-sm underline transition-colors focus-ring-primary rounded"
                 aria-label="Cerrar esta ventana"
               >
                 Cerrar esta ventana

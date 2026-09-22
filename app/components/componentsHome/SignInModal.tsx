@@ -172,16 +172,16 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
             {/* Botón de Google */}
             <button
               onClick={handleGoogleSignIn}
-              className="w-full bg-red-500 text-white py-2 max-sm:py-1.5 rounded mb-4 max-sm:mb-3 hover:bg-red-600 transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm"
+              className="w-full bg-red-eske text-white py-2 max-sm:py-1.5 rounded mb-4 max-sm:mb-3 hover:bg-red-eske-60 transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm"
             >
               REGISTRARME CON GOOGLE
             </button>
 
             {/* Separador */}
             <div className="flex items-center my-4 max-sm:my-3">
-              <hr className="flex-grow border-gray-300 dark:border-white/10" />
-              <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
-              <hr className="flex-grow border-gray-300 dark:border-white/10" />
+              <hr className="flex-grow border-gray-eske-40 dark:border-white/10" />
+              <span className="mx-4 max-sm:mx-3 text-black-eske-10 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
+              <hr className="flex-grow border-gray-eske-40 dark:border-white/10" />
             </div>
 
             <form onSubmit={handleRegisterWithEmail} className="space-y-4 max-sm:space-y-3">
@@ -197,7 +197,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
                 />
               </div>
 
@@ -214,7 +214,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
                   onChange={(e) => setPassword(e.target.value)}
                   minLength={8}
                   required
-                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+                  className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
                 />
               </div>
 
@@ -261,7 +261,7 @@ export default function SignInModal({ isOpen, onClose, onOpenLoginModal }: SignI
               />
 
               {/* Separador */}
-              <hr className="border-gray-300 dark:border-white/10 my-4 max-sm:my-3" />
+              <hr className="border-gray-eske-40 dark:border-white/10 my-4 max-sm:my-3" />
 
               {/* Iniciar Sesión */}
               <p className="text-[16px] max-sm:text-sm text-black-eske dark:text-[#C7D6E0] text-center">

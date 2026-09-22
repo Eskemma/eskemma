@@ -98,7 +98,7 @@ export default function ResponseDate({
           </p>
           <div className="flex space-x-6 max-sm:space-x-4">
             {/* Avatar del asesor */}
-            <div className="mt-4 max-sm:mt-3 w-12 h-12 max-sm:w-10 max-sm:h-10 rounded-full bg-gray-200 dark:bg-[#112230] flex-shrink-0 overflow-hidden">
+            <div className="mt-4 max-sm:mt-3 w-12 h-12 max-sm:w-10 max-sm:h-10 rounded-full bg-gray-eske-20 dark:bg-[#112230] flex-shrink-0 overflow-hidden">
               <img
                 src="images/rss_px.jpg"
                 alt="Raúl Sánchez Salgado, asesor"
@@ -161,7 +161,7 @@ export default function ResponseDate({
             onClick={onClose}
           />
           {/* Línea horizontal */}
-          <hr className="border-gray-300 dark:border-white/10 my-4 max-sm:my-3" />
+          <hr className="border-gray-eske-40 dark:border-white/10 my-4 max-sm:my-3" />
           {/* Links adicionales */}
           <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center">
             Consultar{' '}

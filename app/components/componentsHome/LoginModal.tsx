@@ -154,7 +154,7 @@ export default function LoginModal({
               required
               disabled={loading}
               placeholder="---"
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
             />
           </div>
 
@@ -171,7 +171,7 @@ export default function LoginModal({
               required
               disabled={loading}
               placeholder="Contraseña"
-              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+              className="w-full px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded focus:outline-none focus:border-blue-eske focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
             />
           </div>
 
@@ -180,7 +180,7 @@ export default function LoginModal({
             <div
               role="alert"
               aria-live="assertive"
-              className="text-red-500 text-sm max-sm:text-xs p-3 max-sm:p-2 bg-red-50 border border-red-200 rounded"
+              className="text-red-eske text-sm max-sm:text-xs p-3 max-sm:p-2 bg-red-eske/10 border border-red-eske/30 rounded"
             >
               <p>{error}</p>
             </div>
@@ -197,9 +197,9 @@ export default function LoginModal({
 
         {/* Separador */}
         <div className="flex items-center my-4 max-sm:my-3">
-          <hr className="flex-grow border-gray-300 dark:border-white/10" />
-          <span className="mx-4 max-sm:mx-3 text-gray-500 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
-          <hr className="flex-grow border-gray-300 dark:border-white/10" />
+          <hr className="flex-grow border-gray-eske-40 dark:border-white/10" />
+          <span className="mx-4 max-sm:mx-3 text-black-eske-10 dark:text-[#9AAEBE] text-sm max-sm:text-xs">🔹</span>
+          <hr className="flex-grow border-gray-eske-40 dark:border-white/10" />
         </div>
 
         {/* Mensaje informativo */}
@@ -213,7 +213,7 @@ export default function LoginModal({
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full text-[16px] max-sm:text-sm bg-red-500 text-white py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-red-600 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-ring-primary"
+          className="w-full text-[16px] max-sm:text-sm bg-red-eske text-white py-2 max-sm:py-1.5 rounded-lg font-medium hover:bg-red-eske-60 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-ring-primary"
         >
           INICIAR SESIÓN CON GOOGLE
         </button>
@@ -244,7 +244,7 @@ export default function LoginModal({
         </p>
 
         {/* Enlace para registrarse */}
-        <hr className="border-gray-300 dark:border-white/10 my-4 max-sm:my-3" />
+        <hr className="border-gray-eske-40 dark:border-white/10 my-4 max-sm:my-3" />
 
         <p className="text-[14px] max-sm:text-xs text-black-eske dark:text-[#C7D6E0] text-center">
           ¿Aún no tienes cuenta?{" "}

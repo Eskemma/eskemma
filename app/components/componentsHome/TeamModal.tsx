@@ -113,7 +113,7 @@ const TeamModal = () => {
           >
             {/* Botón de Cierre */}
             <button
-              className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-gray-700 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
+              className="absolute top-4 max-sm:top-3 right-4 max-sm:right-3 text-black-eske-40 dark:text-[#6D8294] hover:text-red-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded"
               onClick={() => setIsOpen(false)}
               aria-label="Cerrar modal del equipo"
             >
@@ -155,7 +155,7 @@ const TeamModal = () => {
 
               {/* Biografía */}
               <div className="mt-2 max-sm:mt-1 text-center">
-                <p id="team-member-bio" className="text-10px max-sm:text-[10px] text-gray-700 dark:text-[#C7D6E0]">{currentMember.bio}</p>
+                <p id="team-member-bio" className="text-10px max-sm:text-[10px] text-black-eske-40 dark:text-[#C7D6E0]">{currentMember.bio}</p>
               </div>
             </div>
 
@@ -163,7 +163,7 @@ const TeamModal = () => {
             <div className="flex justify-between mt-6 max-sm:mt-4">
               {/* Botón Anterior */}
               <button
-                className="text-gray-700 dark:text-[#6D8294] hover:text-blue-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded p-2 max-sm:p-1"
+                className="text-black-eske-40 dark:text-[#6D8294] hover:text-blue-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded p-2 max-sm:p-1"
                 onClick={prevMember}
                 onKeyDown={(e) => handleKeyDown(e, 'prev')}
                 aria-label="Ver miembro anterior del equipo"
@@ -195,7 +195,7 @@ const TeamModal = () => {
                     aria-label={`Ver ${member.name}`}
                     onClick={() => setCurrentIndex(index)}
                     className={`h-2 w-2 max-sm:h-1.5 max-sm:w-1.5 rounded-full focus-ring-primary ${
-                      index === currentIndex ? "bg-orange-eske" : "bg-gray-300 dark:bg-[#6D8294]"
+                      index === currentIndex ? "bg-orange-eske" : "bg-gray-eske-40 dark:bg-[#6D8294]"
                     }`}
                   />
                 ))}
@@ -203,7 +203,7 @@ const TeamModal = () => {
 
               {/* Botón Siguiente */}
               <button
-                className="text-gray-700 dark:text-[#6D8294] hover:text-blue-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded p-2 max-sm:p-1"
+                className="text-black-eske-40 dark:text-[#6D8294] hover:text-blue-eske dark:hover:text-[#C7D6E0] transition-colors duration-300 focus-ring-primary rounded p-2 max-sm:p-1"
                 onClick={nextMember}
                 onKeyDown={(e) => handleKeyDown(e, 'next')}
                 aria-label="Ver siguiente miembro del equipo"

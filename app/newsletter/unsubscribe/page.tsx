@@ -11,7 +11,7 @@ export default function UnsubscribePage() {
   return (
     <Suspense fallback={
       <div 
-        className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center"
+        className="min-h-screen bg-gradient-to-br from-white-eske-40 to-gray-eske-10 dark:from-[#0B1620] dark:to-[#112230] flex items-center justify-center"
         role="status"
         aria-live="polite"
         aria-label="Cargando página de cancelación de suscripción"
