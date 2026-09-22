@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RAIZ = process.cwd();
-const COLORES_ESKE = "blue|orange|white|gray|black|bluegreen|yellow|brown|green|red|violet";
+const COLORES_ESKE = "blue|orange|white|gray|black|bluegreen|yellow|brown|green|red|violet|premium";
 
 function archivos(dir: string, out: string[] = []): string[] {
   // Acepta también un archivo suelto (p. ej. `app/HomeClient.tsx`), no solo directorios.
@@ -164,6 +164,11 @@ describe("PESTEL, Sefix, Moddulo y sitio principal (sub-ronda A): sin colores ge
       )
     );
     expect(coloresGenericos(rutasC).sort()).toEqual(esperado.sort());
+  });
+
+  it("Sitio principal, sub-ronda D (cuenta y planes) = 0 — cierra las 4 sub-rondas", () => {
+    const rutasD = ["app/profile/page.tsx", "app/suscripciones/page.tsx", "app/components/SubscriptionBadge.tsx"];
+    expect(coloresGenericos(rutasD)).toEqual([]);
   });
 
   it("el escáner de genéricos funciona (evita un pase vacuo si el regex se rompe)", () => {

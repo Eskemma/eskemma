@@ -222,6 +222,22 @@ sobre las tarjetas oscuras solo 2.82:1. Patrón de uso: `text-violet-eske-60 dar
 `border-violet-eske/40`, `bg-violet-eske/10`. El guard incluye `violet` en `COLORES_ESKE`: un paso
 inexistente (`violet-eske-70`) rompe el test como cualquier otro token.
 
+**Token `premium-eske` (26-09-22).** Identidad del plan de suscripción **"Premium"**
+(`SubscriptionBadge`, borde/precio/ribbon "Más Popular" de `suscripciones.tsx`). Se creó porque, a
+diferencia de los 4 usos de `violet-eske` (todos arbitrarios/incidentales), este púrpura SÍ es
+identidad de producto real — consistente con Basic=azul/Professional=verde — y su tono es
+materialmente distinto de `violet-eske` (ΔE76 45.5: mismo rango de matiz, 271-283°, pero mucho más
+saturado, 81 % vs 39 %). **Origen del valor (exacto):** `#9333ea` (Tailwind `purple-600`), el único
+hex usado para Premium en todo el repo.
+
+| Token | Valor | Uso |
+|-------|-------|-----|
+| `premium-eske` | `#9333ea` | Bordes, relleno, badge sólido (con texto blanco, 5.38:1), tinte por opacidad; texto en claro (5.13:1 sobre `white-eske`, ya pasa AA sin paso adicional) |
+| `premium-eske-20` | `#ba7ef2` | Texto en modo oscuro (4.61:1 sobre `#18324A`; la base solo da 2.82:1) |
+
+Patrón de uso: `text-premium-eske dark:text-premium-eske-20`, `border-premium-eske/40`,
+`bg-premium-eske`. El guard incluye `premium` en `COLORES_ESKE`.
+
 **Auditoría de diseño — estado (26-09-21).** Sub-ronda 1 (PESTEL + paso 50, 26-09-20)
 y sub-ronda 2 (26-09-21: `black-eske-60` 252 → 0, `black-eske-80` 148 → 0,
 `blue-eske-900` 1 → 0; 401 clases en 67 archivos de Sefix, Fontana, compartidos,
@@ -267,14 +283,22 @@ los CSS se revisaron a mano). Concentración: `app/blog` 237, `componentsHome` 1
 colores de marca de terceros en `blog/[slug]/ShareButtons` (Facebook/X/LinkedIn/WhatsApp) y el
 simulador SERP/OG de `blog/admin/components/SEOPreview` (imita a Google) — excepciones, no
 migrar; (b) identidad por plan/rol: `SubscriptionBadge` y las tarjetas de `suscripciones`
-(basic=azul, premium=**púrpura**, professional=verde) — decisión de diseño, sin equivalente
-para morado; (c) 5 `text-yellow-*` (4 en `suscripciones` = sub-ronda D, 1 en `newsletter/confirm` = B; **ninguno en A**) → `brown-eske-60`;
-(d) chip morado de filtro en `BlogToolbar` — resuelto en C, ver abajo. División (tokens): **A ✅ RESUELTA 26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`, `legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B ✅ RESUELTA 26-09-22 (197 → 0, 20 archivos: `componentsHome` completo incl. `RegisterModal`, `newsletter/confirm` y `newsletter/unsubscribe`)**; **C ✅ RESUELTA 26-09-22 (310 → 0, 39 archivos: blog público + admin; `ShareButtons` y `SEOPreview` quedan con 12 clases de marca de terceros como excepción exacta declarada en el guard)**; **D pendiente, 124** (`profile`, `suscripciones`, `SubscriptionBadge`; 4 `text-yellow-*`), condicionada a la decisión (b). **Fuera del "sitio principal": Moddulo** (315 clases, no registrado hasta 26-09-21) → migrado, ver
-abajo. Quedan además 14 clases en Centinela/Fontana (`AppCard`, kebab de Fontana). **Pendiente
-restante:** la sub-ronda D del sitio principal (`violet-eske` ya existe, pero la decisión (b) de
-planes sigue abierta: no se extiende el token por inercia), los
-grises `gray-eske-40`/`-70` demasiado claros en `FontanaCanvasItemCard`/`FontanaModduloButton` y
-los ajustes visuales puntuales que Raúl detecte.
+(basic=azul, premium=púrpura, professional=verde) — resuelto en D con el token `premium-eske`, ver
+abajo; (c) 5 `text-yellow-*` (4 en `suscripciones` = sub-ronda D, 1 en `newsletter/confirm` = B; **ninguno en A**) → `brown-eske-60`;
+(d) chip morado de filtro en `BlogToolbar` — resuelto en C, ver abajo. **División (tokens) — las 4
+sub-rondas cerradas, sitio principal en 0 salvo las 12 excepciones de marca de C:** **A ✅ RESUELTA
+26-09-21 (143 → 0, 21 archivos: cookies/privacidad/condiciones, contacto, cursos, `shared`, `geo`,
+`legal`, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`)**; **B ✅ RESUELTA 26-09-22
+(197 → 0, 20 archivos: `componentsHome` completo incl. `RegisterModal`, `newsletter/confirm` y
+`newsletter/unsubscribe`)**; **C ✅ RESUELTA 26-09-22 (310 → 0, 39 archivos: blog público + admin;
+`ShareButtons` y `SEOPreview` quedan con 12 clases de marca de terceros como excepción exacta
+declarada en el guard)**; **D ✅ RESUELTA 26-09-22 (124 → 0, 3 archivos: `profile`, `suscripciones`,
+`SubscriptionBadge`, con el token nuevo `premium-eske`)**. **Fuera del "sitio principal": Moddulo**
+(315 clases, no registrado hasta 26-09-21) → migrado, ver abajo. Quedan además 14 clases en
+Centinela/Fontana (`AppCard`, kebab de Fontana) — fuera del alcance de estas 4 sub-rondas. **Pendiente
+restante:** los grises `gray-eske-40`/`-70` demasiado claros en
+`FontanaCanvasItemCard`/`FontanaModduloButton`, `lib/constants/categories.ts` (8 categorías de blog
+con hex crudo, reportado en C, sin tocar) y los ajustes visuales puntuales que Raúl detecte.
 
 **Sub-ronda A (26-09-21) — 143 → 0 en 21 archivos.** Método de siempre: tabla exacta (53 tokens
 distintos, aborta ante lo no mapeado) y verificación: 69 clases nuevas presentes en el CSS compilado,
@@ -358,6 +382,39 @@ del chip de búsqueda ya era `blue-eske/20` desde antes de esta ronda — un tok
 genérico — y coincidió con el nuevo valor de claro). Verificación: 66 clases nuevas presentes en el
 CSS compilado, 0 conflictos de cascada nuevos vs HEAD, guard probado en negativo en AMBOS bloques (el
 de 0 y el de excepciones exactas), `tsc`, `next build` y 332 pruebas.
+
+**Sub-ronda D (26-09-22) — 124 → 0 en 3 archivos, con el token nuevo `premium-eske`. Cierra las 4
+sub-rondas del sitio principal.** `app/profile/page.tsx` (67), `app/suscripciones/page.tsx` (47),
+`app/components/SubscriptionBadge.tsx` (10). Condicionada a decidir el púrpura de Premium — ver
+"Token `premium-eske`" arriba (decisión de Raúl: token propio, no 5º uso de `violet-eske`, por ser
+identidad de producto real y de tono materialmente distinto). **Texto secundario por rol, no por
+paso:** en `profile.tsx` se encontraron 3 tonos distintos de contraparte oscura (`#9AAEBE`,
+`#6D8294`, `#C7D6E0`) en las mismas familias `text-gray-400/500/600/700` — el mapeo siguió la tabla
+de CLAUDE.md ("Texto secundario/atenuado — mapeo por rol") leyendo el par oscuro real de cada
+literal, no un mapeo plano por paso (un `text-gray-500` con `#9AAEBE` va a `black-eske-20`, no a
+`black-eske-10` como el paso sugeriría solo). **Bug real corregido:** `profile.tsx:902`, uno de tres
+`text-gray-700` de fila de checkbox idénticos sin su par `dark:text-[#C7D6E0]` — se agregó, mismo
+criterio que `OrigenCharts` (sub-ronda 2). **`SubscriptionBadge`, switch `getBadgeColor()` completo:**
+`admin`→`red-eske-60` y `unsubscribed-*`→`orange-eske` (decisiones de Raúl, ambas mecánicas —
+reutilizan el tono real aceptando que comparten familia con "error"/"CTA"); `registered`/`default`
+(`bg-gray-400`/`bg-gray-500`, con `text-white`) — **ningún paso de `gray-eske` alcanza AA con texto
+blanco** (máximo `gray-eske-90` = 4.29:1); se cambió el texto a `black-eske`/`black-eske-40`, mismo
+patrón que ya usaba `visitor` (`bg-gray-eske-40 text-black-eske-40`) — `registered`→
+`bg-gray-eske-60 text-black-eske` (5.03:1), `default`→`bg-gray-eske-70 text-black-eske` (5.61:1);
+`visitor` conserva su mapeo con precedente directo. **Extrapolaciones de bajo riesgo** (bordes
+decorativos, no texto): `border-blue-500`/`dark:border-blue-400` (Basic seleccionado) →
+`border-blue-eske`/`dark:border-blue-eske-30`, mismo criterio "+1 paso en oscuro" ya documentado en
+`globals.css` para `--color-brand-primary`; mismo patrón para `border-green-500`/`dark:border-green-400`
+(Professional); `hover:border-blue-300`/`hover:border-green-300` → `/40`, extrapolación lineal del
+patrón `-200→/30` ya usado. Casos con precedente directo no detectado por el diagnóstico inicial
+(`bg-yellow-50`→`yellow-eske/10`, `border-yellow-200`→`yellow-eske/30`, `border-blue-200`→
+`blue-eske/30`, `hover:bg-gray-400`→`gray-eske-70`): resueltos sin pedir decisión nueva. **Sin bugs
+de sufijo `-eske` faltante** en este alcance (primera ronda, junto con C, sin ese patrón). **Sin
+colores de marca de terceros** (no hay checkout ni plantilla de correo de suscripción en el repo).
+1 par claro/oscuro colapsado (`bg-yellow-eske/10`, mismo criterio de rondas previas). Verificación:
+47 clases nuevas presentes en el CSS compilado, 0 conflictos de cascada nuevos vs HEAD, guard probado
+en negativo, `tsc`, `next build` y 333 pruebas. **Con esto quedan cerradas las 4 sub-rondas (A+B+C+D)
+del sitio principal.**
 
 **Moddulo — migración (26-09-21, orden invertido a propósito: primero el frente de mayor volumen).**
 `app/moddulo` + `app/components/moddulo`: **315 de 315 clases migradas en 20 archivos** (296 el primer día, 19 púrpuras al día siguiente).
@@ -1380,3 +1437,4 @@ firebase functions:log
 | 26-09-21 | Diseño — ronda 7: sitio principal, sub-ronda A (143 → 0) | 21 archivos (páginas estáticas, cursos, componentes compartidos, `Header`, `NotificationBell`, `HomeClient`, `lib/redactor`). Guard extendido (acepta archivos sueltos) y probado en negativo por directorio y por archivo. Hallazgo: 4 clases inexistentes `bg-*-60` en `HomeClient` (no-op silencioso). Ajustes de contraste medidos contra el original (`-90` verde/azul sobre tinte, `orange-eske-80`, notas terciarias a `black-eske-10`); 2 defectos previos de modo oscuro corregidos (caja de cookies, mensaje vacío de notificaciones). Los "5 `text-yellow-*`" no estaban en A (están en B y D). Verificación: `tsc`, `next build`, 330 pruebas, 69 clases presentes en el CSS, 0 conflictos de cascada. **Pendiente:** sub-rondas B (197), C (310), D (124), E8, badge `draft` del hub. |
 | 26-09-22 | Diseño — ronda 8: sitio principal, sub-ronda B (197 → 0) | 20 archivos (`componentsHome` completo, `newsletter/confirm`, `newsletter/unsubscribe`). Recontado antes de tocar código: idéntico al diagnóstico previo. 3 modales de plan de suscripción verificados sin identidad de color (no repiten el patrón de `SubscriptionBadge`), mapeo mecánico sin decisión pendiente. 3 bugs de sufijo `-eske` faltante corregidos (`red-60`, `gray-90`, `gray-20`, mismo patrón que `HomeClient` en A). Caja de advertencia de `newsletter/confirm` → `brown-eske-60`/`yellow-eske`, con `dark:` agregado. 2 gradientes con `dark:` agregado, 2 pares claro/oscuro colapsados por resolver al mismo token. Verificación: `tsc`, `next build`, 331 pruebas, 58 clases presentes en el CSS, 0 conflictos de cascada, guard extendido y probado en negativo. **Pendiente:** sub-rondas C (310), D (124), E8, badge `draft` del hub. |
 | 26-09-22 | Diseño — ronda 9: sitio principal, sub-ronda C (310 → 0, salvo 12 de marca) | Blog público (156/23) + admin (154/16). `ShareButtons`/`SEOPreview`: de sus 41 clases totales, 12 son marca real (Facebook/X/LinkedIn/WhatsApp, pestañas Google/Facebook/X) → excepción **exacta** en el guard (lista literal, probada en negativo agregando una clase no declarada); las otras 29 no eran marca y migraron. Chip morado de `BlogToolbar` investigado a fondo (3er indicador de filtro activo, estado de UI local sin relación con datos del blog) y resuelto con decisión de Raúl: `violet-eske` (4º uso oficial) para el chip de orden, `blue-eske` para el de búsqueda. Estado editorial y moderación de comentarios ya usaban tokens, sin tocar. Sin bugs de sufijo `-eske` en este alcance. Banner de error de `NewsletterSignup` sobre fondo de marca (no blanco) → `text-white-eske`, 7.30:1 vs 5.44:1 original. Verificación: `tsc`, `next build`, 332 pruebas, 66 clases presentes en el CSS, 0 conflictos de cascada, guard probado en negativo en los 2 bloques (cero genéricos y excepciones exactas). **Pendiente:** sub-ronda D (124, condicionada a decisión de plan/color), E8, badge `draft` del hub, `lib/constants/categories.ts` (hex crudo, reportado). |
+| 26-09-22 | Diseño — ronda 10: sitio principal, sub-ronda D (124 → 0) + token `premium-eske` — cierra las 4 sub-rondas | Investigación previa (2 exploradores en paralelo) confirmó que el púrpura de Premium (`#9333ea`, único hex en todo el repo) es identidad de producto real (borde+precio consistentes en `suscripciones.tsx`, igual que Basic/Professional) y un tono materialmente distinto de `violet-eske` (ΔE76 45.5). Decisión de Raúl: token nuevo `premium-eske` (no 5º uso de `violet-eske`). `admin`→`red-eske-60` y `unsubscribed-*`→`orange-eske` (decisiones de Raúl, mecánicas). `registered`/`default` de `SubscriptionBadge`: ningún paso de `gray-eske` alcanza AA con texto blanco → texto cambiado a `black-eske`, mismo patrón que `visitor` (5.03:1/5.61:1). Mapeo por rol de la contraparte oscura (no por paso) en `profile.tsx`, con 3 tonos distintos encontrados. Bug real corregido: `profile.tsx:902`, un `dark:` faltante entre 3 filas idénticas. Extrapolaciones de bajo riesgo en bordes decorativos (`+1 paso en oscuro`, ya documentado para `--color-brand-primary`). Verificación: `tsc`, `next build`, 333 pruebas, 47 clases presentes en el CSS, 0 conflictos de cascada, guard probado en negativo. **Con esto cierran A+B+C+D del sitio principal.** **Pendiente:** E8, badge `draft` del hub, `lib/constants/categories.ts`, grises de Fontana. |

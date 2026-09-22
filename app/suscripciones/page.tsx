@@ -88,14 +88,14 @@ export default function SuscripcionesPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-[#0B1620] py-12 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-white-eske-40 dark:bg-[#0B1620] py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <header className="text-center mb-12">
           <h1 className="text-4xl font-bold text-bluegreen-eske mb-4">
             Planes de Suscripción
           </h1>
-          <p className="text-lg text-gray-600 dark:text-[#9AAEBE] max-w-2xl mx-auto">
+          <p className="text-lg text-black-eske-20 dark:text-[#9AAEBE] max-w-2xl mx-auto">
             Elige el plan que mejor se adapte a tus necesidades y lleva tu
             aprendizaje al siguiente nivel
           </p>
@@ -109,15 +109,15 @@ export default function SuscripcionesPage() {
 
           {hasActiveSubscription && (
             <div 
-              className="mt-4 bg-blue-50 dark:bg-[#112230] border border-blue-200 dark:border-white/10 rounded-lg p-4 max-w-md mx-auto"
+              className="mt-4 bg-blue-eske/10 dark:bg-[#112230] border border-blue-eske/30 dark:border-white/10 rounded-lg p-4 max-w-md mx-auto"
               role="status"
               aria-live="polite"
             >
-              <p className="text-sm text-blue-800 dark:text-[#6BA4C6]">
+              <p className="text-sm text-blue-eske-90 dark:text-[#6BA4C6]">
                 <strong>Plan actual:</strong> {getPlanName(user.subscriptionPlan || null)}
               </p>
               {daysRemaining > 0 && (
-                <p className="text-sm text-blue-600 dark:text-[#4791B3] mt-1">
+                <p className="text-sm text-blue-eske-60 dark:text-[#4791B3] mt-1">
                   Expira el {expirationDate} ({daysRemaining} día{daysRemaining !== 1 ? 's' : ''} restante{daysRemaining !== 1 ? 's' : ''})
                 </p>
               )}
@@ -137,20 +137,20 @@ export default function SuscripcionesPage() {
             <article
               className={`bg-white dark:bg-[#18324A] rounded-lg shadow-lg p-8 border-2 transition-all duration-300 ${
                 selectedPlan === "basic"
-                  ? "border-blue-500 dark:border-blue-400 transform scale-105"
-                  : "border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/20"
+                  ? "border-blue-eske dark:border-blue-eske-30 transform scale-105"
+                  : "border-gray-eske-20 dark:border-white/10 hover:border-blue-eske/40 dark:hover:border-white/20"
               }`}
               role="listitem"
             >
               <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-[#EAF2F8] mb-2">
+                <h3 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
                   Plan Básico
                 </h3>
-                <div className="text-4xl font-bold text-blue-600 mb-2">
+                <div className="text-4xl font-bold text-blue-eske-60 mb-2">
                   ${SUBSCRIPTION_PRICES.basic}
-                  <span className="text-lg text-gray-500 dark:text-[#9AAEBE]">/mes</span>
+                  <span className="text-lg text-black-eske-20 dark:text-[#9AAEBE]">/mes</span>
                 </div>
-                <p className="text-gray-600 dark:text-[#9AAEBE]">Ideal para comenzar</p>
+                <p className="text-black-eske-20 dark:text-[#9AAEBE]">Ideal para comenzar</p>
               </div>
 
               <ul 
@@ -161,7 +161,7 @@ export default function SuscripcionesPage() {
                 {PLAN_FEATURES.basic.map((feature, index) => (
                   <li key={index} className="flex items-start" role="listitem">
                     <svg
-                      className="w-5 h-5 text-green-500 mr-2 mt-0.5 shrink-0"
+                      className="w-5 h-5 text-green-eske mr-2 mt-0.5 shrink-0"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                       aria-hidden="true"
@@ -172,7 +172,7 @@ export default function SuscripcionesPage() {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span className="text-gray-700 dark:text-[#C7D6E0] text-sm">{feature}</span>
+                    <span className="text-black-eske-40 dark:text-[#C7D6E0] text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -195,8 +195,8 @@ export default function SuscripcionesPage() {
             <article
               className={`bg-white dark:bg-[#18324A] rounded-lg shadow-lg p-8 border-2 transition-all duration-300 relative ${
                 selectedPlan === "premium"
-                  ? "border-purple-500 dark:border-purple-400 transform scale-105"
-                  : "border-purple-300 dark:border-purple-800/50 hover:border-purple-400 dark:hover:border-purple-600"
+                  ? "border-premium-eske dark:border-premium-eske-20 transform scale-105"
+                  : "border-premium-eske/40 dark:border-premium-eske/30 hover:border-premium-eske dark:hover:border-premium-eske-20"
               }`}
               role="listitem"
             >
@@ -205,20 +205,20 @@ export default function SuscripcionesPage() {
                 className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
                 aria-label="Plan más popular"
               >
-                <span className="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                <span className="bg-premium-eske text-white px-4 py-1 rounded-full text-sm font-semibold">
                   Más Popular
                 </span>
               </div>
 
               <div className="text-center mb-6 mt-4">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-[#EAF2F8] mb-2">
+                <h3 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
                   Plan Premium
                 </h3>
-                <div className="text-4xl font-bold text-purple-600 mb-2">
+                <div className="text-4xl font-bold text-premium-eske mb-2">
                   ${SUBSCRIPTION_PRICES.premium}
-                  <span className="text-lg text-gray-500 dark:text-[#9AAEBE]">/mes</span>
+                  <span className="text-lg text-black-eske-20 dark:text-[#9AAEBE]">/mes</span>
                 </div>
-                <p className="text-gray-600 dark:text-[#9AAEBE]">Para profesionales</p>
+                <p className="text-black-eske-20 dark:text-[#9AAEBE]">Para profesionales</p>
               </div>
 
               <ul 
@@ -229,7 +229,7 @@ export default function SuscripcionesPage() {
                 {PLAN_FEATURES.premium.map((feature, index) => (
                   <li key={index} className="flex items-start" role="listitem">
                     <svg
-                      className="w-5 h-5 text-green-500 mr-2 mt-0.5 shrink-0"
+                      className="w-5 h-5 text-green-eske mr-2 mt-0.5 shrink-0"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                       aria-hidden="true"
@@ -240,7 +240,7 @@ export default function SuscripcionesPage() {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span className="text-gray-700 dark:text-[#C7D6E0] text-sm">{feature}</span>
+                    <span className="text-black-eske-40 dark:text-[#C7D6E0] text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -263,20 +263,20 @@ export default function SuscripcionesPage() {
             <article
               className={`bg-white dark:bg-[#18324A] rounded-lg shadow-lg p-8 border-2 transition-all duration-300 ${
                 selectedPlan === "professional"
-                  ? "border-green-500 dark:border-green-400 transform scale-105"
-                  : "border-gray-200 dark:border-white/10 hover:border-green-300 dark:hover:border-white/20"
+                  ? "border-green-eske dark:border-green-eske-30 transform scale-105"
+                  : "border-gray-eske-20 dark:border-white/10 hover:border-green-eske/40 dark:hover:border-white/20"
               }`}
               role="listitem"
             >
               <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-[#EAF2F8] mb-2">
+                <h3 className="text-2xl font-bold text-black-eske dark:text-[#EAF2F8] mb-2">
                   Plan Professional
                 </h3>
-                <div className="text-4xl font-bold text-green-600 mb-2">
+                <div className="text-4xl font-bold text-green-eske-60 mb-2">
                   ${SUBSCRIPTION_PRICES.professional}
-                  <span className="text-lg text-gray-500 dark:text-[#9AAEBE]">/mes</span>
+                  <span className="text-lg text-black-eske-20 dark:text-[#9AAEBE]">/mes</span>
                 </div>
-                <p className="text-gray-600 dark:text-[#9AAEBE]">Para equipos y empresas</p>
+                <p className="text-black-eske-20 dark:text-[#9AAEBE]">Para equipos y empresas</p>
               </div>
 
               <ul 
@@ -287,7 +287,7 @@ export default function SuscripcionesPage() {
                 {PLAN_FEATURES.professional.map((feature, index) => (
                   <li key={index} className="flex items-start" role="listitem">
                     <svg
-                      className="w-5 h-5 text-green-500 mr-2 mt-0.5 shrink-0"
+                      className="w-5 h-5 text-green-eske mr-2 mt-0.5 shrink-0"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                       aria-hidden="true"
@@ -298,7 +298,7 @@ export default function SuscripcionesPage() {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span className="text-gray-700 dark:text-[#C7D6E0] text-sm">{feature}</span>
+                    <span className="text-black-eske-40 dark:text-[#C7D6E0] text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -342,13 +342,13 @@ export default function SuscripcionesPage() {
 
         {/* Nota sobre integración futura */}
         <aside 
-          className="mt-12 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/40 rounded-lg p-6 max-w-3xl mx-auto"
+          className="mt-12 bg-yellow-eske/10 border border-yellow-eske/30 dark:border-yellow-eske/40 rounded-lg p-6 max-w-3xl mx-auto"
           role="note"
           aria-labelledby="integration-note-title"
         >
           <h4 
             id="integration-note-title"
-            className="font-semibold text-yellow-800 dark:text-yellow-400 mb-2 flex items-center"
+            className="font-semibold text-brown-eske-60 dark:text-yellow-eske mb-2 flex items-center"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -364,7 +364,7 @@ export default function SuscripcionesPage() {
             </svg>
             Integración de pagos pendiente
           </h4>
-          <p className="text-sm text-yellow-700 dark:text-yellow-500/80">
+          <p className="text-sm text-brown-eske-60 dark:text-yellow-eske/80">
             Actualmente, la funcionalidad de suscripción está en modo de prueba.
             La integración con Stripe para procesar pagos reales se implementará
             próximamente. Por ahora, puedes activar cualquier plan para probar

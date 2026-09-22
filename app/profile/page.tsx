@@ -520,11 +520,11 @@ const ProfilePage = () => {
               />
             ) : (
               <div
-                className="w-32 h-32 max-sm:w-24 max-sm:h-24 rounded-full bg-gray-200 dark:bg-[#112230] flex items-center justify-center border-4 border-gray-300 dark:border-white/10"
+                className="w-32 h-32 max-sm:w-24 max-sm:h-24 rounded-full bg-gray-eske-20 dark:bg-[#112230] flex items-center justify-center border-4 border-gray-eske-40 dark:border-white/10"
                 role="img"
                 aria-label="Sin foto de perfil"
               >
-                <span className="text-gray-400 dark:text-[#6D8294] text-sm max-sm:text-xs text-center px-2">
+                <span className="text-black-eske-10 dark:text-[#6D8294] text-sm max-sm:text-xs text-center px-2">
                   Sin foto
                 </span>
               </div>
@@ -553,7 +553,7 @@ const ProfilePage = () => {
               className="hidden"
               aria-label="Seleccionar archivo de imagen para foto de perfil"
             />
-            <p className="text-sm max-sm:text-xs text-gray-500 dark:text-[#9AAEBE] mt-2">
+            <p className="text-sm max-sm:text-xs text-black-eske-20 dark:text-[#9AAEBE] mt-2">
               Tamaño máximo: 2 MB. Formatos: JPG, PNG, GIF
             </p>
           </div>
@@ -577,9 +577,9 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="name"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              Nombre <span className="text-red-500" aria-label="campo requerido">*</span>
+              Nombre <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <input
               type="text"
@@ -587,7 +587,7 @@ const ProfilePage = () => {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.name ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.name ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!!errors.name}
@@ -596,7 +596,7 @@ const ProfilePage = () => {
             {errors.name && (
               <p
                 id="name-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {errors.name}
@@ -608,9 +608,9 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="lastName"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              Apellidos <span className="text-red-500" aria-label="campo requerido">*</span>
+              Apellidos <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <input
               type="text"
@@ -618,7 +618,7 @@ const ProfilePage = () => {
               name="lastName"
               value={formData.lastName}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.lastName ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.lastName ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!!errors.lastName}
@@ -627,7 +627,7 @@ const ProfilePage = () => {
             {errors.lastName && (
               <p
                 id="lastName-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {errors.lastName}
@@ -639,9 +639,9 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="userName"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              Nombre de Usuario <span className="text-red-500" aria-label="campo requerido">*</span>
+              Nombre de Usuario <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <input
               type="text"
@@ -649,7 +649,7 @@ const ProfilePage = () => {
               name="userName"
               value={formData.userName}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${!isUserNameValid ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${!isUserNameValid ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!isUserNameValid}
@@ -658,7 +658,7 @@ const ProfilePage = () => {
             {!isUserNameValid && (
               <p
                 id="userName-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {userNameError}
@@ -667,7 +667,7 @@ const ProfilePage = () => {
             {suggestionMessage && (
               <p
                 id="userName-suggestion"
-                className="text-blue-500 text-sm max-sm:text-xs mt-1"
+                className="text-blue-eske text-sm max-sm:text-xs mt-1"
                 role="status"
                 aria-live="polite"
               >
@@ -680,16 +680,16 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="sex"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              Sexo <span className="text-red-500" aria-label="campo requerido">*</span>
+              Sexo <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <select
               id="sex"
               name="sex"
               value={formData.sex}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.sex ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.sex ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!!errors.sex}
@@ -703,7 +703,7 @@ const ProfilePage = () => {
             {errors.sex && (
               <p
                 id="sex-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {errors.sex}
@@ -715,16 +715,16 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="country"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              País <span className="text-red-500" aria-label="campo requerido">*</span>
+              País <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <select
               id="country"
               name="country"
               value={formData.country}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.country ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.country ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!!errors.country}
@@ -740,7 +740,7 @@ const ProfilePage = () => {
             {errors.country && (
               <p
                 id="country-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {errors.country}
@@ -752,9 +752,9 @@ const ProfilePage = () => {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
-              Correo Electrónico <span className="text-red-500" aria-label="campo requerido">*</span>
+              Correo Electrónico <span className="text-red-eske" aria-label="campo requerido">*</span>
             </label>
             <input
               type="email"
@@ -762,7 +762,7 @@ const ProfilePage = () => {
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.email ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.email ? "border-red-eske" : "border-gray-eske-40"
                 } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
               aria-required="true"
               aria-invalid={!!errors.email}
@@ -770,14 +770,14 @@ const ProfilePage = () => {
             />
             <p
               id="email-hint"
-              className="text-xs max-sm:text-[10px] text-gray-500 mt-1"
+              className="text-xs max-sm:text-[10px] text-black-eske-10 mt-1"
             >
               ⚠️ Este correo es tu llave de acceso. Si lo cambias, recibirás un enlace de verificación en la nueva dirección antes de que el cambio sea efectivo.
             </p>
             {errors.email && (
               <p
                 id="email-error"
-                className="text-red-500 text-sm max-sm:text-xs mt-1"
+                className="text-red-eske text-sm max-sm:text-xs mt-1"
                 role="alert"
               >
                 {errors.email}
@@ -814,7 +814,7 @@ const ProfilePage = () => {
               "Academia",
               "Otro",
             ].map((role) => (
-              <label key={role} className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]">
+              <label key={role} className="flex items-center cursor-pointer hover:bg-white-eske-40 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]">
                 <input
                   type="checkbox"
                   value={role}
@@ -823,7 +823,7 @@ const ProfilePage = () => {
                   className="mr-2 w-4 h-4 accent-bluegreen-eske focus-ring-primary rounded"
                   aria-label={role}
                 />
-                <span className="text-gray-700 dark:text-[#C7D6E0] text-base max-sm:text-sm">{role}</span>
+                <span className="text-black-eske-40 dark:text-[#C7D6E0] text-base max-sm:text-sm">{role}</span>
               </label>
             ))}
           </div>
@@ -832,7 +832,7 @@ const ProfilePage = () => {
           <div className="mt-4 max-sm:mt-3">
             <label
               htmlFor="otherRole"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
               Especifica tu otro rol
             </label>
@@ -843,12 +843,12 @@ const ProfilePage = () => {
               value={formData.otherRole}
               onChange={handleInputChange}
               placeholder="Especifica tu rol"
-              className="w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+              className="w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
               aria-describedby="otherRole-hint"
             />
             <p
               id="otherRole-hint"
-              className="text-xs max-sm:text-[10px] text-gray-500 mt-1"
+              className="text-xs max-sm:text-[10px] text-black-eske-10 mt-1"
             >
               Describe tu rol profesional si no está en la lista
             </p>
@@ -877,7 +877,7 @@ const ProfilePage = () => {
             {interestsList.map((interest) => (
               <label
                 key={interest}
-                className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]"
+                className="flex items-center cursor-pointer hover:bg-white-eske-40 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]"
               >
                 <input
                   type="checkbox"
@@ -887,10 +887,10 @@ const ProfilePage = () => {
                   className="mr-2 w-4 h-4 accent-bluegreen-eske focus-ring-primary rounded"
                   aria-label={interest}
                 />
-                <span className="text-gray-700 dark:text-[#C7D6E0] text-sm max-sm:text-xs">{interest}</span>
+                <span className="text-black-eske-40 dark:text-[#C7D6E0] text-sm max-sm:text-xs">{interest}</span>
               </label>
             ))}
-            <label className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]">
+            <label className="flex items-center cursor-pointer hover:bg-white-eske-40 dark:hover:bg-white/5 p-2 max-sm:p-1.5 rounded transition-colors min-h-[44px] max-sm:min-h-[40px]">
               <input
                 type="checkbox"
                 value="Otro"
@@ -899,7 +899,7 @@ const ProfilePage = () => {
                 className="mr-2 w-4 h-4 accent-bluegreen-eske focus-ring-primary rounded"
                 aria-label="Otro interés"
               />
-              <span className="text-gray-700 text-sm max-sm:text-xs">Otro</span>
+              <span className="text-black-eske-40 dark:text-[#C7D6E0] text-sm max-sm:text-xs">Otro</span>
             </label>
           </div>
         </fieldset>
@@ -907,7 +907,7 @@ const ProfilePage = () => {
           <div className="mt-4 max-sm:mt-3">
             <label
               htmlFor="otherInterest"
-              className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+              className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
             >
               Especifica tu otro interés
             </label>
@@ -918,12 +918,12 @@ const ProfilePage = () => {
               value={formData.otherInterest}
               onChange={handleInputChange}
               placeholder="Especifica tu interés"
-              className="w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-300 dark:border-white/10 rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
+              className="w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border border-gray-eske-40 dark:border-white/10 rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]"
               aria-describedby="otherInterest-hint"
             />
             <p
               id="otherInterest-hint"
-              className="text-xs max-sm:text-[10px] text-gray-500 mt-1"
+              className="text-xs max-sm:text-[10px] text-black-eske-10 mt-1"
             >
               Describe tu tema de interés si no está en la lista
             </p>
@@ -963,9 +963,9 @@ const ProfilePage = () => {
             <div>
               <label
                 htmlFor="currentPassword"
-                className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
               >
-                Contraseña Actual <span className="text-red-500" aria-label="campo requerido">*</span>
+                Contraseña Actual <span className="text-red-eske" aria-label="campo requerido">*</span>
               </label>
               <input
                 type="password"
@@ -973,7 +973,7 @@ const ProfilePage = () => {
                 name="currentPassword"
                 value={passwordData.currentPassword}
                 onChange={handlePasswordChange}
-                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.currentPassword ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.currentPassword ? "border-red-eske" : "border-gray-eske-40"
                   } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
                 aria-required="true"
                 aria-invalid={!!errors.currentPassword}
@@ -982,7 +982,7 @@ const ProfilePage = () => {
               {errors.currentPassword && (
                 <p
                   id="currentPassword-error"
-                  className="text-red-500 text-sm max-sm:text-xs mt-1"
+                  className="text-red-eske text-sm max-sm:text-xs mt-1"
                   role="alert"
                 >
                   {errors.currentPassword}
@@ -993,9 +993,9 @@ const ProfilePage = () => {
             <div>
               <label
                 htmlFor="newPassword"
-                className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
               >
-                Nueva Contraseña <span className="text-red-500" aria-label="campo requerido">*</span>
+                Nueva Contraseña <span className="text-red-eske" aria-label="campo requerido">*</span>
               </label>
               <input
                 type="password"
@@ -1003,7 +1003,7 @@ const ProfilePage = () => {
                 name="newPassword"
                 value={passwordData.newPassword}
                 onChange={handlePasswordChange}
-                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.newPassword ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.newPassword ? "border-red-eske" : "border-gray-eske-40"
                   } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
                 aria-required="true"
                 aria-invalid={!!errors.newPassword}
@@ -1011,14 +1011,14 @@ const ProfilePage = () => {
               />
               <p
                 id="newPassword-hint"
-                className="text-xs max-sm:text-[10px] text-gray-500 mt-1"
+                className="text-xs max-sm:text-[10px] text-black-eske-10 mt-1"
               >
                 Mínimo 6 caracteres
               </p>
               {errors.newPassword && (
                 <p
                   id="newPassword-error"
-                  className="text-red-500 text-sm max-sm:text-xs mt-1"
+                  className="text-red-eske text-sm max-sm:text-xs mt-1"
                   role="alert"
                 >
                   {errors.newPassword}
@@ -1029,10 +1029,10 @@ const ProfilePage = () => {
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm max-sm:text-xs font-medium text-gray-700 dark:text-[#C7D6E0] mb-1"
+                className="block text-sm max-sm:text-xs font-medium text-black-eske-40 dark:text-[#C7D6E0] mb-1"
               >
                 Confirmar Nueva Contraseña{" "}
-                <span className="text-red-500" aria-label="campo requerido">*</span>
+                <span className="text-red-eske" aria-label="campo requerido">*</span>
               </label>
               <input
                 type="password"
@@ -1040,7 +1040,7 @@ const ProfilePage = () => {
                 name="confirmPassword"
                 value={passwordData.confirmPassword}
                 onChange={handlePasswordChange}
-                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 max-sm:px-3 py-2 max-sm:py-1.5 border ${errors.confirmPassword ? "border-red-eske" : "border-gray-eske-40"
                   } rounded-md focus-ring-primary text-base max-sm:text-sm dark:bg-[#112230] dark:text-[#EAF2F8] dark:placeholder-[#6D8294]`}
                 aria-required="true"
                 aria-invalid={!!errors.confirmPassword}
@@ -1049,7 +1049,7 @@ const ProfilePage = () => {
               {errors.confirmPassword && (
                 <p
                   id="confirmPassword-error"
-                  className="text-red-500 text-sm max-sm:text-xs mt-1"
+                  className="text-red-eske text-sm max-sm:text-xs mt-1"
                   role="alert"
                 >
                   {errors.confirmPassword}
@@ -1076,7 +1076,7 @@ const ProfilePage = () => {
                   });
                   setErrors({});
                 }}
-                className="bg-gray-300 text-gray-700 px-6 max-sm:px-4 py-2 max-sm:py-1.5 rounded hover:bg-gray-400 transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm dark:bg-[#21425E] dark:text-[#C7D6E0] dark:hover:bg-[#2C5273]"
+                className="bg-gray-eske-40 text-black-eske-40 px-6 max-sm:px-4 py-2 max-sm:py-1.5 rounded hover:bg-gray-eske-70 transition-colors duration-300 focus-ring-primary text-base max-sm:text-sm dark:bg-[#21425E] dark:text-[#C7D6E0] dark:hover:bg-[#2C5273]"
                 aria-label="Cancelar cambio de contraseña"
               >
                 Cancelar

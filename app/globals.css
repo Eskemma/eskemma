@@ -172,6 +172,19 @@
   --color-violet-eske: #9b59b6;
   --color-violet-eske-20: #c585f5;
   --color-violet-eske-60: #773e8e;
+
+  /* Púrpura — identidad del plan de suscripción "Premium" (`SubscriptionBadge.tsx`,
+     `app/suscripciones/page.tsx`: borde, precio y ribbon "Más Popular" de la tarjeta). Valor EXACTO
+     de la fuente original: `bg-purple-600`/`text-purple-600`/`border-purple-500`, el único hex usado
+     para Premium en todo el repo. Distinto de `violet-eske` (ΔE76 45.5, mucho más saturado: 81 % vs
+     39 %) — no se une a ese token porque es identidad de producto real (mismo patrón consistente que
+     Basic=azul/Professional=verde), no un morado incidental de UI. Solo un derivado: la base ya da
+     5.13:1 sobre `white-eske` (pasa AA en claro, sin necesitar un paso más oscuro); el -20 es para
+     texto en oscuro, porque la base solo da 2.45:1 sobre la tarjeta oscura. Uso por tema:
+       - bordes, relleno, badge sólido (con texto blanco, 5.38:1), tinte (`/10`, `/20`): base.
+       - texto en oscuro: -20 (4.61:1 sobre #18324A). En claro, la base ya sirve como texto. */
+  --color-premium-eske: #9333ea;
+  --color-premium-eske-20: #ba7ef2;
 }
 
 @layer base {

@@ -26,27 +26,27 @@ export default function SubscriptionBadge({ plan: externalPlan }: SubscriptionBa
   const getBadgeColor = (): string => {
     switch (user.role) {
       case "admin":
-        return "bg-red-600 text-white";
+        return "bg-red-eske-60 text-white";
       case "basic":
-        return "bg-blue-500 text-white";
+        return "bg-blue-eske text-white";
       case "premium":
-        return "bg-purple-600 text-white";
+        return "bg-premium-eske text-white";
       case "professional":
-        return "bg-green-600 text-white";
+        return "bg-green-eske-60 text-white";
       case "expired":
-        return "bg-red-500 text-white";
+        return "bg-red-eske text-white";
       case "unsubscribed-basic":
       case "unsubscribed-premium":
       case "unsubscribed-professional":
-        return "bg-orange-500 text-white";
+        return "bg-orange-eske text-white";
       case "user":
         return "bg-bluegreen-eske text-white";
       case "registered":
-        return "bg-gray-400 text-white";
+        return "bg-gray-eske-60 text-black-eske";
       case "visitor":
-        return "bg-gray-300 text-gray-700";
+        return "bg-gray-eske-40 text-black-eske-40";
       default:
-        return "bg-gray-500 text-white";
+        return "bg-gray-eske-70 text-black-eske";
     }
   };
 
