@@ -167,10 +167,38 @@ function emptyXPCTO(): XPCTO {
 // CREAR PROYECTO
 // ==========================================
 
+/**
+ * The pestelProjectId does not exist or belongs to another user. Deliberately
+ * one error for both cases so the caller (and the client) cannot use it to
+ * probe which pestel_projects ids exist.
+ */
+export class PestelProjectNoPropioError extends Error {
+  constructor() {
+    super("Proyecto de PESTEL no encontrado");
+    this.name = "PestelProjectNoPropioError";
+  }
+}
+
 export async function createProject(
   userId: string,
   input: CreateProjectInput
 ): Promise<ModduloProject> {
+  // Ownership guard (26-09-23). pestelProjectId comes from the request body and
+  // is used below with the Admin SDK (which ignores firestore.rules) to persist
+  // a linkedSource and to write modduloProjectId into pestel_projects/{id}.
+  // Without this read, any authenticated user could stamp a foreign PESTEL
+  // project. It runs BEFORE anything is built or written, so a foreign id is
+  // never persisted in pestelProjectId / linkedSource either.
+  if (input.pestelProjectId) {
+    const pestelSnap = await adminDb
+      .collection("pestel_projects")
+      .doc(input.pestelProjectId)
+      .get();
+    if (!pestelSnap.exists || pestelSnap.data()?.userId !== userId) {
+      throw new PestelProjectNoPropioError();
+    }
+  }
+
   const now = FieldValue.serverTimestamp();
   const nowDate = new Date().toISOString(); // Para campos dentro de arrays
 

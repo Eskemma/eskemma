@@ -126,7 +126,7 @@ export default function ModduloPage() {
 // ==========================================
 
 const STATUS_COLORS: Record<ModduloProject["status"], string> = {
-  draft: "bg-gray-eske-20 text-gray-eske-60",
+  draft: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#C7D6E0]",
   active: "bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30",
   paused: "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske",
   completed: "bg-blue-eske/20 text-blue-eske-80 dark:text-blue-eske-30",
@@ -134,7 +134,7 @@ const STATUS_COLORS: Record<ModduloProject["status"], string> = {
   // quedaba como no-op y el texto heredaba el color del ancestro, casi invisible
   // en modo oscuro sobre el mismo `bg-gray-eske-20` claro (mismo bug ya
   // corregido en el hub de PESTEL, 26-09-12).
-  archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#9AAEBE]",
+  archived: "bg-gray-eske-20 text-black-eske-20 dark:bg-white/10 dark:text-[#C7D6E0]",
 };
 
 const STATUS_LABELS: Record<ModduloProject["status"], string> = {

@@ -4,6 +4,8 @@
 // Sin dependencias de React ni Firebase — 100% testeables en aislamiento.
 
 import type { Ambito } from "./seriesUtils";
+import { ESTADOS_ALFABETICOS, claveEstadoSnake } from "@/lib/geo/estados";
+import { nombreEstadoProsa } from "@/lib/geo/abreviaturasEstado";
 import type { SemanalSerieRow } from "@/app/sefix/hooks/useLneSemanalesSerie";
 
 // ────────────────────────────────────────────────────────────────
@@ -474,19 +476,14 @@ export interface SemanalTextsOrigen {
   fuente: string;
 }
 
-const ESTADOS_ABBR: Record<string, string> = {
-  aguascalientes: "Aguascalientes", baja_california: "Baja California",
-  baja_california_sur: "B.C.S.", campeche: "Campeche", chiapas: "Chiapas",
-  chihuahua: "Chihuahua", ciudad_de_mexico: "CDMX", coahuila: "Coahuila",
-  colima: "Colima", durango: "Durango", estado_de_mexico: "Edo. México",
-  guanajuato: "Guanajuato", guerrero: "Guerrero", hidalgo: "Hidalgo",
-  jalisco: "Jalisco", michoacan: "Michoacán", morelos: "Morelos",
-  nayarit: "Nayarit", nuevo_leon: "Nuevo León", oaxaca: "Oaxaca",
-  puebla: "Puebla", queretaro: "Querétaro", quintana_roo: "Q. Roo",
-  san_luis_potosi: "S.L.P.", sinaloa: "Sinaloa", sonora: "Sonora",
-  tabasco: "Tabasco", tamaulipas: "Tamaulipas", tlaxcala: "Tlaxcala",
-  veracruz: "Veracruz", yucatan: "Yucatán", zacatecas: "Zacatecas",
-};
+// Nombre a mostrar en la PROSA del análisis semanal por llave "snake". Nombre completo
+// del catálogo para todos los estados salvo Ciudad de México, que se queda "CDMX"
+// (siglas universales). Las llaves y su orden son el contrato con las columnas
+// `ln_<estado>` que `generateSemanalTextsOrigen` recorre; solo cambian los valores.
+// Exportada para la prueba de que llaves y orden se conservan.
+export const ESTADOS_PROSA_POR_SNAKE: Record<string, string> = Object.fromEntries(
+  ESTADOS_ALFABETICOS.map((e) => [claveEstadoSnake(e.clave), nombreEstadoProsa(e.cve) as string])
+);
 
 export function generateSemanalTextsOrigen(
   data: Record<string, number>,
@@ -497,7 +494,7 @@ export function generateSemanalTextsOrigen(
 
   // Construir lista de estados con su LNE
   const estados: { nombre: string; lne: number; pad: number; key: string }[] = [];
-  for (const [key, label] of Object.entries(ESTADOS_ABBR)) {
+  for (const [key, label] of Object.entries(ESTADOS_PROSA_POR_SNAKE)) {
     const col = textoOrigenCol(key);
     const lne = (data[`ln_${col}`] as number) ?? 0;
     const pad = (data[`pad_${col}`] as number) ?? 0;

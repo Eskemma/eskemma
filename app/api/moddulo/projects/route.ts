@@ -1,7 +1,7 @@
 // app/api/moddulo/projects/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { createProject, listUserProjects } from "@/lib/moddulo/project";
+import { createProject, listUserProjects, PestelProjectNoPropioError } from "@/lib/moddulo/project";
 import type { CreateProjectInput } from "@/types/moddulo.types";
 
 // GET: Listar proyectos del usuario
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
+    if (error instanceof PestelProjectNoPropioError) {
+      return NextResponse.json({ error: "Proyecto de PESTEL no encontrado" }, { status: 404 });
+    }
     console.error("Error al crear proyecto:", error);
     return NextResponse.json({ error: "Error al crear proyecto" }, { status: 500 });
   }

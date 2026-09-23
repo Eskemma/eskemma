@@ -55,6 +55,13 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
     return {
       // Sin id → id automático, como el `.doc()` real de Firestore.
       doc: (id?: string) => docRef(`${path}/${id ?? `auto-${++autoIdCounter}`}`),
+      // add(data) → crea un doc con id automático y devuelve su ref (get()/id),
+      // como el `.add()` real. createProject lo usa.
+      add: vi.fn(async (data: unknown) => {
+        const ref = docRef(`${path}/auto-${++autoIdCounter}`);
+        await ref.set(data);
+        return ref;
+      }),
       where: (field: string, _op: "==", value: unknown) => queryRef(path, [[field, value]]),
     };
   }

@@ -57,15 +57,18 @@ const ORIGEN_KEYS_ANTERIOR: [string, string][] = [
   ["zacatecas", "Zacatecas"],
 ];
 
-// exploracion/page.tsx — ESTADOS_ABREV (keyada por nombre normalizado, con alias a mano)
+// exploracion/page.tsx — ESTADOS_ABREV (keyada por nombre normalizado, con alias a mano).
+// 26-09-23: la tabla se unificó en lib/geo/abreviaturasEstado.ts; este fixture conserva los
+// valores anteriores salvo 3 cambios deliberados (COL. → COLI. porque COL es Colombia;
+// TAMS. → TAMPS.; Q.ROO. → QROO.). El resto sigue verbatim.
 const ESTADOS_ABREV_ANTERIOR: Record<string, string> = {
   aguascalientes: "AGS.", baja_california: "BC.", baja_california_sur: "BCS.", campeche: "CAMP.", chiapas: "CHIS.",
-  chihuahua: "CHIH.", coahuila: "COAH.", coahuila_de_zaragoza: "COAH.", colima: "COL.", cdmx: "CDMX",
+  chihuahua: "CHIH.", coahuila: "COAH.", coahuila_de_zaragoza: "COAH.", colima: "COLI.", cdmx: "CDMX",
   ciudad_de_mexico: "CDMX", df: "CDMX", durango: "DGO.", estado_de_mexico: "EDOMEX.", edomex: "EDOMEX.",
   mexico: "EDOMEX.", guanajuato: "GTO.", guerrero: "GRO.", hidalgo: "HGO.", jalisco: "JAL.", michoacan: "MICH.",
   michoacan_de_ocampo: "MICH.", morelos: "MOR.", nayarit: "NAY.", nuevo_leon: "NL.", oaxaca: "OAX.", puebla: "PUE.",
-  queretaro: "QRO.", quintana_roo: "Q.ROO.", san_luis_potosi: "SLP.", sinaloa: "SIN.", sonora: "SON.",
-  tabasco: "TAB.", tamaulipas: "TAMS.", tlaxcala: "TLAX.", veracruz: "VER.", veracruz_de_ignacio_de_la_llave: "VER.",
+  queretaro: "QRO.", quintana_roo: "QROO.", san_luis_potosi: "SLP.", sinaloa: "SIN.", sonora: "SON.",
+  tabasco: "TAB.", tamaulipas: "TAMPS.", tlaxcala: "TLAX.", veracruz: "VER.", veracruz_de_ignacio_de_la_llave: "VER.",
   yucatan: "YUC.", zacatecas: "ZAC.",
 };
 

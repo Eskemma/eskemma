@@ -24,6 +24,7 @@ import { useGeoTerritorios } from "@/app/sefix/hooks/useLneSemanal";
 import { useLneSemanalesSerie } from "@/app/sefix/hooks/useLneSemanalesSerie";
 import { ESTADOS_LIST } from "@/lib/sefix/constants";
 import { ESTADOS, ESTADOS_ALFABETICOS, claveEstadoSnake } from "@/lib/geo/estados";
+import { CODIGO_ESTADO_POR_SNAKE } from "@/lib/geo/abreviaturasEstado";
 import type { Ambito } from "@/lib/sefix/seriesUtils";
 import {
   AZULES,
@@ -48,19 +49,11 @@ const fmtM = (v: number) =>
   v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : FMT.format(v);
 
 // ─── Mapas de estados ────────────────────────────────────────────────────────
-const ABREV: Record<string, string> = {
-  aguascalientes: "AGS", baja_california: "BC", baja_california_sur: "BCS",
-  campeche: "CAMP", chiapas: "CHIS", chihuahua: "CHIH",
-  ciudad_de_mexico: "CDMX", coahuila: "COAH", colima: "COL",
-  durango: "DGO", estado_de_mexico: "MEX", guanajuato: "GTO",
-  guerrero: "GRO", hidalgo: "HGO", jalisco: "JAL",
-  michoacan: "MICH", morelos: "MOR", nayarit: "NAY",
-  nuevo_leon: "NL", oaxaca: "OAX", puebla: "PUE",
-  queretaro: "QRO", quintana_roo: "QROO", san_luis_potosi: "SLP",
-  sinaloa: "SIN", sonora: "SON", tabasco: "TAB",
-  tamaulipas: "TAMPS", tlaxcala: "TLAX", veracruz: "VER",
-  yucatan: "YUC", zacatecas: "ZAC",
-};
+// Código compacto por llave "snake" (display SOLAMENTE). Las llaves y su orden
+// (`RECEPTOR_ORDER`, `ORIGIN_SUFFIXES`) son el contrato con las columnas de datos
+// `ln_<estado>`: vienen de lib/geo/abreviaturasEstado.ts y no cambian. "MEX" es el
+// país; el Estado de México es EDOMEX.
+const ABREV: Record<string, string> = CODIGO_ESTADO_POR_SNAKE;
 
 // Nombre a mostrar por llave "snake" del estado — derivado del catálogo central
 // (antes una copia escrita a mano de los 32).
@@ -235,7 +228,9 @@ function HeatmapGrid({ matrix, palette, dataKey, label, isDark }: GridProps) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: `44px repeat(${receptors.length}, minmax(22px, 1fr))`,
+                // 48px (antes 44): EDOMEX mide 39.02px a 9px (Arimo, medido en Chrome) y la columna
+                // dejaba exactamente 39px útiles (44 − 5 de padding) → cero margen.
+                gridTemplateColumns: `48px repeat(${receptors.length}, minmax(22px, 1fr))`,
                 width: singleCol ? "100%" : "max-content",
               }}
             >
