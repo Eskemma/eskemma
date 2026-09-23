@@ -102,7 +102,28 @@ app/secrets/
 /_moddulo-docs/
 
 # Datos electorales locales (archivos grandes ~2GB, no van al repositorio)
-/data/
+# Excepción (26-09-22, hallazgo incidental durante el cierre de E8): 4 JSON
+# de Fontana Familia 3 (26-08-27) NO son datos de scratch — se importan
+# estáticamente en el bundle de Next.js (`import ... from "@/data/fontana/
+# *.json"` en ensuCatalogo.ts, ingesta/{ensu,envipe,zap}.ts). Esta regla los
+# excluía en silencio desde su introducción — existían en disco local (por
+# eso `next build` funcionaba en desarrollo) pero nunca llegaron a GitHub,
+# así que el build de Vercel para `develop` fallaba con "module not found"
+# desde el 26-08-27 hasta hoy. Datos públicos derivados de INEGI/DOF, sin
+# información sensible. Un patrón `/data/` simple ignora el directorio
+# ENTERO — una negación a nivel de archivo (`!/data/fontana/x.json`) no
+# basta, git ni siquiera desciende a mirarla — de ahí el patrón de 3 pasos
+# (des-ignorar el árbol de directorios primero, re-ignorar su contenido,
+# reincluir solo los 4 archivos). INDICATOR_REGISTRY.json y
+# contenido_curado/ NO necesitan esta excepción — se leen en runtime desde
+# Cloud Storage (`readFromBodega`), no se importan al bundle.
+/data/*
+!/data/fontana/
+/data/fontana/*
+!/data/fontana/ensu_areas_2026t2.json
+!/data/fontana/ensu_percepcion_2026t2.json
+!/data/fontana/envipe_tasa_victimizacion.json
+!/data/fontana/zap_rural_2026.json
 
 # Datos geográficos SHP (~23 GB, procesados offline con geo-pipeline.ts)
 /info_geo_eske/

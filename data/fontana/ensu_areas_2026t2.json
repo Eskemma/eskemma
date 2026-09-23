@@ -1,0 +1,1567 @@
+{
+  "_fuente": "Microdatos ENSU 2026, Segundo Trimestre (conjunto_de_datos_ensu_viv_0626.csv) — descarga directa pública, sin registro, desde inegi.org.mx/programas/ensu/?ps=microdatos#datos_abiertos. Descargado por Raúl Sánchez el 2026-08-26/27.",
+  "_verificado": "2026-08-27",
+  "_trimestre": "2026-T2",
+  "_totalAreas": 90,
+  "_comoActualizar": "Snapshot TRIMESTRAL manual — este archivo NO se refresca solo. Cuando se descargue el microdato del siguiente trimestre de ENSU (mismo portal, sin registro): 1) repetir la agrupación por CD/NOM_CD -> CVE_ENT/NOM_ENT/CVE_MUN/NOM_MUN desde el nuevo conjunto_de_datos_ensu_viv_AAMM.csv; 2) si el número de áreas o la composición de alguna multi-municipio cambia, recalcular el prorrateo poblacional (CONAPO, resolverPoblacionMunicipal) de los casos que cruzan estado; 3) actualizar _fuente/_verificado/_trimestre/_totalAreas aquí y en data/fontana/ensu_percepcion_2026t2.json, y la fecha en el comentario de cabecera de lib/fontana/ingesta/ensu.ts. Los casos multi-estado y su prorrateo se recalculan cada vez — nunca se asume que siguen siendo los mismos 2.",
+  "areas": [
+    {
+      "cd": "01",
+      "nombre": "Aguascalientes",
+      "municipios": [
+        {
+          "cve_ent": "01",
+          "nombre_ent": "Aguascalientes",
+          "cve_mun": "001",
+          "nombre_mun": "Aguascalientes"
+        },
+        {
+          "cve_ent": "01",
+          "nombre_ent": "Aguascalientes",
+          "cve_mun": "005",
+          "nombre_mun": "Jesús María"
+        }
+      ]
+    },
+    {
+      "cd": "02",
+      "nombre": "Mexicali",
+      "municipios": [
+        {
+          "cve_ent": "02",
+          "nombre_ent": "Baja California",
+          "cve_mun": "002",
+          "nombre_mun": "Mexicali"
+        }
+      ]
+    },
+    {
+      "cd": "03",
+      "nombre": "Tijuana",
+      "municipios": [
+        {
+          "cve_ent": "02",
+          "nombre_ent": "Baja California",
+          "cve_mun": "004",
+          "nombre_mun": "Tijuana"
+        }
+      ]
+    },
+    {
+      "cd": "04",
+      "nombre": "La Paz",
+      "municipios": [
+        {
+          "cve_ent": "03",
+          "nombre_ent": "Baja California Sur",
+          "cve_mun": "003",
+          "nombre_mun": "La Paz"
+        }
+      ]
+    },
+    {
+      "cd": "05",
+      "nombre": "San Francisco de Campeche",
+      "municipios": [
+        {
+          "cve_ent": "04",
+          "nombre_ent": "Campeche",
+          "cve_mun": "002",
+          "nombre_mun": "Campeche"
+        }
+      ]
+    },
+    {
+      "cd": "06",
+      "nombre": "Saltillo",
+      "municipios": [
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "027",
+          "nombre_mun": "Ramos Arizpe"
+        },
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "030",
+          "nombre_mun": "Saltillo"
+        }
+      ]
+    },
+    {
+      "cd": "07",
+      "nombre": "La Laguna",
+      "municipios": [
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "017",
+          "nombre_mun": "Matamoros"
+        },
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "035",
+          "nombre_mun": "Torreón"
+        },
+        {
+          "cve_ent": "10",
+          "nombre_ent": "Durango",
+          "cve_mun": "007",
+          "nombre_mun": "Gómez Palacio"
+        },
+        {
+          "cve_ent": "10",
+          "nombre_ent": "Durango",
+          "cve_mun": "012",
+          "nombre_mun": "Lerdo"
+        }
+      ]
+    },
+    {
+      "cd": "08",
+      "nombre": "Piedras Negras",
+      "municipios": [
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "022",
+          "nombre_mun": "Nava"
+        },
+        {
+          "cve_ent": "05",
+          "nombre_ent": "Coahuila de Zaragoza",
+          "cve_mun": "025",
+          "nombre_mun": "Piedras Negras"
+        }
+      ]
+    },
+    {
+      "cd": "09",
+      "nombre": "Colima",
+      "municipios": [
+        {
+          "cve_ent": "06",
+          "nombre_ent": "Colima",
+          "cve_mun": "002",
+          "nombre_mun": "Colima"
+        },
+        {
+          "cve_ent": "06",
+          "nombre_ent": "Colima",
+          "cve_mun": "010",
+          "nombre_mun": "Villa de Álvarez"
+        }
+      ]
+    },
+    {
+      "cd": "10",
+      "nombre": "Manzanillo",
+      "municipios": [
+        {
+          "cve_ent": "06",
+          "nombre_ent": "Colima",
+          "cve_mun": "007",
+          "nombre_mun": "Manzanillo"
+        }
+      ]
+    },
+    {
+      "cd": "11",
+      "nombre": "Tuxtla Gutierrez",
+      "municipios": [
+        {
+          "cve_ent": "07",
+          "nombre_ent": "Chiapas",
+          "cve_mun": "027",
+          "nombre_mun": "Chiapa de Corzo"
+        },
+        {
+          "cve_ent": "07",
+          "nombre_ent": "Chiapas",
+          "cve_mun": "101",
+          "nombre_mun": "Tuxtla Gutiérrez"
+        }
+      ]
+    },
+    {
+      "cd": "12",
+      "nombre": "Tapachula",
+      "municipios": [
+        {
+          "cve_ent": "07",
+          "nombre_ent": "Chiapas",
+          "cve_mun": "089",
+          "nombre_mun": "Tapachula"
+        }
+      ]
+    },
+    {
+      "cd": "13",
+      "nombre": "Chihuahua",
+      "municipios": [
+        {
+          "cve_ent": "08",
+          "nombre_ent": "Chihuahua",
+          "cve_mun": "019",
+          "nombre_mun": "Chihuahua"
+        }
+      ]
+    },
+    {
+      "cd": "14",
+      "nombre": "Juarez",
+      "municipios": [
+        {
+          "cve_ent": "08",
+          "nombre_ent": "Chihuahua",
+          "cve_mun": "037",
+          "nombre_mun": "Juárez"
+        }
+      ]
+    },
+    {
+      "cd": "19",
+      "nombre": "Durango",
+      "municipios": [
+        {
+          "cve_ent": "10",
+          "nombre_ent": "Durango",
+          "cve_mun": "005",
+          "nombre_mun": "Durango"
+        }
+      ]
+    },
+    {
+      "cd": "20",
+      "nombre": "Leon de los Aldama",
+      "municipios": [
+        {
+          "cve_ent": "11",
+          "nombre_ent": "Guanajuato",
+          "cve_mun": "020",
+          "nombre_mun": "León"
+        },
+        {
+          "cve_ent": "11",
+          "nombre_ent": "Guanajuato",
+          "cve_mun": "025",
+          "nombre_mun": "Purísima del Rincón"
+        },
+        {
+          "cve_ent": "11",
+          "nombre_ent": "Guanajuato",
+          "cve_mun": "031",
+          "nombre_mun": "San Francisco del Rincón"
+        }
+      ]
+    },
+    {
+      "cd": "21",
+      "nombre": "Acapulco de Juarez",
+      "municipios": [
+        {
+          "cve_ent": "12",
+          "nombre_ent": "Guerrero",
+          "cve_mun": "001",
+          "nombre_mun": "Acapulco de Juárez"
+        }
+      ]
+    },
+    {
+      "cd": "22",
+      "nombre": "Chilpancingo de los Bravo",
+      "municipios": [
+        {
+          "cve_ent": "12",
+          "nombre_ent": "Guerrero",
+          "cve_mun": "029",
+          "nombre_mun": "Chilpancingo de los Bravo"
+        }
+      ]
+    },
+    {
+      "cd": "23",
+      "nombre": "Pachuca de Soto",
+      "municipios": [
+        {
+          "cve_ent": "13",
+          "nombre_ent": "Hidalgo",
+          "cve_mun": "048",
+          "nombre_mun": "Pachuca de Soto"
+        },
+        {
+          "cve_ent": "13",
+          "nombre_ent": "Hidalgo",
+          "cve_mun": "051",
+          "nombre_mun": "Mineral de la Reforma"
+        },
+        {
+          "cve_ent": "13",
+          "nombre_ent": "Hidalgo",
+          "cve_mun": "083",
+          "nombre_mun": "Zempoala"
+        }
+      ]
+    },
+    {
+      "cd": "25",
+      "nombre": "Puerto Vallarta",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "067",
+          "nombre_mun": "Puerto Vallarta"
+        }
+      ]
+    },
+    {
+      "cd": "26",
+      "nombre": "Toluca de Lerdo",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "005",
+          "nombre_mun": "Almoloya de Juárez"
+        },
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "051",
+          "nombre_mun": "Lerma"
+        },
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "054",
+          "nombre_mun": "Metepec"
+        },
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "076",
+          "nombre_mun": "San Mateo Atenco"
+        },
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "106",
+          "nombre_mun": "Toluca"
+        },
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "118",
+          "nombre_mun": "Zinacantepec"
+        }
+      ]
+    },
+    {
+      "cd": "27",
+      "nombre": "Ecatepec de Morelos",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "033",
+          "nombre_mun": "Ecatepec de Morelos"
+        }
+      ]
+    },
+    {
+      "cd": "28",
+      "nombre": "Ciudad Nezahualcoyotl",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "058",
+          "nombre_mun": "Nezahualcóyotl"
+        }
+      ]
+    },
+    {
+      "cd": "29",
+      "nombre": "Morelia",
+      "municipios": [
+        {
+          "cve_ent": "16",
+          "nombre_ent": "Michoacan de Ocampo",
+          "cve_mun": "053",
+          "nombre_mun": "Morelia"
+        },
+        {
+          "cve_ent": "16",
+          "nombre_ent": "Michoacan de Ocampo",
+          "cve_mun": "088",
+          "nombre_mun": "Tarímbaro"
+        }
+      ]
+    },
+    {
+      "cd": "30",
+      "nombre": "Uruapan",
+      "municipios": [
+        {
+          "cve_ent": "16",
+          "nombre_ent": "Michoacan de Ocampo",
+          "cve_mun": "102",
+          "nombre_mun": "Uruapan"
+        }
+      ]
+    },
+    {
+      "cd": "31",
+      "nombre": "Lazaro Cardenas",
+      "municipios": [
+        {
+          "cve_ent": "16",
+          "nombre_ent": "Michoacan de Ocampo",
+          "cve_mun": "052",
+          "nombre_mun": "Lázaro Cárdenas"
+        }
+      ]
+    },
+    {
+      "cd": "32",
+      "nombre": "Cuernavaca",
+      "municipios": [
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "007",
+          "nombre_mun": "Cuernavaca"
+        },
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "008",
+          "nombre_mun": "Emiliano Zapata"
+        },
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "011",
+          "nombre_mun": "Jiutepec"
+        },
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "018",
+          "nombre_mun": "Temixco"
+        },
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "028",
+          "nombre_mun": "Xochitepec"
+        },
+        {
+          "cve_ent": "17",
+          "nombre_ent": "Morelos",
+          "cve_mun": "029",
+          "nombre_mun": "Yautepec"
+        }
+      ]
+    },
+    {
+      "cd": "33",
+      "nombre": "Tepic",
+      "municipios": [
+        {
+          "cve_ent": "18",
+          "nombre_ent": "Nayarit",
+          "cve_mun": "008",
+          "nombre_mun": "Xalisco"
+        },
+        {
+          "cve_ent": "18",
+          "nombre_ent": "Nayarit",
+          "cve_mun": "017",
+          "nombre_mun": "Tepic"
+        }
+      ]
+    },
+    {
+      "cd": "35",
+      "nombre": "Oaxaca de Juarez",
+      "municipios": [
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "067",
+          "nombre_mun": "Oaxaca de Juárez"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "083",
+          "nombre_mun": "San Agustín de las Juntas"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "091",
+          "nombre_mun": "San Andrés Huayápam"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "107",
+          "nombre_mun": "San Antonio de la Cal"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "157",
+          "nombre_mun": "San Jacinto Amilpas"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "227",
+          "nombre_mun": "San Lorenzo Cacaotepec"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "350",
+          "nombre_mun": "San Sebastián Tutla"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "385",
+          "nombre_mun": "Santa Cruz Xoxocotlán"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "390",
+          "nombre_mun": "Santa Lucía del Camino"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "399",
+          "nombre_mun": "Santa María Atzompa"
+        },
+        {
+          "cve_ent": "20",
+          "nombre_ent": "Oaxaca",
+          "cve_mun": "519",
+          "nombre_mun": "Santo Domingo Tomaltepec"
+        }
+      ]
+    },
+    {
+      "cd": "36",
+      "nombre": "Heroica Puebla de Zaragoza",
+      "municipios": [
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "015",
+          "nombre_mun": "Amozoc"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "041",
+          "nombre_mun": "Cuautlancingo"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "106",
+          "nombre_mun": "Ocoyucan"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "114",
+          "nombre_mun": "Puebla"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "119",
+          "nombre_mun": "San Andrés Cholula"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "125",
+          "nombre_mun": "San Gregorio Atzompa"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "136",
+          "nombre_mun": "San Miguel Xoxtla"
+        },
+        {
+          "cve_ent": "21",
+          "nombre_ent": "Puebla",
+          "cve_mun": "140",
+          "nombre_mun": "San Pedro Cholula"
+        }
+      ]
+    },
+    {
+      "cd": "37",
+      "nombre": "Queretaro",
+      "municipios": [
+        {
+          "cve_ent": "22",
+          "nombre_ent": "Queretaro",
+          "cve_mun": "006",
+          "nombre_mun": "Corregidora"
+        },
+        {
+          "cve_ent": "22",
+          "nombre_ent": "Queretaro",
+          "cve_mun": "011",
+          "nombre_mun": "El Marqués"
+        },
+        {
+          "cve_ent": "22",
+          "nombre_ent": "Queretaro",
+          "cve_mun": "014",
+          "nombre_mun": "Querétaro"
+        }
+      ]
+    },
+    {
+      "cd": "38",
+      "nombre": "Cancun",
+      "municipios": [
+        {
+          "cve_ent": "23",
+          "nombre_ent": "Quintana Roo",
+          "cve_mun": "005",
+          "nombre_mun": "Benito Juárez"
+        }
+      ]
+    },
+    {
+      "cd": "39",
+      "nombre": "San Luis Potosi",
+      "municipios": [
+        {
+          "cve_ent": "24",
+          "nombre_ent": "San Luis Potosi",
+          "cve_mun": "028",
+          "nombre_mun": "San Luis Potosí"
+        },
+        {
+          "cve_ent": "24",
+          "nombre_ent": "San Luis Potosi",
+          "cve_mun": "035",
+          "nombre_mun": "Soledad de Graciano Sánchez"
+        }
+      ]
+    },
+    {
+      "cd": "40",
+      "nombre": "Culiacan Rosales",
+      "municipios": [
+        {
+          "cve_ent": "25",
+          "nombre_ent": "Sinaloa",
+          "cve_mun": "006",
+          "nombre_mun": "Culiacán"
+        }
+      ]
+    },
+    {
+      "cd": "41",
+      "nombre": "Mazatlan",
+      "municipios": [
+        {
+          "cve_ent": "25",
+          "nombre_ent": "Sinaloa",
+          "cve_mun": "012",
+          "nombre_mun": "Mazatlán"
+        }
+      ]
+    },
+    {
+      "cd": "42",
+      "nombre": "Los Mochis",
+      "municipios": [
+        {
+          "cve_ent": "25",
+          "nombre_ent": "Sinaloa",
+          "cve_mun": "001",
+          "nombre_mun": "Ahome"
+        }
+      ]
+    },
+    {
+      "cd": "43",
+      "nombre": "Hermosillo",
+      "municipios": [
+        {
+          "cve_ent": "26",
+          "nombre_ent": "Sonora",
+          "cve_mun": "030",
+          "nombre_mun": "Hermosillo"
+        }
+      ]
+    },
+    {
+      "cd": "44",
+      "nombre": "Nogales",
+      "municipios": [
+        {
+          "cve_ent": "26",
+          "nombre_ent": "Sonora",
+          "cve_mun": "043",
+          "nombre_mun": "Nogales"
+        }
+      ]
+    },
+    {
+      "cd": "45",
+      "nombre": "Villahermosa",
+      "municipios": [
+        {
+          "cve_ent": "27",
+          "nombre_ent": "Tabasco",
+          "cve_mun": "004",
+          "nombre_mun": "Centro"
+        },
+        {
+          "cve_ent": "27",
+          "nombre_ent": "Tabasco",
+          "cve_mun": "013",
+          "nombre_mun": "Nacajuca"
+        }
+      ]
+    },
+    {
+      "cd": "46",
+      "nombre": "Tampico",
+      "municipios": [
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "003",
+          "nombre_mun": "Altamira"
+        },
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "009",
+          "nombre_mun": "Ciudad Madero"
+        },
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "038",
+          "nombre_mun": "Tampico"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "123",
+          "nombre_mun": "Pánuco"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "133",
+          "nombre_mun": "Pueblo Viejo"
+        }
+      ]
+    },
+    {
+      "cd": "47",
+      "nombre": "Reynosa",
+      "municipios": [
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "032",
+          "nombre_mun": "Reynosa"
+        }
+      ]
+    },
+    {
+      "cd": "48",
+      "nombre": "Nuevo Laredo",
+      "municipios": [
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "027",
+          "nombre_mun": "Nuevo Laredo"
+        }
+      ]
+    },
+    {
+      "cd": "49",
+      "nombre": "Tlaxcala de Xicohtencatl",
+      "municipios": [
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "002",
+          "nombre_mun": "Apetatitlán de Antonio Carvajal"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "005",
+          "nombre_mun": "Apizaco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "010",
+          "nombre_mun": "Chiautempan"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "017",
+          "nombre_mun": "Mazatecochco de José María Morelos"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "018",
+          "nombre_mun": "Contla de Juan Cuamatzi"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "025",
+          "nombre_mun": "San Pablo del Monte"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "026",
+          "nombre_mun": "Santa Cruz Tlaxcala"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "028",
+          "nombre_mun": "Teolocholco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "029",
+          "nombre_mun": "Tepeyanco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "031",
+          "nombre_mun": "Tetla de la Solidaridad"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "032",
+          "nombre_mun": "Tetlatlahuca"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "033",
+          "nombre_mun": "Tlaxcala"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "038",
+          "nombre_mun": "Tzompantepec"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "039",
+          "nombre_mun": "Xaloztoc"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "042",
+          "nombre_mun": "Xicohtzinco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "043",
+          "nombre_mun": "Yauhquemehcan"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "044",
+          "nombre_mun": "Zacatelco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "048",
+          "nombre_mun": "La Magdalena Tlaltelulco"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "049",
+          "nombre_mun": "San Damián Texóloc"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "050",
+          "nombre_mun": "San Francisco Tetlanohcan"
+        },
+        {
+          "cve_ent": "29",
+          "nombre_ent": "Tlaxcala",
+          "cve_mun": "053",
+          "nombre_mun": "San Juan Huactzinco"
+        }
+      ]
+    },
+    {
+      "cd": "50",
+      "nombre": "Veracruz",
+      "municipios": [
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "028",
+          "nombre_mun": "Boca del Río"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "193",
+          "nombre_mun": "Veracruz"
+        }
+      ]
+    },
+    {
+      "cd": "51",
+      "nombre": "Coatzacoalcos",
+      "municipios": [
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "039",
+          "nombre_mun": "Coatzacoalcos"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "048",
+          "nombre_mun": "Cosoleacaque"
+        }
+      ]
+    },
+    {
+      "cd": "52",
+      "nombre": "Merida",
+      "municipios": [
+        {
+          "cve_ent": "31",
+          "nombre_ent": "Yucatan",
+          "cve_mun": "041",
+          "nombre_mun": "Kanasín"
+        },
+        {
+          "cve_ent": "31",
+          "nombre_ent": "Yucatan",
+          "cve_mun": "050",
+          "nombre_mun": "Mérida"
+        },
+        {
+          "cve_ent": "31",
+          "nombre_ent": "Yucatan",
+          "cve_mun": "059",
+          "nombre_mun": "Progreso"
+        },
+        {
+          "cve_ent": "31",
+          "nombre_ent": "Yucatan",
+          "cve_mun": "101",
+          "nombre_mun": "Umán"
+        }
+      ]
+    },
+    {
+      "cd": "53",
+      "nombre": "Zacatecas",
+      "municipios": [
+        {
+          "cve_ent": "32",
+          "nombre_ent": "Zacatecas",
+          "cve_mun": "017",
+          "nombre_mun": "Guadalupe"
+        },
+        {
+          "cve_ent": "32",
+          "nombre_ent": "Zacatecas",
+          "cve_mun": "056",
+          "nombre_mun": "Zacatecas"
+        }
+      ]
+    },
+    {
+      "cd": "54",
+      "nombre": "Fresnillo",
+      "municipios": [
+        {
+          "cve_ent": "32",
+          "nombre_ent": "Zacatecas",
+          "cve_mun": "010",
+          "nombre_mun": "Fresnillo"
+        }
+      ]
+    },
+    {
+      "cd": "55",
+      "nombre": "Los Cabos",
+      "municipios": [
+        {
+          "cve_ent": "03",
+          "nombre_ent": "Baja California Sur",
+          "cve_mun": "008",
+          "nombre_mun": "Los Cabos"
+        }
+      ]
+    },
+    {
+      "cd": "56",
+      "nombre": "Ciudad del Carmen",
+      "municipios": [
+        {
+          "cve_ent": "04",
+          "nombre_ent": "Campeche",
+          "cve_mun": "003",
+          "nombre_mun": "Carmen"
+        }
+      ]
+    },
+    {
+      "cd": "57",
+      "nombre": "Guanajuato",
+      "municipios": [
+        {
+          "cve_ent": "11",
+          "nombre_ent": "Guanajuato",
+          "cve_mun": "015",
+          "nombre_mun": "Guanajuato"
+        }
+      ]
+    },
+    {
+      "cd": "58",
+      "nombre": "Ixtapa-zihuatanejo",
+      "municipios": [
+        {
+          "cve_ent": "12",
+          "nombre_ent": "Guerrero",
+          "cve_mun": "038",
+          "nombre_mun": "Zihuatanejo de Azueta"
+        }
+      ]
+    },
+    {
+      "cd": "59",
+      "nombre": "Guadalajara",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "039",
+          "nombre_mun": "Guadalajara"
+        }
+      ]
+    },
+    {
+      "cd": "60",
+      "nombre": "Tonala",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "101",
+          "nombre_mun": "Tonalá"
+        }
+      ]
+    },
+    {
+      "cd": "61",
+      "nombre": "Tlajomulco de Zuniga",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "097",
+          "nombre_mun": "Tlajomulco de Zúñiga"
+        }
+      ]
+    },
+    {
+      "cd": "62",
+      "nombre": "San Pedro Tlaquepaque",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "098",
+          "nombre_mun": "San Pedro Tlaquepaque"
+        }
+      ]
+    },
+    {
+      "cd": "63",
+      "nombre": "Zapopan",
+      "municipios": [
+        {
+          "cve_ent": "14",
+          "nombre_ent": "Jalisco",
+          "cve_mun": "120",
+          "nombre_mun": "Zapopan"
+        }
+      ]
+    },
+    {
+      "cd": "64",
+      "nombre": "Monterrey",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "039",
+          "nombre_mun": "Monterrey"
+        }
+      ]
+    },
+    {
+      "cd": "65",
+      "nombre": "San Pedro Garza Garcia",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "019",
+          "nombre_mun": "San Pedro Garza García"
+        }
+      ]
+    },
+    {
+      "cd": "66",
+      "nombre": "Apodaca",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "006",
+          "nombre_mun": "Apodaca"
+        }
+      ]
+    },
+    {
+      "cd": "67",
+      "nombre": "Guadalupe",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "026",
+          "nombre_mun": "Guadalupe"
+        }
+      ]
+    },
+    {
+      "cd": "68",
+      "nombre": "General Escobedo",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "021",
+          "nombre_mun": "General Escobedo"
+        }
+      ]
+    },
+    {
+      "cd": "69",
+      "nombre": "San Nicolas de los Garza",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "046",
+          "nombre_mun": "San Nicolás de los Garza"
+        }
+      ]
+    },
+    {
+      "cd": "70",
+      "nombre": "Santa Catarina",
+      "municipios": [
+        {
+          "cve_ent": "19",
+          "nombre_ent": "Nuevo Leon",
+          "cve_mun": "048",
+          "nombre_mun": "Santa Catarina"
+        }
+      ]
+    },
+    {
+      "cd": "71",
+      "nombre": "Azcapotzalco",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "002",
+          "nombre_mun": "Azcapotzalco"
+        }
+      ]
+    },
+    {
+      "cd": "72",
+      "nombre": "Coyoacan",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "003",
+          "nombre_mun": "Coyoacán"
+        }
+      ]
+    },
+    {
+      "cd": "73",
+      "nombre": "Cuajimalpa de Morelos",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "004",
+          "nombre_mun": "Cuajimalpa de Morelos"
+        }
+      ]
+    },
+    {
+      "cd": "74",
+      "nombre": "Gustavo A. Madero",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "005",
+          "nombre_mun": "Gustavo A. Madero"
+        }
+      ]
+    },
+    {
+      "cd": "75",
+      "nombre": "Iztacalco",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "006",
+          "nombre_mun": "Iztacalco"
+        }
+      ]
+    },
+    {
+      "cd": "76",
+      "nombre": "Iztapalapa",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "007",
+          "nombre_mun": "Iztapalapa"
+        }
+      ]
+    },
+    {
+      "cd": "77",
+      "nombre": "La Magdalena Contreras",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "008",
+          "nombre_mun": "La Magdalena Contreras"
+        }
+      ]
+    },
+    {
+      "cd": "78",
+      "nombre": "Milpa Alta",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "009",
+          "nombre_mun": "Milpa Alta"
+        }
+      ]
+    },
+    {
+      "cd": "79",
+      "nombre": "Alvaro Obregon",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "010",
+          "nombre_mun": "Álvaro Obregón"
+        }
+      ]
+    },
+    {
+      "cd": "80",
+      "nombre": "Tlahuac",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "011",
+          "nombre_mun": "Tláhuac"
+        }
+      ]
+    },
+    {
+      "cd": "81",
+      "nombre": "Tlalpan",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "012",
+          "nombre_mun": "Tlalpan"
+        }
+      ]
+    },
+    {
+      "cd": "82",
+      "nombre": "Xochimilco",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "013",
+          "nombre_mun": "Xochimilco"
+        }
+      ]
+    },
+    {
+      "cd": "83",
+      "nombre": "Benito Juarez",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "014",
+          "nombre_mun": "Benito Juárez"
+        }
+      ]
+    },
+    {
+      "cd": "84",
+      "nombre": "Cuauhtemoc",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "015",
+          "nombre_mun": "Cuauhtémoc"
+        }
+      ]
+    },
+    {
+      "cd": "85",
+      "nombre": "Miguel Hidalgo",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "016",
+          "nombre_mun": "Miguel Hidalgo"
+        }
+      ]
+    },
+    {
+      "cd": "86",
+      "nombre": "Venustiano Carranza",
+      "municipios": [
+        {
+          "cve_ent": "09",
+          "nombre_ent": "Ciudad de Mexico",
+          "cve_mun": "017",
+          "nombre_mun": "Venustiano Carranza"
+        }
+      ]
+    },
+    {
+      "cd": "87",
+      "nombre": "Tlalnepantla de Baz",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "104",
+          "nombre_mun": "Tlalnepantla de Baz"
+        }
+      ]
+    },
+    {
+      "cd": "88",
+      "nombre": "Naucalpan de Juarez",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "057",
+          "nombre_mun": "Naucalpan de Juárez"
+        }
+      ]
+    },
+    {
+      "cd": "89",
+      "nombre": "Cuautitlan Izcalli",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "121",
+          "nombre_mun": "Cuautitlán Izcalli"
+        }
+      ]
+    },
+    {
+      "cd": "90",
+      "nombre": "Atizapan de Zaragoza",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "013",
+          "nombre_mun": "Atizapán de Zaragoza"
+        }
+      ]
+    },
+    {
+      "cd": "91",
+      "nombre": "Chimalhuacan",
+      "municipios": [
+        {
+          "cve_ent": "15",
+          "nombre_ent": "Mexico",
+          "cve_mun": "031",
+          "nombre_mun": "Chimalhuacán"
+        }
+      ]
+    },
+    {
+      "cd": "92",
+      "nombre": "Irapuato",
+      "municipios": [
+        {
+          "cve_ent": "11",
+          "nombre_ent": "Guanajuato",
+          "cve_mun": "017",
+          "nombre_mun": "Irapuato"
+        }
+      ]
+    },
+    {
+      "cd": "93",
+      "nombre": "Chetumal",
+      "municipios": [
+        {
+          "cve_ent": "23",
+          "nombre_ent": "Quintana Roo",
+          "cve_mun": "004",
+          "nombre_mun": "Othón P. Blanco"
+        }
+      ]
+    },
+    {
+      "cd": "94",
+      "nombre": "Ciudad Obregon",
+      "municipios": [
+        {
+          "cve_ent": "26",
+          "nombre_ent": "Sonora",
+          "cve_mun": "018",
+          "nombre_mun": "Cajeme"
+        }
+      ]
+    },
+    {
+      "cd": "95",
+      "nombre": "Ciudad Victoria",
+      "municipios": [
+        {
+          "cve_ent": "28",
+          "nombre_ent": "Tamaulipas",
+          "cve_mun": "041",
+          "nombre_mun": "Victoria"
+        }
+      ]
+    },
+    {
+      "cd": "96",
+      "nombre": "Xalapa",
+      "municipios": [
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "026",
+          "nombre_mun": "Banderilla"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "065",
+          "nombre_mun": "Emiliano Zapata"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "087",
+          "nombre_mun": "Xalapa"
+        },
+        {
+          "cve_ent": "30",
+          "nombre_ent": "Veracruz de Ignacio de la Llave",
+          "cve_mun": "182",
+          "nombre_mun": "Tlalnelhuayocan"
+        }
+      ]
+    }
+  ],
+  "prorrateoMultiEstado": {
+    "46": {
+      "28": 84.2,
+      "30": 15.8
+    },
+    "07": {
+      "10": 38.6,
+      "05": 61.4
+    }
+  }
+}
