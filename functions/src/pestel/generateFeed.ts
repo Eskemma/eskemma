@@ -19,6 +19,10 @@ import type {
   FontanaInsumo,
 } from "./classifier/claudePESTL";
 import {calculateRiskVector} from "./risk/vectorCalculator";
+import {
+  calcularVectorRiesgoV2,
+  dimensionAnalysisAVectorRiesgoInput,
+} from "./risk/vectorRiesgoV2";
 import type {InegiDataPoint} from "./scrapers/inegi";
 import type {BanxicoDataPoint} from "./scrapers/banxico";
 
@@ -286,6 +290,12 @@ export async function generateAnalysisV2(params: {
   horizonte: number;
   variableConfigs: PestlDimensionConfig[];
   sefixData?: SefixData | null;
+  // Alertas (26-09-22) — umbral del proyecto para `pestel_alerts`; el
+  // caller ya lo lee de `pestel_projects` al resolver el resto del
+  // proyecto, así que no hace falta una lectura nueva de Firestore aquí.
+  // Default 70 si el proyecto es legacy y no lo trae (mismo default
+  // usado al crear un proyecto nuevo).
+  vectorRiesgoUmbral?: number;
   anthropicKey: string;
   db: Firestore;
 }): Promise<string> {
@@ -298,6 +308,7 @@ export async function generateAnalysisV2(params: {
     territorioCompleto,
     horizonte,
     variableConfigs,
+    vectorRiesgoUmbral = 70,
     sefixData,
     anthropicKey,
     db,
@@ -448,7 +459,8 @@ export async function generateAnalysisV2(params: {
   if (territorioCompleto) {
     const fontanaResultados = await Promise.all(
       DIMENSIONES_CON_FONTANA.map((code) =>
-        fetchFontanaInsumos(code, territorioCompleto, tipo).then((insumos) => ({code, insumos}))
+        fetchFontanaInsumos(code, territorioCompleto, tipo)
+          .then((insumos) => ({code, insumos}))
       )
     );
     for (const {code, insumos} of fontanaResultados) {
@@ -560,6 +572,41 @@ export async function generateAnalysisV2(params: {
     status,
     vigente: true,
   });
+
+  // 9.5. Vector de Riesgo V2 + alerta (26-09-22). Determinista, sin
+  // llamadas a Claude adicionales — reusa `dimResults`, que las 6
+  // llamadas de arriba ya produjeron. Ver
+  // functions/src/pestel/risk/vectorRiesgoV2.ts para el diseño completo
+  // (backtesting, limitaciones de la muestra, criterio sustituto de
+  // isCrisis) y CLAUDE.md ("PESTEL — Etapa 8") para el resumen de
+  // producto.
+  const {
+    vectorRiesgo, isCrisis, dimensionesDominantes,
+  } = calcularVectorRiesgoV2(
+    dimensionAnalysisAVectorRiesgoInput(dimResults),
+    vectorRiesgoUmbral
+  );
+  if (vectorRiesgo >= vectorRiesgoUmbral) {
+    const alertRef = db.collection("pestel_alerts").doc();
+    await alertRef.set({
+      id: alertRef.id,
+      projectId,
+      type: "vector_riesgo_alto",
+      dimensionCode: dimensionesDominantes[0],
+      description:
+        `El vector de riesgo del análisis (${vectorRiesgo}) superó el ` +
+        `umbral configurado (${vectorRiesgoUmbral}). Dimensiones con ` +
+        `mayor peso: ${dimensionesDominantes.join(", ")}.`,
+      isCrisis,
+      generadoEn: admin.firestore.FieldValue.serverTimestamp(),
+      analysisId: analysisRef.id,
+    });
+    console.log(
+      `[generateFeed] Alerta creada (${alertRef.id}) — vectorRiesgo: ` +
+        `${vectorRiesgo}, umbral: ${vectorRiesgoUmbral}, ` +
+        `isCrisis: ${isCrisis}`
+    );
+  }
 
   // 10. Update project stage to 5
   await db

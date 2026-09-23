@@ -30,7 +30,10 @@ export const scrapeAndAnalyze = onRequest(
     // `POST /api/fontana/insumos-pestel` (Next.js) — mismo patrón de
     // secreto que INEGI_TOKEN/BANXICO_TOKEN. FONTANA_API_BASE_URL (la
     // URL pública de la app) NO es un secreto — va en `functions/.env`.
-    secrets: ["INEGI_TOKEN", "BANXICO_TOKEN", "ANTHROPIC_API_KEY", "FONTANA_INTERNAL_TOKEN"],
+    secrets: [
+      "INEGI_TOKEN", "BANXICO_TOKEN", "ANTHROPIC_API_KEY",
+      "FONTANA_INTERNAL_TOKEN",
+    ],
   },
   async (req, res) => {
     if (req.method !== "POST") {
@@ -316,6 +319,12 @@ export const scrapeAndAnalyze = onRequest(
             horizonte: projectData.horizonte as number ?? 6,
             variableConfigs,
             sefixData: sefixData ?? null,
+            // Alertas (26-09-22) — `projectData.alertas` ya se leyó
+            // arriba (línea ~86); se reenvía el umbral, sin releer
+            // Firestore.
+            vectorRiesgoUmbral: (
+              projectData.alertas as {vectorRiesgoUmbral?: number} | undefined
+            )?.vectorRiesgoUmbral ?? 70,
             anthropicKey,
             db,
           });

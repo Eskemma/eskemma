@@ -31,10 +31,13 @@
     {
       "id": "pestel-e8",
       "anchor": "| E8",
-      "description": "Estado de fases PESTEL — E8 Monitoreo",
+      "description": "Estado de fases PESTEL — E8 Monitoreo. Actualizado 26-09-22: paths ampliados para incluir la generación real de alertas (antes solo cubría la UI, que no delataba que nada escribía en pestel_alerts).",
       "paths": [
         "app/centinela/pestel/[projectId]/monitoreo",
-        "app/components/centinela/pestel/monitoreo"
+        "app/components/centinela/pestel/monitoreo",
+        "functions/src/pestel/risk/vectorRiesgoV2.ts",
+        "functions/src/pestel/generateFeed.ts",
+        "functions/src/pestel/feedSync.ts"
       ]
     },
     {

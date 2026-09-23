@@ -151,7 +151,9 @@ export interface FontanaInsumoSintesis {
   // describir el patrón/rango. "aditivo"/"tasa_ponderada" con desglose
   // (sin valor agregado disponible) también puede llegar aquí.
   tipoCalculo?: string;
-  desglose: { nombre: string; valor?: number; unidad?: string; motivo?: string }[];
+  desglose: {
+    nombre: string; valor?: number; unidad?: string; motivo?: string
+  }[];
   fuenteEtiqueta?: string;
   periodo?: string;
   fuenteOficial: string;
@@ -162,7 +164,10 @@ export interface FontanaInsumoSinDato {
   tipo: "sin_dato";
   motivo: string;
 }
-export type FontanaInsumo = FontanaInsumoSimple | FontanaInsumoSintesis | FontanaInsumoSinDato;
+export type FontanaInsumo =
+  | FontanaInsumoSimple
+  | FontanaInsumoSintesis
+  | FontanaInsumoSinDato;
 
 const DIMENSION_NAMES: Record<DimensionCode, string> = {
   P: "Político",
@@ -241,7 +246,9 @@ function formatEconomicData(points: EconomicDataPoint[]): string {
     .join("\n");
 }
 
-const NO_PROMEDIAR_TIPOS = new Set(["no_agregable", "narrativo_sintetizado", undefined]);
+const NO_PROMEDIAR_TIPOS = new Set(
+  ["no_agregable", "narrativo_sintetizado", undefined]
+);
 
 /**
  * Formats Fontana indicator insumos (Económico/Social/Ecológico) for
@@ -256,22 +263,32 @@ function formatFontanaData(insumos: FontanaInsumo[]): string {
   for (const ins of insumos) {
     if (ins.tipo === "simple") {
       lineas.push(
-        `- ${ins.nombre}: ${ins.valor}${ins.unidad ? " " + ins.unidad : ""}` +
-        ` | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`
+        `- ${ins.nombre}: ${ins.valor}` +
+          `${ins.unidad ? " " + ins.unidad : ""}` +
+          ` | fuente_oficial: ${ins.fuenteOficial} | período: ` +
+          `${ins.periodo ?? "sin período"} | detalle: ` +
+          `${ins.fuenteEtiqueta ?? "sin fuente"}`
       );
     } else if (ins.tipo === "sintesis") {
       const conValor = ins.desglose.filter((d) => d.valor !== undefined);
       if (conValor.length === 0) continue;
       const noPromediar = NO_PROMEDIAR_TIPOS.has(ins.tipoCalculo);
       lineas.push(
-        `- ${ins.nombre} (desglose por unidad territorial — ${conValor.length} unidades` +
-        `${noPromediar ? "; NO promediar, describe el patrón/rango entre ellas" : ""}):`
+        `- ${ins.nombre} (desglose por unidad territorial — ` +
+          `${conValor.length} unidades` +
+          `${noPromediar ?
+            "; NO promediar, describe el patrón/rango entre ellas" :
+            ""}):`
       );
       for (const d of conValor) {
-        lineas.push(`  · ${d.nombre}: ${d.valor}${d.unidad ? " " + d.unidad : ""}`);
+        lineas.push(
+          `  · ${d.nombre}: ${d.valor}${d.unidad ? " " + d.unidad : ""}`
+        );
       }
       lineas.push(
-        `  | fuente_oficial: ${ins.fuenteOficial} | período: ${ins.periodo ?? "sin período"} | detalle: ${ins.fuenteEtiqueta ?? "sin fuente"}`
+        `  | fuente_oficial: ${ins.fuenteOficial} | período: ` +
+          `${ins.periodo ?? "sin período"} | detalle: ` +
+          `${ins.fuenteEtiqueta ?? "sin fuente"}`
       );
     }
     // "sin_dato" no se incluye — nada que citar.

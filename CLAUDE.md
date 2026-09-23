@@ -987,7 +987,7 @@ Frontend detecta "completed" → carga análisis → muestra E5
 | E5    | Análisis IA: 5 dims paralelas + sesgos + cadenas | ✅ Completado |
 | E6    | Interpretación: matriz drag-drop (puntero + teclado), panel de sesgos, voces del territorio, comparación con análisis previo; `/approve` responde 422 mientras haya sesgos sin revisar (human-in-loop real) | ✅ Completado (verificado 26-09-21) |
 | E7    | Informes: 4 formatos con streaming (ejecutivo, técnico, FODA-lista, escenarios) + scorecard ponderado + export PDF/DOCX. Falta el 5º formato de la spec 07 (mapa de insights por tipo de proyecto) | 🟡 Parcial — 4 de 5 formatos (verificado 26-09-21) |
-| E8    | Monitoreo continuo + alertas. Hecho: dashboard por dimensión, histórico, cron `scheduledMonitor` cada 6 h para proyectos con `autoMonitorEnabled`, versionado de análisis, UI de alertas/banner de crisis. **NO hecho: nada ESCRIBE `pestel_alerts` (solo se lee/borra) ni `isCrisis`** → el feed y el banner siempre quedan vacíos; umbral fijo en 70 (`vectorRiesgoUmbral`, sin UI para cambiarlo); sin email; frecuencia fija de 6 h (no la de la Etapa 2); `feedSync.ts` (V1) es un stub que lanza "Not implemented" | 🟡 Parcial — UI y cron listos, generación de alertas/crisis sin construir (verificado 26-09-21) |
+| E8    | Monitoreo continuo + alertas. Hecho: dashboard por dimensión, histórico, cron `scheduledMonitor` cada 6 h para proyectos con `autoMonitorEnabled`, versionado de análisis, UI de alertas/banner de crisis, **y ahora la generación real de alertas** — `calcularVectorRiesgoV2` (determinista, sin llamadas a Claude adicionales) se ejecuta al final de `generateAnalysisV2` (V2, el único camino que corre hoy) y escribe en `pestel_alerts` cuando el score supera `alertas.vectorRiesgoUmbral` del proyecto; `isCrisis` con un criterio sustituto (ver detalle abajo, "PESTEL — Etapa 8: generación de alertas"). **Ciclo básico cerrado, sin correo** (`notificarEmail` sigue sin leerse — Opción B, pendiente aparte); umbral sigue fijo en 70 por defecto sin UI para cambiarlo por proyecto; frecuencia sigue fija en 6 h (no la de la Etapa 2); `feedSync.ts` (V1, trigger de `pestel_feeds`) ya no lanza error — no-op explícito documentado, V1 no tiene una fórmula equivalente (fuera de alcance, ver detalle) | ✅ Ciclo básico cerrado (26-09-22) — sin correo (Opción B aparte), sin umbral/frecuencia configurables por UI |
 | —     | Integración con Fontana (Económico/Social/Ecológico), ambas vías (Express + Controlada) | ✅ Completado 26-09-13 |
 | —     | Integración con Moddulo F2 (exploración) — `generate-m1-express` (MapaPESTEL express), `import-pestel` (409 + `confirmReplace`), `find-linked-pestel`, `unlink-pestel`; consumidas por `exploracion/page.tsx` | ✅ Completado (verificado 26-09-21) |
 
@@ -1056,6 +1056,153 @@ son negociables y aplican a todas las etapas, incluyendo las futuras E6-E8.
    decide. Los outputs de IA son insumos para el juicio profesional, no
    recomendaciones definitivas. Ningún output es definitivo sin validación
    explícita del usuario (E6 human-in-the-loop).
+
+### PESTEL — Etapa 8: generación de alertas (26-09-22)
+
+**Diagnóstico previo a este cierre (investigación separada, mismo día):**
+el hueco no era solo "nada escribe en `pestel_alerts`" — no existía ningún
+cálculo de riesgo conectado al camino que realmente corre hoy (V2).
+`calculateRiskVector` (`functions/src/pestel/risk/vectorCalculator.ts`)
+seguía vivo pero cableado exclusivamente al camino V1 legacy
+(`generateFeedFromRawData`), que el cron de monitoreo automático nunca
+ejecuta — su input (`ClassifiedArticle[]` con sentimiento por artículo) no
+existe en V2, que enruta por palabra clave sin clasificar artículos. El
+texto de la UI ("las alertas se generan cuando el riesgo supera el
+umbral") describía un campo que `PestlAnalysisV2` ni siquiera almacenaba.
+`feedSync.ts` (el único artefacto relacionado con "alertas" en el código)
+era un trigger de Firestore sobre `pestel_feeds` (colección V1, nunca se
+crea desde el monitoreo automático V2) que lanzaba `throw new
+Error("Not implemented — ver Fase 4")` — huérfano desde el rediseño V2
+(26-03-27), el comentario "Fase 4" se refería a la integración con
+Moddulo (ya resuelta por otro mecanismo), no a alertas.
+
+**Fórmula (`calcularVectorRiesgoV2`, `functions/src/pestel/risk/
+vectorRiesgoV2.ts`), determinista, sin llamadas a Claude adicionales** —
+opera sobre `DimensionAnalysis[]` (`classification`/`intensity`/`trend`/
+`confidence`), que las 6 llamadas de la Etapa 5 YA producen:
+
+```
+base(AMENAZA) = 80, base(NEUTRAL) = 40, base(OPORTUNIDAD) = 15
+modificador(ALTA) = 1.0, modificador(MEDIA) = 0.6, modificador(BAJA) = 0.3
+
+riesgo_dim = 50 + (base(classification) − 50) × modificador(intensity)
+```
+Si la dimensión es AMENAZA y `trend` es ASCENDENTE, +10 (empeorando); si
+es DESCENDENTE, −10 (mejorando) — sin ajuste de tendencia para
+OPORTUNIDAD/NEUTRAL. Agregado del proyecto, promedio ponderado por
+`confidence` de cada dimensión (mismo principio que `globalConfidence`):
+```
+vectorRiesgo = clamp( Σ(riesgo_dim × confidence_dim) / Σ(confidence_dim) )
+```
+Si `confidence` de todas las dimensiones es 0 (análisis degenerado), cae
+al neutro 50 y nunca dispara alerta — caso límite verificado.
+
+**`isCrisis` — criterio sustituto, NO el original de la spec 08.** La
+spec 08 pide un spike de menciones > 300% sobre la media de 7 días —
+requiere tracking de volumen diario que el pipeline no guarda hoy y que
+no se construyó en esta ronda (infraestructura nueva, fuera de alcance).
+Se activa en su lugar un criterio sustituto, deliberadamente más agresivo
+que el umbral normal: `isCrisis = vectorRiesgo ≥ umbral + 15` **y** al
+menos 2 dimensiones simultáneas en AMENAZA+ALTA. **Esto NO resuelve la
+spec 08 original — la sustituye temporalmente** y queda anotado como
+pendiente de revisión para cuando se retome la versión fortalecida de
+PESTEL (tracking de volumen de menciones en el tiempo).
+
+**Backtesting (26-09-22, solo lectura, 141 análisis reales de
+`pestel_analyses` en Firestore, antes de conectar la fórmula al flujo en
+vivo):** la fórmula no mostró falsos positivos/negativos evidentes contra
+los datos existentes (casos degenerados caen correctamente a 50 sin
+alertar; el caso más bajo de la muestra, con una dimensión OPORTUNIDAD y
+el resto mixto, correctamente no disparó). **Limitación de la muestra,
+documentada explícitamente porque condiciona cómo leer el comportamiento
+en producción:** 128 de los 141 análisis (91%) vienen de un único
+proyecto de prueba interno con clasificación mayoritariamente AMENAZA —
+no es una muestra suficiente para calibrar los parámetros con confianza
+total. Se decidió (aprobado por Raúl) dejar la fórmula tal como fue
+diseñada, sin ajustar ningún número, y observar el comportamiento real en
+producción antes de calibrar. **Si en el futuro las alertas parecen
+dispararse con más frecuencia de la esperada en producción real, el
+primer lugar a revisar es la tendencia de clasificación del análisis por
+dimensión (E5, prompts de `analyzeDimension`), no necesariamente la
+fórmula de `vectorRiesgo` en sí — son responsabilidades distintas del
+sistema.**
+
+**Punto de inserción:** dentro de `generateAnalysisV2`
+(`functions/src/pestel/generateFeed.ts`), entre el paso 9 (guardar
+`pestel_analyses`) y el paso 10 (actualizar `currentStage`) — reusa
+`dimResults`, ya calculado por las 6 llamadas a Claude de la Etapa 5 (cero
+llamadas nuevas a la IA). El umbral del proyecto (`alertas.
+vectorRiesgoUmbral`) se reenvía desde `scrapeAndAnalyze.ts`, que ya tenía
+`projectData.alertas` en scope al leer el proyecto — sin lectura nueva de
+Firestore. Mismo punto de disparo para análisis manual (`POST
+/api/centinela/pestel/trigger`) y automático (`scheduledMonitor`, cron de
+6 h): ambos llaman a la misma Cloud Function `scrapeAndAnalyze` con
+`{projectId, userId}`. El monitoreo automático sigue desactivado por
+defecto (`autoMonitorEnabled: false` al crear el proyecto) — este cambio
+no lo activa ni lo afecta, solo cambia qué pasa al terminar un análisis.
+Al escribir la alerta (`pestel_alerts`, tipo nuevo `"vector_riesgo_alto"`,
+`types/pestel.types.ts`), la descripción cita el score, el umbral y las
+2 dimensiones que más pesaron (`dimensionesDominantes`) — principio de
+transparencia metodológica ya no-negociable de PESTEL.
+
+**`feedSync.ts` corregido, no eliminado.** El camino V1
+(`pestel_configs`/`POST /api/centinela/pestel/config`) sigue siendo
+técnicamente alcanzable en código aunque documentado como legacy/solo-
+lectura, así que el trigger se dejó como no-op explícito (`logger.info`)
+en vez de borrarlo — documenta en su cabecera por qué V1 no tiene una
+fórmula de riesgo equivalente (`PESTLAnalysis`, el shape que guarda
+`pestel_feeds`, no trae `classification`/`intensity` por dimensión; la
+fórmula de V2 no es reusable sin rediseñarla) y por qué el `throw`
+original generaba error en cada doc de `pestel_feeds` sin que nadie lo
+consumiera.
+
+**Pruebas de regresión (`functions/src/pestel/risk/
+vectorRiesgoV2.test.ts`, 20 casos).** `functions/` no tenía runner de
+pruebas (sin jest/vitest/mocha; `firebase-functions-test` presente como
+devDependency pero sin ningún archivo de prueba en todo el paquete) — se
+agregó `tsx` (único devDependency nuevo) + `node:test`/`node:assert`
+(stdlib de Node 22, sin framework de pruebas nuevo), script `npm run test`
+en `functions/package.json`. Cobertura: caso degenerado (vacío,
+confidence:0 en todas), riesgo por combinación clasificación×intensidad,
+ajuste de tendencia (solo AMENAZA, ambas direcciones, confirmando que NO
+aplica a NEUTRAL/OPORTUNIDAD), agregado ponderado por confidence (peso
+igual, confidence:0 no arrastra, mayor confidence pesa más),
+`dimensionesDominantes` (máximo 2, orden correcto), `isCrisis` (dispara
+con el gate compuesto, NO dispara con 1 sola dimensión AMENAZA+ALTA pese
+a superar el margen, NO dispara si el vectorRiesgo no alcanza el margen
+aunque haya 2 dimensiones, el umbral por proyecto desplaza el punto de
+disparo) y el adaptador `dimensionAnalysisAVectorRiesgoInput` (mapeo +
+round-trip). `functions/tsconfig.build.json` (nuevo, extiende
+`tsconfig.json` y excluye `src/**/*.test.ts`) es el que usa `npm run
+build`/`build:watch` — el `tsconfig.json` base sigue incluyendo los
+`.test.ts` porque ESLint (`parserOptions.project`) necesita verlos;
+separarlos evita que el archivo de pruebas se compile a `lib/` (y se
+despliegue) sin romper el linter. `vitest.config.ts` (raíz) excluye
+`functions/**` para que el runner de Next.js no intente interpretar
+archivos que usan la API de `node:test`.
+
+**Verificación:** `tsc --noEmit` (raíz) limpio; `next build` limpio;
+`cd functions && npm run build` limpio; `cd functions && npm run lint`
+limpio en todo lo tocado por esta ronda (2 hallazgos pre-existentes en
+`claudePESTL.ts`, sin relación con este cambio, no tocados — líneas largas
+ya presentes antes de esta ronda); 333 pruebas de la raíz sin regresión;
+20/20 pruebas nuevas de `vectorRiesgoV2.test.ts`. **Pendiente de Raúl:**
+desplegar (`firebase deploy --only functions`, acción que este flujo no
+ejecuta por sí solo) y disparar un análisis real (manual o esperar el
+cron) sobre un proyecto con `alertas.vectorRiesgoUmbral` conocido, para
+confirmar en producción que `pestel_alerts` se escribe y que el feed/
+banner de crisis (`AlertsFeed`, `CrisisBanner`) dejan de estar vacíos.
+
+**Explícitamente fuera de alcance de este cierre** (ya evaluado en el
+diagnóstico previo, no bloquean el ciclo básico): umbral/frecuencia
+configurables por UI (`vectorRiesgoUmbral` ya es un campo por proyecto en
+Firestore, falta la UI para editarlo; la frecuencia de 6 h es una
+constante de código, cambiarla a "por proyecto" requiere arquitectura de
+scheduling distinta); correo (`AlertasConfig.notificarEmail` sigue sin
+leerse — Opción B, extensión de bajo-medio costo sobre el mismo punto de
+escritura, con `lib/email.ts`/Resend ya en uso en otros flujos); reglas de
+alerta configurables por el usuario (`AlertRule`, tipo definido en
+`types/pestel.types.ts` pero nunca construido/leído — sin empezar).
 
 ---
 
@@ -1438,3 +1585,6 @@ firebase functions:log
 | 26-09-22 | Diseño — ronda 8: sitio principal, sub-ronda B (197 → 0) | 20 archivos (`componentsHome` completo, `newsletter/confirm`, `newsletter/unsubscribe`). Recontado antes de tocar código: idéntico al diagnóstico previo. 3 modales de plan de suscripción verificados sin identidad de color (no repiten el patrón de `SubscriptionBadge`), mapeo mecánico sin decisión pendiente. 3 bugs de sufijo `-eske` faltante corregidos (`red-60`, `gray-90`, `gray-20`, mismo patrón que `HomeClient` en A). Caja de advertencia de `newsletter/confirm` → `brown-eske-60`/`yellow-eske`, con `dark:` agregado. 2 gradientes con `dark:` agregado, 2 pares claro/oscuro colapsados por resolver al mismo token. Verificación: `tsc`, `next build`, 331 pruebas, 58 clases presentes en el CSS, 0 conflictos de cascada, guard extendido y probado en negativo. **Pendiente:** sub-rondas C (310), D (124), E8, badge `draft` del hub. |
 | 26-09-22 | Diseño — ronda 9: sitio principal, sub-ronda C (310 → 0, salvo 12 de marca) | Blog público (156/23) + admin (154/16). `ShareButtons`/`SEOPreview`: de sus 41 clases totales, 12 son marca real (Facebook/X/LinkedIn/WhatsApp, pestañas Google/Facebook/X) → excepción **exacta** en el guard (lista literal, probada en negativo agregando una clase no declarada); las otras 29 no eran marca y migraron. Chip morado de `BlogToolbar` investigado a fondo (3er indicador de filtro activo, estado de UI local sin relación con datos del blog) y resuelto con decisión de Raúl: `violet-eske` (4º uso oficial) para el chip de orden, `blue-eske` para el de búsqueda. Estado editorial y moderación de comentarios ya usaban tokens, sin tocar. Sin bugs de sufijo `-eske` en este alcance. Banner de error de `NewsletterSignup` sobre fondo de marca (no blanco) → `text-white-eske`, 7.30:1 vs 5.44:1 original. Verificación: `tsc`, `next build`, 332 pruebas, 66 clases presentes en el CSS, 0 conflictos de cascada, guard probado en negativo en los 2 bloques (cero genéricos y excepciones exactas). **Pendiente:** sub-ronda D (124, condicionada a decisión de plan/color), E8, badge `draft` del hub, `lib/constants/categories.ts` (hex crudo, reportado). |
 | 26-09-22 | Diseño — ronda 10: sitio principal, sub-ronda D (124 → 0) + token `premium-eske` — cierra las 4 sub-rondas | Investigación previa (2 exploradores en paralelo) confirmó que el púrpura de Premium (`#9333ea`, único hex en todo el repo) es identidad de producto real (borde+precio consistentes en `suscripciones.tsx`, igual que Basic/Professional) y un tono materialmente distinto de `violet-eske` (ΔE76 45.5). Decisión de Raúl: token nuevo `premium-eske` (no 5º uso de `violet-eske`). `admin`→`red-eske-60` y `unsubscribed-*`→`orange-eske` (decisiones de Raúl, mecánicas). `registered`/`default` de `SubscriptionBadge`: ningún paso de `gray-eske` alcanza AA con texto blanco → texto cambiado a `black-eske`, mismo patrón que `visitor` (5.03:1/5.61:1). Mapeo por rol de la contraparte oscura (no por paso) en `profile.tsx`, con 3 tonos distintos encontrados. Bug real corregido: `profile.tsx:902`, un `dark:` faltante entre 3 filas idénticas. Extrapolaciones de bajo riesgo en bordes decorativos (`+1 paso en oscuro`, ya documentado para `--color-brand-primary`). Verificación: `tsc`, `next build`, 333 pruebas, 47 clases presentes en el CSS, 0 conflictos de cascada, guard probado en negativo. **Con esto cierran A+B+C+D del sitio principal.** **Pendiente:** E8, badge `draft` del hub, `lib/constants/categories.ts`, grises de Fontana. |
+| 26-09-22 | PESTEL — Etapa 8: generación de alertas (cierra el ciclo básico) | Investigación previa (misma ronda) confirmó que el hueco era más profundo que "nada escribe en `pestel_alerts`": ningún cálculo de riesgo estaba conectado al camino que corre hoy (V2) — `calculateRiskVector` seguía cableado solo a V1 legacy (input `ClassifiedArticle[]` con sentimiento por artículo, que V2 nunca genera), y `feedSync.ts` era un trigger sobre `pestel_feeds` (colección V1, inalcanzable desde el cron V2) con un `throw` huérfano desde el rediseño V2 (26-03-27). Fórmula nueva `calcularVectorRiesgoV2` (`functions/src/pestel/risk/vectorRiesgoV2.ts`, determinista, cero llamadas a Claude adicionales — opera sobre `classification`/`intensity`/`trend`/`confidence` que las 6 llamadas de la Etapa 5 ya producen): riesgo por dimensión según clasificación (AMENAZA=80/NEUTRAL=40/OPORTUNIDAD=15) modulado por intensidad y, solo en AMENAZA, ±10 según tendencia; agregado del proyecto = promedio ponderado por `confidence`. `isCrisis` con criterio SUSTITUTO (`vectorRiesgo ≥ umbral+15` y ≥2 dimensiones AMENAZA+ALTA) — documentado explícitamente que NO es el criterio original de la spec 08 (spike de menciones >300% sobre 7 días, requiere tracking de volumen diario que no existe hoy), pendiente de revisión para la versión fortalecida de PESTEL. **Backtesting previo (solo lectura, 141 análisis reales de Firestore) sin falsos positivos/negativos evidentes, pero con limitación de muestra documentada: 91% de los datos vienen de un único proyecto de prueba con clasificación mayoritariamente AMENAZA — no es representativa para calibrar con confianza; se aprobó dejar la fórmula sin ajustar números, a la espera de producción real** — si las alertas se disparan con más frecuencia de la esperada, revisar primero la tendencia de clasificación de E5, no necesariamente esta fórmula (responsabilidades distintas). Insertada entre el paso 9 y el paso 10 de `generateAnalysisV2` (mismo punto de disparo para análisis manual y automático, sin activar `autoMonitorEnabled`); `vectorRiesgoUmbral` reenviado desde `scrapeAndAnalyze.ts` sin lectura nueva de Firestore. Tipo de alerta nuevo `"vector_riesgo_alto"` (`types/pestel.types.ts`, con `analysisId` para trazabilidad). `feedSync.ts` corregido (no eliminado): no-op explícito documentado, V1 no tiene fórmula equivalente. **Pruebas de regresión nuevas** (`vectorRiesgoV2.test.ts`, 20 casos) — primera vez que `functions/` tiene un runner de pruebas: se agregó `tsx` (único devDependency nuevo) + `node:test`/`node:assert` (stdlib), sin introducir un framework nuevo; `functions/tsconfig.build.json` (nuevo) excluye los `.test.ts` del build de deploy sin afectar a ESLint, `vitest.config.ts` (raíz) excluye `functions/**`. Verificación: `tsc --noEmit`, `next build`, `cd functions && npm run build`, `cd functions && npm run lint` (2 líneas largas pre-existentes en `claudePESTL.ts` bloqueaban el hook de pre-deploy de `firebase deploy` — sin relación con la fórmula, corregidas mecánicamente al intentar el deploy real, ver fila siguiente), 333 pruebas de la raíz sin regresión, 20/20 pruebas nuevas. **Cierra el ciclo básico de E8 — sin correo** (`notificarEmail` sigue sin leerse, Opción B pendiente aparte) **y sin umbral/frecuencia configurables por UI** (fuera de alcance, ya evaluado). **Pendiente de Raúl:** desplegar (`firebase deploy --only functions`) y disparar un análisis real (manual o cron) para confirmar en producción que `pestel_alerts` se escribe y que `AlertsFeed`/`CrisisBanner` dejan de estar vacíos. |
+| 26-09-22 | PESTEL E8 — despliegue: secreto faltante + 2 hallazgos incidentales resueltos | El primer intento de `firebase deploy --only functions` reveló 3 bloqueos, ninguno del diseño de la fórmula: **(1)** el hook de pre-deploy corre `npm run lint` con el `tsconfig.json` base (necesario para que ESLint vea también `vectorRiesgoV2.test.ts`) — las 8 líneas largas pre-existentes de `claudePESTL.ts` (ya reportadas en la fila de arriba como "sin relación, no tocadas") SÍ bloqueaban el deploy real aunque no las nuestras; corregidas mecánicamente (solo wrapping de línea, cero cambio de lógica), verificado con `tsc --noEmit`, `next build`, `cd functions && npm run build/lint/test` limpios. **(2)** `FONTANA_INTERNAL_TOKEN` (integración PESTEL↔Fontana, 26-09-13) nunca se había fijado en Secret Manager — el secreto está declarado en `scrapeAndAnalyze.ts` desde esa ronda pero nadie lo creó; generado un valor nuevo (`openssl rand -hex 32`) y fijado por Raúl en Secret Manager + `.env` local + Vercel (los 3 entornos). **(3, hallazgo incidental, SIN relación con E8 ni con el punto 2):** al revisar el estado de Vercel para confirmar el punto 2, Raúl reportó un error de build en `develop` — investigado con evidencia real (sin CLI de Vercel disponible, diagnóstico por lectura directa del repo): `lib/fontana/ingesta/zap.ts` (+ `ensuCatalogo.ts`, `ingesta/ensu.ts`, `ingesta/envipe.ts`) importan estáticamente 4 JSON de `data/fontana/` al bundle de Next.js — pero `.gitignore:105` (`/data/`, pensada para excluir ~2GB de datos electorales) los excluía en silencio desde que esos imports se introdujeron (Fontana Familia 3, **26-08-27**, confirmado por `git log`); los archivos existían en disco local (por eso el build local sí funcionaba) pero nunca llegaron a GitHub, así que el build de Vercel para `develop` llevaba roto casi un mes — **desde antes de que existiera esta ronda de E8, sin relación con la fórmula de alertas.** Fix: excepción de 3 pasos en `.gitignore` (`/data/*` → `!/data/fontana/` → `/data/fontana/*` → reincluir solo los 4 archivos) — `INDICATOR_REGISTRY.json` y `contenido_curado/` (se leen de Cloud Storage en runtime, no se importan al bundle) y el resto de `data/` (datos grandes) siguen ignorados sin cambio, verificado con `git check-ignore -v` antes/después y `git status --porcelain -uall` confirmando que solo esos 4 archivos quedaban para agregar. Commiteados en un commit separado y enfocado (`8e990c8`, datos públicos INEGI/DOF, sin información sensible), verificado que el blob de git es byte-idéntico al archivo en disco y que un `git worktree` limpio (simulando un checkout fresco tipo Vercel) materializa los 4 archivos sin residuo local. **Deploy reintentado y confirmado exitoso** (`firebase deploy --only functions`, mismo día) — Firebase otorgó automáticamente `roles/secretmanager.secretAccessor` a la cuenta de servicio para `FONTANA_INTERNAL_TOKEN`, confirmando que el secreto SÍ estaba en Secret Manager (no solo en Vercel/`.env`); las 7 funciones (`scrapeAndAnalyze`, `scheduledMonitor`, `feedSync`, `purgeAdjuntos`, `onUserCreate`, `onUserUpdate`, `setAdminRole`) se actualizaron/crearon sin errores. **Aún pendiente de Raúl:** hacer `git push` de este commit y del resto del trabajo de E8 (no auto-push, ver reglas de la sesión); confirmar en el panel de Vercel si el build de `develop` ahora completa (el fix del punto 3 sigue sin push hasta que Raúl lo suba). |
+| 26-09-22 | PESTEL E8 — verificación en vivo confirmada (fórmula, escritura y UI) | Raúl disparó un análisis real (`FlOLfyDYPiHd3OEmDZV5`, proyecto "Campaña de Ricardo Anaya (PAN) para la Presidencia") sobre el deploy recién hecho — `pestel_alerts` siguió vacío. **Investigado con lectura directa de Firestore (script de solo lectura, scratchpad) en vez de asumir "correcto" sin verificar:** las 6 dimensiones reales de ese análisis (P/S/L en AMENAZA+ALTA, E en AMENAZA+MEDIA, T/Ec en NEUTRAL) producen, con la fórmula exacta, `vectorRiesgo = 69` — **a 1 punto del umbral (70) del proyecto**. Confirmado además que `pestel_alerts` tenía 0 documentos en TODO el proyecto (no solo para ese análisis) — la ausencia de alerta es el resultado matemáticamente correcto de la fórmula, no un fallo silencioso. **Duda aparte de Raúl, también investigada:** el indicador "Alertas" no se movía y él no veía en la terminal el `GET .../alerts` del polling de `AlertsFeed` (solo veía `GET /api/notifications`, una ruta distinta y no relacionada — la campanita de notificaciones in-app, no el feed de alertas de monitoreo). Confirmado por código que `AlertsFeed` está montado sin condición en `monitoreo/page.tsx` y hace `fetch` inmediato al montar + cada 30s a la ruta correcta (`GET /api/centinela/pestel/project/[projectId]/alerts`, existente y correcta) — hipótesis: throttling de timers en pestaña de fondo (comportamiento estándar del navegador). **Confirmado por Raúl con DevTools → Network:** la petición SÍ llega (`200 OK`), con la pestaña en foco — la duda queda cerrada, sin bug de polling. **Demostración del camino positivo, sin gastar una llamada nueva a Claude:** por pedido de Raúl ("ver la implementación funcionar, sin lanzar un nuevo análisis"), se bajó `alertas.vectorRiesgoUmbral` de ese proyecto (70 → 50, temporal, solo ese proyecto) y se recalculó `vectorRiesgo` importando **el mismo módulo de producción** (`calcularVectorRiesgoV2`/`dimensionAnalysisAVectorRiesgoInput` de `functions/src/pestel/risk/vectorRiesgoV2.ts`, no una reimplementación) contra las dimensiones REALES ya guardadas de `FlOLfyDYPiHd3OEmDZV5` — con umbral 50: `vectorRiesgo=69` sí dispara, y como hay 3 dimensiones en AMENAZA+ALTA (≥2) y `69 ≥ 50+15=65`, también dispara `isCrisis:true`. Se escribió el documento real `pestel_alerts/8FnbNdLQZMNqWeGJkXkI` (mismo shape exacto que produce el paso 9.5 de `generateAnalysisV2`, `analysisId` apuntando al análisis real, descripción marcada explícitamente `[PRUEBA DE VERIFICACIÓN E8 — umbral temporal de 50]` para no confundirse con una alerta orgánica). Raúl confirmó en navegador: contador de alertas, alerta en el feed y `CrisisBanner` rojo, los 3 visibles. **Decisión de Raúl: NO revertir** — el umbral bajado (50) y la alerta de prueba se quedan deliberadamente en ese proyecto (uno de prueba interno) como recordatorio vivo para cuando se retome la siguiente versión de PESTEL. **Con esto, E8 queda verificado de punta a punta en producción real**: fórmula (20 pruebas unitarias + backtesting de 141 análisis históricos + este cálculo en vivo), escritura en Firestore (alerta real generada por la fórmula real), y UI (`AlertsFeed`/`CrisisBanner` reflejando el estado real, polling confirmado funcional). Sin trabajo pendiente de esta verificación — quedan solo el `git push` y la confirmación de Vercel ya anotados en la fila anterior. |

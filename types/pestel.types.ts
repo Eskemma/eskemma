@@ -279,12 +279,19 @@ export interface AlertRule {
 export interface PESTELAlertV2 {
   id: string;
   projectId: string;
-  type: AlertRule["type"] | "bias_detected" | "coverage_low";
+  // "vector_riesgo_alto" (26-09-22): el score agregado de las 6 dimensiones
+  // (dimensionAnalysisAVectorRiesgoInput + calcularVectorRiesgoV2,
+  // functions/src/pestel/risk/vectorRiesgoV2.ts) superó `alertas.vectorRiesgoUmbral`
+  // del proyecto en el análisis con `analysisId`.
+  type: AlertRule["type"] | "bias_detected" | "coverage_low" | "vector_riesgo_alto";
   dimensionCode?: DimensionCode;
   description: string;
   isCrisis: boolean;
   generadoEn: Timestamp | string;
   readAt?: Timestamp | string | null;
+  // Trazabilidad (principio no negociable de PESTEL): a qué análisis pertenece la
+  // alerta. Solo presente en "vector_riesgo_alto" por ahora.
+  analysisId?: string;
 }
 
 // ==========================================
