@@ -37,7 +37,7 @@ import {
 import { buscarDistritoCandidatos, primerCandidatoTemporal, formatDistritoCabecera } from "@/lib/sefix/districtMatching";
 import { resolverEstadoCve } from "@/lib/geo/estados";
 import { abreviaturaEstado } from "@/lib/moddulo/abreviaturaEstado";
-import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
+import { checkTerritoryMatch, compararTerritorios, explicarTerritorioApproximate, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 import { isMexico } from "@/lib/centinela/pestel/utils/country";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 
@@ -2537,7 +2537,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
               </svg>
               <span>
                 {confirmTarget.territoryMatch === "approximate"
-                  ? `Los territorios parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
+                  ? explicarTerritorioApproximate(compararTerritorios(projectTerritory, confirmTarget.territorio).relacion)
                   : `El análisis es de "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}", pero este proyecto cubre "${projectTerritory?.nombre ?? "territorio no especificado"}".`}
               </span>
             </div>

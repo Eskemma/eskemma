@@ -588,8 +588,8 @@ referencia** (esta pieza) y (2) **composición** de varias unidades (zona metrop
 |-------|--------|
 | **Pieza 1** — núcleo puro `desambiguarReferencia` + `POST /api/geo/candidatos` + tests con casos reales | ✅ **Completada 26-09-24** (sin cambios visibles: nada la consume aún) |
 | Pieza 1b — sugerencias por error de tecleo (solo para `ninguno`) | ⏳ Aparte, documentada abajo |
-| **Paso 2a** — formulario de municipio con `clave`, módulo puro, relleno perezoso y script de migración | 🔧 **Código construido 26-09-24**; migración de datos pendiente de aprobación caso por caso |
-| Paso 2b — `checkTerritoryMatch` por conjuntos (compuerta de vinculación entre apps) | ⏳ Separado, pendiente |
+| **Paso 2a** — formulario de municipio con `clave`, módulo puro, relleno perezoso y script de migración | ✅ **Completado 26-09-24** (código + migración aplicada a los 7 documentos) |
+| **Paso 2b** — `checkTerritoryMatch` por conjuntos (compuerta de vinculación entre apps) | ✅ **Construido 26-09-24** (Variante B; contención entre niveles → Paso 2c opcional) |
 | Paso 3 — herramientas del chat de Fontana sobre el núcleo (distritos, país vs estado) | ⏳ Pendiente |
 | Paso 4 — Moddulo (`project.territorio` estructurado en el chat), portabilidad por id, multiselección | ⏳ Pendiente |
 
@@ -688,14 +688,53 @@ Membrillos»). **Pendiente aparte, decisión de Raúl (no propuesto ni tocado):*
 realmente el proyecto es contenido de negocio, fuera de esta migración. **Ruta `app/api/geo/resolver-municipio/route.ts` ELIMINADA 26-09-24** (ya
 no tenía consumidores; la reemplaza `/api/geo/candidatos`; los helpers de `lib/geo/municipios.ts` los sigue usando Fontana).
 
+*Paso 2b (construido 26-09-24, Variante B aprobada por Raúl).* `checkTerritoryMatch`
+(`lib/moddulo/linkCompatibility.ts`) compara ahora por CONJUNTOS de unidades y no por el primer elemento de
+las listas plurales. Módulo puro nuevo `lib/geo/unidadesTerritoriales.ts` (`unidadesDeTerritorio`:
+nacional `NAC`, estatal CVE, municipal `clave` de `MunicipioSeleccionado` o clave DERIVADA del nombre con
+`estructural=false`, distrito código de 4 dígitos; `relacionDeConjuntos`: igual/cubre/cubierto/traslape/
+disjunto/no_comparable), reutilizable por los Pasos 3 y 4. `compararTerritorios(a, b)` devuelve
+`{match, relacion}`; `checkTerritoryMatch` es `.match`, así que **el contrato de 3 valores no cambió** y los 6
+llamadores siguen igual. **Política (Variante B):** solo se comparan por conjuntos territorios del MISMO
+nivel; niveles distintos siguen en `mismatch`. La contención entre niveles (nacional cubre todo, estatal ⊃
+municipal, municipal vs distrito —esta última necesita el catálogo distrito→municipios, server-side—)
+queda **diferida como Paso 2c opcional**, con mensajes propios. Mismo nivel: disjunto → `mismatch`;
+cubre/cubierto/traslape → `approximate`; igual → `exact` solo si nacional/estatal o AMBOS lados con claves
+estructurales (nunca por interpretar texto; regla vigente). Distritos sin número resoluble en algún lado
+conservan la comparación por cabecera de siempre. **Textos:** `explicarTerritorioApproximate(relacion)`
+es el único lugar del aviso de "approximate" (link-moddulo, `canal3Evaluation`, `ModduloButton`,
+`FontanaModduloButton`, `exploracion/page`): decir "parecen coincidir" cuando uno contiene al otro habría
+engañado a quien confirma; el aviso de Canal 3 "solo consideró la primera" ya solo aplica si la
+comparación por conjuntos no fue posible.
+**Evidencia real (los 496 pares de los 32 territorios guardados, antes/después con el código de HEAD):**
+463 mismatch→mismatch, 22 approximate→approximate, 5 exact→exact y **6 cambios exactos**: 5
+mismatch→approximate (familia ZMG/Guadalajara/Zapopan: Guadalajara ESTÁ dentro de la ZMG, y el código
+anterior daba `mismatch` porque solo miraba el primer municipio, Tlaquepaque — **5 casos reales estaban mal
+clasificados**) y 1 approximate→exact (Progreso+Telchac Puerto+Celestún, claves iguales en ambos lados,
+proyecto `Q5ZY…` vs sesión `3wsy…`). Ningún par real pasa de `exact` a otra cosa. Fixture congelado con los 32
+territorios y el resultado anterior de cada par: `lib/moddulo/__tests__/fixtures/territorios32.json`
+(`lib/moddulo/linkCompatibility.test.ts`, 26 casos: matriz 463/5/22/1/5, simetría de los 496, los 6 cambios
+nombrados, ZMG vs Guadalajara/Zapopan, Progreso, estatal plural, distritos); las 22 pruebas de
+`normalizadoresSueltos.test.ts` pasan SIN editar. **Cambios de comportamiento que hoy "funcionaban" por el
+motivo equivocado, reportados:** (1) por primera vez un municipal puede dar `exact` (claves iguales en ambos
+lados); los territorios con solo `municipio` escalar (p. ej. los 4 de Cuernavaca) siguen en `approximate`
+porque no tienen `clave`; (2) un estatal plural ya no da `exact` por coincidir solo el primer estado
+(`[Jalisco, Colima]` vs `[Jalisco, Nayarit]` → `approximate`; 0 casos reales guardados); (3) un estatal sin
+estado en algún lado pasa de `exact` (sin verificar nada) a `approximate` (0 casos reales); (4) el proyecto
+ZMG de 8 municipios y su sesión vinculada de 10 comparan como `cubierto`/`approximate`, no como `exact`: es
+un hecho de los datos, consistente con la decisión de no tocar esa diferencia en esta ronda. La compuerta de
+vinculación solo se relaja en `approximate → exact` (1 par real); `mismatch → approximate` solo cambia
+mensaje y orden de los pickers (link-moddulo y Canal 3 exigen confirmación en ambos). No cambia
+`staleness.ts` ni el snapshot de vinculación (siguen escalares, gap conocido adyacente).
+
 *Pendientes del Paso 2 (no tocar antes).* (a) Caso real ya guardado:
 `fontana_sesiones/vO9JFif6W3UQc7DlyqPq` tiene el municipio **"Ixtlahuacán" (Jalisco) ambiguo** entre
 "del Río" y "de los Membrillos" — se resolverá con el relleno perezoso de `MunicipioSeleccionado`;
 recordárselo a Raúl al llegar al Paso 2. (b) Antes de migrar, mostrar qué municipios guardados no
 resuelven a clave única (escaneo de solo lectura 26-09-23: 27 de 28 resuelven, 1 ambiguo: ese).
 (c) El picker actual de `TerritorySelector` descarta el `cve` elegido y guarda el texto tecleado
-(`:480`, `:501-505`); `checkTerritoryMatch` solo lee el primer elemento de las listas plurales y el
-municipio nunca da "exact". Diagnóstico completo de formularios, chats y portabilidad en el
+(`:480`, `:501-505`); `checkTerritoryMatch` (hasta el Paso 2b) solo leía el primer elemento de las listas
+plurales y el municipio nunca daba "exact". Diagnóstico completo de formularios, chats y portabilidad en el
 historial de esta ronda.
 
 **Pendientes registrados (no perder de vista):**
@@ -1783,3 +1822,4 @@ firebase functions:log
 | 26-09-23 | Ronda de ajustes menores: guard de `createProject`, badges del hub de Moddulo, abreviaturas de estado unificadas | **1 — Seguridad:** `createProject` ya no escribe sobre un `pestel_projects` ajeno (lee y exige `userId === uid` antes de persistir; 404 en la ruta); regresión permanente (6 casos, verificados en negativo: sin el guard fallan 3) y escaneo de solo lectura de Firestore real con 0 enlaces cross-tenant; fixture `adminMocks.ts` gana `add()`. Detalle en Seguridad. **2 — Badges:** `draft` 2.23:1 → 6.20:1 claro / 6.56:1 oscuro (antes sin `dark:`); `archived` `dark:text` de `#9AAEBE` (4.26:1) a `#C7D6E0`. Quitado de "no tocado y ya defectuoso". **3 — Abreviaturas:** módulo puro `lib/geo/abreviaturasEstado.ts` (tabla de 32 códigos fijada por Raúl; `EDOMEX` y `COLI`, `MEX`/`COL` reservados a países) con 3 formas por contexto; migrados `OrigenCharts` (solo valores; llaves y orden de `RECEPTOR_ORDER`/`ORIGIN_SUFFIXES` intactos, fijados verbatim en test), `lib/moddulo/abreviaturaEstado.ts` (elimina `ABREVIATURA_ESTADO_POR_CVE`, sin importadores) y la prosa de `semanalUtils` (nombres completos salvo CDMX; `ESTADOS_ABBR` eliminada). Confirmado por grep que ningún proceso de lectura de datos usa estos códigos (solo display), por lo que Colima pudo pasar a `COLI`. Tests: `abreviaturasEstado.test.ts` (tabla definitiva, únicos, sin ISO3 conocido, 3 formas de una tabla, llaves/orden, ratchet de literales viejos); fixture de `normalizadoresSueltos.test.ts` actualizado (3 valores deliberados). Medición real en Chrome/Arimo 9 px: `EDOMEX` 39.02 px; columna de etiquetas de fila 44 → 48 px. Se descubrió al probar que JS ordena las llaves `"10".."32"` antes de `"01".."09"` (el test compara por lookup). Nota registrada, NO implementada: reconocimiento de entrada del Estado de México (Punto 2 de la agenda). `check-geo-cf` (copia de Cloud Functions intacta), `tsc`, `next build`, functions build/test (20) y 354 pruebas limpios; `check-docs-freshness` 0 desactualizadas. **Revisión de código:** corregidos 2 hallazgos propios (sort duplicado en vez de `ESTADOS_ALFABETICOS`; export sin uso). **Pendiente de Raúl (navegador):** hub de Moddulo con un proyecto en borrador y uno archivado, claro y oscuro; heatmap de origen de Sefix con `EDOMEX`/`COLI` en eje y filas; encabezado del padrón en Moddulo F2 ("…, COLI." si aplica). |
 | 26-09-24 | Desambiguación geográfica — Pieza 1 completada (núcleo puro + endpoint + tests) y ajustes de reglas | **Ronda de varios pasos, avance parcial (Pieza 1 ✅; pasos 2-4 y Pieza 1b pendientes — ver "Desambiguación de referencias" en Geografía compartida).** Antecedente: 2 rondas de diagnóstico de solo lectura (formularios de territorio, chats de Fontana/Moddulo/PESTEL con forense de 382 mensajes reales, delimitación por tipo de proyecto, coincidencia parcial medida sobre el catálogo real de 2,477 municipios, portabilidad Fontana↔Moddulo↔PESTEL) que llevaron al diseño de 2 capas y 6 decisiones de Raúl. **Construido:** `lib/geo/desambiguar.ts` (`desambiguarReferencia`: único/ambiguo/demasiados/ninguno, tope 8), `POST /api/geo/candidatos`, fixture real `municipios_catalogo.json`, 92 tests. **Comprobación previa:** `/api/geo/options` ya sirve municipios por estado igual que Sefix (sin ajuste), con la advertencia de que su `cve` es numeración INE y la clave estable del núcleo es por nombre. **Hallazgos al construir:** `candidatosGeo` colapsaba los 4 municipios homónimos de Oaxaca (San Juan/San Pedro Mixtepec) — el núcleo los devuelve como 2 candidatos con sufijo `#cve`; "México" añadía el distrito "Nuevo México" (corregido); `Object.keys` ordena las claves numéricas (efecto ya conocido). **Ajustes del 26-09-24 (decisiones de Raúl):** (1) un exacto único con parciales ya no resuelve solo (Santiago → `demasiados` con `exactas`; 119 de 2,332 nombres oficiales cambian); (2) distritos sin filtro de tipo: correcto, lo acota quien llama; (3) alias coloquiales "Ciudad Juárez"/"Cd. Juárez" y "Neza" en la tabla nueva `ALIAS_COLOQUIAL_MUNICIPIO` (separada de `ALIAS_MUNICIPIO`, contrato de joins); (4) errores de tecleo: investigado y **diferido como Pieza 1b** (98 % de recuperación en 1 edición pero 6.9 % de nombres con vecino real a distancia 1 → solo sugerencias, nunca resolver solo). **Frescura:** `check-docs-freshness` marcó 2 líneas (Sefix y conteo de rutas) por la ronda anterior; recontado contra el código: Sefix sigue en 24 rutas, `app/api` pasó de 142 a **143** (`geo/candidatos`). **Verificación:** 446 pruebas, `tsc`, `next build`, `functions build` y `check-geo-cf` limpios; ambas reglas nuevas probadas en negativo. Sin commit ni push. **Pendiente de Raúl:** decidir cuándo pasar al Paso 2 (formulario con clave; incluye el caso real Ixtlahuacán de `fontana_sesiones/vO9JFif6W3UQc7DlyqPq`) y si la Pieza 1b va antes o después. |
 | 26-09-24 | Desambiguación geográfica — Paso 2a construido (formulario con `clave`, módulo puro, relleno perezoso, script de migración con dry-run) | **Ronda de varios pasos, avance parcial.** Decisiones de Raúl sobre los 7 puntos: Ixtlahuacán → «de los Membrillos» (verificado antes contra fuentes, ver Geografía compartida); alias y parciales mecánicos aprobados; Colombia sin clave; campo `clave` (no `cve`); backfill lazy + script puntual con aprobación caso por caso; proyecto ZMG NO se toca (pendiente aparte de Raúl); `checkTerritoryMatch` por conjuntos = Paso 2b separado. **Construido:** `MunicipioSeleccionado.clave?`, `lib/geo/municipioSeleccionado.ts` (21 tests con las 4 formas reales), `TerritorySelector` migrado a `POST /api/geo/candidatos` (picker guarda la clave elegida, dedup por clave, chip por clave: ya no se confunden los 2 San Juan Mixtepec, relleno perezoso al abrir, ambiguos guardados piden elegir), `scripts/migrar-municipios-clave.ts` (dry-run por defecto, `--apply` solo con casos aprobados, `--simular`, respaldo, guarda de cambio concurrente). **Dry-run real:** 7 documentos, 28 entradas (22 exactas, 2 alias, 3 parciales, 1 ambigua). **Verificación:** 467 pruebas, `tsc`, `next build`, `functions build`, `check-geo-cf` limpios; simulación de escritura contra Firestore real sin escribir. **Pendiente de Raúl:** aprobar caso por caso y ejecutar el `--apply`; verificar en navegador (guía entregada); decidir qué hacer con el endpoint `resolver-municipio` (sin consumidores). No se tocó `checkTerritoryMatch` ni el proyecto ZMG. |
+| 26-09-24 | Desambiguación geográfica — Paso 2b: `checkTerritoryMatch` por conjuntos (Variante B) | **Ronda de varios pasos, avance parcial (Pieza 1 ✅, Paso 2a ✅, Paso 2b ✅; quedan Paso 3, Paso 4, Pieza 1b y el Paso 2c opcional).** Módulo puro `lib/geo/unidadesTerritoriales.ts` + `compararTerritorios`/`explicarTerritorioApproximate` en `linkCompatibility.ts`; contrato de 3 valores intacto. Evidencia sobre los 496 pares reales: 6 cambios exactos (5 mismatch→approximate de la familia ZMG/Guadalajara/Zapopan, que estaban mal clasificados por mirar solo el primer municipio, y 1 approximate→exact en Progreso); ningún exact→otra cosa. 5 textos de aviso actualizados (2 de servidor, 3 de UI). Fixture congelado de los 32 territorios + 26 pruebas nuevas; las 22 fijadas de `normalizadoresSueltos` sin editar. Detalle y cambios de comportamiento reportados en Geografía compartida. Verificación: `tsc`, `next build`, functions build/test (20), `check-geo-cf`, 493 pruebas. **Pendiente de Raúl (navegador):** picker de vinculación (Fontana/PESTEL/Moddulo F2) con un proyecto ZMG y uno Guadalajara: aviso «Uno de los territorios contiene al otro…». |

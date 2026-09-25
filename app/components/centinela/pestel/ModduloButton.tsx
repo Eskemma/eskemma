@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PESTELProject } from "@/types/pestel.types";
 import type { ModduloProject } from "@/types/moddulo.types";
-import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
+import { checkTerritoryMatch, compararTerritorios, explicarTerritorioApproximate, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 
 const TIPO_LABELS: Record<string, string> = {
   electoral: "Electoral",
@@ -166,7 +166,7 @@ function PickerModal({
               </svg>
               <span>
                 {confirmTarget.territoryMatch === "approximate"
-                  ? `Los territorios de "${pestelProject.territorio.nombre}" y "${confirmTarget.territorio?.nombre ?? "este proyecto"}" parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
+                  ? `Territorios de "${pestelProject.territorio.nombre}" y "${confirmTarget.territorio?.nombre ?? "este proyecto"}": ${explicarTerritorioApproximate(compararTerritorios(pestelProject.territorio, confirmTarget.territorio).relacion)}`
                   : `El análisis es de "${pestelProject.territorio.nombre}", pero el proyecto cubre "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}". Los datos PESTEL son del territorio del análisis.`}
               </span>
             </div>

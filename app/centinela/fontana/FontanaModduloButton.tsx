@@ -13,7 +13,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { FontanaSesion } from "@/types/fontana.types";
 import type { ModduloProject } from "@/types/moddulo.types";
-import { checkTerritoryMatch, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
+import { checkTerritoryMatch, compararTerritorios, explicarTerritorioApproximate, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
 
 const TIPO_LABELS: Record<string, string> = {
   electoral: "Electoral",
@@ -134,7 +134,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
                 </svg>
                 <span>
                   {confirmTarget.territoryMatch === "approximate"
-                    ? `El territorio de Fontana y "${confirmTarget.territorio?.nombre ?? "este proyecto"}" parecen coincidir, pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular.`
+                    ? `Territorio de Fontana y "${confirmTarget.territorio?.nombre ?? "este proyecto"}": ${explicarTerritorioApproximate(compararTerritorios(sesion.territorio, confirmTarget.territorio).relacion)}`
                     : `Fontana está explorando "${sesion.territorio.nombre}", pero el proyecto cubre "${confirmTarget.territorio?.nombre ?? "territorio no especificado"}".`}
                 </span>
               </div>

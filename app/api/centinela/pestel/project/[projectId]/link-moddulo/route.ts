@@ -9,7 +9,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
-import { checkTerritoryMatch, esTipoCompatible } from "@/lib/moddulo/linkCompatibility";
+import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // Territory compatibility: warning-only unless forceLink
   const pestelTerritorio = pestelData.territorio as Territorio;
   const modduloTerritorio = modduloProject.territorio;
-  const territoryMatch = checkTerritoryMatch(pestelTerritorio, modduloTerritorio);
+  const { match: territoryMatch, relacion } = compararTerritorios(pestelTerritorio, modduloTerritorio);
 
   if (!forceLink && (territoryMatch === "mismatch" || territoryMatch === "approximate")) {
     return NextResponse.json(
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         modduloTerritorio: modduloTerritorio?.nombre ?? null,
         message:
           territoryMatch === "approximate"
-            ? "Los territorios parecen coincidir pero no se pudo verificar con un identificador confiable. Revisa que sean el mismo territorio antes de vincular."
+            ? explicarTerritorioApproximate(relacion)
             : `El análisis PESTEL es de "${pestelTerritorio.nombre}" pero el proyecto de Moddulo cubre "${modduloTerritorio?.nombre ?? "territorio no especificado"}".`,
       },
       { status: 422 }

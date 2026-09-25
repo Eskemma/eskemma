@@ -3,7 +3,7 @@
 // implementación usada tanto por /canal3/evaluar como por /canal3/vincular,
 // para no calcular la misma evaluación dos veces con lógica separada.
 
-import { checkTerritoryMatch, esTipoCompatible } from "@/lib/moddulo/linkCompatibility";
+import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate, type RelacionTerritorial } from "@/lib/moddulo/linkCompatibility";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import type { ModduloProject } from "@/types/moddulo.types";
 import type { Territorio, EvaluacionCompatibilidad } from "@/types/shared.types";
@@ -17,7 +17,7 @@ export function evaluarCompatibilidad(
 ): EvaluacionCompatibilidad {
   const tipoCumple = esTipoCompatible(metadatos.tipoProyectoDeclarado, project.type);
 
-  const territoryMatch = checkTerritoryMatch(metadatos.territorioDeclarado, project.territorio);
+  const { match: territoryMatch, relacion } = compararTerritorios(metadatos.territorioDeclarado, project.territorio);
   const territorioRequiereConfirmacion = territoryMatch !== "exact";
 
   const pertinencia = {
@@ -28,7 +28,7 @@ export function evaluarCompatibilidad(
     ...(territorioRequiereConfirmacion
       ? {
           territorioRequiereConfirmacion: true as const,
-          territorioDetalle: describirTerritoryMismatch(territoryMatch, metadatos.territorioDeclarado, project.territorio),
+          territorioDetalle: describirTerritoryMismatch(territoryMatch, relacion, metadatos.territorioDeclarado, project.territorio),
         }
       : {}),
   };
@@ -54,14 +54,17 @@ export function evaluarCompatibilidad(
 
 function describirTerritoryMismatch(
   match: "approximate" | "mismatch",
+  relacion: RelacionTerritorial,
   declarado: Territorio,
   proyecto: Territorio | undefined
 ): string {
   const base = match === "approximate"
-    ? "Los territorios parecen coincidir pero no se pudo verificar con un identificador confiable. Revisa que sea el mismo territorio antes de vincular."
+    ? explicarTerritorioApproximate(relacion)
     : `La herramienta declara cubrir "${declarado.nombre}" pero el proyecto cubre "${proyecto?.nombre ?? "territorio no especificado"}".`;
 
-  if (esTerritorioParcial(proyecto)) {
+  // Con la comparación por conjuntos ya se consideran TODAS las unidades del proyecto; el aviso solo
+  // aplica cuando no se pudo comparar por conjuntos (sin unidades resolubles en algún lado).
+  if (relacion === "no_comparable" && esTerritorioParcial(proyecto)) {
     return `${base} Además, este proyecto tiene más de una unidad territorial seleccionada — esta comparación solo consideró la primera; verifica manualmente que la fuente cubra también a las demás.`;
   }
   return base;

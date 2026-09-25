@@ -1,0 +1,547 @@
+{
+ "_nota": "Congelado 26-09-24: los 32 territorios reales de moddulo_projects/pestel_projects/fontana_sesiones y el resultado del checkTerritoryMatch ANTERIOR al Paso 2b para cada par i<j (e=exact, a=approximate, m=mismatch), en orden de id.",
+ "territorios": [
+  {
+   "id": "fon/1g2BpNMF5PqZq6sSTZkP",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Jalisco › Guadalajara",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Guadalajara"
+   }
+  },
+  {
+   "id": "fon/1qEjTadeNVliXafJtnBH",
+   "territorio": {
+    "nivel": "distrito_local",
+    "nombre": "Ciudad de México › Distrito Electoral Local 27 en la CDMX",
+    "pais": "México",
+    "estado": "Ciudad de México",
+    "municipio": "Distrito Electoral Local 27 en la CDMX"
+   }
+  },
+  {
+   "id": "fon/37D6M6lcRSfKJo0i6Qcc",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Sinaloa › Ahome",
+    "pais": "México",
+    "estado": "Sinaloa",
+    "municipio": "Ahome"
+   }
+  },
+  {
+   "id": "fon/3wsyhEPu7I7bjjPj3jaG",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Yucatán › Progreso",
+    "pais": "México",
+    "estado": "Yucatán",
+    "municipio": "Progreso",
+    "estadosSeleccionados": [
+     "Yucatán"
+    ],
+    "municipiosSeleccionados": [
+     "Progreso",
+     "Telchac Puerto",
+     "Celestún"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Progreso",
+      "estado": "Yucatán",
+      "clave": "31:PROGRESO"
+     },
+     {
+      "nombre": "Telchac Puerto",
+      "estado": "Yucatán",
+      "clave": "31:TELCHAC PUERTO"
+     },
+     {
+      "nombre": "Celestún",
+      "estado": "Yucatán",
+      "clave": "31:CELESTUN"
+     }
+    ]
+   }
+  },
+  {
+   "id": "fon/5ZZ1lfNT0piNDZRNi2Oj",
+   "territorio": {
+    "nivel": "estatal",
+    "nombre": "Oaxaca",
+    "pais": "México",
+    "estado": "Oaxaca"
+   }
+  },
+  {
+   "id": "fon/7GSYpu6g9zSZTmAFbbGq",
+   "territorio": {
+    "nivel": "estatal",
+    "nombre": "Aguascalientes",
+    "pais": "México",
+    "estado": "Aguascalientes",
+    "estadosSeleccionados": [
+     "Aguascalientes"
+    ]
+   }
+  },
+  {
+   "id": "fon/8105eC4TeD63mIpf0GQ8",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Morelos › Cuernavaca",
+    "pais": "México",
+    "estado": "Morelos",
+    "municipio": "Cuernavaca"
+   }
+  },
+  {
+   "id": "fon/m4qUAXZpDXQfBEYzpCz6",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Yucatán › PROGRESO",
+    "pais": "México",
+    "estado": "Yucatán",
+    "municipio": "PROGRESO",
+    "cve_distrito": "002",
+    "distritosSeleccionados": [
+     {
+      "cve": "002",
+      "nombre": "PROGRESO",
+      "estado": "Yucatán"
+     }
+    ]
+   }
+  },
+  {
+   "id": "fon/p6RJBsh8CJYeAfKTGw8v",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Jalisco › Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México.",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México."
+   }
+  },
+  {
+   "id": "fon/VCGuImwzeoHu0zpuDGvJ",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Magdalena › Nueva Granada",
+    "pais": "Colombia",
+    "estado": "Magdalena",
+    "municipio": "Nueva Granada"
+   }
+  },
+  {
+   "id": "fon/vO9JFif6W3UQc7DlyqPq",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Jalisco › Zapopan",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Zapopan",
+    "municipiosSeleccionados": [
+     "Zapopan",
+     "Tlaquepaque",
+     "Tonalá",
+     "Tlajomulco",
+     "El Salto",
+     "Juanacatlán",
+     "Ixtlahuacán",
+     "Acatlán",
+     "Zapotlanejo",
+     "Guadalajara"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Zapopan",
+      "estado": "Jalisco",
+      "clave": "14:ZAPOPAN"
+     },
+     {
+      "nombre": "Tlaquepaque",
+      "estado": "Jalisco",
+      "clave": "14:SAN PEDRO TLAQUEPAQUE"
+     },
+     {
+      "nombre": "Tonalá",
+      "estado": "Jalisco",
+      "clave": "14:TONALA"
+     },
+     {
+      "nombre": "Tlajomulco",
+      "estado": "Jalisco",
+      "clave": "14:TLAJOMULCO DE ZUÑIGA"
+     },
+     {
+      "nombre": "El Salto",
+      "estado": "Jalisco",
+      "clave": "14:EL SALTO"
+     },
+     {
+      "nombre": "Juanacatlán",
+      "estado": "Jalisco",
+      "clave": "14:JUANACATLAN"
+     },
+     {
+      "nombre": "Ixtlahuacan de los Membrillos",
+      "estado": "Jalisco",
+      "clave": "14:IXTLAHUACAN DE LOS MEMBRILLOS"
+     },
+     {
+      "nombre": "Acatlán",
+      "estado": "Jalisco",
+      "clave": "14:ACATLAN DE JUAREZ"
+     },
+     {
+      "nombre": "Zapotlanejo",
+      "estado": "Jalisco",
+      "clave": "14:ZAPOTLANEJO"
+     },
+     {
+      "nombre": "Guadalajara",
+      "estado": "Jalisco",
+      "clave": "14:GUADALAJARA"
+     }
+    ]
+   }
+  },
+  {
+   "id": "fon/XA30Fks4zUxNb4Av74o6",
+   "territorio": {
+    "nivel": "nacional",
+    "nombre": "México",
+    "pais": "México"
+   }
+  },
+  {
+   "id": "fon/xnMQXhNVbno6hRBYXX0A",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Estado de México › Nezahualcóyotl",
+    "pais": "México",
+    "estado": "Estado de México",
+    "municipio": "Nezahualcóyotl",
+    "estadosSeleccionados": [
+     "Estado de México"
+    ],
+    "municipiosSeleccionados": [
+     "Nezahualcóyotl"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Nezahualcóyotl",
+      "estado": "Estado de México",
+      "clave": "15:NEZAHUALCOYOTL"
+     }
+    ]
+   }
+  },
+  {
+   "id": "fon/yzjwy19fWW42Wv9l007h",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Jalisco › Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México.",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México."
+   }
+  },
+  {
+   "id": "mod/0MJW5m4pOVCMrmZGBXyR",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Sinaloa › Ahome",
+    "pais": "México",
+    "estado": "Sinaloa",
+    "municipio": "Ahome"
+   }
+  },
+  {
+   "id": "mod/0rSXt2cP48QTjKVzBnxn",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Jalisco › Guadalajara",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Guadalajara",
+    "estadosSeleccionados": [
+     "Jalisco"
+    ],
+    "municipiosSeleccionados": [
+     "Guadalajara"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Guadalajara",
+      "estado": "Jalisco",
+      "clave": "14:GUADALAJARA"
+     }
+    ]
+   }
+  },
+  {
+   "id": "mod/eyfCmaaPlSPjhV8cmpTe",
+   "territorio": {
+    "nivel": "estatal",
+    "nombre": "Oaxaca",
+    "pais": "México",
+    "estado": "Oaxaca"
+   }
+  },
+  {
+   "id": "mod/fjDFbxVvmO6GP849oUBp",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Yucatán › Progreso",
+    "pais": "México",
+    "estado": "Yucatán",
+    "municipio": "Progreso",
+    "estadosSeleccionados": [
+     "Yucatán"
+    ],
+    "municipiosSeleccionados": [
+     "Progreso",
+     "Telchac Puerto"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Progreso",
+      "estado": "Yucatán",
+      "clave": "31:PROGRESO"
+     },
+     {
+      "nombre": "Telchac Puerto",
+      "estado": "Yucatán",
+      "clave": "31:TELCHAC PUERTO"
+     }
+    ]
+   }
+  },
+  {
+   "id": "mod/FK83pkjoOp3rMseK54Fi",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Jalisco › Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México.",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México."
+   }
+  },
+  {
+   "id": "mod/fvpuanYx7EYhdV3WLqBr",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Jalisco › Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México.",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México."
+   }
+  },
+  {
+   "id": "mod/Kg5tOo8ShcNwlAVLPSb0",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Morelos › Cuernavaca",
+    "pais": "México",
+    "estado": "Morelos",
+    "municipio": "Cuernavaca"
+   }
+  },
+  {
+   "id": "mod/nZvpYu4nnZrsw5hoGcVP",
+   "territorio": {
+    "nivel": "distrito_local",
+    "nombre": "Ciudad de México › IZTAPALAPA",
+    "pais": "México",
+    "estado": "Ciudad de México",
+    "municipio": "IZTAPALAPA",
+    "cve_distrito": "027",
+    "distritosSeleccionados": [
+     {
+      "cve": "027",
+      "nombre": "IZTAPALAPA",
+      "estado": "Ciudad de México"
+     }
+    ]
+   }
+  },
+  {
+   "id": "mod/O2RBnCPiyGJ6u6kyk1rS",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Jalisco › Tlaquepaque",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Tlaquepaque",
+    "estadosSeleccionados": [
+     "Jalisco"
+    ],
+    "municipiosSeleccionados": [
+     "Tlaquepaque",
+     "Tonalá",
+     "Tlajomulco",
+     "El Salto",
+     "Juanacatlán",
+     "Zapotlanejo",
+     "Guadalajara",
+     "Zapopan"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Tlaquepaque",
+      "estado": "Jalisco",
+      "clave": "14:SAN PEDRO TLAQUEPAQUE"
+     },
+     {
+      "nombre": "Tonalá",
+      "estado": "Jalisco",
+      "clave": "14:TONALA"
+     },
+     {
+      "nombre": "Tlajomulco",
+      "estado": "Jalisco",
+      "clave": "14:TLAJOMULCO DE ZUÑIGA"
+     },
+     {
+      "nombre": "El Salto",
+      "estado": "Jalisco",
+      "clave": "14:EL SALTO"
+     },
+     {
+      "nombre": "Juanacatlán",
+      "estado": "Jalisco",
+      "clave": "14:JUANACATLAN"
+     },
+     {
+      "nombre": "Zapotlanejo",
+      "estado": "Jalisco",
+      "clave": "14:ZAPOTLANEJO"
+     },
+     {
+      "nombre": "Guadalajara",
+      "estado": "Jalisco",
+      "clave": "14:GUADALAJARA"
+     },
+     {
+      "nombre": "Zapopan",
+      "estado": "Jalisco",
+      "clave": "14:ZAPOPAN"
+     }
+    ]
+   }
+  },
+  {
+   "id": "mod/pMw5nNl9SZRrNWHrqUmn",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Magdalena › Nueva Granada",
+    "pais": "Colombia",
+    "estado": "Magdalena",
+    "municipio": "Nueva Granada"
+   }
+  },
+  {
+   "id": "mod/Q5ZYk6iPe92z6fyBdWPL",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Yucatán › Progreso",
+    "pais": "México",
+    "estado": "Yucatán",
+    "municipio": "Progreso",
+    "estadosSeleccionados": [
+     "Yucatán"
+    ],
+    "municipiosSeleccionados": [
+     "Progreso",
+     "Telchac Puerto",
+     "Celestún"
+    ],
+    "municipiosPorEstado": [
+     {
+      "nombre": "Progreso",
+      "estado": "Yucatán",
+      "clave": "31:PROGRESO"
+     },
+     {
+      "nombre": "Telchac Puerto",
+      "estado": "Yucatán",
+      "clave": "31:TELCHAC PUERTO"
+     },
+     {
+      "nombre": "Celestún",
+      "estado": "Yucatán",
+      "clave": "31:CELESTUN"
+     }
+    ]
+   }
+  },
+  {
+   "id": "mod/uF4UM9sJDRsKdA2VnwgY",
+   "territorio": {
+    "nivel": "estatal",
+    "nombre": "Chihuahua",
+    "pais": "México",
+    "estado": "Chihuahua"
+   }
+  },
+  {
+   "id": "mod/YgKs7Mu81j998Bi5TgM4",
+   "territorio": {
+    "nivel": "nacional",
+    "nombre": "México",
+    "pais": "México"
+   }
+  },
+  {
+   "id": "pes/2ofijoeEZ6eRzpCI7PjE",
+   "territorio": {
+    "nivel": "estatal",
+    "nombre": "Chihuahua",
+    "pais": "México",
+    "estado": "Chihuahua"
+   }
+  },
+  {
+   "id": "pes/FTlPqjjdzCXJfSnuis58",
+   "territorio": {
+    "nivel": "municipal",
+    "nombre": "Morelos › Cuernavaca",
+    "pais": "México",
+    "estado": "Morelos",
+    "municipio": "Cuernavaca"
+   }
+  },
+  {
+   "id": "pes/GL79ekIIQoAkt1zxUHWm",
+   "territorio": {
+    "nivel": "municipal",
+    "estado": "Morelos",
+    "municipio": "Cuernavaca",
+    "nombre": "Morelos › Cuernavaca"
+   }
+  },
+  {
+   "id": "pes/okccTbeVMumbKyvc27Jp",
+   "territorio": {
+    "nivel": "distrito_federal",
+    "nombre": "Jalisco › Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México.",
+    "pais": "México",
+    "estado": "Jalisco",
+    "municipio": "Distrito Electoral Federal V, con cabecera en Puerto Vallarta, Jalisco, México."
+   }
+  },
+  {
+   "id": "pes/xJusc7T7WRNVUJmsJHn7",
+   "territorio": {
+    "nivel": "nacional",
+    "nombre": "México",
+    "pais": "México"
+   }
+  }
+ ],
+ "resultadoAnterior": "mmmmmmmmmmmmmmammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmammmmmmmmmmmmmmmmmmmmmammmmmmmmmmmmmmmmmmmmmmmmmmmmmmammmmmmammmmmmmmmmmmmmmmmmemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmammmmmmmaammmmmmmmmmmmmmmmmmmmmmmmmmmmmmammmmaammmmmmmmmmammmmmmmmmmmmmmammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmemmmmemmmmmmmmmmmmmmmmmmmmmmmaammmmmmmmmmammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmammmmmmmammmmmmmmmmammmmmmmmmmmammmmmmmmaammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmemmmmmmmmemmmmammmmm"
+}
