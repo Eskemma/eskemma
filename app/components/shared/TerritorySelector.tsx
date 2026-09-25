@@ -7,14 +7,25 @@ import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import { useGeoOptionsMultiEstado, type EstadoConCve } from "@/app/components/geo/hooks/useGeoOptionsMultiEstado";
 import type { GeoOptionDistrito } from "@/lib/geo/distritos";
 import { getCveEntidad } from "@/lib/geo/estadoCve";
-import { etiquetaDesambiguacionMunicipio } from "@/lib/geo/etiquetasDesambiguacionMunicipio";
 import { formatDistritoLabel } from "@/lib/geo/formatDistrito";
 import { resolverPrimerElemento } from "@/lib/moddulo/territorioPlural";
 import { detectarSenalesTexto } from "@/lib/moddulo/territorioHeuristicas";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 import PartidosMultiSelect, { type MultiSelectOption } from "@/app/sefix/components/elecciones/PartidosMultiSelect";
 import { NOMBRES_ESTADO_ORDENADOS } from "@/lib/geo/estados";
-import { claveMunicipioDeEstado } from "@/lib/geo/claveMunicipioEstado";
+import type { CandidatoReferencia, ResultadoDesambiguacion } from "@/lib/geo/desambiguar";
+import {
+  agregarMunicipioSeleccionado,
+  aplicarRellenos,
+  decidirAltaMunicipio,
+  esResolubleEnCatalogo,
+  mismoMunicipio,
+  municipioDesdeCandidato,
+  municipiosDeTerritorio,
+  proponerRelleno,
+  reemplazarMunicipioSeleccionado,
+  type PropuestaRelleno,
+} from "@/lib/geo/municipioSeleccionado";
 
 // ==========================================
 // DATOS GEOGRÁFICOS
@@ -69,23 +80,8 @@ const PAISES_IBEROAMERICA = [
 // HELPERS DE DEDUPLICACIÓN (Fase 2, 26-08-13 / Decisión 2, 26-08-16)
 // ==========================================
 
-// Decisión 2 (26-08-16) — MunicipioSeleccionado[] con estado por entrada,
-// dedup por nombre+estado normalizado (mismo criterio que agregarDistrito,
-// cve+estado) — un mismo nombre de municipio es válido en 2 estados
-// distintos, solo se deduplica dentro del MISMO estado.
-function agregarMunicipio(
-  actual: MunicipioSeleccionado[],
-  estado: string,
-  nuevoNombre: string
-): MunicipioSeleccionado[] {
-  const nuevoNorm = claveMunicipioDeEstado(estado, nuevoNombre);
-  if (!nuevoNorm) return actual;
-  const yaExiste = actual.some(
-    (m) => m.estado === estado && claveMunicipioDeEstado(estado, m.nombre) === nuevoNorm
-  );
-  if (yaExiste) return actual;
-  return [...actual, { nombre: nuevoNombre.trim(), estado }];
-}
+// Los municipios (MunicipioSeleccionado[] con estado por entrada y, desde 26-09-24, `clave`
+// estable) se agregan/deduplican con lib/geo/municipioSeleccionado.ts (lógica pura y probada).
 
 function agregarDistrito(
   actual: DistritoSeleccionado[],
@@ -200,13 +196,9 @@ export default function TerritorySelector({
   // una entrada por cada nombre, todas atadas a territorio.estado (el único
   // estado que un proyecto legado podía tener) — verificado contra
   // O2RBnCPiyGJ6u6kyk1rS (ZMG, 10 municipios, sin estado por entrada).
-  const [municipiosPorEstado, setMunicipiosPorEstado] = useState<MunicipioSeleccionado[]>(() => {
-    if (territorio?.municipiosPorEstado) return territorio.municipiosPorEstado;
-    if (territorio?.municipiosSeleccionados && territorio.estado) {
-      return territorio.municipiosSeleccionados.map((nombre) => ({ nombre, estado: territorio.estado! }));
-    }
-    return [];
-  });
+  const [municipiosPorEstado, setMunicipiosPorEstado] = useState<MunicipioSeleccionado[]>(() =>
+    municipiosDeTerritorio(territorio)
+  );
   // Texto libre en curso, uno por estado (una caja de texto por estado
   // seleccionado, cada una con su propia lista de chips debajo).
   const [municipioInputPorEstado, setMunicipioInputPorEstado] = useState<Record<string, string>>({});
@@ -221,10 +213,15 @@ export default function TerritorySelector({
   // no colisione cuando 2 candidatos comparten nombre literal (San Juan/
   // San Pedro Mixtepec, Oaxaca) y (b) mostrar la etiqueta de
   // desambiguación de esos casos.
-  const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, { cve: string; nombre: string }[]>>({});
+  const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, CandidatoReferencia[]>>({});
+  // Entradas GUARDADAS con nombre ambiguo (p. ej. "Ixtlahuacán" en Jalisco) detectadas por el
+  // relleno perezoso de `clave`: nunca se resuelven solas, se le pide al usuario elegir.
+  const [ambiguosGuardados, setAmbiguosGuardados] = useState<PropuestaRelleno[]>([]);
   // Aviso transitorio (no reconocido / error de red) — nunca bloquea,
   // solo informa (mismo criterio ya usado en todo el workstream).
   const [avisoMunicipioPorEstado, setAvisoMunicipioPorEstado] = useState<Record<string, string>>({});
+  // Nota informativa (no es una advertencia): "«Pachuca» se interpretó como Pachuca de Soto."
+  const [infoMunicipioPorEstado, setInfoMunicipioPorEstado] = useState<Record<string, string>>({});
 
   // Distrito: acumulador multi-estado (Fase 2, sin cambio de shape en esta
   // ronda) — solo cambia CÓMO se llena: antes "estado en edición" + agregar
@@ -301,6 +298,41 @@ export default function TerritorySelector({
     !loadingDistritos &&
     estadosConCve.length > 0 &&
     Object.keys(erroresDistritos).length === estadosConCve.length;
+
+  // Relleno PEREZOSO de `clave` (26-09-24): al abrir un territorio guardado antes de que existiera
+  // la clave, cada municipio sin ella se resuelve contra el núcleo de desambiguación. Las
+  // resoluciones únicas (exactas, alias o parciales) completan la clave SIN renombrar la entrada;
+  // las ambiguas no se adivinan (se piden en el picker); los sin catálogo (fuera de México) y los
+  // fallos de red se dejan como están. El efecto que emite el cambio propaga el resultado al padre.
+  useEffect(() => {
+    const pendientes = municipiosPorEstado.filter(esResolubleEnCatalogo);
+    if (pendientes.length === 0) return;
+    let cancelado = false;
+    (async () => {
+      const resultados = await Promise.all(
+        pendientes.map(async (m): Promise<ResultadoDesambiguacion | null> => {
+          try {
+            const res = await fetch("/api/geo/candidatos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ texto: m.nombre, estado: m.estado, tipos: ["municipio"] }),
+            });
+            return res.ok ? ((await res.json()) as ResultadoDesambiguacion) : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (cancelado) return;
+      const propuestas = pendientes.map((m, i) => proponerRelleno(m, resultados[i]));
+      setMunicipiosPorEstado((prev) => aplicarRellenos(prev, propuestas));
+      setAmbiguosGuardados(propuestas.filter((p) => p.clase === "ambiguo"));
+    })();
+    return () => {
+      cancelado = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Construir nombre legible y emitir cambio
   useEffect(() => {
@@ -426,58 +458,56 @@ export default function TerritorySelector({
     setDistritosAcumulados((prev) => prev.filter((d) => !(d.cve === cve && d.estado === estadoDelDistrito)));
   }
 
-  // Fase 5 (Ronda 8, 26-08-18) — valida contra el catálogo INEGI antes de
-  // agregar (vía /api/geo/resolver-municipio, server-only por depender de
-  // firebase-admin/storage — no se puede llamar resolveMunicipioCve()
-  // directo desde este client component). 3 caminos: exacto → agrega
-  // normal; ambiguo (2+ candidatos reales) → NO agrega todavía, muestra
-  // el picker; no encontrado o error de red/timeout → degrada agregando
-  // el texto tal cual con aviso visible, nunca bloquea al usuario (mismo
-  // criterio ya aplicado en todo este workstream, ver P2).
+  // Alta de un municipio tecleado. Desde 26-09-24 la resolución sale de POST /api/geo/candidatos
+  // (lib/geo/desambiguar.ts): único → se agrega con su `clave` (si fue un alias o un nombre
+  // incompleto se guarda el nombre oficial y se avisa: «Pachuca» se interpretó como Pachuca de
+  // Soto); ambiguo → picker con las opciones reales (se guarda la clave elegida); demasiados →
+  // pide más nombre; sin reconocer o error de red → se agrega tal cual, sin clave, con aviso
+  // (nunca bloquea al usuario, mismo criterio de todo el workstream, ver P2).
   async function handleAgregarMunicipio(estado: string) {
     const texto = (municipioInputPorEstado[estado] ?? "").trim();
     if (!texto) return;
 
-    // Dedup síncrona ANTES de cualquier fetch — un duplicado exacto nunca
-    // dispara una llamada de red.
-    const yaExiste = municipiosPorEstado.some(
-      (m) => m.estado === estado && claveMunicipioDeEstado(estado, m.nombre) === claveMunicipioDeEstado(estado, texto)
-    );
-    if (yaExiste) {
+    // Dedup síncrona ANTES de cualquier fetch — un duplicado exacto nunca dispara red.
+    if (municipiosPorEstado.some((m) => mismoMunicipio(m, { nombre: texto, estado }))) {
       setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
       return;
     }
 
     setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
     setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
+    setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
     setResolviendoPorEstado((prev) => ({ ...prev, [estado]: true }));
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
-      const res = await fetch("/api/geo/resolver-municipio", {
+      const res = await fetch("/api/geo/candidatos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado, nombre: texto }),
+        body: JSON.stringify({ texto, estado, tipos: ["municipio"] }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const resultado = (await res.json()) as ResultadoDesambiguacion;
+      const alta = decidirAltaMunicipio(estado, texto, resultado);
 
-      if (data.ambiguo && Array.isArray(data.candidatos) && data.candidatos.length > 0) {
-        setCandidatosPorEstado((prev) => ({ ...prev, [estado]: data.candidatos }));
+      if (alta.tipo === "elegir") {
+        setCandidatosPorEstado((prev) => ({ ...prev, [estado]: alta.candidatos }));
+        setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
         return; // no agrega — espera a que el usuario elija
       }
-
-      if (data.noEncontrado) {
-        setAvisoMunicipioPorEstado((prev) => ({
-          ...prev,
-          [estado]: `"${texto}" no se reconoce en el catálogo INEGI — agregado tal cual, verifica el nombre.`,
-        }));
+      if (alta.tipo === "precisar") {
+        setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
+        return; // no agrega — el usuario escribe más
       }
-
-      setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+      if (alta.tipo === "sin_reconocer") {
+        setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
+      } else if (alta.aviso) {
+        setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso! }));
+      }
+      setMunicipiosPorEstado((prev) => agregarMunicipioSeleccionado(prev, alta.entrada));
       setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
     } catch {
       // Timeout/error de red — degrada, nunca bloquea.
@@ -485,7 +515,7 @@ export default function TerritorySelector({
         ...prev,
         [estado]: "No se pudo verificar contra el catálogo — agregado tal cual, confírmalo manualmente.",
       }));
-      setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, texto));
+      setMunicipiosPorEstado((prev) => agregarMunicipioSeleccionado(prev, { nombre: texto, estado }));
       setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
     } finally {
       clearTimeout(timeoutId);
@@ -493,24 +523,31 @@ export default function TerritorySelector({
     }
   }
 
-  // Usuario elige uno de los candidatos reales del picker de ambigüedad —
-  // se agrega el nombre EXACTO elegido, nunca el texto ambiguo original.
-  // El `cve` solo se usó para distinguir la opción en el picker (ver
-  // etiquetaDesambiguacionMunicipio) — el territorio persistido sigue
-  // guardando el nombre, mismo formato que siempre.
-  function elegirCandidatoMunicipio(estado: string, candidato: { cve: string; nombre: string }) {
-    setMunicipiosPorEstado((prev) => agregarMunicipio(prev, estado, candidato.nombre));
+  // El usuario elige una opción real del picker: se guarda el nombre oficial y la CLAVE elegida
+  // (antes se descartaba y dos municipios de nombre idéntico quedaban iguales). Si el picker
+  // venía de una entrada GUARDADA ambigua, esa entrada se reemplaza por la elegida.
+  function elegirCandidatoMunicipio(estado: string, candidato: CandidatoReferencia, reemplaza?: MunicipioSeleccionado) {
+    const elegido = municipioDesdeCandidato(estado, candidato);
+    setMunicipiosPorEstado((prev) =>
+      reemplaza ? reemplazarMunicipioSeleccionado(prev, reemplaza, elegido) : agregarMunicipioSeleccionado(prev, elegido)
+    );
+    if (reemplaza) {
+      setAmbiguosGuardados((prev) => prev.filter((p) => !(p.entrada.estado === reemplaza.estado && p.entrada.nombre === reemplaza.nombre)));
+    }
     setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
+    setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
     setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
   }
 
-  function quitarMunicipio(estado: string, nombre: string) {
-    setMunicipiosPorEstado((prev) => prev.filter((m) => !(m.estado === estado && m.nombre === nombre)));
+  function quitarMunicipio(entrada: MunicipioSeleccionado) {
+    setMunicipiosPorEstado((prev) => prev.filter((m) => m !== entrada));
+    setAmbiguosGuardados((prev) => prev.filter((p) => !(p.entrada.estado === entrada.estado && p.entrada.nombre === entrada.nombre)));
   }
 
   function resetCamposMexico() {
     setEstadosSeleccionados([]);
     setMunicipiosPorEstado([]);
+    setAmbiguosGuardados([]);
     setMunicipioInputPorEstado({});
     setDistritosAcumulados([]);
     setDistritoFallbackTexto("");
@@ -642,6 +679,7 @@ export default function TerritorySelector({
                       // consulta anterior queda obsoleto.
                       setCandidatosPorEstado((prev) => ({ ...prev, [estadoNombre]: [] }));
                       setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estadoNombre]: "" }));
+                      setInfoMunicipioPorEstado((prev) => ({ ...prev, [estadoNombre]: "" }));
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -671,47 +709,53 @@ export default function TerritorySelector({
                     {avisoMunicipioPorEstado[estadoNombre]}
                   </p>
                 )}
-                {(candidatosPorEstado[estadoNombre]?.length ?? 0) > 0 && (
-                  <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-gray-eske-10/60 dark:bg-white/5">
-                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
-                      Nombre ambiguo — ¿cuál de estos quisiste decir?
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {candidatosPorEstado[estadoNombre].map((candidato) => {
-                        // Incidente 2, Verificación 1 — key por cve (nunca
-                        // por nombre: 2 candidatos pueden compartir el
-                        // mismo nombre literal, ver San Juan/San Pedro
-                        // Mixtepec). Etiqueta solo de presentación cuando
-                        // aplica; el texto agregado sigue siendo el
-                        // nombre tal cual (elegirCandidatoMunicipio).
-                        const estadoCve = getCveEntidad(estadoNombre);
-                        const etiqueta = estadoCve ? etiquetaDesambiguacionMunicipio(estadoCve, candidato.cve) : null;
-                        return (
+                {infoMunicipioPorEstado[estadoNombre] && (
+                  <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
+                    {infoMunicipioPorEstado[estadoNombre]}
+                  </p>
+                )}
+                {(() => {
+                  // Picker de opciones reales: el del texto que se está tecleando tiene prioridad;
+                  // si no hay, el de una entrada GUARDADA ambigua de este estado.
+                  const tecleado = candidatosPorEstado[estadoNombre] ?? [];
+                  const guardado = ambiguosGuardados.find((p) => p.entrada.estado === estadoNombre);
+                  const candidatos = tecleado.length > 0 ? tecleado : guardado?.candidatos ?? [];
+                  if (candidatos.length === 0) return null;
+                  const reemplaza = tecleado.length > 0 ? undefined : guardado?.entrada;
+                  return (
+                    <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-gray-eske-10/60 dark:bg-white/5">
+                      <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
+                        {reemplaza
+                          ? `«${reemplaza.nombre}» (ya guardado) puede ser más de un municipio — elige cuál para fijarlo:`
+                          : "Nombre ambiguo — ¿cuál de estos quisiste decir?"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {candidatos.map((candidato) => (
                           <button
-                            key={candidato.cve}
+                            key={candidato.clave}
                             type="button"
-                            onClick={() => elegirCandidatoMunicipio(estadoNombre, candidato)}
+                            onClick={() => elegirCandidatoMunicipio(estadoNombre, candidato, reemplaza)}
                             className="px-2.5 py-1 rounded-full text-xs font-medium border border-bluegreen-eske
                               text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 transition-colors"
                           >
-                            {candidato.nombre}{etiqueta ? ` (${etiqueta})` : ""}
+                            {candidato.etiqueta}
                           </button>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 {municipiosPorEstado.filter((m) => m.estado === estadoNombre).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {municipiosPorEstado
                       .filter((m) => m.estado === estadoNombre)
                       .map((m) => (
-                        <span key={m.nombre} className={chipClass}>
+                        <span key={m.clave ?? m.nombre} className={chipClass}>
                           {m.nombre}
                           <button
                             type="button"
                             aria-label={`Quitar ${m.nombre}`}
-                            onClick={() => quitarMunicipio(estadoNombre, m.nombre)}
+                            onClick={() => quitarMunicipio(m)}
                             className="ml-0.5 hover:text-red-eske focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-bluegreen-eske rounded"
                           >
                             ×

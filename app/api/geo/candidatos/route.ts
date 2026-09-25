@@ -5,9 +5,10 @@
 // tools are two presentations of this same answer.
 //
 // The municipality catalog is server-only (Storage), so it is injected here. No
-// session, same criterion as /api/geo/options and /api/geo/resolver-municipio (public
-// geographic catalog, no user data); input is bounded instead. Does NOT replace
-// resolver-municipio yet: nothing consumes this endpoint until step 2.
+// session, same criterion as /api/geo/options (and the removed resolver-municipio: public
+// geographic catalog, no user data); input is bounded instead. Consumed by TerritorySelector
+// (typed municipalities and the lazy fill of saved ones, Paso 2a, 26-09-24). It replaced
+// /api/geo/resolver-municipio, which was deleted 26-09-24 (it had no consumers left).
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `'texto' excede ${MAX_TEXTO} caracteres` }, { status: 400 });
   }
 
-  // `estado` travels as a NAME (as in resolver-municipio) and is converted to a CVE here.
+  // `estado` travels as a NAME (as TerritorySelector stores it) and is converted to a CVE here.
   let estadoCve: string | undefined;
   if (body?.estado !== undefined && body.estado !== null && body.estado !== "") {
     const cve = typeof body.estado === "string" ? resolverEstadoCve(body.estado) : null;

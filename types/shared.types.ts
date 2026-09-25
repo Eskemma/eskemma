@@ -47,6 +47,17 @@ export interface DistritoSeleccionado {
 export interface MunicipioSeleccionado {
   nombre: string;
   estado: string;
+  /**
+   * Clave estable del municipio (26-09-24, Paso 2a de la desambiguación geográfica):
+   * `${estadoCve}:${nombreCanónico}`, p. ej. "14:SAN PEDRO TLAQUEPAQUE" (ver
+   * lib/geo/desambiguar.ts). Es POR NOMBRE, nunca el `cve` numérico de INE (diverge del
+   * CVE_MUN de INEGI). Solo los 4 municipios homónimos de Oaxaca llevan el sufijo
+   * `#<cve>` para distinguir el par. OPCIONAL: las entradas anteriores no la tienen y se
+   * rellenan al cargar el selector (relleno perezoso) o con
+   * scripts/migrar-municipios-clave.ts; los lectores siguen resolviendo por `nombre`.
+   * Ausente también para territorios fuera de México (sin catálogo).
+   */
+  clave?: string;
 }
 
 // Taxonomía compartida de agregación territorial (Fase 2, 26-08-13) — no

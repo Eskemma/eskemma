@@ -3,7 +3,7 @@
 // territorio, 26-08-15) — convierte un cuelgue silencioso en un error
 // visible con el que el cliente ya sabe degradar (mismo criterio de todo
 // el workstream: nunca bloquear indefinidamente). Reutilizado por
-// /api/geo/resolver-municipio (Fase 5, Ronda 8, 26-08-18) para no
+// /api/geo/candidatos (antes /api/geo/resolver-municipio, Fase 5, Ronda 8, 26-08-18) para no
 // duplicar la misma lógica.
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
