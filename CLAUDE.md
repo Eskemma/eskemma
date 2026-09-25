@@ -77,7 +77,7 @@ equipos de campaña y funcionarios públicos en México.
 | `/moddulo` | Moddulo — gestión de proyectos políticos con IA (9 fases) | Activo |
 | `/centinela/pestel` | PESTEL — análisis PEST-L en tiempo real | En desarrollo |
 | `/cursos` | Talleres y cursos interactivos | Activo |
-| `/sefix` | Dashboard electoral — Next.js/React/TypeScript nativo, 24 rutas API propias bajo `app/api/sefix/`. Migrado desde el prototipo original en R/Shiny (`docs/sefix_R/`, sin desarrollo activo desde 26-04-12, se conserva solo como artefacto histórico) | Activo |
+| `/sefix` | Dashboard electoral — Next.js/React/TypeScript nativo, 24 rutas API propias bajo `app/api/sefix/` (recontado 26-09-24). Migrado desde el prototipo original en R/Shiny (`docs/sefix_R/`, sin desarrollo activo desde 26-04-12, se conserva solo como artefacto histórico) | Activo |
 | `/blog` | El Baúl de Fouché | Activo |
 
 ---
@@ -535,7 +535,8 @@ nombre que devuelve TODOS los candidatos: Estado/Municipio/Distrito federal/Dist
 local) y `lib/geo/cabeceraNombres.ts` (comparación de nombres de cabecera),
 `lib/geo/claveMunicipioEstado.ts` (clave de un municipio tecleado dentro de un estado) y
 `lib/geo/abreviaturasEstado.ts` (códigos/abreviaturas de estado para DISPLAY; ver "Abreviaturas
-de estado" en Estilos).
+de estado" en Estilos) y `lib/geo/desambiguar.ts` (resolución de UNA referencia tecleada por el
+usuario: único / ambiguo / demasiados / ninguno; ver "Desambiguación de referencias" abajo).
 **Antes de escribir cualquier
 `.normalize("NFD")`/`toUpperCase()` sobre un nombre de estado/municipio/distrito,
 usar estos** — el diagnóstico del 2026-09-19 encontró ~18 implementaciones que
@@ -575,6 +576,93 @@ discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estata
   Sefix (voto en el extranjero — otro concepto).
 - Resolución de municipio: siempre `claveCanonicaMunicipio` (alias verificados,
   nunca reglas genéricas de prefijo — ver `claves-geograficas-no-confiables.md`).
+
+**Desambiguación de referencias — ronda de varios pasos (avance parcial, 26-09-24).**
+Estándar único para "qué quiso decir el usuario con este nombre" en formularios Y chats: la lógica
+es una sola (`lib/geo/desambiguar.ts`), la presentación cambia (picker en formulario, pregunta en
+chat). Diagnóstico de 2 rondas (formularios, chats, tipo de proyecto, coincidencia parcial,
+portabilidad entre apps) y diseño de 2 capas aprobados por Raúl: (1) **resolución de una
+referencia** (esta pieza) y (2) **composición** de varias unidades (zona metropolitana, etc.).
+
+| Pieza | Estado |
+|-------|--------|
+| **Pieza 1** — núcleo puro `desambiguarReferencia` + `POST /api/geo/candidatos` + tests con casos reales | ✅ **Completada 26-09-24** (sin cambios visibles: nada la consume aún) |
+| Pieza 1b — sugerencias por error de tecleo (solo para `ninguno`) | ⏳ Aparte, documentada abajo |
+| Paso 2 — formulario de municipio con clave, `MunicipioSeleccionado.cve`, comparación por conjuntos en `checkTerritoryMatch` | ⏳ Pendiente |
+| Paso 3 — herramientas del chat de Fontana sobre el núcleo (distritos, país vs estado) | ⏳ Pendiente |
+| Paso 4 — Moddulo (`project.territorio` estructurado en el chat), portabilidad por id, multiselección | ⏳ Pendiente |
+
+*Pieza 1 — qué hace.* `desambiguarReferencia(texto, {estadoCve?, municipios?, tipos?, mexico?,
+maxCandidatos?})` devuelve `unico` | `ambiguo` (2 a 8 candidatos) | `demasiados` (más de 8: no se
+lista, se pide el estado; lleva `total`, `estadosCve` y `exactas`) | `ninguno`. Cada candidato trae
+`tipo` (país/estado/municipio/distrito federal/local), `clave` estable, `nombre`, `etiqueta` legible
+y `coincidencia` (`exacta` | `alias` | `parcial`). Puro (el catálogo de municipios se INYECTA); el
+endpoint lo inyecta desde `getMunicipiosOptionsNacional()`, valida la entrada (texto ≤ 100
+caracteres, tipos y estado contra catálogo) y no exige sesión (catálogo público, igual que
+`/api/geo/options`). Catálogo de prueba real en `lib/geo/__fixtures__/municipios_catalogo.json`
+(2,477 municipios).
+
+*Reglas (decisiones de Raúl, no reinterpretar):*
+- Varios exactos (2+): solo se listan ellos ("Cuauhtémoc" = 4, "Juárez" = 5, "Guadalupe" = 4).
+- Sin exacto: una coincidencia parcial de palabra completa ("Pachuca" ⊂ "Pachuca de Soto")
+  resuelve sola y se marca `parcial` para mostrar el nombre oficial.
+- **Un exacto único que ADEMÁS tiene parciales NO resuelve solo** (decisión 26-09-24): pasa a
+  `ambiguo` con el exacto primero, o a `demasiados` con el exacto en `exactas` ("Santiago": existe el
+  municipio Santiago, NL, pero 64 más contienen la palabra). Medido en el catálogo real: afecta a 119
+  de 2,332 nombres oficiales (5 %: León, Miguel Hidalgo, Lerdo, Juchitán, Escobedo +6, San Pedro
+  +49…); dentro de un estado dado, 31. Un alias exacto no se lista contra sí mismo.
+- La dimensión de TIPO no se adivina: "Colima" es estado y municipio, "Oaxaca" es estado y
+  (parcial) Oaxaca de Juárez. **Quien llama acota con `tipos`** según su contexto (nivel del
+  formulario, nivel del indicador); sin acotar aparecen también los distritos (decisión 26-09-24:
+  correcto así, "Pachuca" sin `tipos` = municipio + 3 distritos, "Cuauhtémoc" = `demasiados`).
+- "México" **siempre pregunta** (país `MEX` vs Estado de México, clave `15`) salvo que el llamador
+  lo fije con `mexico` o acote `tipos`; dentro de un estado ya dado no es el país. `MEX` es solo el
+  país (ver Abreviaturas).
+- El estado dado (`estadoCve`) acota todos los tipos ANTES de buscar.
+- **Alias coloquiales reales y permanentes** (26-09-24): "Ciudad Juárez"/"Cd. Juárez" → Juárez
+  (08), "Neza" → Nezahualcóyotl (15), en la tabla NUEVA `ALIAS_COLOQUIAL_MUNICIPIO`
+  (`municipioCanonico.ts`), **separada** de `ALIAS_MUNICIPIO` a propósito: esa es contrato de JOINS de
+  datos (cada entrada existe por evidencia de una variante real de una fuente y
+  `claveCanonicaMunicipio` la aplica en todos los adaptadores); estos son apodos de usuario y solo
+  los consume `desambiguar.ts`, así que no pueden alterar ningún join. Solo alias reales, nunca
+  correcciones de tecleo. La copia de Cloud Functions no se afecta (`check-geo-cf` idéntico).
+
+*Claves estables.* Estado = CVE de 2 dígitos; municipio = `${estadoCve}:${claveCanonica}` **por
+nombre — nunca el `cve` de `/api/geo/options`/`getMunicipiosOptions`**, que es numeración INE y
+diverge del CVE_MUN de INEGI en ~55-63 % (`claves-geograficas-no-confiables.md`); distrito = código
+de 4 dígitos; país = `MEX`. **Única excepción:** 4 municipios de Oaxaca comparten nombre por pares
+dentro del mismo estado (San Juan Mixtepec 208/209, San Pedro Mixtepec 316/317, exactamente esos en
+todo el país): salen como 2 candidatos con sufijo `#<cve>` (el cve INE se usa SOLO para distinguir
+el par, nunca para unir datos) y el distrito en la etiqueta ("Dto. 08"). `candidatosGeo` los
+colapsaba en uno; por eso la búsqueda de municipios vive en el núcleo.
+
+*Verificación de Pieza 1.* 73 tests del núcleo + 19 del endpoint (casos reales medidos: Pachuca,
+Tlajomulco, Salto, Ixtlahuacán, Tuxtla, Ocampo, Cuauhtémoc, Juárez, Guadalupe, Santiago, San Juan,
+Villa, Oaxaca, Colima, Querétaro, Mérida, México, Ciudad Juárez, Neza, San Juan Mixtepec, borde
+exacto de 8/9), probados en negativo (quitar la regla del exacto único o los alias hace fallar 8
+tests cada uno); suite completa 446, `tsc`, `next build`, `functions build` y `check-geo-cf` limpios.
+Sin commit de Pieza 1 al escribir esto.
+
+*Pendiente — Pieza 1b, errores de tecleo (decisión: mejora APARTE, no en Pieza 1).* "Guadalajra" →
+`ninguno` hoy, con test que fija que NO se adivina. Investigado (distancia de edición sobre los
+2,332 nombres oficiales): un error de 1 edición recupera el nombre correcto como único vecino en
+748 de 763 casos simulados (98 %), 8 quedan ambiguos con el correcto entre las opciones y 0 caen en
+un nombre equivocado; **pero** 6.9 % de los nombres tienen OTRO nombre real a distancia 1 (Colima ~
+Colipa, Comala ~ Copala, Mazatán ~ Mazatlán) y 21.7 % a distancia 2, así que **nunca debe resolver
+solo**. Diseño propuesto: solo cuando el resultado es `ninguno`, devolver `sugerencias` (máximo 3;
+distancia ≤ 1, y ≤ 2 solo con 10 o más letras) que quien llama CONFIRMA con el usuario; en chat el
+guard debe exigir que la confirmación corresponda a la clave sugerida. Es una función pura pequeña
+pero cambia el contrato del resultado `ninguno` y su presentación es de los pasos 2/3.
+
+*Pendientes del Paso 2 (no tocar antes).* (a) Caso real ya guardado:
+`fontana_sesiones/vO9JFif6W3UQc7DlyqPq` tiene el municipio **"Ixtlahuacán" (Jalisco) ambiguo** entre
+"del Río" y "de los Membrillos" — se resolverá con el relleno perezoso de `MunicipioSeleccionado`;
+recordárselo a Raúl al llegar al Paso 2. (b) Antes de migrar, mostrar qué municipios guardados no
+resuelven a clave única (escaneo de solo lectura 26-09-23: 27 de 28 resuelven, 1 ambiguo: ese).
+(c) El picker actual de `TerritorySelector` descarta el `cve` elegido y guarda el texto tecleado
+(`:480`, `:501-505`); `checkTerritoryMatch` solo lee el primer elemento de las listas plurales y el
+municipio nunca da "exact". Diagnóstico completo de formularios, chats y portabilidad en el
+historial de esta ronda.
 
 **Pendientes registrados (no perder de vista):**
 - **Desambiguación de texto libre/dictado** ("dame la votación en México" — ¿país o
@@ -667,7 +755,9 @@ discrepaban y 4 fallos reales (padrón de "Tlaquepaque" devolvía el dato estata
   - *Superficie relacionada NO tocada:* 15 adaptadores de Fontana pasan de distrito a
     municipio con `extraerCiudadCabecera()` (`lib/moddulo/territorioLabel.ts`); 88 de 361
     cabeceras federales NO son nombre de municipio (CIUDAD DEL CARMEN, VICTORIA DE DURANGO…).
-  **Pendiente:** la interfaz de notificación/desambiguación al usuario (qué se le muestra
+  **Pendiente (26-09-24: diseño aprobado, ver "Desambiguación de referencias" arriba; el
+  núcleo `desambiguar.ts` ya existe, falta conectar formularios y chats):** la interfaz de
+  notificación/desambiguación al usuario (qué se le muestra
   cuando hay >1 candidato, cómo elige, cómo se recuerda) queda sin diseñar, ligada al
   trabajo de interpretación de texto libre/Sefix-AI ya anotado arriba; aquí solo se
   preparó el terreno de datos. Cuando exista, los call sites TEMPORAL usan la lista completa.
@@ -841,7 +931,7 @@ hasta que haya imagen OG corporativa diseñada.
 ```
 /
 ├── app/
-│   ├── api/                          # 142 API route handlers (recontado 26-09-21)
+│   ├── api/                          # 143 API route handlers (recontado 26-09-24; +1 `geo/candidatos`)
 │   │   ├── auth/session/             # POST/DELETE/GET sesiones
 │   │   ├── moddulo/                  # CRUD proyectos + chat SSE
 │   │   └── centinela/pestel/        # config, feed, trigger, status
@@ -1657,3 +1747,4 @@ firebase functions:log
 | 26-09-22 | Seguridad — rotación de secretos en Vercel: 1 hallazgo crítico (llave de Firebase Admin comprometida en el pasado) + 1 bug de build preexistente descubierto en el proceso | Vercel marcó 4 variables como "looks like a secret... consider rotating": `FIREBASE_TOKEN_URI`, `GMAIL_APP_PASSWORD`, `RESEND_API_KEY`, `FIREBASE_PRIVATE_KEY`. Investigación de solo lectura por variable (dónde se usa, impacto de rotar, evidencia de exposición previa en `git log`, sin imprimir ningún valor real): **`FIREBASE_TOKEN_URI`** — falso positivo, es la URL pública fija de OAuth2 de Google (idéntica para cualquier proyecto GCP), ya con fallback hardcodeado en `lib/firebase-admin.ts`; sin acción. **`GMAIL_APP_PASSWORD`** (`lib/emailService.ts`, newsletter) y **`RESEND_API_KEY`** (`lib/email.ts`, contacto) — credenciales reales, un solo punto de consumo cada una, recomendado Sensitive + rotar, sin hallazgo de exposición previa (las 3 solo aparecen una vez en todo el historial de git, en `docs/PROJECT_AUDIT.md`, como nombres de variable con el valor vacío — un checklist, no un valor real). **`FIREBASE_PRIVATE_KEY` — HALLAZGO CRÍTICO:** `git log -S "BEGIN PRIVATE KEY" --all` encontró el marcador de contenido PEM real (no solo el nombre) en el commit `9252a71` (**2025-08-25**), archivo `app/secrets/eskemma-3c4c3-firebase-adminsdk-fbsvc-3d49abeed1.json` — nombre exacto del patrón que genera Firebase al descargar una llave real; `app/secrets/` ya estaba en `.gitignore` desde el primer commit, así que se coló casi con certeza por un `git add -f` manual. Ese commit **no es ancestro de ninguna rama actual** (local ni remota) — solo alcanzable por 2 refs locales de respaldo (`refs/original/refs/heads/main`, creado automáticamente por un `git filter-branch` anterior, y la rama `main-backup`), confirmando que alguna vez se limpió la historia de `main` con éxito; un 3er ref (`version-firebase`) resultó ser el mismo commit, no un hallazgo nuevo. Sin forma de confirmar desde el repo si llegó a estar en GitHub antes de la limpieza — Secret Scanning del repo está **deshabilitado**, así que tampoco hay esa señal. **Cloud Functions confirmado sin exposición**: `functions/src/index.ts` usa `admin.initializeApp()` sin argumentos (Application Default Credentials, identidad separada — `...-compute@developer.gserviceaccount.com`, cero referencias a `FIREBASE_PRIVATE_KEY` en `functions/src`); solo afecta Vercel/Next.js y ~12 scripts locales de mantenimiento (todos leen de `process.env`, ninguno hardcodeado, verificado). Recomendación entregada: rotar YA sin condicionar a nada más (la evidencia ya basta), guía completa paso a paso del procedimiento específico de GCP (generar nueva clave en Firebase Console → actualizar Vercel/`.env` → verificar con `/api/test-admin` → solo entonces revocar la vieja en IAM — a diferencia de Gmail/Resend, generar una clave nueva NO invalida la anterior automáticamente). Borrado de los refs dangling identificado pero explícitamente diferido hasta que Raúl confirme la rotación completa. **Hallazgo aparte, descubierto al intentar verificar la rotación con un deploy real de `develop` en Vercel:** el build falló por un error de TypeScript **sin relación con los secretos** — `scripts/check-geo-cf-sync.ts` (26-09-20) hace `import("../functions/src/utils/estadoCveMap")`, una ruta que existe en disco local pero que `.vercelignore` (desde 26-01-07) excluye del todo en Vercel; como el `tsconfig.json` raíz revisa con TypeScript TODOS los `.ts` del repo en cada `next build` (incluidos los de `scripts/`, aunque la app nunca los importe), este script arrastraba el error a todo el sitio — roto desde el 20 de septiembre, sin relación con ninguna ronda de esta sesión. **Mismo patrón ya usado hoy con `functions/tsconfig.build.json`/`vectorRiesgoV2.test.ts` — precedente para scripts futuros con el mismo problema:** un archivo en `scripts/` cuyo import alcanza algo fuera del alcance real de `next build` (código de `functions/`, u otro directorio excluido) rompe el build de la app aunque nunca se ejecute como parte de ella. **Fix:** agregado `scripts/check-geo-cf-sync.ts` al `exclude` de `tsconfig.json` (raíz) — el script sigue funcionando idéntico al correrlo directo (`npm run check-geo-cf`, motor de TypeScript propio de esa ejecución vía `tsx`), solo deja de ser parte del type-check de la app. Verificado: `npm run check-geo-cf` idéntico a antes, `tsc --noEmit` y `next build` (limpio, sin caché) limpios, 333 pruebas sin regresión. **Estado final (26-09-23):** la rotación de `FIREBASE_PRIVATE_KEY` se ejecutó, la llave comprometida quedó revocada en GCP, los 4 refs locales `refs/original/*` que aún contenían la llave se borraron y el objeto se purgó con `git gc --prune=now` (`main-backup`, verificado limpio con rigor, se dejó intacto), y el fix de `tsconfig.json` quedó commiteado (`5dfadd0`). Lo que pasó después de la rotación (fallos en Vercel por una llave distinta a la sobreviviente) y los pendientes que siguen abiertos están en la fila siguiente. |
 | 26-09-23 | Seguridad — post-rotación de `FIREBASE_PRIVATE_KEY`: Vercel usaba una llave que ya no existía en Google (causa raíz, lección de verificación y pendientes abiertos) | **Síntomas (Preview y Production, local sin problema):** novedades del blog vacías en Home, Dashboard de Sefix sin datos, login por usuario y contraseña con "Error interno del servidor", login con Google con "dominio no autorizado", y la advertencia "looks like a secret" persistente. **Causa raíz de los primeros tres (una sola causa):** todos dependen de firebase-admin en el servidor — Home lee los posts con `adminDb` (`app/page.tsx`, con `catch` que devuelve `[]`, por eso la sección quedaba vacía sin error visible), el login por usuario pasa por `/api/auth/find-user` (`adminDb`) y Sefix lee de Admin Storage (`lib/sefix/storage.ts`). `/blog` seguía funcionando porque usa el SDK cliente (`lib/server/posts.server.ts`, `@/firebase/firebaseConfig`), no el Admin. **Evidencia que la confirmó:** (a) `/api/test-admin` devolvía `invalid_grant: Invalid JWT Signature` en ambos entornos — NO `DECODER routines::unsupported`. Con una llave desechable (sin secretos) se comprobó que una llave mal pegada (comillas literales o saltos convertidos en espacios) pasa `cert()` y falla con `DECODER routines::unsupported`, y una truncada o con doble escape falla al importar el módulo; `invalid_grant` significa que la llave se interpreta bien pero su firma no corresponde a ninguna clave activa. (b) La lista pública de claves activas de la cuenta de servicio (`https://www.googleapis.com/robot/v1/metadata/x509/<client_email>`, sin credenciales) mostraba 3 activas (`8c675a50fa`, `16e6f99524`, `aa4821bda6`; las 2 no propias son claves que Google administra), la comprometida `3d49abeed1` ya NO estaba activa, y la llave del `.env` local coincidía (comparando la clave pública) con `16e6f99524`, la única propia sobreviviente — por eso local funcionaba. (c) Raúl confirmó que el valor de Vercel no era el mismo que el del `.env`. Tras pegar en Vercel el valor del `.env` (sin comillas) y redeployar Preview y Production, `/api/test-admin` devolvió `success` en ambos. No se determinó cómo quedó en Vercel una llave distinta (varias generaciones de llave, una entrada duplicada de mayor alcance, o un valor anterior sin actualizar) — irrelevante para el arreglo. **Descartado con evidencia:** `FIREBASE_PRIVATE_KEY_ID` no interviene en la firma (firebase-admin no lo usa y a Firestore solo le pasa `private_key` y `client_email`), así que un ID desactualizado no era la causa. **Técnica de copiado verificada:** para pasar la llave del `.env` a Vercel sin verla ni tocarla a mano, un `node -e` lee la línea de `.env`, quita comillas envolventes, deja los `\n` como texto literal y lo manda a `pbcopy`; Vercel guarda el valor tal cual, así que las comillas del `.env` (que dotenv sí quita) NO deben pegarse. Se validó antes de usarlo que el resultado, tras el `.replace(/\\n/g, "\n")` de `lib/firebase-admin.ts`, coincide con la clave activa. **Síntoma 5 (Google, dominio no autorizado), independiente de la llave:** es `auth/unauthorized-domain` del SDK cliente (`context/AuthContext.tsx`), contra la lista Authentication → Settings → Authorized domains de Firebase, que NO admite comodines. Estaban `eskemma.com` y `www.eskemma.com`; fallaba al entrar por los alias de Vercel (`eskemma-git-develop-raulsansals-projects.vercel.app`, `eskemma-git-main-raulsansals-projects.vercel.app`). Se agregan esos dos alias estables de rama (uno cubre todos los previews de la rama; no agregar las URLs con hash por deployment). **Lección de verificación (aplica a toda rotación de credenciales):** `/api/test-admin`, o cualquier prueba de "¿funciona la credencial nueva?", NO confirma una rotación mientras la vieja siga activa — el éxito no distingue cuál de las dos se está usando. Aquí pasó en ambos entornos con la llave vieja o con una que después se borró, y el error solo apareció cuando la vieja se revocó. La verificación válida es probar DESPUÉS de que la vieja ya no pueda usarse (o con la vieja deliberadamente inválida), nunca mientras coexisten. Orden a seguir: (1) comprobar que la credencial nueva es válida por sí sola (por ejemplo desde local, o comparando su clave pública contra las claves activas), (2) ponerla en Vercel y redeployar, (3) revocar la vieja, (4) probar en el entorno real; si falla, la nueva sigue viva y basta volver a pegarla. **Pendientes explícitamente abiertos (no son olvidos):** (1) **Advertencia "looks like a secret" de `FIREBASE_PRIVATE_KEY` y `FIREBASE_TOKEN_URI` en Vercel** — se resuelve guardándolas como Sensitive ("Sensitive" y "rotar" son acciones distintas: la advertencia depende del tipo de almacenamiento, no del valor, y persiste aunque se haya rotado). Pospuesto a propósito para no volver a tocar el valor de la llave mientras todo está recién estabilizado, porque guardar como Sensitive implica re-ingresar el valor. Al hacerlo, repetir el procedimiento verificado (portapapeles, pegar sin comillas, redeploy de Preview y Production, `/api/test-admin`, que ahora sí es confiable porque la vieja está revocada) y comprobar en la documentación de Vercel si Sensitive aplica al entorno Development. Nota: `FIREBASE_TOKEN_URI` es la URL pública fija de OAuth2 de Google, no un secreto — el aviso es un falso positivo por el nombre, y `lib/firebase-admin.ts` ya trae ese valor como fallback, así que también podría eliminarse. (2) **Rotación de `GMAIL_APP_PASSWORD` y `RESEND_API_KEY`** (guías completas ya entregadas; consumidores: `lib/emailService.ts` para newsletter y `lib/email.ts` para contacto) — pausada por decisión de secuencia: se retoma cuando se trabaje la estrategia de comunicación del newsletter, en otra sesión. Sin evidencia de exposición previa de ninguna de las dos. Al retomarla, aplicar la lección de verificación de arriba. **Sin cambios de código en esta fila** (solo configuración en Vercel/Firebase y documentación). |
 | 26-09-23 | Ronda de ajustes menores: guard de `createProject`, badges del hub de Moddulo, abreviaturas de estado unificadas | **1 — Seguridad:** `createProject` ya no escribe sobre un `pestel_projects` ajeno (lee y exige `userId === uid` antes de persistir; 404 en la ruta); regresión permanente (6 casos, verificados en negativo: sin el guard fallan 3) y escaneo de solo lectura de Firestore real con 0 enlaces cross-tenant; fixture `adminMocks.ts` gana `add()`. Detalle en Seguridad. **2 — Badges:** `draft` 2.23:1 → 6.20:1 claro / 6.56:1 oscuro (antes sin `dark:`); `archived` `dark:text` de `#9AAEBE` (4.26:1) a `#C7D6E0`. Quitado de "no tocado y ya defectuoso". **3 — Abreviaturas:** módulo puro `lib/geo/abreviaturasEstado.ts` (tabla de 32 códigos fijada por Raúl; `EDOMEX` y `COLI`, `MEX`/`COL` reservados a países) con 3 formas por contexto; migrados `OrigenCharts` (solo valores; llaves y orden de `RECEPTOR_ORDER`/`ORIGIN_SUFFIXES` intactos, fijados verbatim en test), `lib/moddulo/abreviaturaEstado.ts` (elimina `ABREVIATURA_ESTADO_POR_CVE`, sin importadores) y la prosa de `semanalUtils` (nombres completos salvo CDMX; `ESTADOS_ABBR` eliminada). Confirmado por grep que ningún proceso de lectura de datos usa estos códigos (solo display), por lo que Colima pudo pasar a `COLI`. Tests: `abreviaturasEstado.test.ts` (tabla definitiva, únicos, sin ISO3 conocido, 3 formas de una tabla, llaves/orden, ratchet de literales viejos); fixture de `normalizadoresSueltos.test.ts` actualizado (3 valores deliberados). Medición real en Chrome/Arimo 9 px: `EDOMEX` 39.02 px; columna de etiquetas de fila 44 → 48 px. Se descubrió al probar que JS ordena las llaves `"10".."32"` antes de `"01".."09"` (el test compara por lookup). Nota registrada, NO implementada: reconocimiento de entrada del Estado de México (Punto 2 de la agenda). `check-geo-cf` (copia de Cloud Functions intacta), `tsc`, `next build`, functions build/test (20) y 354 pruebas limpios; `check-docs-freshness` 0 desactualizadas. **Revisión de código:** corregidos 2 hallazgos propios (sort duplicado en vez de `ESTADOS_ALFABETICOS`; export sin uso). **Pendiente de Raúl (navegador):** hub de Moddulo con un proyecto en borrador y uno archivado, claro y oscuro; heatmap de origen de Sefix con `EDOMEX`/`COLI` en eje y filas; encabezado del padrón en Moddulo F2 ("…, COLI." si aplica). |
+| 26-09-24 | Desambiguación geográfica — Pieza 1 completada (núcleo puro + endpoint + tests) y ajustes de reglas | **Ronda de varios pasos, avance parcial (Pieza 1 ✅; pasos 2-4 y Pieza 1b pendientes — ver "Desambiguación de referencias" en Geografía compartida).** Antecedente: 2 rondas de diagnóstico de solo lectura (formularios de territorio, chats de Fontana/Moddulo/PESTEL con forense de 382 mensajes reales, delimitación por tipo de proyecto, coincidencia parcial medida sobre el catálogo real de 2,477 municipios, portabilidad Fontana↔Moddulo↔PESTEL) que llevaron al diseño de 2 capas y 6 decisiones de Raúl. **Construido:** `lib/geo/desambiguar.ts` (`desambiguarReferencia`: único/ambiguo/demasiados/ninguno, tope 8), `POST /api/geo/candidatos`, fixture real `municipios_catalogo.json`, 92 tests. **Comprobación previa:** `/api/geo/options` ya sirve municipios por estado igual que Sefix (sin ajuste), con la advertencia de que su `cve` es numeración INE y la clave estable del núcleo es por nombre. **Hallazgos al construir:** `candidatosGeo` colapsaba los 4 municipios homónimos de Oaxaca (San Juan/San Pedro Mixtepec) — el núcleo los devuelve como 2 candidatos con sufijo `#cve`; "México" añadía el distrito "Nuevo México" (corregido); `Object.keys` ordena las claves numéricas (efecto ya conocido). **Ajustes del 26-09-24 (decisiones de Raúl):** (1) un exacto único con parciales ya no resuelve solo (Santiago → `demasiados` con `exactas`; 119 de 2,332 nombres oficiales cambian); (2) distritos sin filtro de tipo: correcto, lo acota quien llama; (3) alias coloquiales "Ciudad Juárez"/"Cd. Juárez" y "Neza" en la tabla nueva `ALIAS_COLOQUIAL_MUNICIPIO` (separada de `ALIAS_MUNICIPIO`, contrato de joins); (4) errores de tecleo: investigado y **diferido como Pieza 1b** (98 % de recuperación en 1 edición pero 6.9 % de nombres con vecino real a distancia 1 → solo sugerencias, nunca resolver solo). **Frescura:** `check-docs-freshness` marcó 2 líneas (Sefix y conteo de rutas) por la ronda anterior; recontado contra el código: Sefix sigue en 24 rutas, `app/api` pasó de 142 a **143** (`geo/candidatos`). **Verificación:** 446 pruebas, `tsc`, `next build`, `functions build` y `check-geo-cf` limpios; ambas reglas nuevas probadas en negativo. Sin commit ni push. **Pendiente de Raúl:** decidir cuándo pasar al Paso 2 (formulario con clave; incluye el caso real Ixtlahuacán de `fontana_sesiones/vO9JFif6W3UQc7DlyqPq`) y si la Pieza 1b va antes o después. |

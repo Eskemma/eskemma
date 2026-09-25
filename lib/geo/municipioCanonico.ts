@@ -140,6 +140,19 @@ export const ALIAS_MUNICIPIO: Record<string, Record<string, string>> = {
   },
 };
 
+// Nombres COLOQUIALES que un usuario TECLEA → nombre oficial, por estado (26-09-24).
+// Misma forma que ALIAS_MUNICIPIO pero tabla APARTE a propósito: ALIAS_MUNICIPIO es contrato
+// de JOINS de datos (cada entrada existe por evidencia de una variante real de una fuente) y
+// `claveCanonicaMunicipio` la aplica en todos los adaptadores; estos son apodos de usuario y
+// solo los consume lib/geo/desambiguar.ts, así que no pueden alterar ningún join. Las llaves
+// están en forma PLANA (MAYÚSCULAS sin acentos, Ñ/Ü plegadas, "." y "_" como espacio: "Cd.
+// Juárez" → "CD JUAREZ"); el valor es el nombre del catálogo. Se agregan solo alias reales y
+// permanentes, nunca correcciones de tecleo (eso es otra capacidad, ver CLAUDE.md).
+export const ALIAS_COLOQUIAL_MUNICIPIO: Record<string, Record<string, string>> = {
+  "08": { "CIUDAD JUAREZ": "JUAREZ", "CD JUAREZ": "JUAREZ" },
+  "15": { "NEZA": "NEZAHUALCOYOTL" },
+};
+
 // Punto único de entrada para CUALQUIER adaptador o pipeline de Fontana que
 // construya o consulte un mapa de datos keyed por nombre de municipio
 // (join por nombre) — nunca llamar normalizarNombreMunicipio() sola para
