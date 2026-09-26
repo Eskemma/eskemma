@@ -5,6 +5,7 @@
 import { type NextRequest } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import { bloqueTerritorioModdulo } from "@/lib/geo/bloqueTerritorio";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type { XPCTO } from "@/types/moddulo.types";
 
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
   }
 
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
+  // Territorio estructurado (Paso 4a): "" en proyectos legados sin territorio → el prompt no cambia.
+  const bloqueTerritorio = bloqueTerritorioModdulo(project.territorio);
 
   const systemPrompt = `Eres el Advisor de F2-Exploración en Moddulo.
 Tu función es EXCLUSIVAMENTE analizar el impacto estratégico de cambios específicos en el DVS (Documento de Viabilidad Situacional).
@@ -49,7 +52,7 @@ PROYECTO: ${project.name} (${project.type})
 XPCTO:
 ${JSON.stringify(xpcto, null, 2)}
 
-MOTOR EN EDICIÓN: ${motor ?? "—"}
+${bloqueTerritorio ? `${bloqueTerritorio}\n\n` : ""}MOTOR EN EDICIÓN: ${motor ?? "—"}
 CAMPO EN EDICIÓN: ${campo ?? "—"}
 
 REGLAS ESTRICTAS:

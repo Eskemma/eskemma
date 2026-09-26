@@ -47,6 +47,7 @@ vi.mock("@/lib/ai/claude", () => ({
 import { adminDb } from "@/lib/firebase-admin";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import { getPhaseSystemPrompt } from "@/lib/ai/phases/prompts";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
 import { anthropic } from "@/lib/ai/claude";
 import { POST } from "./route";
@@ -347,5 +348,63 @@ describe("POST /api/moddulo/chat/[phaseId] — guard de grounding de extractedDa
     const extraido = eventos.find((e) => e.type === "extracted-data");
     expect(extraido.extractedData.__action).toBe("start_express");
     expect(extraido.extractedData["investigacion.insightsClave"]).toBe("Hallazgo con 87.3%");
+  });
+});
+
+describe("POST /api/moddulo/chat/[phaseId] — territorio estructurado (Paso 4a)", () => {
+  const TERR = {
+    nivel: "distrito_federal",
+    nombre: "PROGRESO",
+    estado: "Yucatán",
+    pais: "México",
+    distritosSeleccionados: [{ cve: "002", nombre: "PROGRESO", estado: "Yucatán" }],
+  };
+  const proyectoConTerritorio = () =>
+    ({ type: "electoral", phases: {}, collaborators: [{ uid: UID, role: "owner" }], territorio: TERR }) as unknown as ModduloProject;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdminDb.reset();
+  });
+
+  async function turnoConTerritorio(datos: Record<string, unknown>) {
+    mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
+    mockGetProject.mockResolvedValue(proyectoConTerritorio());
+    mockStream.mockReturnValue(
+      streamConTexto(respuestaConJson("Listo.", datos)) as unknown as ReturnType<typeof anthropic.messages.stream>
+    );
+    const res = await POST(buildRequest({ message: "Continúa.", projectId: PROJECT_ID }), ctx("exploracion"));
+    const cuerpo = await res.text();
+    return { cuerpo, eventos: [...cuerpo.matchAll(/^data: (.*)$/gm)].map((m) => JSON.parse(m[1])) };
+  }
+
+  it("pasa project.territorio como 4.º argumento de getPhaseSystemPrompt", async () => {
+    await turnoConTerritorio({});
+    const args = vi.mocked(getPhaseSystemPrompt).mock.calls[0];
+    expect(args[0]).toBe("exploracion");
+    expect(args[3]).toEqual(TERR);
+  });
+
+  it("el territorio NO viaja dentro del contexto XPCTO (que alimenta el grounding)", async () => {
+    await turnoConTerritorio({});
+    const xpctoCtx = vi.mocked(getPhaseSystemPrompt).mock.calls[0][2];
+    expect(JSON.stringify(xpctoCtx ?? {})).not.toContain("PROGRESO");
+    expect(JSON.stringify(xpctoCtx ?? {})).not.toContain("distritosSeleccionados");
+  });
+
+  it("grounding: el código de distrito del bloque de territorio NO respalda una cifra extraída", async () => {
+    // El código 3102 sale del bloque del prompt, no de lo que dijo el usuario: si el modelo lo extrae
+    // como dato del usuario, el guard sigue exigiendo respaldo y lo descarta.
+    const { eventos } = await turnoConTerritorio({ "xpcto.capacidades.humano": "Equipo de 3102 promotores." });
+    expect(eventos.some((e) => e.type === "extracted-data")).toBe(false);
+  });
+
+  it("proyecto sin territorio (legado): 4.º argumento undefined, sin error", async () => {
+    mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
+    mockGetProject.mockResolvedValue({ type: "electoral", phases: {} } as unknown as ModduloProject);
+    mockStream.mockReturnValue(streamDeUnChunk() as unknown as ReturnType<typeof anthropic.messages.stream>);
+    const res = await POST(buildRequest({ message: "hola", projectId: PROJECT_ID }), ctx("exploracion"));
+    expect(res.status).toBe(200);
+    expect(vi.mocked(getPhaseSystemPrompt).mock.calls[0][3]).toBeUndefined();
   });
 });

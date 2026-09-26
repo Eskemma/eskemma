@@ -6,18 +6,8 @@
 
 import type { Territorio } from "@/types/shared.types";
 import type { ProjectType } from "@/types/moddulo.types";
-import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import { FAMILIAS_FONTANA } from "@/lib/fontana/familias";
-import { etiquetaDistritoSeleccionado } from "@/lib/geo/formatDistrito";
-
-const NIVEL_LEGIBLE: Record<string, string> = {
-  nacional: "Nacional (todo México)",
-  estatal: "Estatal",
-  municipal: "Municipal",
-  distrito: "Distrito electoral federal",
-  distrito_federal: "Distrito electoral federal",
-  distrito_local: "Distrito electoral local",
-};
+import { lineasBaseTerritorio, unidadesPlurales } from "@/lib/geo/bloqueTerritorio";
 
 const TIPO_PROYECTO_LEGIBLE: Record<ProjectType, string> = {
   electoral: "electoral",
@@ -61,50 +51,16 @@ export const EJEMPLO_POBLACION_INDIGENA_POR_TIPO: Record<ProjectType, string> = 
 export const ENCUADRE_INSTRUCCION =
   "Este encuadre es tu punto de partida para priorizar qué destacar primero según el tipo de proyecto — no una limitación de contenido. Si un dato tiene implicaciones relevantes fuera de ese encuadre, inclúyelas también.";
 
-/** Lista legible de las unidades de un territorio plural, o null si es singular. */
-function unidadesPlurales(territorio: Territorio): string | null {
-  if (!esTerritorioParcial(territorio)) return null;
-  if (territorio.distritosSeleccionados && territorio.distritosSeleccionados.length > 1) {
-    return territorio.distritosSeleccionados
-      .map((d) => etiquetaDistritoSeleccionado(territorio.nivel, d, territorio.estado))
-      .join(", ");
-  }
-  if (territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 1) {
-    return territorio.municipiosPorEstado.map((m) => `${m.nombre} (${m.estado})`).join(", ");
-  }
-  if (territorio.municipiosSeleccionados && territorio.municipiosSeleccionados.length > 1) {
-    return territorio.municipiosSeleccionados.join(", ");
-  }
-  if (territorio.estadosSeleccionados && territorio.estadosSeleccionados.length > 1) {
-    return territorio.estadosSeleccionados.join(", ");
-  }
-  return null;
-}
-
 function bloqueTerritorio(territorio: Territorio, tipoProyecto: ProjectType): string {
-  const nivel = NIVEL_LEGIBLE[territorio.nivel] ?? territorio.nivel;
-  const distritoUnico =
-    (territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local") &&
-    territorio.distritosSeleccionados?.length === 1
-      ? etiquetaDistritoSeleccionado(territorio.nivel, territorio.distritosSeleccionados[0], territorio.estado)
-      : null;
-  const nombre =
-    distritoUnico ||
-    territorio.nombre ||
-    [territorio.estado, territorio.municipio].filter(Boolean).join(" › ") ||
-    "(sin nombre)";
   const lineas = [
     "## Territorio de esta sesión (fijo — todas las consultas son sobre este)",
-    `- Nivel: ${nivel}`,
-    `- Territorio: ${nombre}`,
-    territorio.estado ? `- Estado: ${territorio.estado}` : null,
-    territorio.municipio ? `- Municipio: ${territorio.municipio}` : null,
+    ...lineasBaseTerritorio(territorio),
     `- Tipo de proyecto: ${TIPO_PROYECTO_LEGIBLE[tipoProyecto] ?? tipoProyecto}`,
-  ].filter(Boolean);
+  ];
   const plural = unidadesPlurales(territorio);
   if (plural) {
     lineas.push(
-      `- Este proyecto abarca VARIAS unidades: ${plural}. Los valores combinados los calcula la herramienta; nunca los combines tú.`
+      `- Este proyecto abarca VARIAS unidades: ${plural.lista}. Los valores combinados los calcula la herramienta; nunca los combines tú.`
     );
   }
   return lineas.join("\n");

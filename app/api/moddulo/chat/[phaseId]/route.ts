@@ -91,7 +91,13 @@ export async function POST(
           }
         : undefined;
 
-    const baseSystemPrompt = getPhaseSystemPrompt(phaseId as PhaseId, currentFormData, mergedXpctoContext);
+    const baseSystemPrompt = getPhaseSystemPrompt(
+      phaseId as PhaseId,
+      currentFormData,
+      mergedXpctoContext,
+      // Territorio estructurado del proyecto (Firestore): NO va dentro de mergedXpctoContext, que alimenta el grounding.
+      project.territorio
+    );
     const systemPrompt = knowledgeContext
       ? `${knowledgeContext}\n\n${baseSystemPrompt}`
       : baseSystemPrompt;

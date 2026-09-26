@@ -1,4 +1,6 @@
 // lib/ai/phases/prompts.ts
+import type { Territorio } from "@/types/shared.types";
+import { bloqueTerritorioModdulo } from "@/lib/geo/bloqueTerritorio";
 import type { PhaseId, ProjectType } from "@/types/moddulo.types";
 import type { WebContextResult } from "@/lib/search/SearchProvider";
 import { DIMENSION_PRIORITY_BY_TYPE, type DimensionCode } from "@/lib/moddulo/dimensionPriority";
@@ -135,7 +137,7 @@ Genera 4 entregables técnicos que sirven como insumos para la Fase 3 — Invest
   4. Documento Rector: Hipótesis y Directrices (guía maestra para F3)
 
 ALCANCE GEOGRÁFICO: El análisis PEST-L no asume ningún país por defecto.
-Infiere el país, estado o territorio a partir del XPCTO (sujeto, hito, contexto del proyecto).
+Si el prompt incluye el bloque «TERRITORIO DEL PROYECTO», ese es el territorio: úsalo tal cual. Solo si NO existe ese bloque, infiere el país, estado o territorio a partir del XPCTO (sujeto, hito, contexto del proyecto).
 Tu conocimiento abarca marcos políticos, electorales, económicos y legales de México, Iberoamérica y EUA.
 Adapta el análisis al contexto real del proyecto.
 
@@ -1049,7 +1051,8 @@ Responde SOLO con este JSON:
 export function getPhaseSystemPrompt(
   phaseId: PhaseId,
   currentFormData?: Record<string, unknown>,
-  xpctoContext?: Record<string, unknown>
+  xpctoContext?: Record<string, unknown>,
+  territorio?: Territorio | null
 ): string {
   const basePrompt = PHASE_PROMPTS[phaseId];
 
@@ -1072,12 +1075,18 @@ export function getPhaseSystemPrompt(
     xpctoSection = `\n\nCONTEXTO DEL PROYECTO — XPCTO (Fase 1 Propósito):\n${JSON.stringify(xpctoContext, null, 2)}\n\nEste XPCTO es la base del proyecto. Úsalo para contextualizar tu análisis, detectar inconsistencias y fundamentar tus recomendaciones.`;
   }
 
+  // Territorio estructurado del proyecto (Paso 4a, 26-09-26): sección ADICIONAL tras el XPCTO.
+  // Va fuera de `xpctoContext` a propósito: ese objeto también alimenta el texto de grounding de la ruta
+  // y los códigos de distrito (p. ej. 3102) contarían como cifras respaldadas.
+  const bloque = bloqueTerritorioModdulo(territorio);
+  const territorioSection = bloque ? `\n\n${bloque}` : "";
+
   if (!currentFormData || Object.keys(currentFormData).length === 0) {
-    return basePrompt + dateContext + xpctoSection;
+    return basePrompt + dateContext + xpctoSection + territorioSection;
   }
 
   // Añadir contexto de datos ya capturados en la fase actual
   const dataContext = `\n\nDADOS YA CAPTURADOS EN ESTA FASE:\n${JSON.stringify(currentFormData, null, 2)}\n\nNo repitas preguntas sobre campos que ya tienen información. Continúa con los campos pendientes.`;
 
-  return basePrompt + dateContext + xpctoSection + dataContext;
+  return basePrompt + dateContext + xpctoSection + territorioSection + dataContext;
 }
