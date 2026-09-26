@@ -1,4 +1,5 @@
 // lib/geo/formatDistrito.ts
+import { resolverEstadoCve } from "./estados";
 // Nomenclatura compartida de distritos electorales (26-08-16) — mismo
 // formato ya usado por Sefix, ahora estándar para TODO el ecosistema
 // (ver CLAUDE.md, sección "Nomenclatura de Distritos Electorales").
@@ -35,4 +36,22 @@ export function formatDistritoLabel(
   if (!cabecera || !estadoCve) return nombreFallback;
   const distritoCve2 = distritoCve.slice(-2);
   return `${prefijo} ${estadoCve}${distritoCve2} ${cabecera.toUpperCase()}`;
+}
+
+/**
+ * Un distrito SELECCIONADO de un proyecto (`Territorio.distritosSeleccionados[i]`: `cve` de 3 dígitos,
+ * `nombre` = cabecera) en la forma canónica con el estado entre paréntesis:
+ * "D.F. 3102 PROGRESO (Yucatán)". Sin ella el chat solo vería la cabecera ("PROGRESO", "MERIDA"),
+ * que puede ser varios distritos. Cae al nombre crudo si no se puede armar la clave.
+ */
+export function etiquetaDistritoSeleccionado(
+  nivel: "distrito_federal" | "distrito_local" | "distrito" | string,
+  d: { cve: string; nombre: string; estado?: string },
+  estadoDefault?: string
+): string {
+  const estado = d.estado ?? estadoDefault;
+  const estadoCve = estado ? resolverEstadoCve(estado) : null;
+  const tipo = nivel === "distrito_local" ? "distrito_local" : "distrito_federal";
+  const base = formatDistritoLabel(tipo, estadoCve, d.cve, d.nombre, d.nombre);
+  return estado ? `${base} (${estado})` : base;
 }

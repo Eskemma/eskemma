@@ -173,7 +173,7 @@ async function ckanBuscarCarpetas(filters: Record<string, string>): Promise<Regi
 // `carpetasPorMunicipioEstado`/el desglose plural (ver comentario debajo,
 // 2026-08-27): el filtro de SESNSP es exacto en mayúsculas y acento, y
 // `territorio.municipio` puede llegar en CUALQUIER capitalización según
-// de dónde venga (`resolverTerritorioNombre`, que resuelve nombres
+// de dónde venga (`resolverReferenciaTerritorio`, que resuelve nombres
 // externos vía `comparacion-territorios`/`consulta-territorio`, devuelve
 // el nombre del catálogo geográfico en MAYÚSCULAS — "CUERNAVACA" —
 // mientras que el territorio propio de un proyecto, poblado por el

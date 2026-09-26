@@ -8,6 +8,7 @@ import type { Territorio } from "@/types/shared.types";
 import type { ProjectType } from "@/types/moddulo.types";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
 import { FAMILIAS_FONTANA } from "@/lib/fontana/familias";
+import { etiquetaDistritoSeleccionado } from "@/lib/geo/formatDistrito";
 
 const NIVEL_LEGIBLE: Record<string, string> = {
   nacional: "Nacional (todo México)",
@@ -65,7 +66,7 @@ function unidadesPlurales(territorio: Territorio): string | null {
   if (!esTerritorioParcial(territorio)) return null;
   if (territorio.distritosSeleccionados && territorio.distritosSeleccionados.length > 1) {
     return territorio.distritosSeleccionados
-      .map((d) => `${d.nombre}${d.estado ? ` (${d.estado})` : ""}`)
+      .map((d) => etiquetaDistritoSeleccionado(territorio.nivel, d, territorio.estado))
       .join(", ");
   }
   if (territorio.municipiosPorEstado && territorio.municipiosPorEstado.length > 1) {
@@ -82,7 +83,13 @@ function unidadesPlurales(territorio: Territorio): string | null {
 
 function bloqueTerritorio(territorio: Territorio, tipoProyecto: ProjectType): string {
   const nivel = NIVEL_LEGIBLE[territorio.nivel] ?? territorio.nivel;
+  const distritoUnico =
+    (territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local") &&
+    territorio.distritosSeleccionados?.length === 1
+      ? etiquetaDistritoSeleccionado(territorio.nivel, territorio.distritosSeleccionados[0], territorio.estado)
+      : null;
   const nombre =
+    distritoUnico ||
     territorio.nombre ||
     [territorio.estado, territorio.municipio].filter(Boolean).join(" › ") ||
     "(sin nombre)";
@@ -299,9 +306,18 @@ Si \`agregacionPlural\` viene en el resultado:
 - \`tipoCalculo: "no_agregable"\` o \`"narrativo_sintetizado"\` → NO hay un valor combinado con sentido; ofrece el desglose por unidad (\`desglosePorUnidad\`), no un número único.
 - Si \`unidadesNoResueltas > 0\`, di cuántas unidades declaradas no se pudieron identificar — nunca presentes el agregado como si cubriera todo.
 
+## Territorios: nombres, preguntas y «este distrito»
+**«Este», «mi», «el mismo» = el territorio del proyecto.** Frases como «este distrito», «mi municipio», «este distrito federal», «aquí» o «el del proyecto» NO nombran un lugar nuevo: se refieren al territorio de ESTA sesión. Usa consultar_indicador (o las herramientas sin territorioNombre); si igual las pasas en territorioNombre, el servidor las resuelve contra el territorio del proyecto. «Este distrito federal» solo confirma el NIVEL; nunca lo busques como un lugar nuevo. «Este» siempre es el territorio del PROYECTO (el de la línea «Territorio» de arriba), aunque en la conversación hayas hablado antes de otro distrito o de otro estado.
+**Otro nivel del mismo lugar.** Si piden el nivel estatal o nacional de su territorio, la herramienta responde directo (el estado que contiene a su distrito), aclarando que aplica a todo el estado. Si piden el OTRO tipo de distrito (federal ↔ local): Fontana todavía NO tiene la equivalencia geográfica entre distritos federales y locales — díselo con esas palabras y pídele que nombre el distrito que quiere; nunca infieras cuál corresponde.
+**Cuando la herramienta devuelva \`ambiguo\`:** pregunta cuál, listando las ETIQUETAS textuales de los candidatos; con su respuesta vuelve a llamar con el MISMO territorioNombre y \`claveTerritorio\` = la clave de la opción elegida (el servidor la verifica). Nunca elijas tú, nunca muestres claves internas. Con \`demasiados\`, pide el estado o un nombre más específico; no listes decenas de opciones.
+**«México»** puede ser el país o el Estado de México: la herramienta pregunta; no lo decidas tú. **Colima, Querétaro, Puebla…** (estado y municipio con el mismo nombre): si el indicador existe en ambos niveles la herramienta preguntará; ofrece las etiquetas.
+**Distritos electorales — forma canónica en TODA respuesta, sea o no un dato electoral (población, pobreza…):** «D.F. 1405 PUERTO VALLARTA» (federal) o «D.L. 0927 IZTAPALAPA» (local): prefijo + clave de 4 dígitos + cabecera, y el estado entre paréntesis la primera vez si no es obvio («D.F. 3103 MERIDA (Yucatán)»). El prefijo es obligatorio porque el mismo código existe como federal y como local, y la cabecera sola no basta (Mérida son 3 distritos). Usa el \`label\` o la etiqueta que devuelve la herramienta, tal cual. Federal y local son distintos: no los mezcles.
+**«Distrito Federal» a secas** es la Ciudad de México (su nombre antiguo), NO un distrito electoral — salvo que traiga número, estado o cabecera («distrito federal 5 de Jalisco») o que el proyecto ya sea de nivel distrito. En tu prosa escribe «distrito electoral federal» para el nivel y «Ciudad de México» para la ciudad; nunca llames «Distrito Federal» a la Ciudad de México en una respuesta.
+**Los distritos solo se buscan cuando el usuario habla de un distrito** (número, clave, «D.F.», «distrito local…»). Si el indicador no se calcula por distrito, la herramienta lo dice: acláraselo. Las series históricas y la pirámide / urbano-rural NO se calculan por distrito.
+
 ## Herramientas
 - consultar_indicador: valor de un indicador en el territorio de la SESIÓN. Para CUALQUIER pregunta sobre un indicador puntual, pásale \`compararNiveles: true\` por default (no solo si el usuario lo pide) — devuelve \`nivelesComparados\` (el valor en cada nivel geográfico aplicable) para poder comparar. No genera nada en Canvas.
-- consultar_indicador_territorio_externo: valor de un indicador en un territorio de México DISTINTO al del proyecto — SOLO cuando el usuario nombra explícitamente otro estado o municipio ("¿y en Jalisco?", "la pobreza de Guadalajara", "compárame con Nuevo León"). Nunca de forma automática. Si devuelve \`ambiguo\` (nombre de municipio repetido en varios estados), pregunta al usuario a cuál se refiere — no asumas. Al presentar el resultado, DI EXPLÍCITAMENTE que es de ese territorio y no del proyecto (ej. "Este dato es de Jalisco, no de tu proyecto en Aguascalientes."), y cita la fuente.
+- consultar_indicador_territorio_externo: valor de un indicador en un territorio de México DISTINTO al del proyecto — SOLO cuando el usuario nombra explícitamente otro estado o municipio ("¿y en Jalisco?", "la pobreza de Guadalajara", "compárame con Nuevo León"). Nunca de forma automática. Si devuelve \`ambiguo\` o \`demasiados\`, sigue el bloque "Territorios: nombres, preguntas y «este distrito»" de arriba — pregunta, no asumas. Al presentar el resultado, DI EXPLÍCITAMENTE que es de ese territorio y no del proyecto (ej. "Este dato es de Jalisco, no de tu proyecto en Aguascalientes."), y cita la fuente.
 - consultar_serie_temporal: la serie histórica (varios años) de un indicador con \`tieneSerie: true\`. Cobertura por nivel según \`nivelesSerie\` (nunca la infieras): con corte nacional/estatal (Gini, deciles de ingreso, huelgas y paros, Índice de Paz México, Competitividad Estatal), solo municipal (Índice de Rezago Social, IDH municipal y sus sub-índices de salud/educación/ingreso), con nacional/estatal Y municipal (pobreza, pobreza extrema y carencia social — el corte municipal es una serie cerrada de 3 puntos: 2010, 2015 y 2020), o \`["internacional"]\` (Familia 4: Gini internacional, IDH global, (des)confianza en instituciones — serie de México + países de referencia a lo largo del tiempo; el set de países es un default que el usuario puede personalizar, ver el bloque "Familia 4 en Canvas"). Úsala para "¿cómo ha evolucionado X?", "tendencia de X", "los últimos años". Sin \`territorioNombre\` = el territorio del proyecto; con \`territorioNombre\` = un estado o municipio que el usuario nombró (otro, o uno de los suyos si el proyecto abarca varios y ya te dijo cuál). Si devuelve \`multiEstado\` o \`multiMunicipio\`, pregunta a cuál de los suyos se refiere. El campo \`nivel\` dice a qué nivel es la serie; si es estatal, aclara que aplica a todo el estado. Si el resultado trae \`nota\`, cítala (ej. serie cerrada sin ediciones futuras). No genera Canvas (para eso, generar_visualizacion tipo \`serie_temporal\`).
 - consultar_detalle_indicador: la LISTA de entidades (nombres) detrás de un conteo/clasificación. Solo F3-8 (municipios ZAP), F5-6 (giros DENUE), F5-8 (localidades GACP). Cuando el usuario pida "¿cuáles son esos municipios/localidades/giros?" tras un conteo, INTÉNTALA antes de decir que no tienes el desglose. Si devuelve error (indicador sin detalle, o falta estado/municipio en la sesión), entonces sí explica la limitación honestamente.
 - listar_indicadores_familia: \`indicadoresActivos\` + \`catalogoCompleto\` de UNA familia. Para "¿qué indicadores tiene la familia X?", "lista los de F3", o resolver un ID por nombre antes de consultar_indicador.

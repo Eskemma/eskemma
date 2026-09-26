@@ -13,7 +13,7 @@
 //   o `{ ok:false, multiMunicipio:true, municipios:[...] }` y el agente
 //   pregunta a cuál se refiere.
 // - Con `territorio` → un estado o municipio nombrado por el usuario (ajeno
-//   o propio tras la desambiguación), resuelto vía resolverTerritorioNombre.
+//   o propio tras la desambiguación), resuelto vía resolverReferenciaTerritorio.
 //   Un municipio nombrado se mantiene municipal solo si el indicador publica
 //   serie municipal; si NO, se devuelve `{ ok:false, colapsoNivel:true, ... }`
 //   (nunca se colapsa a estado en silencio — hallazgo 1, 26-09-03).
@@ -25,7 +25,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
-import { resolverTerritorioNombre } from "@/lib/fontana/geo/resolverTerritorioNombre";
+import { resolverReferenciaTerritorio, type ResolucionTerritorio } from "@/lib/fontana/geo/resolverReferenciaTerritorio";
 import { estadosDelTerritorio } from "@/lib/fontana/geo/estadosDelTerritorio";
 import { municipiosDelTerritorio } from "@/lib/fontana/geo/municipiosDelTerritorio";
 import { resolverSerieTemporal } from "@/lib/fontana/ingesta/serieTemporal";
@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
   const territorioNombre = searchParams.get("territorio");
   const estadoHint = searchParams.get("estado");
   const nivelHint = searchParams.get("nivel");
+  // Paso 3: clave elegida de una lista de candidatos (se verifica en el servidor) y tipo explícito.
+  const claveTerritorio = searchParams.get("clave");
+  const tipoTerritorio = searchParams.get("tipo");
 
   if (!sesionId || !indicadorId) {
     return NextResponse.json({ error: "sesionId e indicadorId son requeridos" }, { status: 400 });
@@ -71,8 +74,29 @@ export async function GET(request: NextRequest) {
   const registro = await getIndicadorRegistro(indicadorId);
   const nombre = registro?.nombre ?? indicadorId;
 
-  // --- Serie del territorio del proyecto (sin `territorio` en la query) ---
-  if (!territorioNombre) {
+  // Paso 3: un nombre nombrado se resuelve con el núcleo (desambiguación, país vs estado, referencias
+  // contextuales). "este distrito" apunta al territorio del proyecto → sigue por la rama del proyecto.
+  let resolNombrada: Extract<ResolucionTerritorio, { ok: true }> | null = null;
+  let avisoResolucion: string | null = null;
+  if (territorioNombre) {
+    const r = await resolverReferenciaTerritorio({
+      texto: territorioNombre,
+      estadoHint,
+      nivelHint,
+      claveTerritorio,
+      tipoTerritorio,
+      registro,
+      territorioActivo: sesion.territorio,
+    });
+    if (!r.ok) return NextResponse.json(r, { status: 200 });
+    if (r.via !== "contexto") {
+      resolNombrada = r;
+      avisoResolucion = r.aviso ?? null;
+    }
+  }
+
+  // --- Serie del territorio del proyecto (sin `territorio`, o "este distrito") ---
+  if (!resolNombrada) {
     const nivelObjetivo = nivelObjetivoSerie(sesion.territorio, cfg.niveles);
 
     // Proyecto plural: NO se elige por el usuario — se le pregunta a cuál de
@@ -103,9 +127,19 @@ export async function GET(request: NextRequest) {
   }
 
   // --- Serie de un territorio nombrado por el usuario ---
-  const resol = await resolverTerritorioNombre(territorioNombre, estadoHint, nivelHint);
-  if (!resol.ok) {
-    return NextResponse.json(resol, { status: 200 });
+  const resol = resolNombrada;
+
+  // Las series históricas no se calculan por distrito electoral: se dice, no se sustituye por el
+  // municipio de su cabecera (sería otra geografía presentada como la pedida).
+  if (resol.territorio.nivel === "distrito_federal" || resol.territorio.nivel === "distrito_local") {
+    return NextResponse.json(
+      {
+        ok: false,
+        referencia: "nivel_no_disponible",
+        mensaje: `Las series históricas de Fontana no se calculan por distrito electoral (${resol.label}); solo a nivel nacional, estatal o municipal según el indicador.`,
+      },
+      { status: 200 }
+    );
   }
 
   // Un municipio nombrado NO se colapsa en silencio a su estado. Si el
@@ -147,6 +181,11 @@ export async function GET(request: NextRequest) {
         norm(m.estado) === norm(resol.territorio.estado ?? "") &&
         norm(m.nombre) === norm(resol.territorio.municipio ?? "")
     );
+  } else if (resol.territorio.nivel === "nacional") {
+    // País ("México" → el país, elegido por el usuario o derivado de "nivel nacional").
+    territorioSerie = resol.territorio;
+    labelOverride = resol.label;
+    esTerritorioDelProyecto = sesion.territorio.nivel === "nacional";
   } else {
     // Estado nombrado directamente.
     const nombreEstado = resol.territorio.estado ?? resol.label;
@@ -163,6 +202,7 @@ export async function GET(request: NextRequest) {
     esTerritorioDelProyecto,
     labelOverride,
     pedidoMunicipio: resol.territorio.nivel === "municipal",
+    aviso: avisoResolucion,
   });
 }
 
@@ -176,6 +216,8 @@ function responderSerie(
     esTerritorioDelProyecto: boolean;
     labelOverride?: string;
     pedidoMunicipio?: boolean;
+    /** Cómo se interpretó el texto del usuario ("«Pachuca» se interpretó como …"), si aplica. */
+    aviso?: string | null;
   }
 ) {
   if (!serie.ok) {
@@ -193,6 +235,7 @@ function responderSerie(
       // de otra geografía (hallazgo 1).
       pedidoMunicipio: Boolean(origen.pedidoMunicipio),
       territorio: { label },
+      aviso: origen.aviso ?? null,
       esTerritorioExterno: origen.esTerritorioExterno,
       esTerritorioDelProyecto: origen.esTerritorioDelProyecto,
       unidad: serie.unidad ?? null,

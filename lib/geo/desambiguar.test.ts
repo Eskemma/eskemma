@@ -430,3 +430,73 @@ describe("forma del resultado", () => {
     expect(desambiguarReferencia("Tuxtla", MUN)).toEqual(desambiguarReferencia("Tuxtla", MUN));
   });
 });
+
+// ── Paso 3 (26-09-25): distritos por número/clave, «Distrito Federal» = CDMX, etiqueta canónica ──
+// `MUN` fija tipos:["municipio"]; los distritos y el país necesitan el catálogo sin acotar.
+const TODOS = { municipios: MUNICIPIOS };
+
+describe("desambiguarReferencia — distritos por número o clave (regla 6)", () => {
+  const etiquetas = (r: ResultadoDesambiguacion) =>
+    r.estado === "unico" ? [r.candidato.etiqueta] : r.estado === "ambiguo" ? r.candidatos.map((c) => c.etiqueta) : [];
+
+  it("«distrito federal 5 de Jalisco» → D.F. 1405 PUERTO VALLARTA", () => {
+    const r = desambiguarReferencia("distrito federal 5 de Jalisco", TODOS);
+    expect(r).toMatchObject({ estado: "unico", candidato: { tipo: "distrito_federal", clave: "1405", coincidencia: "exacta" } });
+    expect(etiquetas(r)).toEqual(["D.F. 1405 PUERTO VALLARTA (Jalisco)"]);
+  });
+
+  it("«D.L. 27 CDMX» → D.L. 0927 IZTAPALAPA", () => {
+    expect(etiquetas(desambiguarReferencia("D.L. 27 CDMX", TODOS))).toEqual(["D.L. 0927 IZTAPALAPA (Ciudad de México)"]);
+  });
+
+  it("«1405»: el mismo código existe federal y local → pregunta, con el prefijo que los distingue", () => {
+    const r = desambiguarReferencia("1405", TODOS);
+    expect(r.estado).toBe("ambiguo");
+    expect(etiquetas(r)).toEqual(["D.F. 1405 PUERTO VALLARTA (Jalisco)", "D.L. 1405 PUERTO VALLARTA (Jalisco)"]);
+  });
+
+  it("un número sin estado no se adivina: pide el estado (lista los que lo tienen)", () => {
+    const r = desambiguarReferencia("distrito federal 5", TODOS);
+    expect(r.estado).toBe("demasiados");
+    if (r.estado === "demasiados") expect(r.estadosCve).toContain("14");
+  });
+
+  it("Mérida ×3 (federal, Yucatán): cada uno con su clave y su prefijo", () => {
+    const r = desambiguarReferencia("Mérida", { ...TODOS, tipos: ["distrito_federal"], estadoCve: "31" });
+    expect(etiquetas(r)).toEqual([
+      "D.F. 3103 MERIDA (Yucatán)",
+      "D.F. 3104 MERIDA (Yucatán)",
+      "D.F. 3106 MERIDA (Yucatán)",
+    ]);
+  });
+
+  it("«distrito federal Puerto Vallarta»: el prefijo acota el tipo", () => {
+    expect(etiquetas(desambiguarReferencia("distrito federal Puerto Vallarta", TODOS))).toEqual(["D.F. 1405 PUERTO VALLARTA (Jalisco)"]);
+  });
+
+  it("estado que no existe o número inexistente → ninguno", () => {
+    expect(desambiguarReferencia("distrito federal 5 de Narnia", TODOS).estado).toBe("ninguno");
+    expect(desambiguarReferencia("distrito federal 99 de Jalisco", TODOS).estado).toBe("ninguno");
+  });
+
+  it("solo respeta los tipos que el llamador permite", () => {
+    expect(desambiguarReferencia("distrito federal 5 de Jalisco", { ...TODOS, tipos: ["municipio", "estado"] }).estado).toBe("ninguno");
+    expect(desambiguarReferencia("1405", { ...TODOS, tipos: ["distrito_local"] })).toMatchObject({ estado: "unico", candidato: { tipo: "distrito_local" } });
+  });
+});
+
+describe("desambiguarReferencia — «Distrito Federal» a secas es la Ciudad de México", () => {
+  it("«Distrito Federal», «el Distrito Federal» y «DF» → el estado 09", () => {
+    for (const t of ["Distrito Federal", "el Distrito Federal", "DF"]) {
+      expect(desambiguarReferencia(t, TODOS), t).toMatchObject({ estado: "unico", candidato: { tipo: "estado", clave: "09", coincidencia: "alias" } });
+    }
+  });
+
+  it("nunca es un distrito electoral: si el llamador solo admite distritos, no hay resultado", () => {
+    expect(desambiguarReferencia("Distrito Federal", { ...TODOS, tipos: ["distrito_federal", "distrito_local"] }).estado).toBe("ninguno");
+  });
+
+  it("con número o estado deja de ser la Ciudad de México", () => {
+    expect(desambiguarReferencia("distrito federal 5 de Jalisco", TODOS)).toMatchObject({ estado: "unico", candidato: { tipo: "distrito_federal" } });
+  });
+});

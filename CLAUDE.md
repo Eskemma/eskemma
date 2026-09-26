@@ -590,7 +590,7 @@ referencia** (esta pieza) y (2) **composición** de varias unidades (zona metrop
 | Pieza 1b — sugerencias por error de tecleo (solo para `ninguno`) | ⏳ Aparte, documentada abajo |
 | **Paso 2a** — formulario de municipio con `clave`, módulo puro, relleno perezoso y script de migración | ✅ **Completado 26-09-24** (código + migración aplicada a los 7 documentos) |
 | **Paso 2b** — `checkTerritoryMatch` por conjuntos (compuerta de vinculación entre apps) | ✅ **Construido 26-09-24** (Variante B; contención entre niveles → Paso 2c opcional) |
-| Paso 3 — herramientas del chat de Fontana sobre el núcleo (distritos, país vs estado) | ⏳ Pendiente |
+| **Paso 3** — herramientas del chat de Fontana sobre el núcleo (distritos, país vs estado, referencias contextuales) | ✅ **Construido 26-09-25** (el «distrito hermano» federal↔local queda como ronda aparte) |
 | Paso 4 — Moddulo (`project.territorio` estructurado en el chat), portabilidad por id, multiselección | ⏳ Pendiente |
 
 *Pieza 1 — qué hace.* `desambiguarReferencia(texto, {estadoCve?, municipios?, tipos?, mexico?,
@@ -727,6 +727,77 @@ vinculación solo se relaja en `approximate → exact` (1 par real); `mismatch �
 mensaje y orden de los pickers (link-moddulo y Canal 3 exigen confirmación en ambos). No cambia
 `staleness.ts` ni el snapshot de vinculación (siguen escalares, gap conocido adyacente).
 
+*Paso 3 (construido 26-09-25, decisiones de Raúl).* Las herramientas de Fontana resuelven lo que el
+usuario DICE con el núcleo compartido, en este orden (`lib/fontana/geo/resolverReferenciaTerritorio.ts`,
+que sustituye a `resolverTerritorioNombre`):
+1. **Referencia CONTEXTUAL** (`lib/geo/referenciaContextual.ts`, pura, reutilizable por Sefix-AI): «este
+   distrito», «mi municipio», «este distrito federal», «aquí», «nivel estatal» apuntan al territorio YA activo de
+   la sesión y NO se buscan en el catálogo. `decidirContexto`: mismo nivel → se usa el activo; un nivel que lo
+   CONTIENE (estatal/nacional desde un distrito) → se deriva directo, sin preguntar, avisando el alcance; el OTRO
+   tipo de distrito (federal ↔ local) → rechazo honesto; sin referente («este distrito» en un proyecto municipal,
+   o un nivel más fino) → mensaje. «Distrito Federal» a secas es la Ciudad de México salvo que el proyecto ya sea
+   distrital.
+2. **Elección por CLAVE**: las herramientas ganan `claveTerritorio` (y `clavesPorTerritorio` en la comparación).
+   El servidor VUELVE a resolver el texto y solo acepta una clave que esté entre los candidatos reales: el
+   modelo no puede fabricar una clave ni cambiar de territorio. Las claves viajan solo para reenviarlas; al
+   usuario se le muestran las etiquetas.
+3. **Nombre / número / clave** → `desambiguarReferencia`, con `tipos` según lo que el indicador admite
+   (`registro.niveles`): estado y municipio salvo los no viables (si admite ambos, «Colima» pregunta; si el estado
+   es no viable, «Querétaro» es el municipio, como en el incidente); «país» solo si admite nivel nacional; **los
+   distritos solo bajo demanda** (el texto habla de distrito) y solo con nivel distrital confirmado (17 de 86
+   indicadores). Medido: incluirlos siempre dejaría de resolver solos a 413 de 2,122 nombres de municipio (19 %).
+   Un ESTADO exacto gana a los municipios que solo lo contienen como palabra («Jalisco» ≠ «Ojuelos de Jalisco»).
+   Con el catálogo real, 18 de 32 estados preguntan «¿estado o municipio?» cuando el indicador admite ambos
+   niveles (13 con municipio homónimo en el mismo estado + Guerrero, Hidalgo, Morelos, Quintana Roo y Tabasco por
+   municipios homónimos de OTROS estados) — consecuencia aceptada de la decisión «pregunta si admite ambos».
+**Núcleo ampliado** (`desambiguar.ts`, regla 6): `lib/geo/referenciaDistrito.ts` reconoce distritos por número o
+clave («distrito federal 5 de Jalisco», «D.L. 27 CDMX», «D.F. 1405», «1405», romanos, «distrito federal de
+Yucatán»); un número sin estado pide el estado; «Distrito Federal»/«DF» a secas → Ciudad de México.
+`candidatosGeo` gana `buscarDistritosPorCodigo`/`distritosDeEstado`/`cabeceraDeDistrito`. **Forma canónica del
+distrito en TODA respuesta (electoral o no):** `D.F. 1405 PUERTO VALLARTA (Jalisco)` / `D.L. 0927 IZTAPALAPA (Ciudad
+de México)` (`formatDistritoLabel`/`etiquetaDistritoSeleccionado`, la de CLAUDE.md «Nomenclatura de Distritos»); el
+prefijo es obligatorio porque el mismo código existe federal y local (1405 en Jalisco). La etiqueta de candidatos del
+núcleo pasó de «Distrito federal …» a esa forma. El system prompt gana la sección «Territorios: nombres, preguntas
+y «este distrito»» (forma canónica, «Distrito Federal» = CDMX, «este» = el del proyecto, preguntar por etiquetas y
+reenviar la clave) y `bloqueTerritorio` muestra el distrito del proyecto en forma canónica (antes solo la
+cabecera: «PROGRESO»).
+**Rutas y herramientas:** las 4 rutas (`consulta-territorio`, `serie-temporal`, `distribucion`,
+`comparacion-territorios`) usan el adaptador; respuesta uniforme `{ok:false, referencia: ambiguo | demasiados |
+noResuelto | clave_invalida | hermano | sin_referente | nivel_no_disponible | territorio_del_proyecto}` que
+`tools.ts` traduce con un solo helper (`respuestaDeReferencia`, 5 sitios). País → celda NACIONAL; distrito → celda
+DISTRITAL sin caer nunca al valor de otro nivel; las series y la pirámide/urbano-rural NO se calculan por distrito
+(se dice). Se eliminó `resolverTerritorioNombre.ts` y `nivelHintPorIndicador` (código muerto tras el cambio).
+**Verificación (26-09-25):** 590 pruebas (pura: parser 12, contextual 9, núcleo +11, adaptador 34; rutas con el
+cableado real: consulta 13, serie 7, comparación 7, distribución 4). Antes/después con catálogo y registro reales:
+los 7 territorios del incidente Jalisco (Cuernavaca, Iztapalapa, Mérida, Culiacán, Mexicali, Puebla, Querétaro) sin
+cambio con un indicador solo municipal; cambios deliberados: Pachuca/Neza/Ciudad Juárez pasan de «no resuelto» a
+resueltos con aviso, Ixtlahuacán pregunta (antes no resolvía), Santiago pide el estado, «México» pregunta,
+Colima/Querétaro/Zacatecas… preguntan con indicadores de ambos niveles. Datos reales por territorio resuelto: F1-1
+D.F. 3102 = 386,061; D.L. 0927 = 258,386; nacional = 126,014,024; Iztapalapa (municipio) = 1,838,464; Yucatán =
+2,320,898. Llamada REAL a Claude (sesión legislativa de Yucatán, D.F. 3102 PROGRESO): pregunta «¿el estado o el
+municipio?» para Colima → con la respuesta reenvía `claveTerritorio` y da 731,391; «distrito federal 5 de Jalisco»
+→ D.F. 1405 PUERTO VALLARTA (281,404, en forma canónica); «México» pregunta y con «el país» da 126,014,024; «este
+distrito» lo redirige al territorio del proyecto; «este distrito local» lo explica como equivalencia no disponible.
+**Observación honesta:** en 2 de 2 pruebas el modelo respondió el caso «hermano» SIN llamar a la herramienta (por el
+prompt) y atribuyó «este distrito» al último distrito mencionado en la conversación (D.F. 1405) en vez del del
+proyecto; el rechazo determinista de la herramienta existe y está probado, pero el prompt no lo garantiza.
+**Fuera de este paso — «distrito hermano» (RONDA APARTE, diseño esbozado para no perderlo):** inferir qué distrito
+federal corresponde a un local (o al revés) con confirmación al usuario requiere infraestructura que NO existe.
+Hoy solo hay la composición distrito→municipio por tipo (`distritos_municipios` y `distritos_locales_municipios`:
+% de la población de cada municipio en cada distrito — insuficiente donde un municipio se parte en varios
+distritos) y, EN MEMORIA del pipeline `scripts/eceg-data-pipeline.ts`, el cruce sección→federal (`DISTRITO_F`) y
+sección→local (`DISTRITO_L`) del mismo shapefile electoral del INE con `POBTOT` por sección, sin persistir. Diseño:
+persistir `distritos_correspondencia/{estado}.json` (para cada local, los federales que lo cubren con % de su
+población y viceversa), re-subir la bodega, adaptador de lectura y una interfaz de confirmación («¿te refieres al
+D.F. 1405 …?»). Heredaría las limitaciones de cobertura ya documentadas (secciones sin distrito: 0 %–17.8 % por
+estado, Jalisco el peor; 3 estados con el campo `DISTRITO` de ECEG desactualizado). El nombre de la cabecera NO sirve
+como atajo (1405 coincide en Puerto Vallarta por casualidad; Mérida son 3 federales). **Requisito de diseño añadido por Raúl (26-09-25) para esa ronda:** una protección server-side MÁS DURA contra el modelo que responde el caso «hermano» sin llamar a la herramienta (visto en 2 de 2 pruebas del Paso 3, además de tomar «este distrito» como el último mencionado y no el del proyecto): cuando el usuario pide el nivel opuesto al activo y la respuesta del modelo no trae una llamada real a la herramienta, marcar la respuesta como no verificada o forzar una repregunta — en el espíritu de los guards de honestidad de `chat/route.ts` (`AFIRMA_RESULTADO`, `NIEGA_SERIE_HISTORICA`). Riesgo conocido, NO resuelto solo por prompt. Los ejemplos «SKATER» y «votos
+del PAN en este distrito» son de Sefix-AI (T06), que aún no existe: la capa contextual quedó en `lib/geo/` para
+reutilizarla ahí.
+**No tocado / pendiente:** los encabezados de resultados de Sefix muestran solo la cabecera («Dist. MERIDA»), que
+no cumple la convención (Mérida son 3 distritos); el selector de Sefix usa `1405 PUERTO VALLARTA` sin prefijo (no
+ambiguo porque separa federal y local). Reportado, no corregido.
+
 *Pendientes del Paso 2 (no tocar antes).* (a) Caso real ya guardado:
 `fontana_sesiones/vO9JFif6W3UQc7DlyqPq` tiene el municipio **"Ixtlahuacán" (Jalisco) ambiguo** entre
 "del Río" y "de los Membrillos" — se resolverá con el relleno perezoso de `MunicipioSeleccionado`;
@@ -742,8 +813,10 @@ historial de esta ronda.
   Estado de México según el resto de la frase?). NO se resuelve en este helper: es
   interpretación conversacional, no normalización de catálogos estructurados.
   Candidato natural: el trabajo de Sefix-AI (T06). Por eso
-  `lib/fontana/geo/resolverTerritorioNombre.ts` (nombres dichos por el usuario en el
-  chat de Fontana) sigue usando `ESTADO_CVE_MAP` directo y NO resuelve "México" a estado.
+  `lib/fontana/geo/resolverReferenciaTerritorio.ts` (nombres dichos por el usuario en el
+  chat de Fontana) **ya resuelve con el núcleo desde el Paso 3 (26-09-25)** y PREGUNTA país vs Estado de
+  México en vez de asumir el estado (ver "Paso 3" abajo); la desambiguación conversacional más rica
+  (interpretar el resto de la frase) sigue pendiente de Sefix-AI.
   **Reconocimiento de ENTRADA del Estado de México (anotado 26-09-23, NO implementado):** cuando un
   USUARIO lo escribe o dicta debe reconocerse en cualquiera de sus formas — "México", "Edomex",
   "EDOMEX", "MEX" en contexto de estado, "Estado de México", "Mex." — y decidir país vs estado según
@@ -785,7 +858,7 @@ historial de esta ronda.
   municipios, tipos})` → `CandidatoGeo[]` (tipo, clave, nombre de display,
   `coincidencia` exacta/parcial, `anio`, `nombresPorAnio`); el catálogo de municipios se
   inyecta (el de INE es server-only). Hoy ningún call site lo usa: es la base para
-  Sefix-AI/texto libre, junto con `resolverTerritorioNombre` (Estado vs Municipio, que
+  Sefix-AI/texto libre, junto con `resolverReferenciaTerritorio` (Estado vs Municipio, que
   sigue resolviendo por su cuenta).
   **Hallazgo completo (datos reales, 132 CSV de Storage: federal 2006-2024, local
   2015-2024; Firestore de proyectos Moddulo):**
@@ -841,9 +914,8 @@ historial de esta ronda.
   entrada que resolvía la expresión vieja da el MISMO CVE con el resolver nuevo (solo
   cambian los casos que antes fallaban: "México", nombres oficiales largos, CDMX).
   Caso real verificado: F3-1 (homicidios) con "México" resuelve como F1-1 (7.4, Edomex).
-  Excepciones deliberadas (documentadas en el código): (a) `resolverTerritorioNombre.ts`
-  línea del lookup de texto libre sigue con `ESTADO_CVE_MAP[norm]` (ambigüedad "México"
-  → pendiente Sefix-AI, ver arriba); (b) fuentes indexadas por NOMBRE de estado usan
+  Excepciones deliberadas (documentadas en el código): (a) [ELIMINADA 26-09-25: el chat de Fontana
+  ya no usa `ESTADO_CVE_MAP[norm]`, resuelve con el núcleo]; (b) fuentes indexadas por NOMBRE de estado usan
   `claveEstadoDatos` (canonicaliza ambos lados) y conservan alias PROPIOS de la
   fuente (IEP: nombres en inglés; SHCP: `ALIAS_ENTIDAD_SHCP`). Al migrar aparecieron
   fallos silenciosos reales, ya corregidos: STPS devolvía 0 (no error) para estados
@@ -1004,7 +1076,7 @@ hasta que haya imagen OG corporativa diseñada.
 ```
 /
 ├── app/
-│   ├── api/                          # 142 API route handlers (recontado 26-09-24: +`geo/candidatos`, −`geo/resolver-municipio`)
+│   ├── api/                          # 142 API route handlers (recontado 26-09-25: sin cambio; 26-09-24 +`geo/candidatos`, −`geo/resolver-municipio`)
 │   │   ├── auth/session/             # POST/DELETE/GET sesiones
 │   │   ├── moddulo/                  # CRUD proyectos + chat SSE
 │   │   └── centinela/pestel/        # config, feed, trigger, status
@@ -1430,7 +1502,7 @@ con **tool use real** del SDK Anthropic (`lib/fontana/agente/`):
 - `consultar_indicador_territorio_externo` — indicador en un estado/municipio
   DISTINTO al del proyecto, solo cuando el usuario lo nombra explícitamente.
   `GET .../consulta-territorio` — resuelve el nombre vía `claveCanonicaMunicipio`
-  (helper compartido `lib/fontana/geo/resolverTerritorioNombre.ts`);
+  (helper compartido `lib/fontana/geo/resolverReferenciaTerritorio.ts`, que sustituyó a `resolverTerritorioNombre` en el Paso 3);
   `ambiguo` si el municipio se repite entre estados (el agente pregunta). Fase 1:
   solo lectura, sin Canvas.
 - `consultar_serie_temporal` — serie histórica (varios años) de un indicador
@@ -1823,3 +1895,4 @@ firebase functions:log
 | 26-09-24 | Desambiguación geográfica — Pieza 1 completada (núcleo puro + endpoint + tests) y ajustes de reglas | **Ronda de varios pasos, avance parcial (Pieza 1 ✅; pasos 2-4 y Pieza 1b pendientes — ver "Desambiguación de referencias" en Geografía compartida).** Antecedente: 2 rondas de diagnóstico de solo lectura (formularios de territorio, chats de Fontana/Moddulo/PESTEL con forense de 382 mensajes reales, delimitación por tipo de proyecto, coincidencia parcial medida sobre el catálogo real de 2,477 municipios, portabilidad Fontana↔Moddulo↔PESTEL) que llevaron al diseño de 2 capas y 6 decisiones de Raúl. **Construido:** `lib/geo/desambiguar.ts` (`desambiguarReferencia`: único/ambiguo/demasiados/ninguno, tope 8), `POST /api/geo/candidatos`, fixture real `municipios_catalogo.json`, 92 tests. **Comprobación previa:** `/api/geo/options` ya sirve municipios por estado igual que Sefix (sin ajuste), con la advertencia de que su `cve` es numeración INE y la clave estable del núcleo es por nombre. **Hallazgos al construir:** `candidatosGeo` colapsaba los 4 municipios homónimos de Oaxaca (San Juan/San Pedro Mixtepec) — el núcleo los devuelve como 2 candidatos con sufijo `#cve`; "México" añadía el distrito "Nuevo México" (corregido); `Object.keys` ordena las claves numéricas (efecto ya conocido). **Ajustes del 26-09-24 (decisiones de Raúl):** (1) un exacto único con parciales ya no resuelve solo (Santiago → `demasiados` con `exactas`; 119 de 2,332 nombres oficiales cambian); (2) distritos sin filtro de tipo: correcto, lo acota quien llama; (3) alias coloquiales "Ciudad Juárez"/"Cd. Juárez" y "Neza" en la tabla nueva `ALIAS_COLOQUIAL_MUNICIPIO` (separada de `ALIAS_MUNICIPIO`, contrato de joins); (4) errores de tecleo: investigado y **diferido como Pieza 1b** (98 % de recuperación en 1 edición pero 6.9 % de nombres con vecino real a distancia 1 → solo sugerencias, nunca resolver solo). **Frescura:** `check-docs-freshness` marcó 2 líneas (Sefix y conteo de rutas) por la ronda anterior; recontado contra el código: Sefix sigue en 24 rutas, `app/api` pasó de 142 a **143** (`geo/candidatos`). **Verificación:** 446 pruebas, `tsc`, `next build`, `functions build` y `check-geo-cf` limpios; ambas reglas nuevas probadas en negativo. Sin commit ni push. **Pendiente de Raúl:** decidir cuándo pasar al Paso 2 (formulario con clave; incluye el caso real Ixtlahuacán de `fontana_sesiones/vO9JFif6W3UQc7DlyqPq`) y si la Pieza 1b va antes o después. |
 | 26-09-24 | Desambiguación geográfica — Paso 2a construido (formulario con `clave`, módulo puro, relleno perezoso, script de migración con dry-run) | **Ronda de varios pasos, avance parcial.** Decisiones de Raúl sobre los 7 puntos: Ixtlahuacán → «de los Membrillos» (verificado antes contra fuentes, ver Geografía compartida); alias y parciales mecánicos aprobados; Colombia sin clave; campo `clave` (no `cve`); backfill lazy + script puntual con aprobación caso por caso; proyecto ZMG NO se toca (pendiente aparte de Raúl); `checkTerritoryMatch` por conjuntos = Paso 2b separado. **Construido:** `MunicipioSeleccionado.clave?`, `lib/geo/municipioSeleccionado.ts` (21 tests con las 4 formas reales), `TerritorySelector` migrado a `POST /api/geo/candidatos` (picker guarda la clave elegida, dedup por clave, chip por clave: ya no se confunden los 2 San Juan Mixtepec, relleno perezoso al abrir, ambiguos guardados piden elegir), `scripts/migrar-municipios-clave.ts` (dry-run por defecto, `--apply` solo con casos aprobados, `--simular`, respaldo, guarda de cambio concurrente). **Dry-run real:** 7 documentos, 28 entradas (22 exactas, 2 alias, 3 parciales, 1 ambigua). **Verificación:** 467 pruebas, `tsc`, `next build`, `functions build`, `check-geo-cf` limpios; simulación de escritura contra Firestore real sin escribir. **Pendiente de Raúl:** aprobar caso por caso y ejecutar el `--apply`; verificar en navegador (guía entregada); decidir qué hacer con el endpoint `resolver-municipio` (sin consumidores). No se tocó `checkTerritoryMatch` ni el proyecto ZMG. |
 | 26-09-24 | Desambiguación geográfica — Paso 2b: `checkTerritoryMatch` por conjuntos (Variante B) | **Ronda de varios pasos, avance parcial (Pieza 1 ✅, Paso 2a ✅, Paso 2b ✅; quedan Paso 3, Paso 4, Pieza 1b y el Paso 2c opcional).** Módulo puro `lib/geo/unidadesTerritoriales.ts` + `compararTerritorios`/`explicarTerritorioApproximate` en `linkCompatibility.ts`; contrato de 3 valores intacto. Evidencia sobre los 496 pares reales: 6 cambios exactos (5 mismatch→approximate de la familia ZMG/Guadalajara/Zapopan, que estaban mal clasificados por mirar solo el primer municipio, y 1 approximate→exact en Progreso); ningún exact→otra cosa. 5 textos de aviso actualizados (2 de servidor, 3 de UI). Fixture congelado de los 32 territorios + 26 pruebas nuevas; las 22 fijadas de `normalizadoresSueltos` sin editar. Detalle y cambios de comportamiento reportados en Geografía compartida. Verificación: `tsc`, `next build`, functions build/test (20), `check-geo-cf`, 493 pruebas. **Pendiente de Raúl (navegador):** picker de vinculación (Fontana/PESTEL/Moddulo F2) con un proyecto ZMG y uno Guadalajara: aviso «Uno de los territorios contiene al otro…». |
+| 26-09-25 | Desambiguación geográfica — Paso 3: Fontana sobre el núcleo (distritos, país vs estado, referencias contextuales, elección por clave) | **Ronda de varios pasos, avance parcial (Pieza 1 ✅, Pasos 2a/2b/3 ✅; quedan Paso 4, Pieza 1b, Paso 2c opcional y la ronda del distrito hermano).** Adaptador `resolverReferenciaTerritorio` (sustituye a `resolverTerritorioNombre`), capa contextual `lib/geo/referenciaContextual.ts`, parser `lib/geo/referenciaDistrito.ts`, núcleo con regla 6, 4 rutas + 5 sitios de `tools.ts` + system prompt (forma canónica `D.F. 1405 PUERTO VALLARTA`, «Distrito Federal» = CDMX). Distritos solo bajo demanda (medido: siempre incluidos rompen 19 % de los nombres), país vs Estado de México pregunta, estado/municipio homónimo pregunta si el indicador admite ambos (18 de 32 estados), la clave elegida la verifica el servidor. Datos reales verificados y llamada real a Claude; observación honesta: el modelo a veces responde el caso «hermano» sin llamar a la herramienta. 590 pruebas, `tsc`, `next build`, functions build/test, `check-geo-cf`. Detalle en Geografía compartida (incluye el diseño esbozado del «distrito hermano»). **Pendiente de Raúl (navegador):** el chat de Fontana con un proyecto distrital: «¿y en el distrito federal 5 de Jalisco?», «Colima», «México», «este distrito». |

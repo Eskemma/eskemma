@@ -34,7 +34,7 @@
  * (columna NOM_MUN de cada CSV, leída UTF-8), pero se KEYEA con
  * `claveCanonicaMunicipio()` de lib/geo/municipioCanonico.ts — la MISMA
  * función que usa el query time (resolverMunicipioCveIter en
- * lib/fontana/ingesta/iter.ts) y que produce resolverTerritorioNombre.
+ * lib/fontana/ingesta/iter.ts) y que produce resolverReferenciaTerritorio.
  * Lo que NO se hereda del catálogo geo de INE es su NUMERACIÓN de CVE_MUN:
  * verificado (2026-07-31) que diverge del CVE_MUN oficial de INEGI en
  * 1,550 de ~2,469 municipios (63%) — ej. Nuevo León: geo asigna "040" a
@@ -110,7 +110,7 @@ function esUrbano(tamloc: string): boolean {
 // El catálogo nombre→CVE_MUN del ITER se keyea con la MISMA función
 // canónica (claveCanonicaMunicipio) que usa el query time
 // (resolverMunicipioCveIter en lib/fontana/ingesta/iter.ts) y que produce
-// resolverTerritorioNombre — sin normalización propia que pueda divergir
+// resolverReferenciaTerritorio — sin normalización propia que pueda divergir
 // (causa del fallo sistémico de resolución de nombres acentuados,
 // 2026-09-03: este script leía los CSV UTF-8 como latin1 Y keyeaba con un
 // normalize local). El módulo lib/geo/municipioCanonico.ts es lógica pura

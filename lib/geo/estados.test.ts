@@ -228,8 +228,9 @@ describe("ratchet de resoluciones inline", () => {
   // búsquedas por nombre normalizado a mano (`normalizeGeoName(territorio.estado)`)
   // se migraron a lib/geo/estados.ts (2026-09-19). El tope es 0: cualquier
   // resolución nueva de estado debe usar `resolverEstadoCve`/`claveEstadoDatos`.
-  // Excepción documentada: `resolverTerritorioNombre` usa `ESTADO_CVE_MAP[norm]`
-  // (texto libre del chat; ver CLAUDE.md) — no coincide con este patrón a propósito.
+  // (26-09-25) La excepción anterior —`resolverTerritorioNombre` con `ESTADO_CVE_MAP[norm]` para el
+  // texto libre del chat— desapareció: el chat de Fontana resuelve con el núcleo de desambiguación
+  // (lib/geo/desambiguar.ts, vía resolverReferenciaTerritorio), que ya pregunta país vs estado.
   const PENDIENTES_INLINE = 0;
 
   it("no hay resoluciones inline de estado fuera de lib/geo/estados.ts", () => {

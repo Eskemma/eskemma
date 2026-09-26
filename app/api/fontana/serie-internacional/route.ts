@@ -6,7 +6,7 @@
 //
 // Ruta SEPARADA de serie-temporal/route.ts a propósito: esa es de un solo
 // territorio mexicano (usa sesion.territorio, estadosDelTerritorio,
-// resolverTerritorioNombre, ResultadoSerie con un solo puntos[]). F4 no
+// resolverReferenciaTerritorio, ResultadoSerie con un solo puntos[]). F4 no
 // tiene Territorio y devuelve N series — meterlo ahí obligaría a un modo
 // "sin territorio, multi-país" en cada rama. Config de qué indicadores F4
 // tienen serie: lib/fontana/series/seriesInternacionalesDisponibles.ts.

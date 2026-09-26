@@ -128,9 +128,11 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         indicadorId: { type: "string", description: "ID real del indicador (de listar_indicadores_familia)." },
-        territorioNombre: { type: "string", description: "Nombre del estado o municipio tal como lo dijo el usuario." },
+        territorioNombre: { type: "string", description: "El territorio tal como lo dijo el usuario: estado, municipio, país ('México') o distrito electoral por su clave/número ('D.F. 1405 PUERTO VALLARTA', 'distrito federal 5 de Jalisco', '1405'). Si dijo 'este distrito', 'mi municipio' o 'nivel estatal', pásalo tal cual: el servidor lo resuelve contra el territorio del proyecto." },
         estadoNombre: { type: "string", description: "Opcional. El estado, si el usuario lo precisó (ej. 'Reforma, Chiapas' → territorioNombre='Reforma', estadoNombre='Chiapas'). Desambigua municipios homónimos." },
         nivel: { type: "string", enum: ["estatal", "municipal"], description: "Opcional. 'municipal' si el usuario pidió explícitamente el municipio de un nombre que también es estado." },
+        claveTerritorio: { type: "string", description: "Paso 3: la CLAVE de la opción que el usuario eligió de una lista de candidatos que esta herramienta te devolvió antes (`ambiguo`). Envíala junto con el MISMO territorioNombre; el servidor la verifica contra los candidatos reales y rechaza cualquier otra. Nunca la inventes ni la muestres al usuario." },
+        tipoTerritorio: { type: "string", enum: ["estado", "municipio", "pais", "distrito_federal", "distrito_local"], description: "Opcional: el tipo de territorio, SOLO si el usuario lo dijo explícitamente (ej. 'el estado de Colima' → 'estado', 'el municipio de Colima' → 'municipio', 'el país' → 'pais', 'distrito federal' / 'distrito local' cuando pide un distrito electoral)." },
       },
       required: ["indicadorId", "territorioNombre"],
     },
@@ -145,6 +147,8 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
         indicadorId: { type: "string", description: "ID real del indicador. Debe tener `tieneSerie: true`." },
         territorioNombre: { type: "string", description: "Estado o municipio dicho por el usuario, solo si pidió un territorio distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Opcional, desambigua municipios homónimos." },
+        claveTerritorio: { type: "string", description: "Paso 3: la CLAVE de la opción que el usuario eligió de una lista de candidatos que esta herramienta te devolvió antes (`ambiguo`). Envíala junto con el MISMO territorioNombre; el servidor la verifica contra los candidatos reales y rechaza cualquier otra. Nunca la inventes ni la muestres al usuario." },
+        tipoTerritorio: { type: "string", enum: ["estado", "municipio", "pais"], description: "Opcional: el tipo de territorio, SOLO si el usuario lo dijo explícitamente (ej. 'el estado de Colima' → 'estado', 'el municipio de Colima' → 'municipio', 'el país' → 'pais', 'distrito federal' / 'distrito local' cuando pide un distrito electoral)." },
         paisesAgregar: { type: "array", items: { type: "string" }, description: "SOLO Familia 4: países que el usuario pidió AGREGAR a la comparación, EXACTAMENTE como los nombró. El servidor verifica que cada uno aparezca literal en el mensaje del usuario; si no, rechaza la llamada. No lo llenes tú por tu cuenta." },
         paisesExcluir: { type: "array", items: { type: "string" }, description: "SOLO Familia 4: países del set por defecto que el usuario pidió QUITAR (ej. 'sin Argentina'). Misma verificación." },
       },
@@ -195,6 +199,8 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
         nivel: { type: "string", enum: NIVELES_ENUM, description: "Opcional para 'resumen'. Default = nivel del territorio." },
         territorioNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion' (F1-2 pirámide / F1-11 urbano-rural): estado o municipio que el usuario nombró, si pidió uno distinto al del proyecto o si el proyecto abarca varios y ya te precisó cuál." },
         estadoNombre: { type: "string", description: "Para 'serie_temporal' y 'distribucion': desambigua municipios homónimos." },
+        claveTerritorio: { type: "string", description: "Paso 3: la CLAVE de la opción que el usuario eligió de una lista de candidatos que esta herramienta te devolvió antes (`ambiguo`). Envíala junto con el MISMO territorioNombre; el servidor la verifica contra los candidatos reales y rechaza cualquier otra. Nunca la inventes ni la muestres al usuario. (Para 'serie_temporal' y 'distribucion'.)" },
+        tipoTerritorio: { type: "string", enum: ["estado", "municipio", "pais"], description: "Opcional: el tipo de territorio, SOLO si el usuario lo dijo explícitamente (ej. 'el estado de Colima' → 'estado', 'el municipio de Colima' → 'municipio', 'el país' → 'pais', 'distrito federal' / 'distrito local' cuando pide un distrito electoral). (Para 'serie_temporal' y 'distribucion'.)" },
         confirmadoLote: { type: "boolean", description: "Ponlo en true SOLO si el usuario ya confirmó explícitamente en un turno anterior que quiere las gráficas de varios/todos los territorios de su proyecto. Sin esto, a partir del 3er territorio distinto en un mismo turno la herramienta se detiene y te pide preguntar primero." },
         territorios: {
           type: "array",
@@ -210,6 +216,16 @@ export const FONTANA_TOOLS: Anthropic.Tool[] = [
           type: "array",
           items: { type: "string", enum: ["estatal", "municipal", ""] },
           description: "SOLO para 'comparacion_territorios': paralelo a `territorios` (mismo índice) — 'municipal' si el usuario pidió explícitamente el municipio de un nombre que también es estado (ej. 'municipios (capitales)': Puebla, Querétaro), 'estatal' si pidió explícitamente el estado. Usa cadena vacía en las posiciones donde el usuario no especificó nivel — mismo criterio que el parámetro `nivel` de consultar_indicador_territorio_externo.",
+        },
+        clavesPorTerritorio: {
+          type: "array",
+          items: { type: "string" },
+          description: "SOLO para 'comparacion_territorios': paralelo a `territorios` — la CLAVE que el usuario eligió de la lista de opciones (`noResueltos[].opciones`) de una llamada anterior. Cadena vacía donde no aplique.",
+        },
+        tiposPorTerritorio: {
+          type: "array",
+          items: { type: "string", enum: ["estado", "municipio", "pais", "distrito_federal", "distrito_local", ""] },
+          description: "SOLO para 'comparacion_territorios': paralelo a `territorios` — el tipo, únicamente si el usuario lo dijo explícitamente ('el estado de Colima', 'distrito local'). Cadena vacía donde no aplique.",
         },
         paisesAgregar: {
           type: "array",
@@ -703,11 +719,8 @@ async function generarVisualizacion(
           `El proyecto abarca varios estados (${estados.join(", ")}). Pregunta al usuario a cuál se refiere y vuelve a llamar con territorioNombre = ese estado.`
         );
       }
-      if (data.ambiguo) {
-        const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
-        return reject(`«${territorioNombre}» coincide con ${cands.length} municipios; pregunta al usuario a cuál se refiere (municipio + estado).`);
-      }
-      if (data.noResuelto) return reject(`No reconozco el territorio «${territorioNombre}».`);
+      const rr = respuestaDeReferencia(data, territorioNombre);
+      if (rr) return reject(rr.rechazo);
       if (data.error === "no_soportado") {
         return reject(String(data.mensaje ?? "Ese indicador solo se desglosa para el territorio del proyecto."));
       }
@@ -916,6 +929,53 @@ async function listarIndicadoresActivosTodasFamilias(ctx: ToolContext): Promise<
 // Consulta de un indicador en un territorio EXTERNO al proyecto (Fase 1).
 // Reusa la misma fuente de datos; solo cambia la resolución de territorio.
 // NO se mezcla con la agregación de territorio plural del proyecto.
+// Paso 3 (26-09-25): respuesta común de las herramientas que resuelven un territorio por TEXTO.
+// Las rutas devuelven `referencia` cuando no se pudo resolver a un territorio: hay que PREGUNTAR
+// (ambiguo / demasiados), o explicar honestamente (noResuelto, hermano, sin_referente,
+// nivel_no_disponible, clave_invalida, territorio_del_proyecto). Nunca se elige por el usuario.
+// Las CLAVES viajan solo para reenviarlas; al usuario se le muestran las ETIQUETAS.
+type RespuestaReferencia = { resumen: string; resultado: Record<string, unknown>; rechazo: string };
+
+function respuestaDeReferencia(data: Record<string, unknown>, territorioNombre: string): RespuestaReferencia | null {
+  const ref = typeof data.referencia === "string" ? data.referencia : null;
+  if (!ref) return null;
+  const mensaje = String(data.mensaje ?? "");
+
+  if (ref === "ambiguo") {
+    const cands = (data.candidatos as { clave: string; tipo: string; etiqueta: string }[]) ?? [];
+    const instruccion =
+      "Pregunta al usuario cuál de estas opciones quiere, listando las ETIQUETAS tal cual (nunca las claves ni códigos internos). NO asumas ninguna. " +
+      "Cuando responda, vuelve a llamar esta herramienta con el MISMO territorioNombre y `claveTerritorio` = la clave de la opción elegida (el servidor la verifica). " +
+      "Al nombrar un distrito electoral usa SIEMPRE la forma completa de la etiqueta («D.F. 1405 PUERTO VALLARTA»).";
+    return {
+      resumen: `«${territorioNombre}» es ambiguo: ${cands.length} opciones.`,
+      resultado: { ambiguo: true, candidatos: cands, instruccion },
+      rechazo: `«${territorioNombre}» puede ser ${cands.length} territorios: ${cands.map((c) => c.etiqueta).join(" | ")}. ${instruccion}`,
+    };
+  }
+  if (ref === "demasiados") {
+    const total = Number(data.total ?? 0);
+    const exactas = (data.exactas as { clave: string; tipo: string; etiqueta: string }[]) ?? [];
+    const instruccion =
+      `«${territorioNombre}» coincide con ${total} territorios: NO los listes todos. Pídele al usuario el estado o un nombre más específico y vuelve a llamar (estadoNombre). ` +
+      (exactas.length
+        ? "Si quiere el que se llama exactamente así, puedes ofrecer las opciones exactas por su etiqueta y reenviar `claveTerritorio` con la que elija."
+        : "");
+    return {
+      resumen: `«${territorioNombre}» coincide con ${total} territorios.`,
+      resultado: { demasiados: true, total, estados: data.estados, opciones: exactas, instruccion },
+      rechazo: instruccion,
+    };
+  }
+  if (ref === "noResuelto") {
+    const rs = `No reconozco el territorio «${territorioNombre}».`;
+    const instruccion = "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre (estado, municipio, país o distrito de México).";
+    return { resumen: rs, resultado: { noResuelto: true, error: rs, instruccion }, rechazo: `${rs} ${instruccion}` };
+  }
+  // clave_invalida / hermano / sin_referente / nivel_no_disponible / territorio_del_proyecto
+  return { resumen: mensaje, resultado: { referencia: ref, error: mensaje, instruccion: mensaje }, rechazo: mensaje };
+}
+
 async function consultarIndicadorTerritorioExterno(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
   const indicadorId = String(input.indicadorId ?? "");
   const territorioNombre = String(input.territorioNombre ?? "").trim();
@@ -929,6 +989,8 @@ async function consultarIndicadorTerritorioExterno(input: Record<string, unknown
   const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId, territorio: territorioNombre });
   if (estadoNombre) params.set("estado", estadoNombre);
   if (nivel) params.set("nivel", nivel);
+  if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/consulta-territorio?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
   });
@@ -938,23 +1000,11 @@ async function consultarIndicadorTerritorioExterno(input: Record<string, unknown
     const rs = String(data.mensaje ?? data.error ?? "No se pudo consultar el territorio externo.");
     return { resultForModel: { error: rs }, toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rs, ok: false } };
   }
-  if (data.ambiguo) {
-    const cands = data.candidatos as { estado: string; municipio: string }[];
-    const rs = `«${territorioNombre}» es ambiguo: ${cands.length} municipios con ese nombre.`;
+  const rr = respuestaDeReferencia(data, territorioNombre);
+  if (rr) {
     return {
-      resultForModel: {
-        ambiguo: true,
-        candidatos: cands,
-        instruccion: "Pregunta al usuario a cuál de estos territorios se refiere (municipio + estado). NO asumas ninguno.",
-      },
-      toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rs, ok: false },
-    };
-  }
-  if (data.noResuelto) {
-    const rs = `No reconozco el territorio «${territorioNombre}».`;
-    return {
-      resultForModel: { noResuelto: true, error: rs, instruccion: "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre (estado o municipio de México)." },
-      toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rs, ok: false },
+      resultForModel: rr.resultado,
+      toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rr.resumen, ok: false },
     };
   }
 
@@ -969,7 +1019,8 @@ async function consultarIndicadorTerritorioExterno(input: Record<string, unknown
       instruccion:
         `Este dato es de ${terr.label}, NO del territorio del proyecto (${territorioLabel(ctx.territorio)}). ` +
         `Dilo explícitamente en tu respuesta (ej. "Este dato es de ${terr.label}, no de tu proyecto en ${territorioLabel(ctx.territorio)}."). ` +
-        `Cita la fuente igual que en cualquier otro dato.`,
+        `Cita la fuente igual que en cualquier otro dato.` +
+        (data.aviso ? ` Aclárale al usuario cómo se interpretó su petición: ${String(data.aviso)}` : ""),
     },
     toolCall: { tool: "consultar_indicador_territorio_externo", input, resultSummary: rs, ok: data.valor !== null },
   };
@@ -1000,6 +1051,8 @@ async function fetchSerie(
   const estadoNombre = input.estadoNombre ? String(input.estadoNombre).trim() : "";
   if (territorioNombre) params.set("territorio", territorioNombre);
   if (estadoNombre) params.set("estado", estadoNombre);
+  if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/serie-temporal?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
   });
@@ -1019,6 +1072,8 @@ async function fetchDistribucion(
   const estadoNombre = input.estadoNombre ? String(input.estadoNombre).trim() : "";
   if (territorioNombre) params.set("territorio", territorioNombre);
   if (estadoNombre) params.set("estado", estadoNombre);
+  if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/distribucion?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
   });
@@ -1316,23 +1371,11 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
       toolCall: { tool, input, resultSummary: rs, ok: false },
     };
   }
-  if (data.ambiguo) {
-    const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
-    const rs = `«${territorioNombre}» es ambiguo: ${cands.length} municipios con ese nombre.`;
+  const rr = respuestaDeReferencia(data, territorioNombre);
+  if (rr) {
     return {
-      resultForModel: {
-        ambiguo: true,
-        candidatos: cands,
-        instruccion: "Pregunta al usuario a cuál de estos territorios se refiere (municipio + estado). NO asumas.",
-      },
-      toolCall: { tool, input, resultSummary: rs, ok: false },
-    };
-  }
-  if (data.noResuelto) {
-    const rs = `No reconozco el territorio «${territorioNombre}».`;
-    return {
-      resultForModel: { noResuelto: true, error: rs, instruccion: "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre del estado." },
-      toolCall: { tool, input, resultSummary: rs, ok: false },
+      resultForModel: rr.resultado,
+      toolCall: { tool, input, resultSummary: rr.resumen, ok: false },
     };
   }
   if (data.colapsoNivel) {
@@ -1374,6 +1417,7 @@ async function consultarSerieTemporal(input: Record<string, unknown>, ctx: ToolC
       : data.esTerritorioDelProyecto
         ? `Esta es la serie de ${terr.label} — el territorio del proyecto a este nivel. `
         : "") +
+    (data.aviso ? `Aclárale al usuario cómo se interpretó su petición: ${String(data.aviso)} ` : "") +
     "Cita la fuente. Si la serie trae `ranking` por punto, menciona los cambios de posición cuando sean relevantes.";
   return {
     resultForModel: { ...data, instruccion },
@@ -1407,11 +1451,8 @@ async function generarSerieTemporal(
       `El proyecto abarca varios municipios (${municipios.join(", ")}). Este es un dato por municipio — pregunta al usuario a cuál de sus municipios se refiere y vuelve a intentar con ese municipio (territorioNombre).`
     );
   }
-  if (data.ambiguo) {
-    const cands = (data.candidatos as { estado: string; municipio: string }[]) ?? [];
-    return reject(`«${String(input.territorioNombre ?? "")}» coincide con ${cands.length} municipios; pregunta al usuario a cuál se refiere.`);
-  }
-  if (data.noResuelto) return reject(`No reconozco el territorio «${String(input.territorioNombre ?? "")}».`);
+  const rr = respuestaDeReferencia(data, String(input.territorioNombre ?? ""));
+  if (rr) return reject(rr.rechazo);
   if (data.colapsoNivel) {
     const donde = data.entregaNivel === "estatal" ? `estatal (${data.estado})` : "nacional";
     return reject(
@@ -1504,6 +1545,7 @@ async function generarSerieTemporal(
         (esTerritorioExterno
           ? ` Además, ${terr.label} no es parte del territorio del proyecto — aclárualo.`
           : "") +
+        (data.aviso ? ` Aclárale al usuario cómo se interpretó su petición: ${String(data.aviso)}` : "") +
         (item.nota ? ` La serie trae una aclaración estructural — menciónala: "${item.nota}"` : ""),
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },
@@ -1706,10 +1748,14 @@ async function fetchComparacionTerritorios(
   const nivelesPorTerritorio = Array.isArray(input.nivelesPorTerritorio)
     ? input.nivelesPorTerritorio.map(String)
     : [];
+  const clavesPorTerritorio = Array.isArray(input.clavesPorTerritorio) ? input.clavesPorTerritorio.map(String) : [];
+  const tiposPorTerritorio = Array.isArray(input.tiposPorTerritorio) ? input.tiposPorTerritorio.map(String) : [];
   const params = new URLSearchParams({ sesionId: ctx.sesionId, indicadorId });
   for (const t of territorios) params.append("territorio", t);
   for (const e of estadosPorTerritorio) params.append("estado", e);
   for (const n of nivelesPorTerritorio) params.append("nivel", n);
+  for (const c of clavesPorTerritorio) params.append("clave", c);
+  for (const t of tiposPorTerritorio) params.append("tipo", t);
   const res = await fetch(`${ctx.baseUrl}/api/fontana/comparacion-territorios?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
   });
@@ -1800,7 +1846,7 @@ async function generarComparacionTerritorios(
       noResueltos: comp.noResueltos,
       instruccionChat:
         comp.noResueltos.length > 0
-          ? "Aclárale al usuario, con el motivo real, cuáles territorios NO entraron a la comparación (ambiguos o no reconocidos) — nunca los omitas en silencio."
+          ? "Aclárale al usuario, con el motivo real, cuáles territorios NO entraron a la comparación (ambiguos o no reconocidos) — nunca los omitas en silencio. Si un territorio quedó ambiguo, pregunta cuál quiere listando las ETIQUETAS de `opciones` (nunca las claves) y, con su respuesta, vuelve a llamar con `clavesPorTerritorio` (misma posición que ese territorio)."
           : null,
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },

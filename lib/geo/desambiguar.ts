@@ -31,6 +31,10 @@
 //   4. "México" always asks (country vs Estado de México) unless the caller fixes it
 //      with `mexico` or narrows `tipos`. MEX is reserved for the country.
 //   5. A state given by the caller (`estadoCve`) narrows every type BEFORE searching.
+//   6. (26-09-25) A district named by NUMBER or CODE ("distrito federal 5 de Jalisco", "D.L. 27
+//      CDMX", "1405") is looked up by code (referenciaDistrito.ts); a number without a state
+//      asks for the state (`demasiados`). Bare "Distrito Federal" is the old name of Mexico
+//      City, never an electoral district. District labels always carry the D.F./D.L. prefix.
 //
 // Stable keys: state = 2-digit CVE; municipality = `${estadoCve}:${claveCanonica}`
 // (BY NAME — never the INE `cve` of lib/geo/municipios.ts: that numbering diverges from
@@ -45,16 +49,27 @@
 // Out of scope here (later steps): compositions of several units, migrating saved
 // territories, `checkTerritoryMatch`, fuzzy "did you mean" suggestions for `ninguno`.
 
-import { buscarCandidatosPorNombre, type CandidatoGeo, type MunicipioCatalogo } from "./candidatosGeo";
+import {
+  buscarCandidatosPorNombre,
+  buscarDistritosPorCodigo,
+  distritosDeEstado,
+  type CandidatoGeo,
+  type MunicipioCatalogo,
+} from "./candidatosGeo";
 import { esAlcanceNacional, nombreEstadoDisplay } from "./estados";
 import { nombreMunicipioDisplay } from "./display";
 import { etiquetaDesambiguacionMunicipio } from "./etiquetasDesambiguacionMunicipio";
 import {
+  esDistritoFederalAntiguo,
+  formaPlana,
+  parsearReferenciaDistrito,
+  type ReferenciaDistrito,
+  type TipoDistrito,
+} from "./referenciaDistrito";
+import {
   ALIAS_COLOQUIAL_MUNICIPIO,
   claveCanonicaMunicipio,
   claveComparacionMunicipio,
-  normalizarNombreMunicipio,
-  plegarDiacriticosGeo,
 } from "./municipioCanonico";
 
 export type TipoReferencia = "pais" | "estado" | "municipio" | "distrito_federal" | "distrito_local";
@@ -112,11 +127,6 @@ export const MAX_CANDIDATOS_POR_DEFECTO = 8;
 const MIN_LETRAS_PARCIAL = 3;
 const CVE_ESTADO_MEXICO = "15";
 
-/** Plain comparison form: accent-free uppercase, "_" and dots as separators, Ñ/Ü folded. */
-function formaPlana(s: string): string {
-  return plegarDiacriticosGeo(normalizarNombreMunicipio(s.replace(/[_.,]/g, " ")));
-}
-
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -126,7 +136,9 @@ function etiquetaDe(tipo: TipoReferencia, nombre: string, estadoCve?: string): s
   if (tipo === "estado") return nombre;
   const estado = estadoCve ? nombreEstadoDisplay(estadoCve) : null;
   if (tipo === "municipio") return estado ? `${nombre}, ${estado}` : nombre;
-  const prefijo = tipo === "distrito_federal" ? "Distrito federal" : "Distrito local";
+  // Canonical district form (CLAUDE.md "Nomenclatura de Distritos Electorales"): the prefix D.F./D.L.
+  // is what tells a federal from a local district that share the code ("D.F. 1405" vs "D.L. 1405").
+  const prefijo = tipo === "distrito_federal" ? "D.F." : "D.L.";
   return estado ? `${prefijo} ${nombre} (${estado})` : `${prefijo} ${nombre}`;
 }
 
@@ -235,6 +247,51 @@ function cerrar(candidatos: CandidatoReferencia[], maxCandidatos: number): Resul
   return { estado: "ambiguo", candidatos: ordenados };
 }
 
+/** Districts named by number / code / type+state (rule 6). */
+function resolverReferenciaDistrito(
+  ref: ReferenciaDistrito,
+  texto: string,
+  opts: OpcionesDesambiguar,
+  maxCandidatos: number
+): ResultadoDesambiguacion {
+  const permitidos = (opts.tipos ?? TIPOS_REFERENCIA).filter(
+    (t): t is TipoDistrito => t === "distrito_federal" || t === "distrito_local"
+  );
+  const pedidos = ref.tipo ? permitidos.filter((t) => t === ref.tipo) : permitidos;
+  if (!pedidos.length || ref.estadoNoReconocido) return { estado: "ninguno" };
+
+  // The state may come from the phrase and/or from the caller; if both are given they must agree.
+  if (ref.estadoCve && opts.estadoCve && ref.estadoCve !== opts.estadoCve) return { estado: "ninguno" };
+  const estadoCve = ref.estadoCve ?? opts.estadoCve;
+
+  let hallados: CandidatoGeo[] = [];
+  if (ref.codigo) {
+    if (estadoCve && !ref.codigo.startsWith(estadoCve)) return { estado: "ninguno" };
+    hallados = buscarDistritosPorCodigo(ref.codigo, pedidos);
+  } else if (ref.numero) {
+    if (estadoCve) {
+      hallados = buscarDistritosPorCodigo(`${estadoCve}${ref.numero}`, pedidos);
+    } else {
+      // A bare number exists in many states: never guess, ask for the state.
+      const porEstado = new Set<string>();
+      for (let n = 1; n <= 32; n++) {
+        const cve = String(n).padStart(2, "0");
+        if (buscarDistritosPorCodigo(`${cve}${ref.numero}`, pedidos).length) porEstado.add(cve);
+      }
+      if (!porEstado.size) return { estado: "ninguno" };
+      return { estado: "demasiados", total: porEstado.size, estadosCve: [...porEstado].sort(), exactas: [] };
+    }
+  } else if (ref.cabecera) {
+    hallados = buscarCandidatosPorNombre(ref.cabecera, { estadoCve, tipos: pedidos });
+  } else if (estadoCve && ref.tipo) {
+    hallados = distritosDeEstado(estadoCve, pedidos);
+  } else {
+    return { estado: "ninguno" }; // only the level ("distrito local"): a level, not a place
+  }
+
+  return cerrar(hallados.map((c) => desdeCandidatoGeo(c, texto)), maxCandidatos);
+}
+
 /**
  * Resolves what the user typed to one entity, a short list to ask about, "too many"
  * (ask for the state), or nothing. See the file header for the rules.
@@ -252,6 +309,22 @@ export function desambiguarReferencia(
   const quiere = (t: TipoReferencia) => tipos.includes(t);
 
   const candidatos: CandidatoReferencia[] = [];
+
+  // Rule 6: bare "Distrito Federal" is Mexico City (old name), not an electoral district.
+  if (esDistritoFederalAntiguo(texto)) {
+    if (!quiere("estado") || (estadoCve && estadoCve !== "09")) return { estado: "ninguno" };
+    const nombre = nombreEstadoDisplay("09") ?? "Ciudad de México";
+    return {
+      estado: "unico",
+      candidato: { tipo: "estado", clave: "09", estadoCve: "09", nombre, etiqueta: nombre, coincidencia: "alias" },
+    };
+  }
+
+  // Rule 6: a district named by number / code.
+  if (quiere("distrito_federal") || quiere("distrito_local")) {
+    const ref = parsearReferenciaDistrito(texto);
+    if (ref) return resolverReferenciaDistrito(ref, texto, opts, maxCandidatos);
+  }
 
   // Rule 4: bare "México" is the country or the Estado de México. Only when the search
   // is not already inside a state.

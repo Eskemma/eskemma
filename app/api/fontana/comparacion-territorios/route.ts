@@ -40,6 +40,10 @@ export async function GET(request: NextRequest) {
   const territorios = searchParams.getAll("territorio");
   const estados = searchParams.getAll("estado"); // paralelo por índice, puede venir vacío o más corto
   const niveles = searchParams.getAll("nivel"); // paralelo por índice, puede venir vacío o más corto
+  // Paso 3 (paralelos por índice; "" = sin dato): clave elegida de una lista de candidatos (se
+  // verifica en el servidor) y tipo explícito (estado, municipio, país, distrito_federal, distrito_local).
+  const claves = searchParams.getAll("clave");
+  const tipos = searchParams.getAll("tipo");
 
   if (!sesionId || !indicadorId || territorios.length === 0) {
     return NextResponse.json({ error: "sesionId, indicadorId y al menos un territorio son requeridos" }, { status: 400 });
@@ -71,7 +75,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 26-09-07: por cada territorio, el nivel final combina (dentro de
-  // resolverTerritoriosNombres, vía nivelHintPorIndicador) el override
+  // resolverTerritoriosNombres, vía el adaptador resolverReferenciaTerritorio) el override
   // EXPLÍCITO del usuario (`niveles[i]`, nuevo — antes comparacion_territorios
   // no tenía forma de pedirlo, causa raíz del hallazgo Puebla/Querétaro) con
   // el fallback determinístico por indicador ya existente (si "estatal" es
@@ -81,8 +85,11 @@ export async function GET(request: NextRequest) {
       nombre,
       estadoHint: estados[i] || undefined,
       nivelHintExplicito: niveles[i] || null,
+      claveTerritorio: claves[i] || null,
+      tipoTerritorio: tipos[i] || null,
     })),
-    registro
+    registro,
+    sesion.territorio
   );
 
   if (resueltos.length === 0) {
@@ -97,18 +104,33 @@ export async function GET(request: NextRequest) {
   const norm = (s: string) => normalizeGeoName(s);
 
   const filas = await Promise.all(
-    resueltos.map(async ({ territorio, label }) => {
+    resueltos.map(async ({ territorio, label, esTerritorioDelProyecto: apuntaAlProyecto }) => {
       const celdas = await resolverIndicadorFontana(indicadorId, territorio);
-      const nivelObjetivo = territorio.nivel === "municipal" ? "municipal" : "estatal";
-      const celda = celdas.find((c) => c.nivel === nivelObjetivo) ?? celdas.find((c) => "valor" in c);
+      const nivelObjetivo =
+        territorio.nivel === "municipal"
+          ? "municipal"
+          : territorio.nivel === "nacional"
+            ? "nacional"
+            : territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local" || territorio.nivel === "distrito"
+              ? "distrital"
+              : "estatal";
+      // Un municipio o estado puede caer a otra celda con valor; un distrito o el país NUNCA.
+      const puedeCaerAOtroNivel = nivelObjetivo === "municipal" || nivelObjetivo === "estatal";
+      const celda =
+        celdas.find((c) => c.nivel === nivelObjetivo) ?? (puedeCaerAOtroNivel ? celdas.find((c) => "valor" in c) : undefined);
       const tieneValor = celda && "valor" in celda;
 
       const esTerritorioDelProyecto =
-        territorio.nivel === "municipal"
+        apuntaAlProyecto ??
+        (territorio.nivel === "municipal"
           ? municipiosProyecto.some(
               (m) => norm(m.estado) === norm(territorio.estado ?? "") && norm(m.nombre) === norm(territorio.municipio ?? "")
             )
-          : estadosProyecto.some((e) => norm(e) === norm(territorio.estado ?? territorio.nombre));
+          : territorio.nivel === "nacional"
+            ? sesion.territorio.nivel === "nacional"
+            : territorio.nivel === "distrito_federal" || territorio.nivel === "distrito_local" || territorio.nivel === "distrito"
+              ? false
+              : estadosProyecto.some((e) => norm(e) === norm(territorio.estado ?? territorio.nombre)));
 
       return {
         territorioLabel: label,

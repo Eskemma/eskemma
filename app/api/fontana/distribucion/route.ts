@@ -7,7 +7,7 @@
 //   - Sin `territorio` y proyecto plural municipal (>1 municipio) →
 //     { ok:false, multiMunicipio:true, municipios:[...] } → el agente pregunta
 //     y puede recibir varios municipios (una tarjeta de Canvas por cada uno).
-//   - Con `territorio` → resolverTerritorioNombre; la respuesta lleva
+//   - Con `territorio` → resolverReferenciaTerritorio (núcleo de desambiguación); la respuesta lleva
 //     esTerritorioExterno / esTerritorioDelProyecto para que el agente aclare
 //     que el dato es de ese territorio y no del proyecto.
 // Solo F1-2 / F1-11 (ITER — resolverIndicadorIter acepta cualquier Territorio).
@@ -17,7 +17,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { cargarSesionConTerritorioActual } from "@/lib/fontana/sesionTerritorio";
 import { getIndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
-import { resolverTerritorioNombre } from "@/lib/fontana/geo/resolverTerritorioNombre";
+import { resolverReferenciaTerritorio, type ResolucionTerritorio } from "@/lib/fontana/geo/resolverReferenciaTerritorio";
 import { estadosDelTerritorio } from "@/lib/fontana/geo/estadosDelTerritorio";
 import { municipiosDelTerritorio } from "@/lib/fontana/geo/municipiosDelTerritorio";
 import { resolverIndicadorIter } from "@/lib/fontana/ingesta/iter";
@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
   const territorioNombre = searchParams.get("territorio");
   const estadoHint = searchParams.get("estado");
   const nivelHint = searchParams.get("nivel");
+  // Paso 3: clave elegida de una lista de candidatos (se verifica en el servidor) y tipo explícito.
+  const claveTerritorio = searchParams.get("clave");
+  const tipoTerritorio = searchParams.get("tipo");
 
   if (!sesionId || !indicadorId) {
     return NextResponse.json({ error: "sesionId e indicadorId son requeridos" }, { status: 400 });
@@ -74,8 +77,25 @@ export async function GET(request: NextRequest) {
   const nombre = registro?.nombre ?? indicadorId;
   const idIter = indicadorId as "F1-2" | "F1-11";
 
+  // Paso 3: un nombre nombrado se resuelve con el núcleo; "este distrito" apunta al territorio del
+  // proyecto y sigue por la rama del proyecto.
+  let resolNombrada: Extract<ResolucionTerritorio, { ok: true }> | null = null;
+  if (territorioNombre) {
+    const r = await resolverReferenciaTerritorio({
+      texto: territorioNombre,
+      estadoHint,
+      nivelHint,
+      claveTerritorio,
+      tipoTerritorio,
+      registro,
+      territorioActivo: sesion.territorio,
+    });
+    if (!r.ok) return NextResponse.json(r, { status: 200 });
+    if (r.via !== "contexto") resolNombrada = r;
+  }
+
   // --- Desglose del territorio del proyecto ---
-  if (!territorioNombre) {
+  if (!resolNombrada) {
     const nivel = nivelDelTerritorio(sesion.territorio);
     if (nivel === "municipal") {
       const muns = municipiosDelTerritorio(sesion.territorio);
@@ -101,10 +121,22 @@ export async function GET(request: NextRequest) {
   }
 
   // --- Desglose de un territorio nombrado por el usuario ---
-  const resol = await resolverTerritorioNombre(territorioNombre, estadoHint, nivelHint);
-  if (!resol.ok) return NextResponse.json(resol, { status: 200 });
+  const resol = resolNombrada;
 
-  const nivel: NivelObjetivo = resol.territorio.nivel === "municipal" ? "municipal" : "estatal";
+  // El desglose por categorías del ITER no llega al distrito electoral: se dice, no se sustituye.
+  if (resol.territorio.nivel === "distrito_federal" || resol.territorio.nivel === "distrito_local") {
+    return NextResponse.json(
+      {
+        ok: false,
+        referencia: "nivel_no_disponible",
+        mensaje: `Este desglose (pirámide / urbano-rural) no se calcula por distrito electoral (${resol.label}); solo nacional, estatal o municipal.`,
+      },
+      { status: 200 }
+    );
+  }
+
+  const nivel: NivelObjetivo =
+    resol.territorio.nivel === "municipal" ? "municipal" : resol.territorio.nivel === "nacional" ? "nacional" : "estatal";
   const celdas = await resolverIndicadorIter(idIter, resol.territorio);
 
   let esTerritorioDelProyecto: boolean;
@@ -115,6 +147,8 @@ export async function GET(request: NextRequest) {
         norm(m.estado) === norm(resol.territorio.estado ?? "") &&
         norm(m.nombre) === norm(resol.territorio.municipio ?? "")
     );
+  } else if (nivel === "nacional") {
+    esTerritorioDelProyecto = sesion.territorio.nivel === "nacional";
   } else {
     esTerritorioDelProyecto = estadosDelTerritorio(sesion.territorio).some(
       (e) => normalizeGeoName(e) === normalizeGeoName(resol.territorio.estado ?? resol.label)

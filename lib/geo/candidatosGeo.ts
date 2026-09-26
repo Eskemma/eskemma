@@ -161,3 +161,56 @@ export function buscarCandidatosPorNombre(
   if (quiere("distrito_local")) out.push(...candidatosDistrito("distrito_local", cabecerasLoc as CatalogoCodigos, claveTexto, estadoCve));
   return out;
 }
+
+const CATALOGO_POR_TIPO: Record<"distrito_federal" | "distrito_local", CatalogoCodigos> = {
+  distrito_federal: cabecerasFed as CatalogoCodigos,
+  distrito_local: cabecerasLoc as CatalogoCodigos,
+};
+
+const TIPOS_DISTRITO: readonly ("distrito_federal" | "distrito_local")[] = ["distrito_federal", "distrito_local"];
+
+function candidatoDeCodigo(tipo: "distrito_federal" | "distrito_local", codigo: string): CandidatoGeo | null {
+  const cabecera = CATALOGO_POR_TIPO[tipo][codigo];
+  if (!cabecera) return null;
+  const estado = codigo.slice(0, 2);
+  const historicos = nombresHistoricosDistrito(tipo, codigo);
+  return {
+    tipo,
+    clave: codigo,
+    estadoCve: estado,
+    nombre: nombreDistritoDisplay(estado, codigo.slice(2), cabecera),
+    coincidencia: "exacta",
+    anio: ANIO_CATALOGO_CABECERAS,
+    ...(historicos ? { nombresPorAnio: { ...historicos } } : {}),
+  };
+}
+
+/** Cabecera tal como está en el catálogo vigente ("PUERTO VALLARTA", "CD. ALTAMIRANO"), o null. */
+export function cabeceraDeDistrito(tipo: "distrito_federal" | "distrito_local", codigo: string): string | null {
+  return CATALOGO_POR_TIPO[tipo][codigo] ?? null;
+}
+
+/** Distritos vigentes con ese código de 4 dígitos (estado + distrito). Uno por tipo que exista. */
+export function buscarDistritosPorCodigo(
+  codigo: string,
+  tipos: readonly ("distrito_federal" | "distrito_local")[] = TIPOS_DISTRITO
+): CandidatoGeo[] {
+  return tipos.map((t) => candidatoDeCodigo(t, codigo)).filter((c): c is CandidatoGeo => c !== null);
+}
+
+/** Todos los distritos vigentes de un estado (por tipo), ordenados por código. */
+export function distritosDeEstado(
+  estadoCve: string,
+  tipos: readonly ("distrito_federal" | "distrito_local")[] = TIPOS_DISTRITO
+): CandidatoGeo[] {
+  const out: CandidatoGeo[] = [];
+  for (const t of tipos) {
+    for (const codigo of Object.keys(CATALOGO_POR_TIPO[t]).sort()) {
+      if (codigo.startsWith(estadoCve)) {
+        const c = candidatoDeCodigo(t, codigo);
+        if (c) out.push(c);
+      }
+    }
+  }
+  return out;
+}
