@@ -292,12 +292,8 @@ export default function ExploracionPage() {
       color: projectColor,
     };
 
-    if (projectTerritory) {
-      params.nivel = projectTerritory.nivel;
-      if (projectTerritory.estado) params.estado = projectTerritory.estado;
-      if (projectTerritory.municipio) params.municipio = projectTerritory.municipio;
-      if (projectTerritory.pais) params.pais = projectTerritory.pais;
-    }
+    // El territorio NO viaja en la URL (perdía cve_distrito y las listas plurales): el wizard de PESTEL lo
+    // pide por id a GET /api/territorio/origen con `moddulo_project_id` (Paso 4b, 26-09-26).
 
     router.push(`/centinela/pestel/nuevo?${new URLSearchParams(params).toString()}`);
   }

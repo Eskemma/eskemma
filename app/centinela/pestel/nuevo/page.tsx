@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { fetchTerritorioOrigen } from "@/lib/territorio/fetchOrigen";
 import WizardStep1Tipo from "@/app/components/centinela/pestel/wizard/WizardStep1Tipo";
 import WizardStep2Territorio from "@/app/components/centinela/pestel/wizard/WizardStep2Territorio";
 import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/WizardStep3Variables";
@@ -11,7 +12,6 @@ import ConfirmReplacePestelModal, {
 import type {
   TipoProyecto,
   Territorio,
-  NivelTerritorial,
   PestlDimensionConfig,
 } from "@/types/pestel.types";
 
@@ -38,34 +38,32 @@ export default function NuevoProyectoPage() {
     const tipoParam = searchParams.get("tipo") as TipoProyecto | null;
     const modduloProjectId = searchParams.get("moddulo_project_id") ?? undefined;
 
-    const VALID_NIVELES: NivelTerritorial[] = ["nacional", "estatal", "municipal", "distrito", "distrito_federal", "distrito_local"];
-    const nivelParam = searchParams.get("nivel") as NivelTerritorial | null;
-    const nivelTerritorio = VALID_NIVELES.includes(nivelParam as NivelTerritorial) ? nivelParam! : null;
-    const estadoParam = searchParams.get("estado") ?? "";
-    const municipioParam = searchParams.get("municipio") ?? "";
-    const paisParam = searchParams.get("pais") ?? "";
-
-    const territorioNombre = [estadoParam, municipioParam].filter(Boolean).join(" › ");
-    const territorioInicial: Territorio | null = nivelTerritorio
-      ? {
-          nivel: nivelTerritorio,
-          nombre: territorioNombre || nivelTerritorio,
-          ...(paisParam ? { pais: paisParam } : {}),
-          ...(estadoParam ? { estado: estadoParam } : {}),
-          ...(municipioParam ? { municipio: municipioParam } : {}),
-        }
-      : null;
-
     return {
       tipo: VALID_TIPOS.includes(tipoParam as TipoProyecto) ? tipoParam : null,
       nombre: searchParams.get("nombre") ?? "",
       horizonte: Number(searchParams.get("horizonte") ?? 6) || 6,
       color: searchParams.get("color") ?? "#026988",
-      territorio: territorioInicial,
+      territorio: null,
       dimensions: [],
       ...(modduloProjectId ? { modduloProjectId, modduloOrigenEscenario: "A" as const } : {}),
     };
   });
+  // Territorio del proyecto Moddulo de origen, por id (Paso 4b): incluye cve_distrito y las listas plurales
+  // que los antiguos query params (nivel/estado/municipio/pais) perdían. El servidor verifica la propiedad;
+  // si falla, el wizard queda vacío y editable. No pisa lo que el usuario ya haya elegido.
+  const modduloOrigenId = data.modduloProjectId;
+  useEffect(() => {
+    if (!modduloOrigenId) return;
+    let cancelado = false;
+    fetchTerritorioOrigen("moddulo", modduloOrigenId).then((origen) => {
+      if (cancelado || !origen) return;
+      setData((prev) => (prev.territorio ? prev : { ...prev, territorio: origen.territorio }));
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [modduloOrigenId]);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Conflicto detectado por el guard de creación (409: el proyecto Moddulo

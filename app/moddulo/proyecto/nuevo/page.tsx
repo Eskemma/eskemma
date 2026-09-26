@@ -1,13 +1,13 @@
 // app/moddulo/proyecto/nuevo/page.tsx
 "use client";
 
+import { fetchTerritorioOrigen } from "@/lib/territorio/fetchOrigen";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
 import { PROJECT_TYPE_LABELS, PROJECT_TYPE_DESCRIPTIONS } from "@/types/moddulo.types";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
-import type { FontanaSesion } from "@/types/fontana.types";
 
 type Step = 1 | 2 | 3;
 
@@ -59,6 +59,20 @@ function NuevoProyectoContent() {
     }
   }, [fromPESTEL, pestelProjectName, pestelProjectType]);
 
+  // Territorio del proyecto PESTEL de origen, por id (Paso 4b): antes PESTEL→Moddulo no pasaba territorio
+  // y el usuario lo reescribía. El servidor verifica la propiedad; editable; no pisa lo ya elegido.
+  useEffect(() => {
+    if (!fromPESTEL || !pestelProjectId) return;
+    let cancelado = false;
+    fetchTerritorioOrigen("pestel", pestelProjectId).then((origen) => {
+      if (cancelado || !origen) return;
+      setTerritory((prev) => prev ?? origen.territorio);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [fromPESTEL, pestelProjectId]);
+
   // Pre-fill si viene de Fontana (Flujo 1, Punto 2b — 2ª pasada,
   // 2026-08-19) — a diferencia de PESTEL, la URL solo trae
   // `fontanaSesionId` (sin territorio/tipo en query params, seria
@@ -70,19 +84,13 @@ function NuevoProyectoContent() {
   // (sin prellenar), sin mensaje de error intrusivo — no es crítico.
   useEffect(() => {
     if (!fromFontana || !fontanaSesionId) return;
-    (async () => {
-      try {
-        const res = await fetch(`/api/fontana/sesion?sesion_id=${fontanaSesionId}`);
-        if (!res.ok) return;
-        const data = (await res.json()) as { sesion: FontanaSesion };
-        const sesion = data.sesion;
-        setName(sesion.territorio.nombre ? `Exploración — ${sesion.territorio.nombre}` : "Exploración desde Fontana");
-        setType(sesion.tipoProyecto);
-        setTerritory(sesion.territorio);
-      } catch {
-        // No bloquea el wizard — se ve vacío como hoy, sin prellenar.
-      }
-    })();
+    // Misma ruta por id que PESTEL: verifica propiedad y resincroniza el territorio con el proyecto vinculado.
+    fetchTerritorioOrigen("fontana", fontanaSesionId).then((origen) => {
+      if (!origen) return;
+      setName(origen.territorio.nombre ? `Exploración — ${origen.territorio.nombre}` : "Exploración desde Fontana");
+      if (origen.tipo) setType(origen.tipo as ProjectType);
+      setTerritory(origen.territorio);
+    });
   }, [fromFontana, fontanaSesionId]);
 
   const projectTypes: ProjectType[] = ["electoral", "gubernamental", "legislativo", "ciudadano"];

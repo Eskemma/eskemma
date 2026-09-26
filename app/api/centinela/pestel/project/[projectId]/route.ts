@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
+import { getPestelProjectPropio } from "@/lib/centinela/pestel/projectPropio";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PESTELProject, TipoProyecto, Territorio, PESTELProjectStatus } from "@/types/pestel.types";
 
@@ -20,13 +21,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const { projectId } = await context.params;
-  const snap = await adminDb.collection("pestel_projects").doc(projectId).get();
-
-  if (!snap.exists || snap.data()?.userId !== session.uid) {
+  const project = await getPestelProjectPropio(projectId, session.uid);
+  if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
 
-  return NextResponse.json({ project: { id: snap.id, ...snap.data() } as PESTELProject & { id: string } });
+  return NextResponse.json({ project });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {

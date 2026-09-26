@@ -1,4 +1,5 @@
 // lib/moddulo/project.ts
+import { getPestelProjectPropio } from "@/lib/centinela/pestel/projectPropio";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type {
@@ -190,11 +191,7 @@ export async function createProject(
   // project. It runs BEFORE anything is built or written, so a foreign id is
   // never persisted in pestelProjectId / linkedSource either.
   if (input.pestelProjectId) {
-    const pestelSnap = await adminDb
-      .collection("pestel_projects")
-      .doc(input.pestelProjectId)
-      .get();
-    if (!pestelSnap.exists || pestelSnap.data()?.userId !== userId) {
+    if (!(await getPestelProjectPropio(input.pestelProjectId, userId))) {
       throw new PestelProjectNoPropioError();
     }
   }
@@ -331,6 +328,22 @@ export async function getProject(
   }
 
   return { id: snap.id, ...rest };
+}
+
+/**
+ * Lectura de SOLO LECTURA de lo mínimo que necesita el prellenado entre apps (Paso 4b): mismo criterio de
+ * acceso que `getProject` (colaborador), pero sin `lastAccessedAt` ni backfills — un prellenado no debe
+ * mutar el proyecto origen. Null si no existe o el usuario no colabora (no distingue los dos casos).
+ */
+export async function getProjectParaPrellenado(
+  projectId: string,
+  userId: string
+): Promise<Pick<ModduloProject, "name" | "type" | "color" | "territorio"> | null> {
+  const snap = await adminDb.collection(COLLECTION).doc(projectId).get();
+  if (!snap.exists) return null;
+  const data = snap.data() as ModduloProject;
+  if (!data.collaborators?.some((c) => c.uid === userId)) return null;
+  return { name: data.name, type: data.type, color: data.color, territorio: data.territorio };
 }
 
 // ==========================================
