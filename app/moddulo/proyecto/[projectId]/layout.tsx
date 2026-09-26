@@ -2,11 +2,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { notFound, useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import PhaseNav from "@/app/moddulo/components/PhaseNav";
 import type { RDAItem, PhaseId, PhaseStatus } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
+import { debeMostrarNotFound } from "@/lib/moddulo/proyectoNoEncontrado";
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -26,6 +27,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [phaseStatuses, setPhaseStatuses] = useState<Partial<Record<PhaseId, PhaseStatus>>>({});
   // Nombre del proyecto — mostrado en el breadcrumb del header.
   const [projectName, setProjectName] = useState<string>("");
+  // El proyecto no existe (eliminado) o el usuario no colabora → página 404 (ver lib/moddulo/proyectoNoEncontrado.ts).
+  const [proyectoNoEncontrado, setProyectoNoEncontrado] = useState(false);
 
   // Bloquear scroll del body — el scroll vive dentro del chat, no en la página
   useEffect(() => {
@@ -36,7 +39,10 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/moddulo/projects/${projectId}`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (debeMostrarNotFound(r.status, pathname)) setProyectoNoEncontrado(true);
+        return r.ok ? r.json() : null;
+      })
       .then((data) => {
         if (data?.project?.rda) setRda(data.project.rda);
         if (data?.project?.name) setProjectName(data.project.name);
@@ -51,6 +57,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
       })
       .catch(() => { /* no-op — el sidebar simplemente no muestra estados */ });
   }, [projectId]);
+
+  // notFound() solo es válido durante el render (no en efectos): se dispara desde el estado.
+  if (proyectoNoEncontrado) notFound();
 
   if (!projectId) {
     return (

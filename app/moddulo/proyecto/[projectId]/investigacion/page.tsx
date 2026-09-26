@@ -107,7 +107,11 @@ export default function InvestigacionPage() {
     if (!projectId) return;
     try {
       const r = await fetch(`/api/moddulo/projects/${projectId}`, { credentials: "include" });
-      if (!r.ok) return;
+      if (!r.ok) {
+        // 404: el layout de la ruta muestra la página 404; otros códigos quedan registrados.
+        if (r.status !== 404) console.error(`[investigacion] API error ${r.status}:`, await r.text());
+        return;
+      }
       const data = await r.json();
       const p = data.project;
       if (!p) return;

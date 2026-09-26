@@ -109,7 +109,8 @@ function PropositoPageContent() {
     fetch(`/api/moddulo/projects/${projectId}`, { credentials: "include" })
       .then(async (r) => {
         if (!r.ok) {
-          console.error(`[proposito] API error ${r.status}:`, await r.text());
+          // 404: el layout de la ruta muestra la página 404 (no es un error que solo deba ir a consola).
+          if (r.status !== 404) console.error(`[proposito] API error ${r.status}:`, await r.text());
           return null;
         }
         return r.json();
