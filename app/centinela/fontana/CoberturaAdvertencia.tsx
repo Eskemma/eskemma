@@ -37,10 +37,11 @@
 // amarillo + ▲) — son 2 problemas distintos y deben leerse distinto de
 // un vistazo, no solo por el texto.
 
+import { nivelAvisoCobertura } from "@/lib/fontana/coberturaDistrital";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 
 type Props =
-  | { nivel: "distrito"; tipoDistrito: "federal" | "local"; coberturaPct: number }
+  | { nivel: "distrito"; tipoDistrito: "federal" | "local"; coberturaPct: number; esProporcion?: boolean }
   | { nivel: "municipio"; tipoDistrito: "federal" | "local" }
   | { nivel: "municipio_propio"; tipoDistrito: "federal" | "local"; coberturaPct: number }
   | { nivel: "fuente_mixta" }
@@ -75,9 +76,13 @@ const CHIP_CLASS =
   "mt-1.5 inline-flex items-center gap-1 px-1.5 py-1 rounded border border-blue-eske " +
   "text-[10px] text-black-eske-20 dark:text-[#9AAEBE] cursor-pointer";
 
+const CHIP_CLASS_FUERTE = CHIP_CLASS.replace("border-blue-eske", "border-orange-eske");
+
 export default function CoberturaAdvertencia(props: Props) {
+  // Aviso graduado (26-09-26): 90–99 % nota breve, < 90 % advertencia fuerte.
+  const fuerte = props.nivel === "distrito" && nivelAvisoCobertura(props.coberturaPct) === "fuerte";
   const etiqueta =
-    props.nivel === "distrito" ? "Cobertura incompleta"
+    props.nivel === "distrito" ? (fuerte ? "Cobertura parcial" : "Nota sobre cobertura")
     : props.nivel === "fuente_mixta" || props.nivel === "fmi_no_disponible" ? "Nota sobre la fuente"
     : props.nivel === "zona_metropolitana" ? "Valor de zona metropolitana"
     : props.nivel === "area_ensu" ? "Valor de área urbana ENSU"
@@ -131,10 +136,13 @@ export default function CoberturaAdvertencia(props: Props) {
       </>
     ) : props.nivel === "distrito" ? (
       <>
-        El valor mostrado es la suma de las secciones censales 2020 que sí lograron vincularse a este distrito{" "}
-        {tipo}. El <strong>{complemento(props.coberturaPct)}%</strong> restante no pudo asignarse porque la
-        cartografía electoral vigente no coincide exactamente con los límites del Censo 2020 en esta zona. Por eso
-        esta cifra puede subestimar la población real de este distrito.
+        El dato de este distrito {tipo} cubre aproximadamente el <strong>{props.coberturaPct}%</strong> de su población según el
+        Censo 2020 y la cartografía electoral vigente. El <strong>{complemento(props.coberturaPct)}%</strong> restante no pudo
+        asignarse porque los límites electorales no coinciden exactamente con los del Censo en esta zona.{" "}
+        {props.esProporcion
+          ? "Como es un porcentaje, se calcula solo con la población que sí se pudo asignar."
+          : "Por eso esta cifra puede subestimar la población real de este distrito."}
+        {fuerte && " La cobertura es baja: úsalo con reserva y considera el dato municipal como referencia complementaria."}
       </>
     ) : props.nivel === "municipio" ? (
       <>
@@ -161,7 +169,7 @@ export default function CoberturaAdvertencia(props: Props) {
           {etiqueta}
         </>
       }
-      triggerClassName={CHIP_CLASS}
+      triggerClassName={fuerte ? CHIP_CLASS_FUERTE : CHIP_CLASS}
     />
   );
 }

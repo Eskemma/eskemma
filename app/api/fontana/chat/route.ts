@@ -24,6 +24,7 @@ import { FAMILIA4_NOMBRES } from "@/lib/fontana/familia4Catalogo";
 import { limpiarUndefined } from "@/lib/fontana/agente/canvasBuilder";
 import { construirBloqueAdjuntos } from "@/lib/fontana/agente/adjuntosContexto";
 import { adminDb } from "@/lib/firebase-admin";
+import { AVISO_REUSO, respuestaRequiereConsulta } from "@/lib/fontana/agente/guardReuso";
 import type { FontanaChatMessage, FontanaToolCall } from "@/types/fontana.types";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -293,6 +294,7 @@ export async function POST(request: NextRequest) {
       let correccionVocabularioHecha = false;
       let correccionNombreHerramientaHecha = false;
       let correccionNegoSerieHecha = false;
+      let correccionReusoHecha = false;
       let correccionPersonalizacionPaisesHecha = false;
 
       try {
@@ -344,6 +346,23 @@ export async function POST(request: NextRequest) {
             correccionAlucinacionHecha = true;
             if (textoIter) send({ type: "text_suppress" });
             mensajes.push({ role: "user", content: AVISO_SIN_HERRAMIENTAS });
+            continue;
+          }
+
+          // Guard de REUSO: la respuesta trae una tabla de valores o afirma que no hay
+          // dato, sin ninguna llamada a herramienta en este turno (el historial es solo
+          // texto: puede estar repitiendo un turno viejo, desactualizado o erróneo). Se
+          // omite si el turno trae adjuntos (el texto puede venir del archivo).
+          if (
+            terminaTurno &&
+            toolCallsAcum.length === 0 &&
+            adjuntoIds.length === 0 &&
+            !correccionReusoHecha &&
+            respuestaRequiereConsulta(textoIter)
+          ) {
+            correccionReusoHecha = true;
+            if (textoIter) send({ type: "text_suppress" });
+            mensajes.push({ role: "user", content: AVISO_REUSO });
             continue;
           }
 

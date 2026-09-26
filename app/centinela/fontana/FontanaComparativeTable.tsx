@@ -14,6 +14,7 @@
 // variante distinta por modo claro/oscuro (no solo un tono más oscuro),
 // mismo criterio ya verificado en PESTLPanelV2.tsx (nivelConfianza).
 
+import { esUnidadProporcion, nivelAvisoCobertura } from "@/lib/fontana/coberturaDistrital";
 import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type { CeldaTablaFontana, NivelTablaFontana, IndicadorFilaFontana } from "@/lib/fontana/tablaColumnas";
@@ -62,7 +63,6 @@ const ETIQUETA_VER_AGREGACION_PLURAL: Record<NivelTerritorial, string> = {
   distrito_local: "Ver valores distritales",
 };
 
-const UMBRAL_COBERTURA = 99;
 
 const ETIQUETA_BOTON_DESGLOSE: Record<TipoElementoNacional, string> = {
   estados: "Ver estados",
@@ -270,8 +270,8 @@ function Celda({
         {(celda.nivel === "nacional" || celda.nivel === "estatal") && INDICADORES_FUENTE_MIXTA_INEGI_PM.has(indicadorId) && (
           <CoberturaAdvertencia nivel="fuente_mixta" />
         )}
-        {celda.nivel === "distrital" && celda.coberturaPct !== undefined && celda.coberturaPct < UMBRAL_COBERTURA && celda.tipoDistritoPropio && (
-          <CoberturaAdvertencia nivel="distrito" tipoDistrito={celda.tipoDistritoPropio} coberturaPct={celda.coberturaPct} />
+        {celda.nivel === "distrital" && celda.coberturaPct !== undefined && nivelAvisoCobertura(celda.coberturaPct) !== "ninguno" && celda.tipoDistritoPropio && (
+          <CoberturaAdvertencia nivel="distrito" tipoDistrito={celda.tipoDistritoPropio} coberturaPct={celda.coberturaPct} esProporcion={esUnidadProporcion(celda.unidad)} />
         )}
         {celda.zonaMetropolitana && (
           <CoberturaAdvertencia

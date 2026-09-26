@@ -16,6 +16,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import type { Territorio } from "@/types/shared.types";
 import type { ProjectType } from "@/types/moddulo.types";
 import { esTerritorioParcial } from "@/lib/moddulo/territorioPlural";
+import { armarNivelesComparados, camposCobertura } from "@/lib/fontana/agente/nivelesComparados";
 import { getIndicadorRegistro, getIndicadoresPorFamilia, type NaturalezaDato } from "@/lib/fontana/indicatorRegistry";
 import { esIndicadorNarrativoCurado } from "@/lib/fontana/ingesta/contenidoCurado";
 import { tieneSerie, SERIES_DISPONIBLES } from "@/lib/fontana/series/seriesDisponibles";
@@ -554,14 +555,11 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
   // hay cálculo nuevo, solo se dejan de descartar los otros niveles.
   const compararNiveles = input.compararNiveles === true;
   const nivelesComparados = compararNiveles
-    ? ind.celdas.map((c) => ({
-        nivel: c.nivel,
-        valor: c.valor ?? null,
-        unidad: c.unidad ?? null,
-        naturaleza: c.naturaleza ?? registro.niveles.find((n) => n.nivel === c.nivel)?.naturaleza ?? null,
-        fuenteEtiqueta: c.fuenteEtiqueta ?? ind.fuenteEtiqueta ?? null,
-        motivo: c.valor === undefined ? c.motivo ?? "Nivel no cubierto." : null,
-      }))
+    ? armarNivelesComparados(
+        ind.celdas,
+        (nivel) => registro.niveles.find((n) => n.nivel === nivel)?.naturaleza ?? null,
+        ind.fuenteEtiqueta ?? null
+      )
     : null;
 
   const result = {
@@ -575,6 +573,8 @@ async function consultarIndicador(input: Record<string, unknown>, ctx: ToolConte
     naturaleza: celda?.naturaleza ?? naturalezaRegistry,
     fuenteEtiqueta: celda?.fuenteEtiqueta ?? ind.fuenteEtiqueta ?? null,
     motivo: valor === null ? celda?.motivo ?? "Nivel no cubierto." : null,
+    // Solo el nivel distrital con valor: cuánta población del distrito cubre el dato + el aviso graduado.
+    ...camposCobertura(celda),
     agregacionPlural,
     disponibilidadTemporal: registro.disponibilidadTemporal ?? null,
     tieneSerie: tieneSerieCualquiera(indicadorId),
