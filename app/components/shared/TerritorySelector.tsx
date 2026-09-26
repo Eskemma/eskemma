@@ -14,6 +14,8 @@ import type { WebContextResult } from "@/lib/search/SearchProvider";
 import PartidosMultiSelect, { type MultiSelectOption } from "@/app/sefix/components/elecciones/PartidosMultiSelect";
 import { NOMBRES_ESTADO_ORDENADOS } from "@/lib/geo/estados";
 import type { CandidatoReferencia, ResultadoDesambiguacion } from "@/lib/geo/desambiguar";
+import type { GeoOptionMunicipio } from "@/lib/geo/clavesMunicipioCatalogo";
+import { aplicarSeleccionMunicipios, clavesSeleccionadas, opcionesMunicipios } from "@/lib/geo/municipiosMultiselect";
 import {
   agregarMunicipioSeleccionado,
   aplicarRellenos,
@@ -292,6 +294,17 @@ export default function TerritorySelector({
   } = useGeoOptionsMultiEstado<GeoOptionDistrito>({
     tipo: nivel === "distrito_federal" ? "distritos_fed" : "distritos_loc",
     estados: esDistrito ? estadosConCve : [],
+  });
+
+  // Catálogo de municipios de los estados elegidos (multiselección con búsqueda, Paso 4c): cada opción
+  // trae la `clave` estable calculada en el servidor. La alta libre por nombre sigue como respaldo.
+  const {
+    options: catalogoMunicipios,
+    isLoading: cargandoMunicipios,
+    erroresPorEstado: erroresMunicipios,
+  } = useGeoOptionsMultiEstado<GeoOptionMunicipio>({
+    tipo: "municipios",
+    estados: esMexico && nivel === "municipal" ? estadosConCve : [],
   });
 
   const todosLosEstadosFallaron =
@@ -664,11 +677,44 @@ export default function TerritorySelector({
                   {estadoNombre}
                   {estadoNombre === estadosSeleccionados[0] && (
                     <InfoTooltip
-                      content="Selecciona el municipio donde tiene lugar tu proyecto. (Si lo amerita, puedes seleccionar más de un municipio). Escribe el nombre exacto."
+                      content="Busca el municipio donde tiene lugar tu proyecto y selecciónalo (si lo amerita, puedes elegir más de uno). Si no aparece en la lista, agrégalo escribiendo su nombre."
                       example="Jiutepec"
                     />
                   )}
                 </div>
+                {(() => {
+                  const cve = estadosConCve.find((e) => e.nombre === estadoNombre)?.cve;
+                  const catalogo = catalogoMunicipios.filter((o) => o.estado === estadoNombre);
+                  if (erroresMunicipios[estadoNombre]) {
+                    return (
+                      <p className="text-xs text-yellow-eske-70 dark:text-yellow-eske">
+                        No se pudo cargar la lista de municipios de {estadoNombre} — escríbelos por nombre.
+                      </p>
+                    );
+                  }
+                  if (!cve) return null;
+                  return (
+                    <div className="relative">
+                      <PartidosMultiSelect
+                        id={`municipios-${cve}`}
+                        label="Municipios"
+                        options={opcionesMunicipios(cve, catalogo, municipiosPorEstado.filter((m) => m.estado === estadoNombre))}
+                        selected={clavesSeleccionadas(municipiosPorEstado, estadoNombre)}
+                        onChange={(vals) =>
+                          setMunicipiosPorEstado((prev) =>
+                            aplicarSeleccionMunicipios(prev, estadoNombre, vals.filter((v) => v !== SENTINELA_LIMPIAR), catalogo)
+                          )
+                        }
+                        placeholder={cargandoMunicipios && catalogo.length === 0 ? "Cargando municipios…" : "Buscar municipio…"}
+                        todosLabel={SENTINELA_LIMPIAR}
+                        disabled={cargandoMunicipios && catalogo.length === 0}
+                      />
+                    </div>
+                  );
+                })()}
+                <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE]">
+                  ¿No aparece en la lista? Agrégalo escribiendo su nombre:
+                </p>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -745,10 +791,12 @@ export default function TerritorySelector({
                     </div>
                   );
                 })()}
-                {municipiosPorEstado.filter((m) => m.estado === estadoNombre).length > 0 && (
+                {/* Las entradas CON clave ya se ven como etiquetas del selector; aquí quedan las que no tienen
+                    (alta libre sin catálogo, fuera de México) — o todas si la lista no cargó. */}
+                {municipiosPorEstado.filter((m) => m.estado === estadoNombre && (!m.clave || erroresMunicipios[estadoNombre])).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {municipiosPorEstado
-                      .filter((m) => m.estado === estadoNombre)
+                      .filter((m) => m.estado === estadoNombre && (!m.clave || erroresMunicipios[estadoNombre]))
                       .map((m) => (
                         <span key={m.clave ?? m.nombre} className={chipClass}>
                           {m.nombre}

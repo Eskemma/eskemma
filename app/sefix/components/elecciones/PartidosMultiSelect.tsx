@@ -2,6 +2,7 @@
 // Multi-select con tags para partidos/coaliciones y secciones electorales.
 // Patrón idéntico al de secciones en SemanalView.tsx (LNE).
 import { useState, useRef, useEffect, useId } from "react";
+import { decidirEnter, filtrarOpciones } from "@/lib/ui/multiSelectFiltro";
 
 export interface MultiSelectOption {
   value: string;
@@ -39,10 +40,8 @@ export default function PartidosMultiSelect({
 
   const isTodos = selected.includes(todosLabel) || selected.length === 0;
 
-  const filteredOptions = options.filter((o) => {
-    if (selected.includes(o.value)) return false;
-    return o.label.toLowerCase().includes(search.toLowerCase());
-  });
+  // Búsqueda sin acentos y con tope de opciones dibujadas (catálogos de cientos, p. ej. municipios de Oaxaca).
+  const { visibles: filteredOptions, total: totalCoincidencias } = filtrarOpciones(options, selected, search);
 
   function add(value: string) {
     if (value === todosLabel) {
@@ -65,9 +64,15 @@ export default function PartidosMultiSelect({
       remove(selected[selected.length - 1]);
     }
     if (e.key === "Escape") setOpen(false);
-    if (e.key === "Enter" && filteredOptions.length > 0) {
-      e.preventDefault();
-      add(filteredOptions[0].value);
+    if (e.key === "Enter") {
+      const { evitarEnvio, agregar } = decidirEnter({
+        abierto: open,
+        busqueda: search,
+        coincidencias: filteredOptions,
+        componiendo: e.nativeEvent.isComposing,
+      });
+      if (evitarEnvio) e.preventDefault();
+      if (agregar !== null) add(agregar);
     }
   }
 
@@ -184,6 +189,11 @@ export default function PartidosMultiSelect({
           )}
           {filteredOptions.length === 0 && (
             <p className="px-3 py-2 text-xs text-black-eske-10 dark:text-[#6D8294]">Sin resultados</p>
+          )}
+          {totalCoincidencias > filteredOptions.length && (
+            <p className="px-3 py-1.5 text-xs text-black-eske-10 dark:text-[#6D8294]">
+              Mostrando {filteredOptions.length} de {totalCoincidencias} — sigue escribiendo para acotar
+            </p>
           )}
           {filteredOptions.map((o) => (
             <button

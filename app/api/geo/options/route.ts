@@ -1,3 +1,4 @@
+import { clavesDeMunicipiosDelEstado } from "@/lib/geo/clavesMunicipioCatalogo";
 import { NextRequest, NextResponse } from "next/server";
 import { getStorage } from "firebase-admin/storage";
 import { adminApp } from "@/lib/firebase-admin";
@@ -168,7 +169,12 @@ function extractOptions(
     }
   }
 
-  return options.sort((a, b) => a.cve.localeCompare(b.cve));
+  const ordenadas = options.sort((a, b) => a.cve.localeCompare(b.cve));
+  if (tipo !== "municipios") return ordenadas;
+  // Municipios: clave estable calculada aquí (Paso 4c) con la misma regla que lib/geo/desambiguar.ts,
+  // para que la multiselección no duplique la regla de homónimos (Oaxaca #cve). Campo aditivo.
+  const claves = clavesDeMunicipiosDelEstado(padId, ordenadas);
+  return ordenadas.map((o, i) => ({ ...o, clave: claves[i] }));
 }
 
 export async function GET(req: NextRequest) {
