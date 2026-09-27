@@ -16,6 +16,7 @@ export type EcegNivel =
   | "distritos_municipios"
   | "distritos_locales"
   | "distritos_locales_municipios"
+  | "distritos_correspondencia"
   | "municipios"
   | "secciones";
 
@@ -31,6 +32,7 @@ export function buildEcegStoragePath(nivel: EcegNivel, estadoId?: string): strin
   if (nivel === "distritos_municipios") return `${STORAGE_PREFIX}/distritos_municipios/${id}.json`;
   if (nivel === "distritos_locales") return `${STORAGE_PREFIX}/distritos_locales/${id}.json`;
   if (nivel === "distritos_locales_municipios") return `${STORAGE_PREFIX}/distritos_locales_municipios/${id}.json`;
+  if (nivel === "distritos_correspondencia") return `${STORAGE_PREFIX}/distritos_correspondencia/${id}.json`;
   if (nivel === "secciones") return `${STORAGE_PREFIX}/secciones/${id}.json`;
   return `${STORAGE_PREFIX}/municipios/${id}.json`;
 }

@@ -9,8 +9,13 @@ import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 
 vi.mock("@/lib/geo/municipios", () => ({ getMunicipiosOptionsNacional: vi.fn() }));
+// Frente A ("distrito hermano", 26-09-27): resolverReferenciaTerritorio ahora importa
+// resolverCorrespondenciaLocalFederal de eceg.ts, que a su vez toca Storage (firebase-admin) — se
+// mockea igual que los demás módulos que no son el objeto de esta prueba.
+vi.mock("@/lib/fontana/ingesta/eceg", () => ({ resolverCorrespondenciaLocalFederal: vi.fn() }));
 
 import { getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
+import { resolverCorrespondenciaLocalFederal } from "@/lib/fontana/ingesta/eceg";
 import { resolverReferenciaTerritorio, type ResolucionTerritorio } from "./resolverReferenciaTerritorio";
 
 const CVE_PARES: Record<string, [string, string]> = {
@@ -32,6 +37,7 @@ beforeEach(() => {
       return { ...m, cve, estadoNombre: nombreEstadoDisplay(m.estadoCve) ?? m.estadoCve } as never;
     })
   );
+  vi.mocked(resolverCorrespondenciaLocalFederal).mockResolvedValue({ ok: false, motivo: "sin mock configurado" });
 });
 
 type Nivel = "nacional" | "estatal" | "distrital" | "municipal";
@@ -223,11 +229,21 @@ describe("referencias contextuales: «este distrito» apunta al territorio activ
     expect(r.territorio).toMatchObject({ nivel: "nacional" });
   });
 
-  it("pedir el OTRO tipo de distrito: rechazo honesto (no existe la equivalencia)", async () => {
+  it("pedir el OTRO tipo de distrito sin cve_distrito activo: rechazo honesto (no existe la equivalencia)", async () => {
     const local = activo("distrito_local", { estado: "Jalisco", nombre: "D.L. 1405 PUERTO VALLARTA" });
     const r = await resolverReferenciaTerritorio({ texto: "este distrito federal", registro: AMBOS, territorioActivo: local });
     expect(r).toMatchObject({ ok: false, referencia: "hermano" });
     if (r.ok === false && r.referencia === "hermano") expect(r.mensaje).toContain("no tiene la equivalencia");
+  });
+
+  it("Federal→Local: SIEMPRE el mensaje fijo, con redacción ESTRUCTURAL (no 'todavía no')", async () => {
+    const r = await resolverReferenciaTerritorio({ texto: "este distrito local", registro: AMBOS, territorioActivo: dto });
+    expect(r).toMatchObject({ ok: false, referencia: "hermano" });
+    if (r.ok === false && r.referencia === "hermano") {
+      expect(r.mensaje).toContain("limitación estructural");
+      expect(r.mensaje).not.toContain("todavía");
+    }
+    expect(resolverCorrespondenciaLocalFederal).not.toHaveBeenCalled();
   });
 
   it("«este distrito» en un proyecto municipal no tiene referente", async () => {
@@ -245,6 +261,78 @@ describe("referencias contextuales: «este distrito» apunta al territorio activ
     const r = ok(await resolverReferenciaTerritorio({ texto: "Guadalajara", nivelHint: "municipal", registro: SOLO_MUNICIPAL, territorioActivo: dto }));
     expect(r.via).toBe("nombre");
     expect(r.territorio).toMatchObject({ municipio: "GUADALAJARA" });
+  });
+});
+
+describe("Frente A (\"distrito hermano\", 26-09-27): correspondencia Local→Federal", () => {
+  const local = activo("distrito_local", { estado: "Yucatán", nombre: "D.L. 3102 PROGRESO", cve_distrito: "012" });
+
+  it("≥ umbral (ok:true del adaptador): se ofrece como SUGERENCIA a confirmar, nunca se resuelve sola", async () => {
+    vi.mocked(resolverCorrespondenciaLocalFederal).mockResolvedValue({
+      ok: true,
+      distritoFederalCve: "005",
+      pctDominante: 100,
+      anioCartografia: 2025,
+    });
+    const r = await resolverReferenciaTerritorio({ texto: "este distrito federal", registro: AMBOS, territorioActivo: local });
+    expect(resolverCorrespondenciaLocalFederal).toHaveBeenCalledWith("31", "012");
+    expect(r).toMatchObject({ ok: false, referencia: "correspondencia", pctDominante: 100 });
+    if (r.ok === false && r.referencia === "correspondencia") {
+      expect(r.sugerida.clave).toBe("3105");
+      expect(r.mensaje).toContain("no es una equivalencia exacta");
+      expect(r.mensaje).toContain("claveTerritorio");
+    }
+  });
+
+  it("con clave + sugerenciaConfirmada: resuelve al distrito federal sugerido (via: correspondencia)", async () => {
+    vi.mocked(resolverCorrespondenciaLocalFederal).mockResolvedValue({
+      ok: true,
+      distritoFederalCve: "005",
+      pctDominante: 100,
+      anioCartografia: 2025,
+    });
+    const r = ok(
+      await resolverReferenciaTerritorio({
+        texto: "este distrito federal",
+        registro: AMBOS,
+        territorioActivo: local,
+        claveTerritorio: "3105",
+        sugerenciaConfirmada: true,
+      })
+    );
+    expect(r.via).toBe("correspondencia");
+    expect(r.territorio).toMatchObject({ nivel: "distrito_federal", cve_distrito: "005" });
+    expect(r.aviso).toContain("100%");
+    expect(r.aviso).toContain("confirmado por el usuario");
+  });
+
+  it("clave sin confirmar (sugerenciaConfirmada ausente): NO resuelve, aunque la clave coincida", async () => {
+    vi.mocked(resolverCorrespondenciaLocalFederal).mockResolvedValue({
+      ok: true,
+      distritoFederalCve: "005",
+      pctDominante: 100,
+      anioCartografia: 2025,
+    });
+    const r = await resolverReferenciaTerritorio({
+      texto: "este distrito federal",
+      registro: AMBOS,
+      territorioActivo: local,
+      claveTerritorio: "3105",
+    });
+    expect(r).toMatchObject({ ok: false, referencia: "correspondencia" });
+  });
+
+  it("< umbral (ok:false del adaptador): mensaje honesto citando el motivo real, sin sugerir nada", async () => {
+    vi.mocked(resolverCorrespondenciaLocalFederal).mockResolvedValue({
+      ok: false,
+      motivo: "Este distrito local no tiene un distrito federal que domine claramente (el más cercano cubre solo el 65% de su población)",
+    });
+    const r = await resolverReferenciaTerritorio({ texto: "este distrito federal", registro: AMBOS, territorioActivo: local });
+    expect(r).toMatchObject({ ok: false, referencia: "hermano" });
+    if (r.ok === false && r.referencia === "hermano") {
+      expect(r.mensaje).toContain("65%");
+      expect(r.mensaje).toContain("no por falta de cálculo");
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
+vi.mock("@/lib/fontana/ingesta/eceg", () => ({ resolverCorrespondenciaLocalFederal: vi.fn() }));
 vi.mock("@/lib/fontana/sesionTerritorio", () => ({ cargarSesionConTerritorioActual: vi.fn() }));
 vi.mock("@/lib/fontana/indicatorRegistry", () => ({ getIndicadorRegistro: vi.fn() }));
 vi.mock("@/lib/fontana/ingesta", () => ({ resolverIndicadorFontana: vi.fn() }));
@@ -129,7 +130,7 @@ describe("GET /api/fontana/consulta-territorio (Paso 3)", () => {
   it("el OTRO tipo de distrito (el proyecto es federal, piden el local): rechazo honesto", async () => {
     const j = await (await pedir({ territorio: "este distrito local" })).json();
     expect(j).toMatchObject({ ok: false, referencia: "hermano" });
-    expect(j.mensaje).toContain("no tiene la equivalencia");
+    expect(j.mensaje).toContain("limitación estructural");
   });
 
   it("un nombre que no existe: noResuelto", async () => {

@@ -361,6 +361,59 @@ export async function resolverMunicipiosDeDistrito(
   }));
 }
 
+// "Distrito hermano" — Frente A (26-09-27): SOLO Local→Federal (ver la nota de
+// scripts/eceg-data-pipeline.ts, buildCorrespondenciaLocalFederal, sobre por qué Federal→Local no
+// tiene adaptador ni archivo: es una limitación estructural, no un dato pendiente).
+export interface CorrespondenciaLocalFederalStorage {
+  anioCartografia: number;
+  porDistritoLocal: Record<string, { distritoFederalDominante: string; pctDominante: number }>;
+}
+
+/** Umbral bajo el cual la correspondencia no se sugiere (decisión de Raúl, medido: 80% deja un margen
+ *  razonable — con 90% de 5 a 12 puntos más de distritos locales quedarían sin sugerencia). */
+export const UMBRAL_CORRESPONDENCIA_LOCAL_FEDERAL = 80;
+
+export type ResultadoCorrespondenciaLocalFederal =
+  | { ok: true; distritoFederalCve: string; pctDominante: number; anioCartografia: number }
+  | { ok: false; motivo: string };
+
+/**
+ * Distrito FEDERAL dominante de un distrito LOCAL (por CVE de 3 dígitos), si su dominancia alcanza
+ * `UMBRAL_CORRESPONDENCIA_LOCAL_FEDERAL`. NUNCA se resuelve solo del lado del llamador: es una
+ * SUGERENCIA que el chat de Fontana debe hacer confirmar al usuario (mismo patrón que las sugerencias
+ * por error de tecleo de la Pieza 1b) — el `anioCartografia` viaja para que la respuesta aclare que es
+ * la cartografía vigente de ese año, no una correspondencia permanente entre distritos.
+ */
+export async function resolverCorrespondenciaLocalFederal(
+  estadoCve: string,
+  distritoLocalCve: string
+): Promise<ResultadoCorrespondenciaLocalFederal> {
+  let data: CorrespondenciaLocalFederalStorage;
+  try {
+    data = await fetchEcegFromStorage<CorrespondenciaLocalFederalStorage>(
+      buildEcegStoragePath("distritos_correspondencia", estadoCve)!
+    );
+  } catch {
+    return { ok: false, motivo: "Error de conexión con la bodega de datos" };
+  }
+  const fila = data.porDistritoLocal[distritoLocalCve];
+  if (!fila) {
+    return { ok: false, motivo: "No hay datos de correspondencia para este distrito local" };
+  }
+  if (fila.pctDominante < UMBRAL_CORRESPONDENCIA_LOCAL_FEDERAL) {
+    return {
+      ok: false,
+      motivo: `Este distrito local no tiene un distrito federal que domine claramente (el más cercano cubre solo el ${fila.pctDominante}% de su población)`,
+    };
+  }
+  return {
+    ok: true,
+    distritoFederalCve: fila.distritoFederalDominante,
+    pctDominante: fila.pctDominante,
+    anioCartografia: data.anioCartografia,
+  };
+}
+
 // Elemento (municipio o distrito) → nombre + celda — para el modal "Ver
 // municipios"/"Ver distritos" de proyectos a nivel Estatal (Encargo 2,
 // modo buscador+selección múltiple, cierre 2026-08-04). A diferencia de

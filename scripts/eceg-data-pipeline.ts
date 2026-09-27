@@ -26,6 +26,7 @@ import os from "os";
 import { initializeApp, cert, App } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import dotenv from "dotenv";
+import { ANIO_CATALOGO_CABECERAS } from "../lib/geo/candidatosGeo";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require("xlsx");
@@ -424,6 +425,70 @@ function buildDistritosData(
   return out;
 }
 
+// "Distrito hermano" — Frente A (26-09-27): correspondencia LOCAL→FEDERAL únicamente. Medido con
+// datos reales sobre 6 estados antes de construir esto: Federal→Local NUNCA tiene un local dominante
+// (en los 5 estados sin anomalía, el 100% de los distritos federales quedan por debajo de 80% de
+// dominancia — un federal es SIEMPRE varios locales a la vez, nunca uno solo) — es una limitación
+// ESTRUCTURAL, no un dato pendiente de calcular, así que esa dirección NUNCA se persiste ni se
+// calcula: la respuesta correcta ahí es un mensaje fijo (ver lib/fontana/geo/resolverReferenciaTerritorio.ts).
+// Local→Federal SÍ tiene, la mayoría de las veces, un federal dominante claro — se calcula IGUAL para
+// todos los estados, Jalisco incluido (sin caso especial): Jalisco resultó tener DISTRITO_F===DISTRITO_L
+// en el 100% de sus secciones para la cartografía vigente (verificado, no un artefacto de este cálculo),
+// confirmado por Raúl como real mas ESPECÍFICO DEL AÑO de la redistritación 2024/2025 — nunca se debe
+// asumir estable hacia adelante. Por eso el archivo lleva `anioCartografia` como metadato explícito
+// (mismo `ANIO_CATALOGO_CABECERAS` que ya usa candidatosGeo.ts para el mismo catálogo de cabeceras) en
+// vez de una clave multi-año: un histórico real de correspondencias por año de redistritación
+// necesitaría shapefiles LOCALES de cada redistritación pasada, que no existen en el repo — fuera de
+// alcance de esta pieza, documentado aquí para quien la retome.
+interface CorrespondenciaLocalFederalData {
+  anioCartografia: number;
+  porDistritoLocal: Record<string, { distritoFederalDominante: string; pctDominante: number }>;
+}
+
+/**
+ * Correspondencia LOCAL→FEDERAL: para cada distrito local, el distrito federal que concentra más
+ * POBTOT y qué % de la población del local cae en ese federal. Mismo patrón que
+ * buildDistritosMunicipiosData (suma POBTOT por sección hacia ambos lados de un par), pero de un
+ * distrito local hacia UN SOLO federal dominante (no una matriz de composición completa: el uso real
+ * —sugerir el federal más probable— solo necesita el dominante, no el desglose de los demás).
+ */
+function buildCorrespondenciaLocalFederal(
+  rows: EcegRow[],
+  seccionDistMap: Map<number, string>,
+  seccionDistLocalMap: Map<number, string>
+): CorrespondenciaLocalFederalData {
+  const pobtotPorLocal: Record<string, number> = {};
+  const pobtotPorLocalFederal: Record<string, Record<string, number>> = {};
+
+  for (const row of rows) {
+    if (row.SECCION == null) continue;
+    const local = seccionDistLocalMap.get(row.SECCION);
+    if (!local) continue;
+    const pob = typeof row.POBTOT === "number" ? row.POBTOT : 0;
+    pobtotPorLocal[local] = (pobtotPorLocal[local] ?? 0) + pob;
+
+    const federal = seccionDistMap.get(row.SECCION);
+    if (!federal) continue;
+    if (!pobtotPorLocalFederal[local]) pobtotPorLocalFederal[local] = {};
+    pobtotPorLocalFederal[local][federal] = (pobtotPorLocalFederal[local][federal] ?? 0) + pob;
+  }
+
+  const porDistritoLocal: CorrespondenciaLocalFederalData["porDistritoLocal"] = {};
+  for (const [local, porFederal] of Object.entries(pobtotPorLocalFederal)) {
+    const total = pobtotPorLocal[local];
+    if (!total) continue;
+    let dominante = "";
+    let max = 0;
+    for (const [federal, pob] of Object.entries(porFederal)) {
+      if (pob > max) { max = pob; dominante = federal; }
+    }
+    if (!dominante) continue;
+    porDistritoLocal[local] = { distritoFederalDominante: dominante, pctDominante: Math.round((max / total) * 1000) / 10 };
+  }
+
+  return { anioCartografia: ANIO_CATALOGO_CABECERAS, porDistritoLocal };
+}
+
 interface DistritosMunicipiosData {
   composicion: Record<string, Record<string, number>>; // { [CVE_DISTRITO]: { [CVE_MUN]: pctPOBTOT } }
   coberturaDistritos: Record<string, number>; // { [CVE_DISTRITO]: pctCobertura }
@@ -601,6 +666,8 @@ async function processEstado(
     coberturaMunicipios: localComposicion.coberturaMunicipios,
   };
 
+  const correspondenciaLocalFederal = buildCorrespondenciaLocalFederal(rows, seccionDistMap, seccionDistLocalMap);
+
   // Cobertura por distrito, embebida directamente en distritosData/
   // distritosLocalesData — verificado seguro (app/api/sefix/eceg-datos/route.ts
   // solo hace rec[variable] contra una whitelist estática, nunca
@@ -634,6 +701,7 @@ async function processEstado(
   const distMunPath = `${STORAGE_PREFIX}/distritos_municipios/${estadoId}.json`;
   const distLocPath = `${STORAGE_PREFIX}/distritos_locales/${estadoId}.json`;
   const distLocMunPath = `${STORAGE_PREFIX}/distritos_locales_municipios/${estadoId}.json`;
+  const correspondenciaPath = `${STORAGE_PREFIX}/distritos_correspondencia/${estadoId}.json`;
 
   if (dryRun) {
     const secOut  = path.join(os.tmpdir(), `eceg_secciones_${estadoId}.json`);
@@ -648,12 +716,15 @@ async function processEstado(
     fs.writeFileSync(distMunOut, JSON.stringify(distritosMunicipiosData));
     fs.writeFileSync(distLocOut, JSON.stringify(distritosLocalesData));
     fs.writeFileSync(distLocMunOut, JSON.stringify(distritosLocalesMunicipiosData));
+    const correspondenciaOut = path.join(os.tmpdir(), `eceg_distritos_correspondencia_${estadoId}.json`);
+    fs.writeFileSync(correspondenciaOut, JSON.stringify(correspondenciaLocalFederal));
     process.stdout.write(`  [dry-run] → ${secOut}\n`);
     process.stdout.write(`  [dry-run] → ${munOut}\n`);
     process.stdout.write(`  [dry-run] → ${distOut}\n`);
     process.stdout.write(`  [dry-run] → ${distMunOut}\n`);
     process.stdout.write(`  [dry-run] → ${distLocOut}\n`);
     process.stdout.write(`  [dry-run] → ${distLocMunOut}\n`);
+    process.stdout.write(`  [dry-run] → ${correspondenciaOut}\n`);
   } else {
     process.stdout.write(`  ↑ ${secPath}…\n`);
     await uploadJson(app!, secPath, seccionesData);
@@ -667,6 +738,8 @@ async function processEstado(
     await uploadJson(app!, distLocPath, distritosLocalesData);
     process.stdout.write(`  ↑ ${distLocMunPath}…\n`);
     await uploadJson(app!, distLocMunPath, distritosLocalesMunicipiosData);
+    process.stdout.write(`  ↑ ${correspondenciaPath}…\n`);
+    await uploadJson(app!, correspondenciaPath, correspondenciaLocalFederal);
     process.stdout.write(`  ✓ Done\n`);
   }
 

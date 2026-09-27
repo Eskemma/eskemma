@@ -15,6 +15,11 @@ describe("nombreDeClave", () => {
     expect(nombreDeClave("basura")).toBeNull();
     expect(nombreDeClave("MEX")).toBeNull();
   });
+
+  it("Frente A (26-09-27): clave de 4 dígitos = distrito federal sugerido por correspondencia (su cabecera)", () => {
+    expect(nombreDeClave("1405")).toBe("PUERTO VALLARTA");
+    expect(nombreDeClave("9999")).toBeNull(); // código sin cabecera real: no fabrica un nombre
+  });
 });
 
 describe("sugerenciaConfirmada", () => {
@@ -52,5 +57,11 @@ describe("sugerenciaConfirmada", () => {
 
   it("estado: «¿Quisiste decir Colima?» + «sí» confirma la clave 06", () => {
     expect(sugerenciaConfirmada("06", ctx("sí", "¿Quisiste decir Colima?"))).toBe(true);
+  });
+
+  it("Frente A (26-09-27): distrito federal sugerido — se confirma igual que cualquier otra sugerencia", () => {
+    expect(sugerenciaConfirmada("1405", ctx("sí, usa ese", "¿Usamos D.F. 1405 PUERTO VALLARTA para esta consulta?"))).toBe(true);
+    expect(sugerenciaConfirmada("1405", ctx("no, mejor dime otro", "¿Usamos D.F. 1405 PUERTO VALLARTA para esta consulta?"))).toBe(false);
+    expect(sugerenciaConfirmada("1405", ctx("dame la población", "Hola"))).toBe(false);
   });
 });

@@ -32,6 +32,7 @@ import { getMunicipiosOptionsNacional } from "@/lib/geo/municipios";
 import { nombreEstadoDisplay, resolverEstadoCve } from "@/lib/geo/estados";
 import { esDistritoFederalAntiguo, mencionaDistrito } from "@/lib/geo/referenciaDistrito";
 import { clasificarReferencia, decidirContexto } from "@/lib/geo/referenciaContextual";
+import { resolverCorrespondenciaLocalFederal } from "@/lib/fontana/ingesta/eceg";
 import type { Territorio } from "@/types/shared.types";
 import type { IndicadorRegistro } from "@/lib/fontana/indicatorRegistry";
 
@@ -49,9 +50,10 @@ export type ResolucionTerritorio =
       territorio: Territorio;
       label: string;
       /** Cómo se llegó: por el nombre, por una clave elegida, o desde el territorio activo. */
-      via: "nombre" | "clave" | "contexto" | "contenedor" | "sugerencia";
-      /** Solo `via: "sugerencia"` (Pieza 1b): la sugerencia por tecleo que se aceptó por su clave. El llamador DEBE
-       *  verificar que el usuario la confirmó antes de usar el dato (ver `verificarConfirmacionSugerencia` en tools.ts). */
+      via: "nombre" | "clave" | "contexto" | "contenedor" | "sugerencia" | "correspondencia";
+      /** Solo `via: "sugerencia"` (Pieza 1b) o `via: "correspondencia"` (Frente A, "distrito hermano"): la
+       *  sugerencia que se aceptó por su clave. El llamador DEBE verificar que el usuario la confirmó antes
+       *  de usar el dato (ver `verificarConfirmacionSugerencia` en tools.ts). */
       sugerida?: { clave: string; nombre: string; etiqueta: string };
       /** Aviso para el usuario cuando el texto se interpretó ("«Pachuca» se interpretó como …"). */
       aviso?: string;
@@ -70,6 +72,10 @@ export type ResolucionTerritorio =
     }
   // Pieza 1b: no se reconoce, pero hay sugerencias por error de tecleo. NO es una resolución: hay que preguntar.
   | { ok: false; referencia: "sugerencia"; sugerencias: CandidatoTerritorio[]; mensaje: string }
+  // Frente A ("distrito hermano", 26-09-27): Local→Federal con un distrito federal que domina claramente
+  // (≥ umbral) la población del local activo — es una SUGERENCIA, nunca una equivalencia exacta: hay que
+  // confirmarla igual que una sugerencia de la Pieza 1b (misma clave + `sugerenciaConfirmada`).
+  | { ok: false; referencia: "correspondencia"; sugerida: CandidatoTerritorio; pctDominante: number; mensaje: string }
   | { ok: false; referencia: "noResuelto"; noResuelto: true }
   | { ok: false; referencia: "clave_invalida" | "hermano" | "sin_referente" | "nivel_no_disponible"; mensaje: string };
 
@@ -192,6 +198,28 @@ function territorioDeCandidato(c: CandidatoReferencia, catalogo: OpcionCatalogoM
   };
 }
 
+/** Construye el `Territorio` de un distrito a partir de su cve de 3 dígitos y el estado (Frente A: el
+ *  distrito federal dominante de una correspondencia Local→Federal). Mismo patrón que la rama de distrito
+ *  de `territorioDeCandidato`, pero partiendo de una cve ya conocida en vez de un `CandidatoReferencia`. */
+function territorioDistritoPorCve(
+  nivel: "distrito_federal" | "distrito_local",
+  estadoCve: string,
+  distritoCve3: string,
+  estadoNombre: string
+): { territorio: Territorio; label: string; clave: string } {
+  const codigo4 = `${estadoCve}${distritoCve3.slice(-2)}`;
+  const cabecera = cabeceraDeDistrito(nivel, codigo4) ?? "";
+  const label = formatDistritoLabel(nivel, estadoCve, distritoCve3, cabecera, codigo4);
+  const territorio: Territorio = {
+    nivel,
+    estado: estadoNombre,
+    nombre: label,
+    cve_distrito: distritoCve3,
+    distritosSeleccionados: [{ cve: distritoCve3, nombre: cabecera, estado: estadoNombre }],
+  };
+  return { territorio, label, clave: codigo4 };
+}
+
 function labelDeTerritorio(t: Territorio): string {
   if (t.nivel === "municipal") return `${t.municipio}, ${t.estado}`;
   // Distrito con UN distrito seleccionado: forma canónica con clave, nunca solo la cabecera.
@@ -252,13 +280,65 @@ export async function resolverReferenciaTerritorio(entrada: EntradaReferencia): 
     if (decision.accion === "hermano") {
       const pedido = decision.pedido === "distrito_federal" ? "federal" : "local";
       const actual = decision.activo === "distrito_federal" ? "federal" : "local";
+      const ejemploNombrar =
+        `Pídele al usuario que nombre el distrito ${pedido} (por ejemplo «D.${pedido === "federal" ? "F" : "L"}. 1405 PUERTO VALLARTA» ` +
+        `o «distrito ${pedido} 5 de Jalisco»).`;
+
+      // Frente A ("distrito hermano", 26-09-27): Local→Federal SÍ tiene una correspondencia calculada por
+      // dominancia poblacional (con umbral, `resolverCorrespondenciaLocalFederal`) — nunca se resuelve
+      // sola, se ofrece como SUGERENCIA que el usuario debe confirmar (mismo patrón que la Pieza 1b).
+      if (decision.activo === "distrito_local" && decision.pedido === "distrito_federal") {
+        const estadoCve = activo.estado ? resolverEstadoCve(activo.estado) : undefined;
+        const distritoLocalCve = activo.cve_distrito;
+        if (estadoCve && distritoLocalCve) {
+          const corresp = await resolverCorrespondenciaLocalFederal(estadoCve, distritoLocalCve);
+          if (corresp.ok) {
+            const { territorio, label, clave } = territorioDistritoPorCve("distrito_federal", estadoCve, corresp.distritoFederalCve, activo.estado ?? "");
+            if (entrada.claveTerritorio === clave && entrada.sugerenciaConfirmada) {
+              return {
+                ok: true,
+                territorio,
+                label,
+                via: "correspondencia",
+                aviso:
+                  `Se usó ${label}, el distrito federal que domina el ${corresp.pctDominante}% de la población de ` +
+                  `${labelDeTerritorio(activo)} (cartografía ${corresp.anioCartografia}), confirmado por el usuario.`,
+              };
+            }
+            const sugerida: CandidatoTerritorio = { clave, tipo: "distrito_federal", etiqueta: label, coincidencia: "parcial" };
+            return {
+              ok: false,
+              referencia: "correspondencia",
+              sugerida,
+              pctDominante: corresp.pctDominante,
+              mensaje:
+                `Tu proyecto trabaja en un distrito local (${labelDeTerritorio(activo)}) y pides el nivel federal. El distrito federal que ` +
+                `más se le parece es ${label}, que cubre el ${corresp.pctDominante}% de su población (cartografía ${corresp.anioCartografia}) — ` +
+                `no es una equivalencia exacta. Pregúntale al usuario si quiere usarlo para esta consulta (nunca lo asumas); si confirma, ` +
+                `vuelve a llamar con \`claveTerritorio\`="${clave}" y deja que el servidor lo verifique.`,
+            };
+          }
+          return {
+            ok: false,
+            referencia: "hermano",
+            mensaje:
+              `Tu proyecto trabaja en un distrito local (${labelDeTerritorio(activo)}) y pides el nivel federal, pero ningún distrito ` +
+              `federal domina con claridad su población (${corresp.motivo}) — no hay una correspondencia confiable que sugerir, no por falta ` +
+              `de cálculo sino porque la población del distrito realmente se reparte entre varios. ${ejemploNombrar}`,
+          };
+        }
+      }
+
       return {
         ok: false,
         referencia: "hermano",
         mensaje:
           `Tu proyecto trabaja en un distrito ${actual} (${labelDeTerritorio(activo)}) y pides el nivel ${pedido}. ` +
-          `Fontana todavía no tiene la equivalencia geográfica entre distritos federales y locales, así que no puedo decir cuál distrito ${pedido} corresponde a esa zona. ` +
-          `Pídele al usuario que nombre el distrito ${pedido} (por ejemplo «D.${pedido === "federal" ? "F" : "L"}. 1405 PUERTO VALLARTA» o «distrito ${pedido} 5 de Jalisco»).`,
+          (pedido === "local"
+            ? `Un distrito federal casi siempre reparte su población entre varios distritos locales a la vez, así que no hay uno solo que le ` +
+              `corresponda con claridad: es una limitación estructural de cómo se trazan los dos mapas, no un dato que falte calcular. `
+            : `Fontana no tiene la equivalencia geográfica entre distritos federales y locales para este caso. `) +
+          ejemploNombrar,
       };
     }
     return { ok: false, referencia: "sin_referente", mensaje: decision.mensaje };

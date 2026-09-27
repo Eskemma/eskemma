@@ -7,6 +7,7 @@ import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
+vi.mock("@/lib/fontana/ingesta/eceg", () => ({ resolverCorrespondenciaLocalFederal: vi.fn() }));
 vi.mock("@/lib/fontana/sesionTerritorio", () => ({ cargarSesionConTerritorioActual: vi.fn() }));
 vi.mock("@/lib/fontana/indicatorRegistry", () => ({ getIndicadorRegistro: vi.fn() }));
 vi.mock("@/lib/fontana/ingesta/iter", () => ({ resolverIndicadorIter: vi.fn() }));

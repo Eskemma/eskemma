@@ -98,6 +98,41 @@ export function clasificarReferencia(
   return { tipo: "nombre" };
 }
 
+// Frente B (26-09-27): detección de "hermano" cuando el usuario lo pregunta en una frase completa
+// ("y en el distrito local, ¿cuánto sería?"), no la frase deíctica exacta y aislada que exige
+// `clasificarReferencia` (^...$). Reusa `decidirContexto` — misma semántica, sin duplicar la regla:
+// solo cuenta como "pidió el hermano" si decidirContexto ya lo clasificaría así para el territorio activo.
+//
+// Hallazgo real (verificación en vivo del Frente A, 26-09-27): una frase que menciona AMBOS tipos
+// («mi proyecto es de distrito local... quiero el distrito federal») rompía la primera versión, que
+// tomaba el PRIMER tipo mencionado sin importar cuál — aquí el primero era justo el propio (activo),
+// así que nunca disparaba. Ahora se busca cada tipo por separado y se evalúa cada uno contra
+// `decidirContexto`; dispara con el que de verdad sea "el otro", sin depender del orden de la frase.
+const RE_DISTRITO_FEDERAL = /\bDISTRITO(?:\s+ELECTORAL)?\s+FEDERAL\b/;
+const RE_DISTRITO_LOCAL = /\bDISTRITO(?:\s+ELECTORAL)?\s+LOCAL\b/;
+
+/**
+ * ¿El mensaje del usuario pide (en cualquier parte de la frase, no solo como frase exacta) el OTRO
+ * tipo de distrito del que ya está activo? Devuelve el tipo pedido, o null si no aplica (no menciona
+ * ningún tipo que decidirContexto clasifique como "hermano", o el territorio activo no es distrital).
+ * Ver chat/route.ts: guard de servidor para el hallazgo del Paso 3 (el modelo respondió el caso
+ * "hermano" en prosa sin llamar ninguna herramienta, 2 de 2 pruebas reales).
+ */
+export function mencionaOtroTipoDeDistrito(
+  mensajeUsuario: string | null | undefined,
+  nivelActivo: NivelTerritorial | null | undefined
+): "distrito_federal" | "distrito_local" | null {
+  if (!mensajeUsuario || !nivelActivo || !esDistrital(nivelActivo)) return null;
+  const p = formaPlana(mensajeUsuario);
+  const candidatos: ("distrito_federal" | "distrito_local")[] = [];
+  if (RE_DISTRITO_FEDERAL.test(p)) candidatos.push("distrito_federal");
+  if (RE_DISTRITO_LOCAL.test(p)) candidatos.push("distrito_local");
+  for (const pedido of candidatos) {
+    if (decidirContexto(pedido, nivelActivo).accion === "hermano") return pedido;
+  }
+  return null;
+}
+
 export type DecisionContextual =
   | { accion: "usar_activo" }
   | { accion: "nivel_contenedor"; nivel: "estatal" | "nacional" }

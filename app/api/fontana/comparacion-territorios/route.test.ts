@@ -8,6 +8,7 @@ import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import type { Territorio } from "@/types/shared.types";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
+vi.mock("@/lib/fontana/ingesta/eceg", () => ({ resolverCorrespondenciaLocalFederal: vi.fn() }));
 vi.mock("@/lib/fontana/sesionTerritorio", () => ({ cargarSesionConTerritorioActual: vi.fn() }));
 vi.mock("@/lib/fontana/indicatorRegistry", () => ({ getIndicadorRegistro: vi.fn() }));
 vi.mock("@/lib/fontana/ingesta", () => ({ resolverIndicadorFontana: vi.fn() }));
@@ -91,7 +92,7 @@ describe("GET /api/fontana/comparacion-territorios (Paso 3)", () => {
   it("el otro tipo de distrito queda como no resuelto, con el motivo honesto", async () => {
     const j = await (await pedir("F1-1", [{ territorio: "este distrito local" }, { territorio: "Guadalajara" }])).json();
     expect(j.filas).toHaveLength(1);
-    expect(j.noResueltos[0].motivo).toContain("no tiene la equivalencia");
+    expect(j.noResueltos[0].motivo).toContain("limitación estructural");
   });
 
   it("si ninguno se reconoce → ok:false con los motivos", async () => {

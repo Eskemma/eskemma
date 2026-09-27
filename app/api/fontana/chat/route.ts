@@ -25,6 +25,7 @@ import { limpiarUndefined } from "@/lib/fontana/agente/canvasBuilder";
 import { construirBloqueAdjuntos } from "@/lib/fontana/agente/adjuntosContexto";
 import { adminDb } from "@/lib/firebase-admin";
 import { AVISO_REUSO, respuestaRequiereConsulta } from "@/lib/fontana/agente/guardReuso";
+import { AVISO_HERMANO, turnoRequiereConsultaHermano } from "@/lib/fontana/agente/guardHermano";
 import type { FontanaChatMessage, FontanaToolCall } from "@/types/fontana.types";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -295,6 +296,7 @@ export async function POST(request: NextRequest) {
       let correccionNombreHerramientaHecha = false;
       let correccionNegoSerieHecha = false;
       let correccionReusoHecha = false;
+      let correccionHermanoHecha = false;
       let correccionPersonalizacionPaisesHecha = false;
 
       try {
@@ -363,6 +365,22 @@ export async function POST(request: NextRequest) {
             correccionReusoHecha = true;
             if (textoIter) send({ type: "text_suppress" });
             mensajes.push({ role: "user", content: AVISO_REUSO });
+            continue;
+          }
+
+          // Guard "distrito hermano" (Frente B, 26-09-27): el usuario pidió el OTRO tipo de
+          // distrito del que ya está activo (federal↔local) y ningún resultado real de este turno
+          // lo tocó — el modelo puede estar respondiendo de memoria (hallazgo del Paso 3: 2/2 veces
+          // sin llamar ninguna herramienta). Se verifica contra el MENSAJE REAL del usuario, no
+          // contra lo que el modelo afirme haber hecho.
+          if (
+            terminaTurno &&
+            !correccionHermanoHecha &&
+            turnoRequiereConsultaHermano(ctx.ultimoMensajeUsuario, ctx.territorio?.nivel, toolResultTextsAcum)
+          ) {
+            correccionHermanoHecha = true;
+            if (textoIter) send({ type: "text_suppress" });
+            mensajes.push({ role: "user", content: AVISO_HERMANO });
             continue;
           }
 

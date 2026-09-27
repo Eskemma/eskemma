@@ -12,6 +12,7 @@
 // nombre, definición, naturaleza por nivel, agregacionPlural.tipo).
 
 import { nombreEstadoDisplay } from "@/lib/geo/estados";
+import { cabeceraDeDistrito } from "@/lib/geo/candidatosGeo";
 import type Anthropic from "@anthropic-ai/sdk";
 import { adminDb } from "@/lib/firebase-admin";
 import type { Territorio } from "@/types/shared.types";
@@ -977,6 +978,16 @@ function respuestaDeReferencia(data: Record<string, unknown>, territorioNombre: 
       rechazo: mensaje,
     };
   }
+  if (ref === "correspondencia") {
+    // Frente A ("distrito hermano", 26-09-27): Local→Federal con un distrito federal dominante — es una
+    // SUGERENCIA (nunca una equivalencia exacta), igual que la Pieza 1b: hay que confirmarla con el usuario.
+    const sug = data.sugerida as { clave: string; tipo: string; etiqueta: string } | undefined;
+    return {
+      resumen: mensaje,
+      resultado: { referencia: ref, sugerida: sug, pctDominante: data.pctDominante, instruccion: mensaje },
+      rechazo: mensaje,
+    };
+  }
   if (ref === "noResuelto") {
     const rs = `No reconozco el territorio «${territorioNombre}».`;
     const instruccion = "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre (estado, municipio, país o distrito de México).";
@@ -1162,6 +1173,10 @@ function territorioConfirmadoDePropuestaAnterior(territorioNombre: string, ctx: 
 // haya propuesto y el usuario confirmado), con las mismas funciones que ya protegen la comparación y el lote.
 export function nombreDeClave(clave: string): string | null {
   if (/^\d{2}$/.test(clave)) return nombreEstadoDisplay(clave);
+  // Frente A ("distrito hermano", 26-09-27): clave de 4 dígitos (estado+distrito) = un distrito federal
+  // sugerido por correspondencia Local→Federal. Sin ambigüedad con los otros dos formatos (estado=2
+  // dígitos exactos, municipio="NN:NOMBRE"): hoy es el único candidato que produce una clave de 4 dígitos.
+  if (/^\d{4}$/.test(clave)) return cabeceraDeDistrito("distrito_federal", clave);
   const m = clave.match(/^\d{2}:([^#]+)(?:#.*)?$/);
   return m ? m[1] : null;
 }
