@@ -216,6 +216,11 @@ export default function TerritorySelector({
   // San Pedro Mixtepec, Oaxaca) y (b) mostrar la etiqueta de
   // desambiguación de esos casos.
   const [candidatosPorEstado, setCandidatosPorEstado] = useState<Record<string, CandidatoReferencia[]>>({});
+  // Pieza 1b (26-09-26): sugerencias «¿quisiste decir…?» de un nombre tecleado que no se reconoció. NO se agrega
+  // nada hasta que el usuario elija una o pida agregar el texto tal cual (nunca se elige por él).
+  const [sugerenciasPorEstado, setSugerenciasPorEstado] = useState<
+    Record<string, { candidatos: CandidatoReferencia[]; entradaTalCual: MunicipioSeleccionado } | null>
+  >({});
   // Entradas GUARDADAS con nombre ambiguo (p. ej. "Ixtlahuacán" en Jalisco) detectadas por el
   // relleno perezoso de `clave`: nunca se resuelven solas, se le pide al usuario elegir.
   const [ambiguosGuardados, setAmbiguosGuardados] = useState<PropuestaRelleno[]>([]);
@@ -488,6 +493,7 @@ export default function TerritorySelector({
     }
 
     setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
+    setSugerenciasPorEstado((prev) => ({ ...prev, [estado]: null }));
     setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
     setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
     setResolviendoPorEstado((prev) => ({ ...prev, [estado]: true }));
@@ -499,7 +505,7 @@ export default function TerritorySelector({
       const res = await fetch("/api/geo/candidatos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto, estado, tipos: ["municipio"] }),
+        body: JSON.stringify({ texto, estado, tipos: ["municipio"], sugerir: true }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -510,6 +516,11 @@ export default function TerritorySelector({
         setCandidatosPorEstado((prev) => ({ ...prev, [estado]: alta.candidatos }));
         setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
         return; // no agrega — espera a que el usuario elija
+      }
+      if (alta.tipo === "sugerir") {
+        setSugerenciasPorEstado((prev) => ({ ...prev, [estado]: { candidatos: alta.candidatos, entradaTalCual: alta.entradaTalCual } }));
+        setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
+        return; // no agrega — espera a que el usuario elija una sugerencia o pida agregarlo tal cual
       }
       if (alta.tipo === "precisar") {
         setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estado]: alta.aviso }));
@@ -548,6 +559,24 @@ export default function TerritorySelector({
       setAmbiguosGuardados((prev) => prev.filter((p) => !(p.entrada.estado === reemplaza.estado && p.entrada.nombre === reemplaza.nombre)));
     }
     setCandidatosPorEstado((prev) => ({ ...prev, [estado]: [] }));
+    setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
+    setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
+  }
+
+  // El usuario confirma una sugerencia de tecleo: entra por el mismo camino que un candidato elegido de la lista.
+  function elegirSugerenciaMunicipio(estado: string, candidato: CandidatoReferencia) {
+    elegirCandidatoMunicipio(estado, candidato);
+    setSugerenciasPorEstado((prev) => ({ ...prev, [estado]: null }));
+  }
+
+  // «Agregar tal cual»: siempre disponible (Colombia, nombres fuera del catálogo). Sin clave, con aviso.
+  function agregarTalCualMunicipio(estado: string, entrada: MunicipioSeleccionado) {
+    setMunicipiosPorEstado((prev) => agregarMunicipioSeleccionado(prev, entrada));
+    setAvisoMunicipioPorEstado((prev) => ({
+      ...prev,
+      [estado]: `"${entrada.nombre}" se agregó tal cual (sin verificar contra el catálogo) — confirma que el nombre es correcto.`,
+    }));
+    setSugerenciasPorEstado((prev) => ({ ...prev, [estado]: null }));
     setInfoMunicipioPorEstado((prev) => ({ ...prev, [estado]: "" }));
     setMunicipioInputPorEstado((prev) => ({ ...prev, [estado]: "" }));
   }
@@ -724,6 +753,7 @@ export default function TerritorySelector({
                       // Texto editado — cualquier picker/aviso de la
                       // consulta anterior queda obsoleto.
                       setCandidatosPorEstado((prev) => ({ ...prev, [estadoNombre]: [] }));
+                      setSugerenciasPorEstado((prev) => ({ ...prev, [estadoNombre]: null }));
                       setAvisoMunicipioPorEstado((prev) => ({ ...prev, [estadoNombre]: "" }));
                       setInfoMunicipioPorEstado((prev) => ({ ...prev, [estadoNombre]: "" }));
                     }}
@@ -759,6 +789,32 @@ export default function TerritorySelector({
                   <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
                     {infoMunicipioPorEstado[estadoNombre]}
                   </p>
+                )}
+                {sugerenciasPorEstado[estadoNombre] && (
+                  <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-gray-eske-10/60 dark:bg-white/5">
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">¿Quisiste decir…?</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sugerenciasPorEstado[estadoNombre]!.candidatos.map((c) => (
+                        <button
+                          key={c.clave}
+                          type="button"
+                          onClick={() => elegirSugerenciaMunicipio(estadoNombre, c)}
+                          className="px-2.5 py-1 rounded-full text-xs font-medium border border-bluegreen-eske
+                            text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 transition-colors"
+                        >
+                          {c.etiqueta}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => agregarTalCualMunicipio(estadoNombre, sugerenciasPorEstado[estadoNombre]!.entradaTalCual)}
+                        className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-eske-30 dark:border-white/20
+                          text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+                      >
+                        Agregar «{sugerenciasPorEstado[estadoNombre]!.entradaTalCual.nombre}» tal cual
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {(() => {
                   // Picker de opciones reales: el del texto que se está tecleando tiene prioridad;

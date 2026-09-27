@@ -57,6 +57,7 @@ import {
   type MunicipioCatalogo,
 } from "./candidatosGeo";
 import { esAlcanceNacional, nombreEstadoDisplay } from "./estados";
+import { COINCIDENCIA_SUGERIDA, limitarSugerencias, nombresSugeridosPorTecleo } from "./sugerenciasTecleo";
 import { nombreMunicipioDisplay } from "./display";
 import { etiquetaDesambiguacionMunicipio } from "./etiquetasDesambiguacionMunicipio";
 import {
@@ -83,7 +84,7 @@ export const TIPOS_REFERENCIA: readonly TipoReferencia[] = [
 ];
 
 /** How the text matched: literally, as a known alias ("Tlaquepaque", "CDMX"), or as whole words inside a longer name. */
-export type CoincidenciaReferencia = "exacta" | "alias" | "parcial";
+export type CoincidenciaReferencia = "exacta" | "alias" | "parcial" | "sugerida";
 
 export interface CandidatoReferencia {
   tipo: TipoReferencia;
@@ -114,13 +115,19 @@ export interface OpcionesDesambiguar {
   mexico?: "pais" | "estado";
   /** Largest list worth showing; beyond it the result is `demasiados`. Default 8. */
   maxCandidatos?: number;
+  /**
+   * Pieza 1b (26-09-26): when nothing is recognised (`ninguno`), also return up to 3 "did you mean" typo
+   * suggestions (edit distance 1, municipalities and states, ≥ 5 letters). OFF by default: no existing
+   * caller changes. Suggestions are NEVER a resolution — see lib/geo/sugerenciasTecleo.ts.
+   */
+  sugerir?: boolean;
 }
 
 export type ResultadoDesambiguacion =
   | { estado: "unico"; candidato: CandidatoReferencia }
   | { estado: "ambiguo"; candidatos: CandidatoReferencia[] }
   | { estado: "demasiados"; total: number; estadosCve: string[]; exactas: CandidatoReferencia[] }
-  | { estado: "ninguno" };
+  | { estado: "ninguno"; sugerencias?: CandidatoReferencia[] };
 
 export const MAX_CANDIDATOS_POR_DEFECTO = 8;
 /** Below this many letters a partial (whole-word) municipality match is not attempted. */
@@ -294,9 +301,51 @@ function resolverReferenciaDistrito(
 
 /**
  * Resolves what the user typed to one entity, a short list to ask about, "too many"
- * (ask for the state), or nothing. See the file header for the rules.
+ * (ask for the state), or nothing. See the file header for the rules. With `sugerir`, a `ninguno`
+ * may carry typo suggestions (never a resolution).
  */
 export function desambiguarReferencia(
+  texto: string | null | undefined,
+  opts: OpcionesDesambiguar = {}
+): ResultadoDesambiguacion {
+  const resultado = resolverReferencia(texto, opts);
+  if (resultado.estado !== "ninguno" || !opts.sugerir || !texto) return resultado;
+  const sugerencias = sugerirCandidatos(texto, opts);
+  return sugerencias.length > 0 ? { estado: "ninguno", sugerencias } : resultado;
+}
+
+/**
+ * Typo suggestions for a text that resolved to nothing. Skips what is not a place name typed wrongly:
+ * district references (by number / code), the national scope sentinel and bare "Distrito Federal".
+ */
+function sugerirCandidatos(texto: string, opts: OpcionesDesambiguar): CandidatoReferencia[] {
+  if (esAlcanceNacional(texto) || esDistritoFederalAntiguo(texto) || parsearReferenciaDistrito(texto)) return [];
+  const tipos = (opts.tipos ?? TIPOS_REFERENCIA).filter((t) => t === "estado" || t === "municipio");
+  const municipios = opts.municipios ?? [];
+  const nombres = nombresSugeridosPorTecleo(texto, { estadoCve: opts.estadoCve, municipios, tipos });
+
+  const candidatos: CandidatoReferencia[] = [];
+  const vistas = new Set<string>();
+  const agregar = (c: CandidatoReferencia) => {
+    if (vistas.has(c.clave)) return;
+    vistas.add(c.clave);
+    candidatos.push({ ...c, coincidencia: COINCIDENCIA_SUGERIDA });
+  };
+  for (const n of nombres) {
+    if (n.tipo === "estado") {
+      const nombre = nombreEstadoDisplay(n.estadoCve) ?? n.plano;
+      agregar({ tipo: "estado", clave: n.estadoCve, estadoCve: n.estadoCve, nombre, etiqueta: nombre, coincidencia: "exacta" });
+    } else {
+      // Reuses the municipality logic so same-name pairs keep their `#cve` keys and labels.
+      for (const c of candidatosMunicipio(n.nombreCatalogo as string, municipios, "exacta", n.estadoCve)) agregar(c);
+    }
+  }
+  return limitarSugerencias(
+    candidatos.sort((a, b) => ORDEN_TIPO[a.tipo] - ORDEN_TIPO[b.tipo] || a.clave.localeCompare(b.clave))
+  );
+}
+
+function resolverReferencia(
   texto: string | null | undefined,
   opts: OpcionesDesambiguar = {}
 ): ResultadoDesambiguacion {

@@ -20,6 +20,8 @@ export interface ResolucionTerritoriosBatch {
     /** true si apunta al propio territorio del proyecto ("este distrito"). */
     esTerritorioDelProyecto?: boolean;
     aviso?: string;
+    /** Pieza 1b: se resolvió aceptando una sugerencia por tecleo por su clave (requiere confirmación del usuario). */
+    sugerida?: { clave: string; nombre: string; etiqueta: string };
   }[];
   noResueltos: {
     nombreIngresado: string;
@@ -44,6 +46,8 @@ export async function resolverTerritoriosNombres(
     claveTerritorio?: string | null;
     /** Paso 3: tipo dicho explícitamente por el usuario (estado, municipio, país, distrito_federal, distrito_local). */
     tipoTerritorio?: string | null;
+    /** Pieza 1b: tools.ts verificó que el usuario confirmó la sugerencia por tecleo de esta clave. */
+    sugerenciaConfirmada?: boolean;
   }[],
   // Registry del indicador: el adaptador decide con él qué tipos considerar (estado/municipio/país/
   // distrito). El override explícito del usuario siempre gana; si no hay, se acota por los niveles
@@ -53,7 +57,7 @@ export async function resolverTerritoriosNombres(
   territorioActivo?: Territorio | null
 ): Promise<ResolucionTerritoriosBatch> {
   const resultados = await Promise.all(
-    nombres.map(async ({ nombre, estadoHint, nivelHintExplicito, claveTerritorio, tipoTerritorio }) => ({
+    nombres.map(async ({ nombre, estadoHint, nivelHintExplicito, claveTerritorio, tipoTerritorio, sugerenciaConfirmada }) => ({
       nombreIngresado: nombre,
       resolucion: await resolverReferenciaTerritorio({
         texto: nombre,
@@ -61,6 +65,7 @@ export async function resolverTerritoriosNombres(
         nivelHint: nivelHintExplicito ?? null,
         claveTerritorio: claveTerritorio ?? null,
         tipoTerritorio: tipoTerritorio ?? null,
+        sugerenciaConfirmada: sugerenciaConfirmada ?? false,
         registro,
         territorioActivo: territorioActivo ?? null,
       }),
@@ -78,6 +83,7 @@ export async function resolverTerritoriosNombres(
         label: resolucion.label,
         esTerritorioDelProyecto: resolucion.esTerritorioDelProyecto,
         aviso: resolucion.aviso,
+        ...(resolucion.sugerida ? { sugerida: resolucion.sugerida } : {}),
       });
     } else if (resolucion.referencia === "ambiguo") {
       noResueltos.push({
@@ -92,6 +98,13 @@ export async function resolverTerritoriosNombres(
         motivo: resolucion.mensaje,
         candidatos: resolucion.exactas.map((c) => c.etiqueta),
         opciones: resolucion.exactas,
+      });
+    } else if (resolucion.referencia === "sugerencia") {
+      noResueltos.push({
+        nombreIngresado,
+        motivo: resolucion.mensaje,
+        candidatos: resolucion.sugerencias.map((c) => c.etiqueta),
+        opciones: resolucion.sugerencias,
       });
     } else if (resolucion.referencia === "noResuelto") {
       noResueltos.push({ nombreIngresado, motivo: `«${nombreIngresado}» no se reconoce como territorio de México (estado, municipio, país o distrito).` });

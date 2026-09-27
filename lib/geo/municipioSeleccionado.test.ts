@@ -193,3 +193,30 @@ describe("dedup, upgrade y reemplazo", () => {
     expect(r.map((m) => m.nombre)).toEqual(["Zapopan", "Ixtlahuacan de los Membrillos", "Guadalajara"]);
   });
 });
+
+describe("alta de un municipio tecleado con sugerencias (Pieza 1b)", () => {
+  const altaConSugerir = (texto: string, estado: string) =>
+    decidirAltaMunicipio(
+      estado,
+      texto,
+      desambiguarReferencia(texto, { estadoCve: resolverEstadoCve(estado) ?? undefined, municipios: CAT, tipos: ["municipio"], sugerir: true })
+    );
+
+  it("«Guadalajra» → NO se agrega: propone Guadalajara y conserva la entrada 'tal cual' para el botón", () => {
+    const r = altaConSugerir("Guadalajra", "Jalisco");
+    expect(r.tipo).toBe("sugerir");
+    if (r.tipo !== "sugerir") return;
+    expect(r.candidatos.map((c) => c.etiqueta)).toEqual(["Guadalajara, Jalisco"]);
+    expect(r.entradaTalCual).toEqual({ nombre: "Guadalajra", estado: "Jalisco" });
+  });
+
+  it("un nombre sin sugerencias sigue siendo 'sin_reconocer' (se agrega tal cual con aviso, como siempre)", () => {
+    expect(altaConSugerir("Narnia", "Jalisco").tipo).toBe("sin_reconocer");
+  });
+
+  it("los exactos, alias y ambiguos no cambian con `sugerir` encendido", () => {
+    expect(altaConSugerir("Tonalá", "Jalisco").tipo).toBe("agregar");
+    expect(altaConSugerir("Tlaquepaque", "Jalisco").tipo).toBe("agregar");
+    expect(altaConSugerir("Ixtlahuacán", "Jalisco").tipo).toBe("elegir");
+  });
+});

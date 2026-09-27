@@ -28,13 +28,14 @@ const niveles = (estados: Record<string, string>) =>
   ["nacional", "estatal", "distrital", "municipal"].map((nivel) => ({ nivel, estado: estados[nivel] ?? "no_viable" }));
 const TODOS = { nacional: "confirmado", estatal: "confirmado", distrital: "confirmado", municipal: "confirmado" };
 
-function pedir(indicadorId: string, filas: { territorio: string; estado?: string; clave?: string; tipo?: string }[]) {
+function pedir(indicadorId: string, filas: { territorio: string; estado?: string; clave?: string; tipo?: string; sugConf?: string }[]) {
   const params = new URLSearchParams({ sesionId: "s1", indicadorId });
   for (const f of filas) {
     params.append("territorio", f.territorio);
     params.append("estado", f.estado ?? "");
     params.append("clave", f.clave ?? "");
     params.append("tipo", f.tipo ?? "");
+    params.append("sugConf", f.sugConf ?? "");
   }
   return GET(new Request(`http://localhost/api/fontana/comparacion-territorios?${params}`) as never);
 }
@@ -97,5 +98,23 @@ describe("GET /api/fontana/comparacion-territorios (Paso 3)", () => {
     const j = await (await pedir("F1-1", [{ territorio: "Narnia" }, { territorio: "Mordor" }])).json();
     expect(j).toMatchObject({ ok: false });
     expect(j.noResueltos).toHaveLength(2);
+  });
+
+  // Pieza 1b (26-09-26): una sugerencia por tecleo queda en noResueltos con sus opciones; solo entra con confirmación.
+  it("«Guadalajra» queda en noResueltos con la sugerencia (no se compara); «Zapopan» sí entra", async () => {
+    const j = await (await pedir("F1-1", [{ territorio: "Guadalajra", estado: "Jalisco", tipo: "municipio" }, { territorio: "Zapopan", estado: "Jalisco", tipo: "municipio" }])).json();
+    expect(j.noResueltos).toHaveLength(1);
+    expect(j.noResueltos[0]).toMatchObject({ nombreIngresado: "Guadalajra", candidatos: ["Guadalajara, Jalisco"] });
+    expect(j.noResueltos[0].opciones[0]).toMatchObject({ clave: "14:GUADALAJARA", coincidencia: "sugerida" });
+    expect(j.filas).toHaveLength(1);
+  });
+
+  it("la clave de la sugerencia entra SOLO con sugConf=1 (paralelo por posición); sin él, sigue sin resolver", async () => {
+    const sin = await (await pedir("F1-1", [{ territorio: "Guadalajra", estado: "Jalisco", tipo: "municipio", clave: "14:GUADALAJARA" }, { territorio: "Zapopan", estado: "Jalisco", tipo: "municipio" }])).json();
+    expect(sin.noResueltos).toHaveLength(1);
+    expect(sin.filas).toHaveLength(1);
+    const con = await (await pedir("F1-1", [{ territorio: "Guadalajra", estado: "Jalisco", tipo: "municipio", clave: "14:GUADALAJARA", sugConf: "1" }, { territorio: "Zapopan", estado: "Jalisco", tipo: "municipio" }])).json();
+    expect(con.noResueltos).toEqual([]);
+    expect(con.filas).toHaveLength(2);
   });
 });

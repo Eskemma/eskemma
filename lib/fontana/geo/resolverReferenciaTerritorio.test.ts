@@ -280,3 +280,66 @@ describe("no reconocido", () => {
     expect(await resolverReferenciaTerritorio({ texto: "Narnia", registro: AMBOS })).toMatchObject({ ok: false, referencia: "noResuelto" });
   });
 });
+
+// ─── Pieza 1b (26-09-26): sugerencias por error de tecleo ─────────────────────────────────────────
+describe("sugerencias por error de tecleo (Pieza 1b)", () => {
+  const sugerencia = (r: ResolucionTerritorio) => {
+    if (r.ok || r.referencia !== "sugerencia") throw new Error(`esperaba sugerencia, vino ${r.ok ? "ok" : r.referencia}`);
+    return r;
+  };
+
+  it("«Guadalajra» (Jalisco) NO resuelve: devuelve la sugerencia Guadalajara con su clave y una instrucción de preguntar", async () => {
+    const r = sugerencia(await resolverReferenciaTerritorio({ texto: "Guadalajra", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL }));
+    expect(r.sugerencias.map((c) => [c.clave, c.etiqueta, c.coincidencia])).toEqual([["14:GUADALAJARA", "Guadalajara, Jalisco", "sugerida"]]);
+    expect(r.mensaje).toContain("NO asumas");
+    expect(r.mensaje).toContain("claveTerritorio");
+  });
+
+  it("«Colixa» con un indicador de ambos niveles: Colima (estado y municipio) y Colipa juntos — nunca elige", async () => {
+    const r = sugerencia(await resolverReferenciaTerritorio({ texto: "Colixa", registro: AMBOS }));
+    expect(r.sugerencias.map((c) => `${c.tipo}:${c.clave}`)).toEqual(["estado:06", "municipio:06:COLIMA", "municipio:30:COLIPA"]);
+  });
+
+  it("negativos: un lugar que no existe, distancia 2 y menos de 5 letras → noResuelto (sin sugerencias falsas)", async () => {
+    for (const texto of ["Narnia", "Guadlajra", "Lon"]) {
+      const r = await resolverReferenciaTerritorio({ texto, estadoHint: "Jalisco", registro: SOLO_MUNICIPAL });
+      expect(r).toEqual({ ok: false, referencia: "noResuelto", noResuelto: true });
+    }
+  });
+
+  it("las coincidencias reales NO pasan por sugerencias: «Comala» resuelve normal", async () => {
+    const r = ok(await resolverReferenciaTerritorio({ texto: "Comala", estadoHint: "Colima", registro: SOLO_MUNICIPAL }));
+    expect(r.via).toBe("nombre");
+    expect(r.sugerida).toBeUndefined();
+  });
+
+  it("clave de la sugerencia SIN confirmación del usuario → se rechaza (clave_invalida), aunque la clave sea real", async () => {
+    const r = await resolverReferenciaTerritorio({ texto: "Guadalajra", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL, claveTerritorio: "14:GUADALAJARA" });
+    expect(r).toMatchObject({ ok: false, referencia: "clave_invalida" });
+    expect((r as { mensaje: string }).mensaje).toContain("todavía no lo confirmó");
+  });
+
+  it("clave de la sugerencia CON confirmación verificada → resuelve a esa entidad, marcado como via 'sugerencia'", async () => {
+    const r = ok(
+      await resolverReferenciaTerritorio({ texto: "Guadalajra", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL, claveTerritorio: "14:GUADALAJARA", sugerenciaConfirmada: true })
+    );
+    expect(r.via).toBe("sugerencia");
+    expect(r.sugerida).toMatchObject({ clave: "14:GUADALAJARA", nombre: "Guadalajara" });
+    expect(r.territorio).toMatchObject({ nivel: "municipal", estado: "Jalisco", municipio: "GUADALAJARA" });
+    expect(r.aviso).toContain("sugerencia por error de tecleo");
+  });
+
+  it("una clave FABRICADA (real pero que no es sugerencia de ese texto) se rechaza aunque venga 'confirmada'", async () => {
+    for (const clave of ["14:ZAPOPAN", "06", "99:INVENTADO"]) {
+      const r = await resolverReferenciaTerritorio({ texto: "Guadalajra", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL, claveTerritorio: clave, sugerenciaConfirmada: true });
+      expect(r).toMatchObject({ ok: false, referencia: "clave_invalida" });
+    }
+  });
+
+  it("una elección normal de una lista ambigua NO necesita confirmación de sugerencia (sin regresión)", async () => {
+    const amb = await resolverReferenciaTerritorio({ texto: "Ixtlahuacán", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL });
+    if (amb.ok || amb.referencia !== "ambiguo") throw new Error("esperaba ambiguo");
+    const r = ok(await resolverReferenciaTerritorio({ texto: "Ixtlahuacán", estadoHint: "Jalisco", registro: SOLO_MUNICIPAL, claveTerritorio: amb.candidatos[0].clave }));
+    expect(r.via).toBe("clave");
+  });
+});

@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
   // verifica en el servidor) y tipo explícito (estado, municipio, país, distrito_federal, distrito_local).
   const claves = searchParams.getAll("clave");
   const tipos = searchParams.getAll("tipo");
+  // Pieza 1b (paralelo por índice, "1" = tools.ts verificó que el usuario confirmó la sugerencia por tecleo de esa clave).
+  const sugConf = searchParams.getAll("sugConf");
 
   if (!sesionId || !indicadorId || territorios.length === 0) {
     return NextResponse.json({ error: "sesionId, indicadorId y al menos un territorio son requeridos" }, { status: 400 });
@@ -87,6 +89,7 @@ export async function GET(request: NextRequest) {
       nivelHintExplicito: niveles[i] || null,
       claveTerritorio: claves[i] || null,
       tipoTerritorio: tipos[i] || null,
+      sugerenciaConfirmada: sugConf[i] === "1",
     })),
     registro,
     sesion.territorio

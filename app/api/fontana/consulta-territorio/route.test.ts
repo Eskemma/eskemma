@@ -142,4 +142,21 @@ describe("GET /api/fontana/consulta-territorio (Paso 3)", () => {
     vi.mocked(cargarSesionConTerritorioActual).mockResolvedValueOnce(null);
     expect((await pedir({ territorio: "Guadalajara" })).status).toBe(404);
   });
+
+  // Pieza 1b (26-09-26): sugerencias por error de tecleo — nunca resuelven solas.
+  it("«Guadalajra» → referencia 'sugerencia' (no consulta el dato): pregunta, no asume", async () => {
+    const j = await (await pedir({ territorio: "Guadalajra", estado: "Jalisco", nivel: "municipal" })).json();
+    expect(j).toMatchObject({ ok: false, referencia: "sugerencia" });
+    expect(j.sugerencias.map((c: { clave: string }) => c.clave)).toEqual(["14:GUADALAJARA"]);
+    expect(resolverIndicadorFontana).not.toHaveBeenCalled();
+  });
+
+  it("la clave de la sugerencia SIN sugConf se rechaza; con sugConf=1 (verificado por tools) resuelve", async () => {
+    const sin = await (await pedir({ territorio: "Guadalajra", estado: "Jalisco", nivel: "municipal", clave: "14:GUADALAJARA" })).json();
+    expect(sin).toMatchObject({ ok: false, referencia: "clave_invalida" });
+    expect(resolverIndicadorFontana).not.toHaveBeenCalled();
+    const con = await (await pedir({ territorio: "Guadalajra", estado: "Jalisco", nivel: "municipal", clave: "14:GUADALAJARA", sugConf: "1" })).json();
+    expect(con).toMatchObject({ ok: true, valor: 4, territorio: { label: "GUADALAJARA, Jalisco" } });
+    expect(con.aviso).toContain("sugerencia por error de tecleo");
+  });
 });

@@ -11,6 +11,7 @@
 // El único acceso directo a `lib/` es al registry (lookup de metadatos:
 // nombre, definición, naturaleza por nivel, agregacionPlural.tipo).
 
+import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import type Anthropic from "@anthropic-ai/sdk";
 import { adminDb } from "@/lib/firebase-admin";
 import type { Territorio } from "@/types/shared.types";
@@ -967,6 +968,15 @@ function respuestaDeReferencia(data: Record<string, unknown>, territorioNombre: 
       rechazo: instruccion,
     };
   }
+  if (ref === "sugerencia") {
+    // Pieza 1b: nombre no reconocido con sugerencias por error de tecleo. Es una PREGUNTA, no una resolución.
+    const cands = (data.sugerencias as { clave: string; tipo: string; etiqueta: string }[]) ?? [];
+    return {
+      resumen: `«${territorioNombre}» no se reconoce; posibles: ${cands.map((c) => c.etiqueta).join(" | ")}.`,
+      resultado: { sugerencia: true, sugerencias: cands, instruccion: mensaje },
+      rechazo: mensaje,
+    };
+  }
   if (ref === "noResuelto") {
     const rs = `No reconozco el territorio «${territorioNombre}».`;
     const instruccion = "Dile al usuario que no reconociste ese territorio y pídele que verifique el nombre (estado, municipio, país o distrito de México).";
@@ -990,6 +1000,7 @@ async function consultarIndicadorTerritorioExterno(input: Record<string, unknown
   if (estadoNombre) params.set("estado", estadoNombre);
   if (nivel) params.set("nivel", nivel);
   if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (sugerenciaConfirmada(input.claveTerritorio ? String(input.claveTerritorio) : null, ctx)) params.set("sugConf", "1");
   if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/consulta-territorio?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
@@ -1052,6 +1063,7 @@ async function fetchSerie(
   if (territorioNombre) params.set("territorio", territorioNombre);
   if (estadoNombre) params.set("estado", estadoNombre);
   if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (sugerenciaConfirmada(input.claveTerritorio ? String(input.claveTerritorio) : null, ctx)) params.set("sugConf", "1");
   if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/serie-temporal?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
@@ -1073,6 +1085,7 @@ async function fetchDistribucion(
   if (territorioNombre) params.set("territorio", territorioNombre);
   if (estadoNombre) params.set("estado", estadoNombre);
   if (input.claveTerritorio) params.set("clave", String(input.claveTerritorio));
+  if (sugerenciaConfirmada(input.claveTerritorio ? String(input.claveTerritorio) : null, ctx)) params.set("sugConf", "1");
   if (input.tipoTerritorio) params.set("tipo", String(input.tipoTerritorio));
   const res = await fetch(`${ctx.baseUrl}/api/fontana/distribucion?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
@@ -1140,6 +1153,34 @@ const RE_CONFIRMACION_O_CORRECCION =
 function territorioConfirmadoDePropuestaAnterior(territorioNombre: string, ctx: ToolContext): boolean {
   if (!territorioNombradoPorUsuario(territorioNombre, ctx.ultimoMensajeAsistente)) return false;
   return RE_CONFIRMACION_O_CORRECCION.test(normalizeGeoName(ctx.ultimoMensajeUsuario));
+}
+
+// Pieza 1b (26-09-26): una SUGERENCIA por error de tecleo nunca se acepta sin confirmación humana. El servidor
+// de la ruta solo acepta la clave de una sugerencia si este chequeo —que sí ve la conversación— la marca
+// confirmada. La clave codifica el nombre (municipio «14:SAN PEDRO TLAQUEPAQUE#208», estado «06»), así que
+// no hace falta el catálogo: se exige que el usuario haya nombrado ese territorio (o que el asistente lo
+// haya propuesto y el usuario confirmado), con las mismas funciones que ya protegen la comparación y el lote.
+export function nombreDeClave(clave: string): string | null {
+  if (/^\d{2}$/.test(clave)) return nombreEstadoDisplay(clave);
+  const m = clave.match(/^\d{2}:([^#]+)(?:#.*)?$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Deliberadamente MÁS ESTRICTO que `territorioNombradoPorUsuario`: aquí el nombre completo debe aparecer como
+ * frase, sin el respaldo por token. Con el respaldo, «San Pedro Tlaqepaque» (mal tecleado) "nombraría" a
+ * «SAN PEDRO TLAQUEPAQUE» por la palabra «PEDRO» y una sugerencia quedaría confirmada sin que nadie la confirmara.
+ */
+export function sugerenciaConfirmada(clave: string | undefined | null, ctx: ToolContext): boolean {
+  if (!clave) return false;
+  const nombre = nombreDeClave(clave);
+  if (!nombre) return false;
+  const objetivo = normalizeGeoName(nombre);
+  if (!objetivo) return false;
+  const dichoPorUsuario = contienePalabraCompleta(normalizeGeoName(ctx.ultimoMensajeUsuario), objetivo);
+  if (dichoPorUsuario) return true;
+  const propuestoPorAsistente = contienePalabraCompleta(normalizeGeoName(ctx.ultimoMensajeAsistente), objetivo);
+  return propuestoPorAsistente && RE_CONFIRMACION_O_CORRECCION.test(normalizeGeoName(ctx.ultimoMensajeUsuario));
 }
 
 // 26-09-05, hallazgo "Fallo 2" (Tlaquepaque re-falla en el turno de la
@@ -1755,6 +1796,7 @@ async function fetchComparacionTerritorios(
   for (const e of estadosPorTerritorio) params.append("estado", e);
   for (const n of nivelesPorTerritorio) params.append("nivel", n);
   for (const c of clavesPorTerritorio) params.append("clave", c);
+  for (const c of clavesPorTerritorio) params.append("sugConf", sugerenciaConfirmada(c || null, ctx) ? "1" : "0");
   for (const t of tiposPorTerritorio) params.append("tipo", t);
   const res = await fetch(`${ctx.baseUrl}/api/fontana/comparacion-territorios?${params.toString()}`, {
     headers: { cookie: ctx.cookie },
@@ -1846,7 +1888,7 @@ async function generarComparacionTerritorios(
       noResueltos: comp.noResueltos,
       instruccionChat:
         comp.noResueltos.length > 0
-          ? "Aclárale al usuario, con el motivo real, cuáles territorios NO entraron a la comparación (ambiguos o no reconocidos) — nunca los omitas en silencio. Si un territorio quedó ambiguo, pregunta cuál quiere listando las ETIQUETAS de `opciones` (nunca las claves) y, con su respuesta, vuelve a llamar con `clavesPorTerritorio` (misma posición que ese territorio)."
+          ? "Aclárale al usuario, con el motivo real, cuáles territorios NO entraron a la comparación (ambiguos o no reconocidos) — nunca los omitas en silencio. Si un territorio quedó ambiguo, pregunta cuál quiere listando las ETIQUETAS de `opciones` (nunca las claves) y, con su respuesta, vuelve a llamar con `clavesPorTerritorio` (misma posición que ese territorio). Si un territorio no se reconoció pero trae `opciones` de tipo «¿quisiste decir…?» (error de tecleo), pregúntale al usuario si quiso decir eso y NUNCA lo corrijas tú: solo con su confirmación vuelve a llamar con el MISMO nombre y `clavesPorTerritorio` de la opción confirmada (el servidor lo verifica)."
           : null,
     },
     toolCall: { tool: "generar_visualizacion", input, resultSummary, ok: true },

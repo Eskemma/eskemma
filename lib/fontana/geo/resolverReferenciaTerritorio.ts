@@ -49,7 +49,10 @@ export type ResolucionTerritorio =
       territorio: Territorio;
       label: string;
       /** Cómo se llegó: por el nombre, por una clave elegida, o desde el territorio activo. */
-      via: "nombre" | "clave" | "contexto" | "contenedor";
+      via: "nombre" | "clave" | "contexto" | "contenedor" | "sugerencia";
+      /** Solo `via: "sugerencia"` (Pieza 1b): la sugerencia por tecleo que se aceptó por su clave. El llamador DEBE
+       *  verificar que el usuario la confirmó antes de usar el dato (ver `verificarConfirmacionSugerencia` en tools.ts). */
+      sugerida?: { clave: string; nombre: string; etiqueta: string };
       /** Aviso para el usuario cuando el texto se interpretó ("«Pachuca» se interpretó como …"). */
       aviso?: string;
       /** true si apunta al propio territorio del proyecto ("este distrito"). */
@@ -65,6 +68,8 @@ export type ResolucionTerritorio =
       exactas: CandidatoTerritorio[];
       mensaje: string;
     }
+  // Pieza 1b: no se reconoce, pero hay sugerencias por error de tecleo. NO es una resolución: hay que preguntar.
+  | { ok: false; referencia: "sugerencia"; sugerencias: CandidatoTerritorio[]; mensaje: string }
   | { ok: false; referencia: "noResuelto"; noResuelto: true }
   | { ok: false; referencia: "clave_invalida" | "hermano" | "sin_referente" | "nivel_no_disponible"; mensaje: string };
 
@@ -76,6 +81,12 @@ export interface EntradaReferencia {
   nivelHint?: string | null;
   /** Clave elegida de una lista de candidatos ofrecida antes. */
   claveTerritorio?: string | null;
+  /**
+   * Pieza 1b: el llamador (tools.ts, que ve la conversación) verificó que el usuario CONFIRMÓ el territorio de
+   * `claveTerritorio`. Sin esto una clave que solo corresponde a una SUGERENCIA por tecleo se rechaza: una
+   * sugerencia nunca se acepta sin confirmación humana.
+   */
+  sugerenciaConfirmada?: boolean;
   /** "estado" | "municipio" | "pais" | "distrito_federal" | "distrito_local": el usuario lo dijo explícitamente. */
   tipoTerritorio?: string | null;
   registro?: Pick<IndicadorRegistro, "niveles"> | null;
@@ -272,6 +283,29 @@ export async function resolverReferenciaTerritorio(entrada: EntradaReferencia): 
       completo.estado === "unico" ? [completo.candidato] : completo.estado === "ambiguo" ? completo.candidatos : [];
     const elegido = candidatos.find((c) => c.clave === entrada.claveTerritorio);
     if (!elegido) {
+      // Pieza 1b: ¿es la clave de una SUGERENCIA por tecleo de este texto? Solo se acepta si está entre las
+      // sugerencias que el servidor recalcula ahora (el modelo no puede fabricar una clave).
+      const sugerida = sugerenciasDeTexto(texto, base, tipos).find((c) => c.clave === entrada.claveTerritorio);
+      if (sugerida && !entrada.sugerenciaConfirmada) {
+        return {
+          ok: false,
+          referencia: "clave_invalida",
+          mensaje:
+            `«${texto}» solo coincide con ${sugerida.etiqueta} como sugerencia por error de tecleo y el usuario todavía no lo confirmó. ` +
+            "Pregúntale si quiso decir eso (con la etiqueta, nunca la clave) y espera su respuesta antes de volver a llamar.",
+        };
+      }
+      if (sugerida) {
+        const territorio = territorioDeCandidato(sugerida, opcionesCatalogo);
+        return {
+          ok: true,
+          territorio,
+          label: labelDeTerritorio(territorio),
+          via: "sugerencia",
+          sugerida: { clave: sugerida.clave, nombre: sugerida.nombre, etiqueta: sugerida.etiqueta },
+          aviso: `«${texto}» se interpretó como ${sugerida.etiqueta} (sugerencia por error de tecleo, confirmada por el usuario).`,
+        };
+      }
       return {
         ok: false,
         referencia: "clave_invalida",
@@ -329,5 +363,31 @@ export async function resolverReferenciaTerritorio(entrada: EntradaReferencia): 
       mensaje: `«${texto}» coincide con ${resultado.total} territorios: pídele al usuario el estado o un nombre más específico. No listes todos.`,
     };
   }
+  // Pieza 1b: nada se reconoce, pero puede ser un error de tecleo — se SUGIERE (nunca se resuelve).
+  const sugerencias = sugerenciasDeTexto(texto, base, tipos);
+  if (sugerencias.length > 0) {
+    const cands = sugerencias.map(aCandidato);
+    return { ok: false, referencia: "sugerencia", sugerencias: cands, mensaje: mensajeSugerencia(texto, cands) };
+  }
   return { ok: false, referencia: "noResuelto", noResuelto: true };
+}
+
+/** Sugerencias por tecleo de un texto no reconocido, acotadas a los `tipos` de la consulta (si solo se admite
+ *  municipio también se considera el estado, igual que el respaldo «pediste municipal y es un estado»). */
+function sugerenciasDeTexto(
+  texto: string,
+  base: { estadoCve?: string; municipios: MunicipioCatalogoRef[] },
+  tipos: TipoReferencia[]
+): CandidatoReferencia[] {
+  const soloMunicipio = tipos.length === 1 && tipos[0] === "municipio";
+  const r = desambiguarReferencia(texto, { ...base, tipos: soloMunicipio ? ["estado", "municipio"] : tipos, sugerir: true });
+  return r.estado === "ninguno" ? r.sugerencias ?? [] : [];
+}
+
+function mensajeSugerencia(texto: string, cands: CandidatoTerritorio[]): string {
+  return (
+    `«${texto}» no se reconoce. Puede ser un error de tecleo: ¿quisiste decir ${cands.map((c) => c.etiqueta).join(" o ")}? ` +
+    "Pregúntaselo al usuario con esas ETIQUETAS (nunca las claves) y NO asumas ni corrijas el nombre por tu cuenta. " +
+    `Solo cuando el usuario confirme una, vuelve a llamar con el MISMO territorioNombre («${texto}») y \`claveTerritorio\` = la clave de la opción confirmada (el servidor la verifica).`
+  );
 }

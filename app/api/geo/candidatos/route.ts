@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       : [];
 
     return NextResponse.json(
-      desambiguarReferencia(texto, { estadoCve, tipos, municipios, mexico: body?.mexico })
+      desambiguarReferencia(texto, { estadoCve, tipos, municipios, mexico: body?.mexico, sugerir: body?.sugerir === true })
     );
   } catch (err) {
     // Timeout or a real Storage failure: never hang the client.

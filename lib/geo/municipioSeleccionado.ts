@@ -63,7 +63,10 @@ export type AltaMunicipio =
   | { tipo: "agregar"; entrada: MunicipioSeleccionado; aviso?: string }
   | { tipo: "elegir"; candidatos: CandidatoReferencia[]; aviso: string }
   | { tipo: "precisar"; aviso: string }
-  | { tipo: "sin_reconocer"; entrada: MunicipioSeleccionado; aviso: string };
+  | { tipo: "sin_reconocer"; entrada: MunicipioSeleccionado; aviso: string }
+  // Pieza 1b (26-09-26): no se reconoce, pero hay sugerencias por tecleo. NO se agrega nada hasta que el
+  // usuario elija una sugerencia o pida agregar el texto tal cual (`entradaTalCual`).
+  | { tipo: "sugerir"; candidatos: CandidatoReferencia[]; entradaTalCual: MunicipioSeleccionado; aviso: string };
 
 export function decidirAltaMunicipio(
   estado: string,
@@ -93,6 +96,14 @@ export function decidirAltaMunicipio(
         aviso: `«${texto}» coincide con demasiados municipios — escribe más del nombre.`,
       };
     case "ninguno":
+      if (resultado.sugerencias?.length) {
+        return {
+          tipo: "sugerir",
+          candidatos: resultado.sugerencias,
+          entradaTalCual: { nombre: texto, estado },
+          aviso: `«${texto}» no se reconoce en el catálogo. ¿Quisiste decir…?`,
+        };
+      }
       return {
         tipo: "sin_reconocer",
         entrada: { nombre: texto, estado },

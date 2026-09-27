@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
   const nivelHint = searchParams.get("nivel");
   // Paso 3: clave elegida de una lista de candidatos (se verifica en el servidor) y tipo explícito.
   const claveTerritorio = searchParams.get("clave");
+  // Pieza 1b: tools.ts verificó que el usuario confirmó la sugerencia por tecleo de esa clave.
+  const sugerenciaConfirmada = searchParams.get("sugConf") === "1";
   const tipoTerritorio = searchParams.get("tipo");
 
   if (!sesionId || !indicadorId) {
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
       estadoHint,
       nivelHint,
       claveTerritorio,
+      sugerenciaConfirmada,
       tipoTerritorio,
       registro,
       territorioActivo: sesion.territorio,
