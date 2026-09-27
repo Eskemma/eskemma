@@ -41,13 +41,16 @@ describe("checkTerritoryMatch: caracterización con los 32 territorios reales", 
     expect(pares).toHaveLength(496);
   });
 
-  it("matriz anterior → nuevo: 463 / 5 / 22 / 1 / 5 y nada más", () => {
+  // Paso 2c (26-09-27) suma 81 transiciones m>a más (contención de nivel, todas con "nacional" de por
+  // medio en los datos reales de hoy): 463 - 81 = 382 quedan en mismatch por nivel distinto y sin
+  // contención; los 5 de la familia ZMG (2b, mismo nivel) no se tocan.
+  it("matriz anterior → nuevo: 382 / 86 / 22 / 1 / 5 y nada más (2b: 5 de nivel igual + 2c: 81 de contención)", () => {
     const matriz: Record<string, number> = {};
     pares.forEach((p, n) => {
       const clave = `${p.anterior}>${nuevo[n][0]}`;
       matriz[clave] = (matriz[clave] ?? 0) + 1;
     });
-    expect(matriz).toEqual({ "m>m": 463, "m>a": 5, "a>a": 22, "a>e": 1, "e>e": 5 });
+    expect(matriz).toEqual({ "m>m": 382, "m>a": 86, "a>a": 22, "a>e": 1, "e>e": 5 });
   });
 
   it("es simétrica en los 496 pares", () => {
@@ -58,13 +61,15 @@ describe("checkTerritoryMatch: caracterización con los 32 territorios reales", 
     }
   });
 
-  it("los únicos 6 pares que cambian son los de la familia ZMG/Guadalajara/Zapopan y Progreso", () => {
+  it("los 6 cambios de 2b (mismo nivel) siguen igual; los 81 nuevos son TODOS m>a de contención de nivel", () => {
     const cambios = pares
       .map((p, n) => ({ p, n }))
       .filter(({ p, n }) => p.anterior !== nuevo[n][0])
-      .map(({ p, n }) => `${p.anterior}>${nuevo[n][0]} ${ts[p.i].id.slice(0, 9)} ${ts[p.j].id.slice(0, 9)}`)
-      .sort();
-    expect(cambios).toEqual(
+      .map(({ p, n }) => ({ clave: `${p.anterior}>${nuevo[n][0]}`, a: ts[p.i].territorio, b: ts[p.j].territorio, id: `${ts[p.i].id.slice(0, 9)} ${ts[p.j].id.slice(0, 9)}` }));
+    expect(cambios).toHaveLength(87); // 6 (2b) + 81 (2c)
+
+    const cambios2b = cambios.filter((c) => c.a.nivel === c.b.nivel).map((c) => `${c.clave} ${c.id}`).sort();
+    expect(cambios2b).toEqual(
       [
         "m>a fon/1g2Bp mod/O2RBn", // Guadalajara (sesión) vs proyecto ZMG de 8 municipios
         "m>a fon/1g2Bp fon/vO9JF", // Guadalajara vs sesión Zapopan (10 municipios)
@@ -74,6 +79,11 @@ describe("checkTerritoryMatch: caracterización con los 32 territorios reales", 
         "a>e fon/3wsyh mod/Q5ZYk", // Progreso: claves iguales en ambos lados
       ].sort()
     );
+
+    const cambios2c = cambios.filter((c) => c.a.nivel !== c.b.nivel);
+    expect(cambios2c).toHaveLength(81);
+    expect(cambios2c.every((c) => c.clave === "m>a")).toBe(true);
+    expect(cambios2c.every((c) => c.a.nivel === "nacional" || c.b.nivel === "nacional")).toBe(true);
   });
 
   it("ningún par real pasa de 'exact' a otra cosa (no se estrecha nada que hoy funcione)", () => {
@@ -157,9 +167,14 @@ describe("compararTerritorios: estatal por conjuntos", () => {
 
 // ── Lo que NO cambia ──────────────────────────────────────────────────────────
 describe("compararTerritorios: políticas vigentes se conservan", () => {
-  it("niveles distintos → mismatch (contención entre niveles queda para el Paso 2c)", () => {
-    expect(compararTerritorios(t({ nivel: "estatal", estado: "Jalisco" }), zmg(["Zapopan"]))).toEqual({ match: "mismatch", relacion: "no_comparable" });
-    expect(checkTerritoryMatch(t({ nivel: "nacional" }), t({ nivel: "estatal", estado: "Jalisco" }))).toBe("mismatch");
+  it("niveles distintos: mismatch salvo la contención del Paso 2c (nacional o estatal⊃municipal/distrital del mismo estado); municipal↔distrito sigue mismatch", () => {
+    // Jalisco (estatal) SÍ contiene a Zapopan (municipal, Jalisco): approximate por contención (2c), no mismatch.
+    expect(compararTerritorios(t({ nivel: "estatal", estado: "Jalisco" }), zmg(["Zapopan"]))).toEqual({ match: "approximate", relacion: "cubre" });
+    // nacional SÍ contiene a un estatal: approximate por contención (2c).
+    expect(checkTerritoryMatch(t({ nivel: "nacional" }), t({ nivel: "estatal", estado: "Jalisco" }))).toBe("approximate");
+    // distrito_federal vs distrito_local: mismo NOMBRE de nivel-base pero valores distintos del enum
+    // NivelTerritorial (a.nivel !== b.nivel) y ninguno de los dos es "estatal"/"nacional": la contención
+    // de 2c no aplica (no es el caso municipal↔distrito, pero tampoco un caso de contención definido) → mismatch.
     expect(checkTerritoryMatch(t({ nivel: "distrito_federal", estado: "Jalisco" }), t({ nivel: "distrito_local", estado: "Jalisco" }))).toBe("mismatch");
   });
 
@@ -204,6 +219,47 @@ describe("compararTerritorios: distritos", () => {
 });
 
 // ── Textos ───────────────────────────────────────────────────────────────────
+// ── Paso 2c (26-09-27): contención entre niveles distintos ──────────────────
+describe("compararTerritorios: contención entre niveles (Paso 2c)", () => {
+  const nacionalMx = t({ nivel: "nacional", nombre: "México", pais: "México" });
+  const estadoJalisco = t({ nivel: "estatal", estado: "Jalisco" });
+  const municipioGdl = t({ nivel: "municipal", estado: "Jalisco", municipio: "Guadalajara" });
+  const distritoJalisco = t({ nivel: "distrito_federal", estado: "Jalisco", cve_distrito: "005", distritosSeleccionados: [{ cve: "005", nombre: "PUERTO VALLARTA", estado: "Jalisco" }] });
+  const estadoColima = t({ nivel: "estatal", estado: "Colima" });
+
+  it("nacional cubre un estatal, un municipal y un distrital — siempre approximate, nunca exact", () => {
+    for (const otro of [estadoJalisco, municipioGdl, distritoJalisco]) {
+      expect(compararTerritorios(nacionalMx, otro)).toEqual({ match: "approximate", relacion: "cubre" });
+      expect(compararTerritorios(otro, nacionalMx)).toEqual({ match: "approximate", relacion: "cubierto" });
+    }
+  });
+
+  it("estatal cubre un municipal/distrital del MISMO estado", () => {
+    expect(compararTerritorios(estadoJalisco, municipioGdl)).toEqual({ match: "approximate", relacion: "cubre" });
+    expect(compararTerritorios(municipioGdl, estadoJalisco)).toEqual({ match: "approximate", relacion: "cubierto" });
+    expect(compararTerritorios(estadoJalisco, distritoJalisco)).toEqual({ match: "approximate", relacion: "cubre" });
+  });
+
+  it("estatal NO cubre un municipal/distrital de OTRO estado: sigue mismatch", () => {
+    expect(checkTerritoryMatch(estadoColima, municipioGdl)).toBe("mismatch");
+  });
+
+  it("municipal↔distrito sigue en mismatch: la contención NO se extiende ahí (catálogo server-only, ver comentario en linkCompatibility.ts)", () => {
+    expect(checkTerritoryMatch(municipioGdl, distritoJalisco)).toBe("mismatch");
+  });
+
+  it("nacional de otro país no cubre nada (mismo criterio de país que el resto de la función)", () => {
+    const nacionalOtro = t({ nivel: "nacional", nombre: "Colombia", pais: "Colombia" });
+    const municipioConPais = t({ nivel: "municipal", estado: "Jalisco", municipio: "Guadalajara", pais: "México" });
+    expect(checkTerritoryMatch(nacionalOtro, municipioConPais)).toBe("mismatch");
+  });
+
+  it("es simétrica", () => {
+    expect(compararTerritorios(municipioGdl, nacionalMx).match).toBe(compararTerritorios(nacionalMx, municipioGdl).match);
+    expect(compararTerritorios(municipioGdl, estadoJalisco).match).toBe(compararTerritorios(estadoJalisco, municipioGdl).match);
+  });
+});
+
 describe("explicarTerritorioApproximate", () => {
   it("cada relación tiene un texto distinto y solo 'igual'/'no_comparable' dice 'parecen coincidir'", () => {
     const textos = (["igual", "no_comparable", "cubre", "cubierto", "traslape"] as const).map(explicarTerritorioApproximate);

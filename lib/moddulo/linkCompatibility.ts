@@ -67,12 +67,54 @@ function mismoMunicipio(estado: string | undefined, a: string, b: string): boole
 
 const esDistrito = (nivel: string) => ["distrito_federal", "distrito_local", "distrito"].includes(nivel);
 
+// Paso 2c (26-09-27): contención entre NIVELES DISTINTOS — solo lo resoluble hoy sin un catálogo
+// nuevo: nacional cubre cualquier territorio del mismo país, y un estatal cubre un municipal/distrital
+// de alguno de sus estados. Nunca concede "exact" (contener no es ser el mismo territorio).
+//
+// Municipal↔distrito queda DIFERIDO (junto con el "distrito hermano", ver systemPrompt.ts y CLAUDE.md):
+// el catálogo de composición sí existe (distritos_municipios/{estado}.json en Cloud Storage, `composicion:
+// Record<distritoCve, Record<municipioCve, pctPobtot>>`, ya usado por lib/fontana/tabla/sintesisDistrital.ts
+// y lib/fontana/ingesta/eceg.ts), pero (a) es SERVER-ONLY — se lee con fetchEcegFromStorage (Admin Storage)
+// — mientras que checkTerritoryMatch/compararTerritorios se llama hoy desde componentes CLIENTE
+// ("use client": ModduloButton.tsx, FontanaModduloButton.tsx, F3Tablero.tsx) además de una ruta de
+// servidor, como función SÍNCRONA; y (b) es PORCENTUAL, no una partición limpia — un municipio puede
+// repartirse entre varios distritos, así que "contenido" exigiría decidir un umbral (¿80%? ¿90%?), no es
+// un simple ⊆ de conjuntos. Resolverlo de verdad implica volver la función async y exponer un endpoint
+// para los consumidores cliente — cambio de arquitectura, no una extensión de esta pieza.
+function relacionPorContencionDeNivel(a: Territorio, b: Territorio): RelacionTerritorial | null {
+  const mismoPais =
+    !a.pais || !b.pais || claveTextoGeo(a.pais) === claveTextoGeo(b.pais);
+  if (!mismoPais) return null;
+
+  if (a.nivel === "nacional") return "cubre";
+  if (b.nivel === "nacional") return "cubierto";
+
+  const esMunicipalODistrito = (n: string) => n === "municipal" || esDistrito(n);
+  if (a.nivel === "estatal" && esMunicipalODistrito(b.nivel)) {
+    const ua = unidadesDeTerritorio(a);
+    const ub = unidadesDeTerritorio(b);
+    if (ub.estados.size === 0) return null;
+    return [...ub.estados].every((e) => ua.claves.has(e)) ? "cubre" : null;
+  }
+  if (b.nivel === "estatal" && esMunicipalODistrito(a.nivel)) {
+    const ua = unidadesDeTerritorio(a);
+    const ub = unidadesDeTerritorio(b);
+    if (ua.estados.size === 0) return null;
+    return [...ua.estados].every((e) => ub.claves.has(e)) ? "cubierto" : null;
+  }
+  return null;
+}
+
 export function compararTerritorios(
   a: Territorio | null | undefined,
   b: Territorio | null | undefined
 ): ComparacionTerritorial {
   if (!a || !b) return { match: "approximate", relacion: "no_comparable" };
-  if (a.nivel !== b.nivel) return { match: "mismatch", relacion: "no_comparable" };
+  if (a.nivel !== b.nivel) {
+    const relacionContencion = relacionPorContencionDeNivel(a, b);
+    // Contener nunca es "ser el mismo territorio": siempre approximate, nunca exact.
+    return relacionContencion ? { match: "approximate", relacion: relacionContencion } : { match: "mismatch", relacion: "no_comparable" };
+  }
   if (a.pais && b.pais && claveTextoGeo(a.pais) !== claveTextoGeo(b.pais)) {
     return { match: "mismatch", relacion: "disjunto" };
   }
