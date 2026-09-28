@@ -8,12 +8,30 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { PHASE_NAMES, PROJECT_TYPE_LABELS } from "@/types/moddulo.types";
 import type { ModduloProject } from "@/types/moddulo.types";
+import { DIAS_RETENCION_PROYECTOS, diasRestantesEnPapelera } from "@/lib/moddulo/papelera";
+
+// Mismo patrón ya usado por el hub de PESTEL (app/centinela/pestel/page.tsx):
+// un Timestamp de Admin SDK llega serializado como {_seconds, _nanoseconds}.
+function toMs(value: unknown): number {
+  if (!value) return Date.now();
+  if (typeof value === "object" && value !== null && "_seconds" in value) {
+    return (value as { _seconds: number })._seconds * 1000;
+  }
+  const d = new Date(value as string);
+  return isNaN(d.getTime()) ? Date.now() : d.getTime();
+}
+
+function formatDate(value: unknown): string {
+  return new Date(toMs(value)).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default function ModduloPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<ModduloProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [papeleraProjects, setPapeleraProjects] = useState<ModduloProject[]>([]);
+  const [papeleraLoading, setPapeleraLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/");
@@ -28,8 +46,37 @@ export default function ModduloPage() {
       .finally(() => setIsLoading(false));
   }, [user]);
 
-  function handleDeleted(id: string) {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/moddulo/projects/papelera", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setPapeleraProjects(data.projects ?? []))
+      .catch(() => {})
+      .finally(() => setPapeleraLoading(false));
+  }, [user]);
+
+  // Al mover a papelera, el proyecto desaparece de "Mis proyectos" y aparece
+  // en la sección Papelera de inmediato (sin esperar un refetch) — deletedAt
+  // se sintetiza con la hora del cliente solo para mostrar "se elimina en N
+  // días" de inmediato; el valor real que manda es el que escribió el
+  // servidor (serverTimestamp), esto es solo una aproximación visual.
+  function handleMovedToPapelera(project: ModduloProject) {
+    setProjects((prev) => prev.filter((p) => p.id !== project.id));
+    setPapeleraProjects((prev) => [
+      { ...project, deletedAt: { _seconds: Math.floor(Date.now() / 1000) } as never, deletedBy: user?.uid },
+      ...prev,
+    ]);
+  }
+
+  function handleRestored(id: string) {
+    setPapeleraProjects((prev) => {
+      const found = prev.find((p) => p.id === id);
+      if (found) {
+        const { deletedAt: _deletedAt, deletedBy: _deletedBy, ...rest } = found;
+        setProjects((p) => [rest as ModduloProject, ...p]);
+      }
+      return prev.filter((p) => p.id !== id);
+    });
   }
 
   function handleStatusChange(id: string, newStatus: ModduloProject["status"]) {
@@ -108,16 +155,113 @@ export default function ModduloPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onDeleted={handleDeleted}
                   onStatusChange={handleStatusChange}
                   onMetaChange={handleMetaChange}
+                  onMovedToPapelera={handleMovedToPapelera}
                 />
               ))}
             </div>
           )}
+
+          {!papeleraLoading && papeleraProjects.length > 0 && (
+            <PapeleraSection projects={papeleraProjects} onRestored={handleRestored} />
+          )}
         </div>
       </section>
     </main>
+  );
+}
+
+// ==========================================
+// SECCIÓN PAPELERA
+// ==========================================
+
+function PapeleraSection({
+  projects,
+  onRestored,
+}: {
+  projects: ModduloProject[];
+  onRestored: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mb-12 border-t border-gray-eske-20 dark:border-white/10 pt-6">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 text-sm font-medium text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske-40 dark:hover:text-[#C7D6E0] transition-colors"
+      >
+        <svg
+          className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        Papelera ({projects.length})
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-4">
+          {projects.map((project) => (
+            <PapeleraCard key={project.id} project={project} onRestored={onRestored} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PapeleraCard({
+  project,
+  onRestored,
+}: {
+  project: ModduloProject;
+  onRestored: (id: string) => void;
+}) {
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dias = diasRestantesEnPapelera(toMs(project.deletedAt));
+
+  async function handleRestore() {
+    setIsRestoring(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/moddulo/projects/${project.id}/restore`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        setError(data.error ?? "No se pudo restaurar el proyecto.");
+        return;
+      }
+      onRestored(project.id!);
+    } catch {
+      setError("Error de conexión al restaurar.");
+    } finally {
+      setIsRestoring(false);
+    }
+  }
+
+  return (
+    <div className="bg-white-eske dark:bg-[#18324A] rounded-xl border border-gray-eske-20 dark:border-white/10 p-5 opacity-80">
+      <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] truncate mb-1">{project.name}</h3>
+      <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
+        Eliminado el {formatDate(project.deletedAt)} · se elimina definitivamente en {dias} día{dias !== 1 ? "s" : ""}
+      </p>
+      {error && <p className="text-xs text-red-eske mt-2">{error}</p>}
+      <button
+        type="button"
+        onClick={handleRestore}
+        disabled={isRestoring}
+        className="mt-3 px-3 py-1.5 text-xs font-medium bg-bluegreen-eske text-white-eske rounded-lg hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+      >
+        {isRestoring && (
+          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
+        Restaurar
+      </button>
+    </div>
   );
 }
 
@@ -149,21 +293,24 @@ const META_COLOR_SWATCHES = ["#026988", "#248cc1", "#ffa366", "#649941", "#ffd14
 
 function ProjectCard({
   project,
-  onDeleted,
+  onMovedToPapelera,
   onStatusChange,
   onMetaChange,
 }: {
   project: ModduloProject;
-  onDeleted: (id: string) => void;
+  onMovedToPapelera: (project: ModduloProject) => void;
   onStatusChange: (id: string, status: ModduloProject["status"]) => void;
   onMetaChange: (id: string, meta: Pick<ModduloProject, "name" | "description" | "color">) => void;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isEditingMeta, setIsEditingMeta] = useState(false);
+  const [metaError, setMetaError] = useState<string | null>(null);
   const [metaDraft, setMetaDraft] = useState({ name: project.name, description: project.description ?? "", color: project.color ?? "#026988" });
   const [isSavingMeta, setIsSavingMeta] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
   const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const borderColor = project.status === "archived" ? "#9ca3af" : (project.color ?? "#026988");
@@ -178,6 +325,7 @@ function ProjectCard({
     const name = metaDraft.name.trim();
     if (!name || name.length < 3) return;
     setIsSavingMeta(true);
+    setMetaError(null);
     try {
       const r = await fetch(`/api/moddulo/projects/${project.id}`, {
         method: "PATCH",
@@ -188,8 +336,13 @@ function ProjectCard({
       if (r.ok) {
         onMetaChange(project.id!, { name, description: metaDraft.description.trim(), color: metaDraft.color });
         setIsEditingMeta(false);
+      } else {
+        const data = await r.json().catch(() => ({}));
+        setMetaError(data.error ?? "No se pudo guardar. Intenta de nuevo.");
       }
-    } catch {} finally {
+    } catch {
+      setMetaError("Error de conexión. Intenta de nuevo.");
+    } finally {
       setIsSavingMeta(false);
     }
   }
@@ -207,28 +360,44 @@ function ProjectCard({
 
   async function handleStatusPatch(newStatus: ModduloProject["status"]) {
     setKebabOpen(false);
+    setStatusError(null);
     try {
-      await fetch(`/api/moddulo/projects/${project.id}`, {
+      const r = await fetch(`/api/moddulo/projects/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ status: newStatus }),
       });
-      onStatusChange(project.id!, newStatus);
-    } catch {}
+      if (r.ok) {
+        onStatusChange(project.id!, newStatus);
+      } else {
+        const data = await r.json().catch(() => ({}));
+        setStatusError(data.error ?? "No se pudo cambiar el estado.");
+      }
+    } catch {
+      setStatusError("Error de conexión al cambiar el estado.");
+    }
   }
 
   async function handleDelete() {
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const r = await fetch(`/api/moddulo/projects/${project.id}`, {
         method: "DELETE",
         credentials: "include",
       });
-      if (r.ok) onDeleted(project.id!);
+      if (r.ok) {
+        onMovedToPapelera(project);
+        setConfirmDelete(false);
+      } else {
+        const data = await r.json().catch(() => ({}));
+        setDeleteError(data.error ?? "No se pudo mover a la papelera. Intenta de nuevo.");
+      }
+    } catch {
+      setDeleteError("Error de conexión. Intenta de nuevo.");
     } finally {
       setIsDeleting(false);
-      setConfirmDelete(false);
     }
   }
 
@@ -293,6 +462,10 @@ function ProjectCard({
           </div>
         </Link>
 
+        {statusError && (
+          <p className="px-1 mt-1 text-xs text-red-eske">{statusError}</p>
+        )}
+
         {/* Kebab — outside Link so clicks don't navigate */}
         <div className="absolute top-3 right-3 z-10" ref={kebabRef}>
           <button
@@ -342,6 +515,7 @@ function ProjectCard({
         <DeleteModal
           projectName={project.name}
           isDeleting={isDeleting}
+          error={deleteError}
           hasPestelLink={project.phases?.exploracion?.linkedSource?.kind === "T22"}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}
@@ -441,6 +615,7 @@ function ProjectCard({
                 </div>
               </div>
             </div>
+            {metaError && <p className="text-xs text-red-eske">{metaError}</p>}
             <div className="flex items-center justify-end gap-3 pt-1">
               <button
                 type="button"
@@ -476,12 +651,14 @@ function ProjectCard({
 function DeleteModal({
   projectName,
   isDeleting,
+  error,
   hasPestelLink,
   onConfirm,
   onCancel,
 }: {
   projectName: string;
   isDeleting: boolean;
+  error?: string | null;
   hasPestelLink?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -494,11 +671,12 @@ function DeleteModal({
       <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <h3 className="font-semibold text-gray-eske-80 dark:text-[#C7D6E0] text-base">
-            ¿Eliminar «{projectName}»?
+            ¿Mover «{projectName}» a la papelera?
           </h3>
           <p className="text-sm text-gray-eske-60 dark:text-[#9AAEBE] leading-relaxed">
-            Esta acción es permanente y no se puede deshacer. Se perderá todo el historial
-            de conversaciones y fases del proyecto.
+            Podrás restaurarlo durante {DIAS_RETENCION_PROYECTOS} días desde la sección Papelera.
+            Pasado ese plazo se eliminará junto con sus resultados de F3 y archivos adjuntos.
+            Las sesiones de Fontana vinculadas quedarán sueltas, sin perder su información.
           </p>
           {hasPestelLink && (
             <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-yellow-eske-80 dark:text-yellow-eske/90">
@@ -511,12 +689,13 @@ function DeleteModal({
                   d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
               </svg>
               <span>
-                Este proyecto tiene un análisis PESTEL vinculado en Centinela. El análisis
-                seguirá ahí, pero para usarlo en un nuevo proyecto de Moddulo tendrás que
-                pasar por el flujo de recuperación y volver a capturar las variables de Propósito.
+                Este proyecto tiene un análisis PESTEL vinculado en Centinela. Mientras esté en
+                la papelera, el vínculo se mantiene intacto — si lo restauras, todo sigue
+                funcionando igual. Solo se rompe si pasan los {DIAS_RETENCION_PROYECTOS} días.
               </span>
             </div>
           )}
+          {error && <p className="text-sm text-red-eske">{error}</p>}
         </div>
         <div className="flex items-center justify-end gap-3">
           <button
@@ -538,7 +717,7 @@ function DeleteModal({
             {isDeleting && (
               <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             )}
-            Eliminar
+            Mover a papelera
           </button>
         </div>
       </div>

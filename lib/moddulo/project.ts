@@ -282,6 +282,14 @@ export async function getProject(
 
   const data = snap.data() as ModduloProject;
 
+  // Papelera (26-09-28): un proyecto en papelera NUNCA es visible aquí, para NADIE —
+  // ni para el dueño. Esta función es el lector general que usan ~35 puntos del
+  // código (rutas de mutación F2/F3, el layout, los enlaces cruzados con PESTEL/
+  // Fontana); todos deben comportarse como si el proyecto no existiera. Para ver un
+  // proyecto en papelera (solo el dueño, solo para restaurarlo) usar
+  // `getProjectPapelera`, nunca esta función.
+  if (data.deletedAt) return null;
+
   // Verificar que el usuario tiene acceso
   const isCollaborator = data.collaborators?.some((c) => c.uid === userId);
   if (!isCollaborator) return null;
@@ -342,8 +350,31 @@ export async function getProjectParaPrellenado(
   const snap = await adminDb.collection(COLLECTION).doc(projectId).get();
   if (!snap.exists) return null;
   const data = snap.data() as ModduloProject;
+  // Papelera (26-09-28): mismo criterio que getProject — un proyecto en papelera no
+  // se usa como origen de prellenado, ni para su propio dueño.
+  if (data.deletedAt) return null;
   if (!data.collaborators?.some((c) => c.uid === userId)) return null;
   return { name: data.name, type: data.type, color: data.color, territorio: data.territorio };
+}
+
+/**
+ * Papelera (26-09-28): variante que SÍ ve un proyecto con `deletedAt` seteado — usada
+ * ÚNICAMENTE por la ruta de restaurar y la vista de Papelera, ambas ya acotadas al
+ * dueño (`collaborator.role === "owner"`) en el llamador; esta función solo exige
+ * colaborador, igual que `getProject`. NUNCA usar esto donde iría `getProject` — un
+ * proyecto en papelera debe ser invisible en cualquier otro punto del código.
+ */
+export async function getProjectPapelera(
+  projectId: string,
+  userId: string
+): Promise<ModduloProject | null> {
+  const snap = await adminDb.collection(COLLECTION).doc(projectId).get();
+  if (!snap.exists) return null;
+  const data = snap.data() as ModduloProject;
+  if (!data.deletedAt) return null;
+  if (!data.collaborators?.some((c) => c.uid === userId)) return null;
+  const { id: _id, ...rest } = data as ModduloProject & { id?: string };
+  return { id: snap.id, ...rest };
 }
 
 // ==========================================
@@ -365,12 +396,33 @@ export async function listUserProjects(
     .where("userId", "==", userId)
     .orderBy("updatedAt", "desc");
 
-  if (options?.limit) {
-    query = query.limit(options.limit) as typeof query;
-  }
-
   const snap = await query.get();
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ModduloProject));
+  // Papelera (26-09-28): filtrado EN MEMORIA (sin índice compuesto nuevo — mismo
+  // criterio que CLAUDE.md ya recomienda para volúmenes chicos, < 100 docs por
+  // usuario). Un proyecto en papelera nunca aparece en el listado general.
+  //
+  // El límite se aplica DESPUÉS de filtrar deletedAt, nunca en la query de
+  // Firestore — un `.limit(N)` a nivel de query se aplicaría sobre los N
+  // documentos más recientes ANTES de saber cuáles están en papelera, así que
+  // podría devolver menos de N proyectos activos aunque existan más (hallazgo
+  // real, 26-09-28: `GET /api/moddulo/projects?limit=` pasa un límite
+  // controlado por el cliente hasta aquí).
+  const activos = snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as ModduloProject))
+    .filter((p) => !p.deletedAt);
+  return options?.limit ? activos.slice(0, options.limit) : activos;
+}
+
+/**
+ * Papelera (26-09-28): lista SOLO los proyectos del usuario con `deletedAt` seteado —
+ * usada únicamente por la vista de Papelera. Mismo filtrado en memoria que
+ * `listUserProjects`, invertido.
+ */
+export async function listProyectosPapelera(userId: string): Promise<ModduloProject[]> {
+  const snap = await adminDb.collection(COLLECTION).where("userId", "==", userId).get();
+  return snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as ModduloProject))
+    .filter((p) => !!p.deletedAt);
 }
 
 // ==========================================
@@ -512,6 +564,13 @@ export async function restoreProject(projectId: string, userId: string): Promise
   await updateProject(projectId, userId, { status: "active" });
 }
 
+// Papelera (26-09-28, fase b): "eliminar" ya NO borra físicamente — mueve el
+// proyecto a papelera (deletedAt/deletedBy). El back-link de PESTEL,
+// linkedSource y las sesiones de Fontana vinculadas NO se tocan aquí — eso es
+// responsabilidad exclusiva de la purga programada de la fase (c) (ver §11.1
+// del plan: orden idempotente, documento al final). Mover a papelera y
+// restaurar son operaciones simétricas y baratas — ningún vínculo se rompe ni
+// se reconstruye en ninguna de las dos, por diseño (§3 del plan).
 export async function deleteProject(projectId: string, userId: string): Promise<void> {
   const project = await getProject(projectId, userId);
   if (!project) throw new Error("Proyecto no encontrado.");
@@ -519,23 +578,29 @@ export async function deleteProject(projectId: string, userId: string): Promise<
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (collaborator?.role !== "owner") throw new Error("Solo el dueño puede eliminar el proyecto.");
 
-  // Solo un vínculo real de Centinela (kind "T22") tiene una contraparte en
-  // pestel_projects que limpiar — el sourceId de un vínculo "express" es el
-  // propio ID del proyecto Moddulo, no un documento de Centinela.
-  const explorarLink = project.phases?.["exploracion"]?.linkedSource;
-  const pestProjectId = explorarLink?.kind === "T22" ? explorarLink.sourceId : undefined;
+  await adminDb.collection(COLLECTION).doc(projectId).update({
+    deletedAt: FieldValue.serverTimestamp(),
+    deletedBy: userId,
+  });
+}
 
-  await adminDb.collection(COLLECTION).doc(projectId).delete();
+// Nombre deliberadamente distinto de `restoreProject` (arriba, línea 563) —
+// esa función es el mecanismo VIEJO y decorativo de `status: "archived" ↔
+// "active"` (un badge, nunca filtrado de listUserProjects). Esta es la
+// restauración REAL de la papelera (deletedAt/deletedBy). Los dos nombres
+// conviven a propósito: no hay que unificarlos, son conceptos distintos.
+export async function restoreProjectFromPapelera(projectId: string, userId: string): Promise<void> {
+  const project = await getProjectPapelera(projectId, userId);
+  if (!project) throw new Error("Proyecto no encontrado o no está en la papelera.");
 
-  // Non-fatal cleanup: remove the back-link in Centinela after the Moddulo project is gone.
-  // If this fails, OrphanRecoveryView handles the stale link gracefully.
-  if (pestProjectId) {
-    try {
-      await adminDb.collection("pestel_projects").doc(pestProjectId).update({
-        modduloProjectId: FieldValue.delete(),
-      });
-    } catch (err) {
-      console.error("[deleteProject] write-back cleanup falló para pestProjectId:", pestProjectId, err);
-    }
-  }
+  // Chequeo de owner EXPLÍCITO y SEPARADO del de getProjectPapelera (que solo
+  // exige ser colaborador) — pedido explícito de Raúl: restaurar es una
+  // operación tan sensible como eliminar, mismo criterio de propiedad.
+  const collaborator = project.collaborators.find((c) => c.uid === userId);
+  if (collaborator?.role !== "owner") throw new Error("Solo el dueño puede restaurar el proyecto.");
+
+  await adminDb.collection(COLLECTION).doc(projectId).update({
+    deletedAt: FieldValue.delete(),
+    deletedBy: FieldValue.delete(),
+  });
 }

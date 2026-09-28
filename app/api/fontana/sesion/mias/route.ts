@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
   const proyectos = await Promise.all(
     proyectoIds.map(async (id) => {
       const doc = await adminDb.collection("moddulo_projects").doc(id).get();
-      return [id, doc.exists ? { nombre: doc.data()?.name as string, currentPhase: doc.data()?.currentPhase as string } : null] as const;
+      // Papelera (26-09-28): un proyecto en papelera se trata igual que uno borrado —
+      // no se muestra como "proyecto vinculado" (mismo criterio que getProject).
+      const data = doc.data();
+      return [id, doc.exists && !data?.deletedAt ? { nombre: data?.name as string, currentPhase: data?.currentPhase as string } : null] as const;
     })
   );
   const proyectosPorId = new Map(proyectos);

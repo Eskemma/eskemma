@@ -134,7 +134,8 @@ export async function PATCH(
   }
 }
 
-// DELETE: Eliminar proyecto permanentemente
+// DELETE: Mover proyecto a la papelera (soft-delete, 26-09-28 — ver deleteProject).
+// La eliminación definitiva es otra ruta, fase (c) del plan de papelera.
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }

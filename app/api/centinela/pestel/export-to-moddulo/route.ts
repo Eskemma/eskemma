@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
       .doc(modduloProjectId)
       .get();
 
-    if (!modduloSnap.exists || modduloSnap.data()?.userId !== session.uid) {
+    // Papelera (26-09-28): un proyecto en papelera se trata igual que uno inexistente.
+    if (!modduloSnap.exists || modduloSnap.data()?.userId !== session.uid || modduloSnap.data()?.deletedAt) {
       return NextResponse.json(
         { error: "Proyecto Moddulo no encontrado o sin permisos" },
         { status: 404 }

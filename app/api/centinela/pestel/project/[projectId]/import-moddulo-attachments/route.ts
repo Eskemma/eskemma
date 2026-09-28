@@ -104,6 +104,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const modData = modSnap.data()!;
+  // Papelera (26-09-28): un proyecto en papelera se trata igual que uno inexistente.
+  if (modData.deletedAt) {
+    return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
+  }
   const hasAccess = (modData.collaborators as { uid: string; role: string }[] | undefined)
     ?.some((c) => c.uid === session.uid && (c.role === "owner" || c.role === "editor"));
   if (!hasAccess) {

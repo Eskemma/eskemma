@@ -5,6 +5,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
+import { getProject } from "@/lib/moddulo/project";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 export async function GET(request: NextRequest) {
@@ -56,18 +57,25 @@ export async function GET(request: NextRequest) {
     // Repair: write sourceId (+ kind/componente, ausentes precisamente
     // porque este es el caso de "el lado Moddulo nunca los tuvo") de vuelta
     // a Moddulo si faltaban.
-    try {
-      await adminDb
-        .collection("moddulo_projects")
-        .doc(modduloProjectId)
-        .update({
-          "phases.exploracion.linkedSource.sourceId": doc.id,
-          "phases.exploracion.linkedSource.kind": "T22",
-          "phases.exploracion.linkedSource.componente": "centinela",
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-    } catch {
-      // Non-fatal: still return the found project to the client
+    // Hueco cerrado (26-09-28): esta rama escribía sobre moddulo_projects sin
+    // verificar que el proyecto exista, sea del usuario, o no esté en papelera —
+    // getProject ya hace las 3 cosas (y ahora también excluye deletedAt). Si no pasa,
+    // se omite el repair pero se sigue devolviendo el lado PESTEL encontrado.
+    const modduloProject = await getProject(modduloProjectId, session.uid);
+    if (modduloProject) {
+      try {
+        await adminDb
+          .collection("moddulo_projects")
+          .doc(modduloProjectId)
+          .update({
+            "phases.exploracion.linkedSource.sourceId": doc.id,
+            "phases.exploracion.linkedSource.kind": "T22",
+            "phases.exploracion.linkedSource.componente": "centinela",
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+      } catch {
+        // Non-fatal: still return the found project to the client
+      }
     }
 
     return NextResponse.json({

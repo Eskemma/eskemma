@@ -337,6 +337,12 @@ export interface ModduloProject {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastAccessedAt: Timestamp;
+  // Papelera (26-09-28): ausente/undefined = activo. `getProject`/`getProjectParaPrellenado`/
+  // `listUserProjects` (uso general) NUNCA devuelven un proyecto con `deletedAt` seteado — para
+  // verlo existen las variantes explícitas `getProjectPapelera`/`listProyectosPapelera`
+  // (lib/moddulo/project.ts), usadas solo por la ruta de restaurar y la vista de Papelera.
+  deletedAt?: Timestamp;
+  deletedBy?: string;
 }
 
 // ==========================================

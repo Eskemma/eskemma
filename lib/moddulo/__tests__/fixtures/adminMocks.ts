@@ -34,12 +34,21 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
 
   let autoIdCounter = 0;
 
-  function docRef(path: string) {
-    return {
+  interface DocRef {
+    id: string;
+    get: () => Promise<{ exists: boolean; data: () => unknown; ref: DocRef }>;
+    set: (data: unknown) => Promise<void>;
+    update: (data: Record<string, unknown>) => Promise<void>;
+    collection: (name: string) => ReturnType<typeof collectionRef>;
+  }
+
+  function docRef(path: string): DocRef {
+    const ref: DocRef = {
       id: path.split("/").at(-1) as string,
       get: vi.fn(async () => ({
         exists: store.has(path),
         data: () => store.get(path),
+        ref,
       })),
       set: vi.fn(async (data: unknown) => {
         store.set(path, data);
@@ -49,6 +58,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       }),
       collection: (name: string) => collectionRef(`${path}/${name}`),
     };
+    return ref;
   }
 
   function collectionRef(path: string) {
@@ -66,23 +76,42 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
     };
   }
 
-  // Soporta SOLO where(campo, "==", valor) encadenado + get() sobre los
-  // hijos directos de la colección — lo que usa pestel/project POST en su
-  // dedup. No pretende cubrir el resto de operadores/órdenes de Firestore.
-  function queryRef(path: string, clauses: [string, unknown][]) {
-    return {
+  // Soporta where(campo, "==", valor) encadenado + orderBy(campo, dir) + limit(n) +
+  // get() sobre los hijos directos de la colección — lo que usa pestel/project POST en
+  // su dedup y listUserProjects (papelera, 26-09-28). No pretende cubrir el resto de
+  // operadores de Firestore.
+  function queryRef(
+    path: string,
+    clauses: [string, unknown][],
+    order?: { field: string; dir: "asc" | "desc" },
+    limitN?: number
+  ) {
+    const self = {
       where: (field: string, _op: "==", value: unknown) =>
-        queryRef(path, [...clauses, [field, value]]),
+        queryRef(path, [...clauses, [field, value]], order, limitN),
+      orderBy: (field: string, dir: "asc" | "desc" = "asc") => queryRef(path, clauses, { field, dir }, limitN),
+      limit: (n: number) => queryRef(path, clauses, order, n),
       get: vi.fn(async () => {
-        const docs = [...store.entries()]
+        let docs = [...store.entries()]
           .filter(([p]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes("/"))
           .filter(([, data]) =>
             clauses.every(([f, v]) => (data as Record<string, unknown> | undefined)?.[f] === v)
           )
           .map(([p, data]) => ({ id: p.split("/").at(-1) as string, data: () => data }));
+        if (order) {
+          const { field, dir } = order;
+          docs = [...docs].sort((a, b) => {
+            const av = (a.data() as Record<string, unknown> | undefined)?.[field];
+            const bv = (b.data() as Record<string, unknown> | undefined)?.[field];
+            const cmp = av === bv ? 0 : (av as string) < (bv as string) ? -1 : 1;
+            return dir === "asc" ? cmp : -cmp;
+          });
+        }
+        if (limitN != null) docs = docs.slice(0, limitN);
         return { empty: docs.length === 0, docs };
       }),
     };
+    return self;
   }
 
   const collection = vi.fn((name: string) => collectionRef(name));
