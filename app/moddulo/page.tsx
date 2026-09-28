@@ -60,6 +60,10 @@ export default function ModduloPage() {
   // se sintetiza con la hora del cliente solo para mostrar "se elimina en N
   // días" de inmediato; el valor real que manda es el que escribió el
   // servidor (serverTimestamp), esto es solo una aproximación visual.
+  // (Verificado 26-09-28: a diferencia de handleRestored de abajo, esta función
+  // YA era pura en sus 2 updaters — project viene de un argumento, no de leer
+  // `prev` de una de las 2 listas dentro del updater de la otra — así que no
+  // tenía el mismo riesgo de duplicado por doble invocación en Strict Mode.)
   function handleMovedToPapelera(project: ModduloProject) {
     setProjects((prev) => prev.filter((p) => p.id !== project.id));
     setPapeleraProjects((prev) => [
@@ -68,15 +72,22 @@ export default function ModduloPage() {
     ]);
   }
 
+  // Bug real (26-09-28, verificación de fase (b)): la versión anterior llamaba
+  // setProjects() DESDE DENTRO del updater de setPapeleraProjects — un updater de
+  // React debe ser puro (sin efectos secundarios). En desarrollo, Strict Mode
+  // invoca cada updater DOS VECES a propósito para detectar justo esta clase de
+  // impureza; la llamada anidada a setProjects se ejecutaba en ambas invocaciones,
+  // duplicando el proyecto restaurado en "Mis proyectos" (warning real de React:
+  // "Encountered two children with the same key"). Fix: leer `found` del estado ya
+  // renderizado (closure, no de un `prev` dentro de un updater) y disparar los 2
+  // setState como actualizaciones independientes y puras — ninguna llama a la otra.
   function handleRestored(id: string) {
-    setPapeleraProjects((prev) => {
-      const found = prev.find((p) => p.id === id);
-      if (found) {
-        const { deletedAt: _deletedAt, deletedBy: _deletedBy, ...rest } = found;
-        setProjects((p) => [rest as ModduloProject, ...p]);
-      }
-      return prev.filter((p) => p.id !== id);
-    });
+    const found = papeleraProjects.find((p) => p.id === id);
+    setPapeleraProjects((prev) => prev.filter((p) => p.id !== id));
+    if (found) {
+      const { deletedAt: _deletedAt, deletedBy: _deletedBy, ...rest } = found;
+      setProjects((prev) => [rest as ModduloProject, ...prev]);
+    }
   }
 
   function handleStatusChange(id: string, newStatus: ModduloProject["status"]) {
