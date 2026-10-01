@@ -60,4 +60,17 @@ describe("POST /api/moddulo/projects — pestelProjectId", () => {
 
     expect(res.status).toBe(201);
   });
+
+  it("409 si el pestelProjectId ya está vinculado a otro Moddulo (vivo o en papelera) — §11.5, Punto 1", async () => {
+    mockAdminDb.reset({
+      "pestel_projects/pPropio": { userId: UID, modduloProjectId: "mViejo" },
+      "moddulo_projects/mViejo": { userId: UID, name: "Ya vinculado" },
+    });
+
+    const res = await POST(
+      buildRequest({ type: "electoral", name: "X", pestelProjectId: "pPropio" })
+    );
+
+    expect(res.status).toBe(409);
+  });
 });

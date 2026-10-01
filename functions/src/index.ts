@@ -8,6 +8,10 @@ export {feedSync} from "./pestel/feedSync";
 // ── Fontana (T10) ──────────────────────────────────────────────────────────
 export {purgeAdjuntos} from "./fontana/purgeAdjuntos";
 
+// ── Moddulo — papelera de proyectos ─────────────────────────────────────
+export {purgeModduloProjectsScheduled} from "./moddulo/scheduled";
+export {purgeModduloProjectNow} from "./moddulo/purgeNow";
+
 // ── Core ───────────────────────────────────────────────────────────────────
 import {
   onDocumentCreated,

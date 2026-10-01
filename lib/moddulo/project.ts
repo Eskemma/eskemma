@@ -180,6 +180,26 @@ export class PestelProjectNoPropioError extends Error {
   }
 }
 
+// §11.5 del plan de papelera (26-09-29, Punto 1 de la fase c). Sin este
+// guard, OrphanRecoveryView -> createProject podía crear un SEGUNDO
+// proyecto Moddulo apuntando al mismo pestelProjectId mientras el
+// original seguía existiendo (vivo o en papelera) — el back-link de
+// PESTEL quedaba apuntando solo al nuevo, y al restaurar el original
+// (que conserva su propio linkedSource.sourceId intacto, la papelera no
+// toca vínculos) quedaban 2 proyectos reclamando el mismo análisis.
+// link-moddulo/route.ts ya bloqueaba este caso del otro lado
+// (pestel_already_linked) — createProject era el único camino sin
+// protección. Deliberadamente el mismo error/mensaje para "ya vinculado
+// a otro Moddulo vivo" y "ya vinculado a otro Moddulo en papelera": a
+// quien llama no le sirve distinguir los dos casos, y no revela el
+// estado del proyecto ajeno.
+export class PestelYaVinculadoError extends Error {
+  constructor() {
+    super("Este proyecto de PESTEL ya está vinculado a otro proyecto de Moddulo.");
+    this.name = "PestelYaVinculadoError";
+  }
+}
+
 export async function createProject(
   userId: string,
   input: CreateProjectInput
@@ -191,8 +211,24 @@ export async function createProject(
   // project. It runs BEFORE anything is built or written, so a foreign id is
   // never persisted in pestelProjectId / linkedSource either.
   if (input.pestelProjectId) {
-    if (!(await getPestelProjectPropio(input.pestelProjectId, userId))) {
+    const pestelProject = await getPestelProjectPropio(input.pestelProjectId, userId);
+    if (!pestelProject) {
       throw new PestelProjectNoPropioError();
+    }
+    // Doble-vínculo guard (26-09-29): pestelProject ya viene con
+    // modduloProjectId en el objeto devuelto por getPestelProjectPropio —
+    // ninguna lectura nueva de Firestore del lado PESTEL. Solo se lee
+    // moddulo_projects/{existingId} (con o sin deletedAt: un proyecto en
+    // papelera SIGUE contando como "ya vinculado" — la papelera no libera
+    // el vínculo, solo la purga lo hace) para decidir si bloquear.
+    if (pestelProject.modduloProjectId) {
+      const existingSnap = await adminDb
+        .collection(COLLECTION)
+        .doc(pestelProject.modduloProjectId)
+        .get();
+      if (existingSnap.exists) {
+        throw new PestelYaVinculadoError();
+      }
     }
   }
 

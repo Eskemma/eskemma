@@ -18,7 +18,7 @@ vi.mock("firebase-admin/firestore", () => ({
 }));
 
 import { adminDb } from "@/lib/firebase-admin";
-import { createProject, PestelProjectNoPropioError } from "./project";
+import { createProject, PestelProjectNoPropioError, PestelYaVinculadoError } from "./project";
 import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 
 const mockAdminDb = adminDb as unknown as ReturnType<typeof createMockAdminDb>;
@@ -71,6 +71,48 @@ describe("createProject — guard de pestelProjectId", () => {
     expect(project.userId).toBe(UID);
     const linked = (project.phases.exploracion as unknown as Record<string, unknown>).linkedSource;
     expect(linked).toMatchObject({ kind: "T22", sourceId: "pPropio", sourceAnalysisId: "an1" });
+    expect(
+      (mockAdminDb.snapshot()["pestel_projects/pPropio"] as Record<string, unknown>).modduloProjectId
+    ).toBe(project.id);
+  });
+
+  it("rechaza un pestelProjectId ya vinculado a un Moddulo ACTIVO — §11.5, Punto 1", async () => {
+    mockAdminDb.reset({
+      "pestel_projects/pPropio": { userId: UID, nombre: "Mio", modduloProjectId: "mViejo" },
+      "moddulo_projects/mViejo": { userId: UID, name: "Ya vinculado" },
+    });
+    const antes = mockAdminDb.snapshot();
+
+    await expect(
+      createProject(UID, { ...base, pestelProjectId: "pPropio" })
+    ).rejects.toBeInstanceOf(PestelYaVinculadoError);
+
+    // No se creó un 2º proyecto Moddulo ni se tocó nada existente.
+    expect(moddulosEnStore()).toEqual(["moddulo_projects/mViejo"]);
+    expect(mockAdminDb.snapshot()).toEqual(antes);
+  });
+
+  it("rechaza un pestelProjectId ya vinculado a un Moddulo EN PAPELERA — la papelera no libera el vínculo", async () => {
+    mockAdminDb.reset({
+      "pestel_projects/pPropio": { userId: UID, nombre: "Mio", modduloProjectId: "mPapelera" },
+      "moddulo_projects/mPapelera": { userId: UID, name: "En papelera", deletedAt: "TS" },
+    });
+
+    await expect(
+      createProject(UID, { ...base, pestelProjectId: "pPropio" })
+    ).rejects.toBeInstanceOf(PestelYaVinculadoError);
+    expect(moddulosEnStore()).toEqual(["moddulo_projects/mPapelera"]);
+  });
+
+  it("permite crear si modduloProjectId apunta a un doc que YA NO EXISTE (legado pre-papelera, borrado físico)", async () => {
+    mockAdminDb.reset({
+      "pestel_projects/pPropio": { userId: UID, nombre: "Mio", modduloProjectId: "mBorradoFisico" },
+      // moddulo_projects/mBorradoFisico NO existe — referencia stale de antes de la papelera.
+    });
+
+    const project = await createProject(UID, { ...base, pestelProjectId: "pPropio" });
+    expect(project.userId).toBe(UID);
+    // El write-back apunta al proyecto NUEVO, no al id borrado.
     expect(
       (mockAdminDb.snapshot()["pestel_projects/pPropio"] as Record<string, unknown>).modduloProjectId
     ).toBe(project.id);
