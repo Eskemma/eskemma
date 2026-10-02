@@ -4,7 +4,7 @@
 
 ## Formatos de salida
 
-PESTEL genera automáticamente cuatro tipos de informe. Todos son
+PESTEL genera automáticamente cinco tipos de informe. Todos son
 editables antes de exportar.
 
 ### 1. Reporte ejecutivo

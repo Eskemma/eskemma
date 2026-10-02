@@ -64,7 +64,11 @@ export interface EcegIndicadorConfig {
 // F1-18 (otros adaptadores) están deliberadamente ausentes de este mapa.
 export const FONTANA_ECEG_CONFIG: Record<string, EcegIndicadorConfig> = {
   "F1-1": { key: "POBTOT", tipo: "directo" },
-  "F1-3": { key: "P3YM_HLI", tipo: "porcentaje", denominadorKey: "POBTOT" },
+  // Denominador P_3YMAS, no POBTOT — corregido 26-10-01: P3YM_HLI se
+  // define sobre "población de 3 años y más" (diccionario de datos ITER
+  // 2020, texto literal), confirmado contra el dato real de los 32
+  // estados antes de aplicar (ver CLAUDE.md, Deuda Técnica).
+  "F1-3": { key: "P3YM_HLI", tipo: "porcentaje", denominadorKey: "P_3YMAS" },
   "F1-4": { key: "HOGJEF_F", tipo: "porcentaje", denominadorKey: "TOTHOG" },
   "F1-5": { key: "GRAPROES", tipo: "directo" },
   "F1-6": { key: "PNACOE", tipo: "porcentaje", denominadorKey: "POBTOT" },
@@ -79,10 +83,15 @@ export const FONTANA_ECEG_CONFIG: Record<string, EcegIndicadorConfig> = {
   // rango plausible.
   "F1-10": { key: "VPH_C_SERV", tipo: "porcentaje", denominadorKey: "TVIVPAR" },
   "F1-12": { key: "P12YM_CASA", tipo: "porcentaje", denominadorKey: "__F1_12_DENOM__" },
-  "F1-13": { key: "P15YM_SE", tipo: "porcentaje", denominadorKey: "P_18YMAS" },
+  // Denominador P_15YMAS, no P_18YMAS — corregido 26-10-01: el
+  // comentario anterior lo marcaba como "proxy 15+ años" porque se
+  // creía que P_15YMAS no estaba disponible; sí lo está (ver F1-3).
+  "F1-13": { key: "P15YM_SE", tipo: "porcentaje", denominadorKey: "P_15YMAS" },
   "F1-14": { key: "P18YM_PB", tipo: "porcentaje", denominadorKey: "P_18YMAS" },
   "F1-15": { key: "PCON_DISC", tipo: "porcentaje", denominadorKey: "POBTOT" },
-  "F1-19": { key: "P3HLINHE", tipo: "porcentaje", denominadorKey: "POBTOT" },
+  // Denominador P_3YMAS, no POBTOT — mismo fix que F1-3 (P3HLINHE
+  // comparte exactamente la misma base poblacional por definición).
+  "F1-19": { key: "P3HLINHE", tipo: "porcentaje", denominadorKey: "P_3YMAS" },
   "F2-11": { key: "VPH_INTER", tipo: "porcentaje", denominadorKey: "VIVPAR_HAB" },
   "F2-13": { key: "PDER_SS", tipo: "porcentaje", denominadorKey: "POBTOT" },
 };

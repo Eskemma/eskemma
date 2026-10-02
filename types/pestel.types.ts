@@ -222,7 +222,7 @@ export interface ScorecardItem {
 
 export interface InformeGenerado {
   id: string;
-  formato: "ejecutivo" | "tecnico" | "foda_lista" | "escenarios";
+  formato: "ejecutivo" | "tecnico" | "foda_lista" | "escenarios" | "insights_por_tipo";
   contenidoTexto: string;
   datosEstructurados: {
     escenarios?: { optimista: string; base: string; pesimista: string };

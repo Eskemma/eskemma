@@ -61,6 +61,11 @@ const CURATED_COLUMNS = [
   // Demografía
   "POBTOT", "POB0_14", "POB15_64", "POB65_MAS", "P3YM_HLI", "POB_AFRO", "REL_H_M",
   "POBMAS", "POBFEM", "P_60YMAS", "P_15A49_F", "P_18YMAS", "PROM_HNV", "POB_EDADNE", "PNACOE",
+  // Denominadores reales de F1-3/F1-13/F1-19 (antes se usaba POBTOT/P_18YMAS
+  // como proxy — verificado 26-10-01 contra el diccionario de datos ITER:
+  // P3YM_HLI y P3HLINHE se definen sobre "población de 3 años y más", y
+  // P15YM_SE sobre "población de 15 años y más" — ninguno sobre POBTOT/18+).
+  "P_3YMAS", "P_15YMAS",
   // Educación
   "GRAPROES", "P15YM_AN",
   "P15YM_SE", "P18YM_PB", "P15PRI_IN", "P15PRI_CO", "P15SEC_IN", "P15SEC_CO", "P15A17A", "P18A24A",

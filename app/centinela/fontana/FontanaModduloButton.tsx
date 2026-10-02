@@ -106,7 +106,7 @@ function PickerModal({ sesion, onClose }: { sesion: FontanaSesion; onClose: () =
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-eske-40 hover:text-gray-eske-70 hover:bg-gray-eske-10 dark:hover:bg-white/10 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

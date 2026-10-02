@@ -13,13 +13,19 @@ import {
   markdownToHtml,
 } from "@/lib/shared/reportExport";
 
-export type ReportFormat = "executive" | "technical" | "foda" | "scenarios";
+export type ReportFormat =
+  | "executive"
+  | "technical"
+  | "foda"
+  | "scenarios"
+  | "insights_por_tipo";
 
 const FORMAT_SLUG: Record<ReportFormat, string> = {
   executive: "ejecutivo",
   technical: "tecnico",
   foda: "foda",
   scenarios: "escenarios",
+  insights_por_tipo: "insights-por-tipo",
 };
 
 const FORMAT_LABEL: Record<ReportFormat, string> = {
@@ -27,6 +33,7 @@ const FORMAT_LABEL: Record<ReportFormat, string> = {
   technical: "Técnico",
   foda: "FODA",
   scenarios: "Escenarios",
+  insights_por_tipo: "Mapa de insights",
 };
 
 const BRAND_LABEL = "Centinela — PESTEL";

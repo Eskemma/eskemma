@@ -24,6 +24,7 @@ const FORMAT_MAP: Record<ReportFormat, InformeGenerado["formato"]> = {
   technical: "tecnico",
   foda: "foda_lista",
   scenarios: "escenarios",
+  insights_por_tipo: "insights_por_tipo",
 };
 
 async function persistInforme(
@@ -75,6 +76,7 @@ const VALID_FORMATS: ReportFormat[] = [
   "technical",
   "foda",
   "scenarios",
+  "insights_por_tipo",
 ];
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   if (!format || !VALID_FORMATS.includes(format as ReportFormat)) {
     return NextResponse.json(
-      { error: "format inválido. Usa: executive, technical, foda, scenarios" },
+      { error: "format inválido. Usa: executive, technical, foda, scenarios, insights_por_tipo" },
       { status: 400 }
     );
   }

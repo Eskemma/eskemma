@@ -54,6 +54,12 @@ const FORMAT_OPTIONS: {
     description: "Optimista / Base / Pesimista",
     borderClass: "border-l-4 border-b-2 border-red-eske",
   },
+  {
+    id: "insights_por_tipo",
+    label: "Mapa de insights",
+    description: "Agrupados por tipo de proyecto",
+    borderClass: "border-l-4 border-b-2 border-orange-eske",
+  },
 ];
 
 export default function InformesPage() {
@@ -383,7 +389,7 @@ export default function InformesPage() {
             Selecciona el formato y PESTEL generará el texto en tiempo real.
             Los informes ya generados se guardan en esta sesión.
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {FORMAT_OPTIONS.map((opt) => {
               const isCached = Boolean(reportCache[opt.id]);
               const isActive = activeFormat === opt.id;

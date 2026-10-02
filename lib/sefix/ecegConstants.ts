@@ -154,13 +154,20 @@ export const DEFAULT_ECEG_VARIABLE = "POBTOT";
 // Indicators with no entry here are index/average values — shown as raw value, not %.
 export const ECEG_DENOMINATORS: Partial<Record<string, string>> = {
   // Demografía → POBTOT
-  P3YM_HLI: "POBTOT", P3HLINHE: "POBTOT", PHOG_IND: "POBTOT",
+  // P3YM_HLI/P3HLINHE → P_3YMAS, no POBTOT — corregido 26-10-01, mismo
+  // fix que lib/fontana/ingesta/eceg.ts (coordinado): ambos se definen
+  // sobre "población de 3 años y más" (diccionario de datos ITER 2020).
+  P3YM_HLI: "P_3YMAS", P3HLINHE: "P_3YMAS", PHOG_IND: "POBTOT",
   POB_AFRO: "POBTOT", POB0_14: "POBTOT", POB15_64: "POBTOT",
   POB65_MAS: "POBTOT", P_60YMAS: "POBTOT", P_15A49_F: "POBTOT",
   P_18YMAS: "POBTOT", POBMAS: "POBTOT", POBFEM: "POBTOT",
   PNACOE: "POBTOT",
   // Educación → P_18YMAS (proxy 15+ años)
-  P15YM_SE: "P_18YMAS", P15YM_AN: "P_18YMAS", P18YM_PB: "P_18YMAS",
+  // P15YM_SE → P_15YMAS, no P_18YMAS — corregido 26-10-01 (mismo fix
+  // coordinado): P15YM_SE se define sobre "población de 15 años y más",
+  // no 18+. P15YM_AN/P18YM_PB NO se tocan en este fix (fuera de alcance
+  // aprobado — P18YM_PB ya usa la base correcta de 18+ por definición).
+  P15YM_SE: "P_15YMAS", P15YM_AN: "P_18YMAS", P18YM_PB: "P_18YMAS",
   P15PRI_IN: "P_18YMAS", P15PRI_CO: "P_18YMAS",
   P15SEC_IN: "P_18YMAS", P15SEC_CO: "P_18YMAS",
   // P15A17A y P18A24A se muestran como conteo absoluto (no existe denominador de cohorte exacto)
