@@ -108,7 +108,6 @@ export interface PlanFeatures {
 
 export const MODDULO_APPS = {
   BASIC: [
-    "redactor",
     "crm",
     "dashboard",
     "calendario",
@@ -119,7 +118,6 @@ export const MODDULO_APPS = {
   ],
   
   PREMIUM: [
-    "redactor",
     "crm", 
     "dashboard",
     "calendario",
@@ -131,14 +129,12 @@ export const MODDULO_APPS = {
     "email-marketing",
     "estratega",
     "sintesis",
-    "redactor-premium",
     "crm-premium",
     "dashboard-premium",
     "calendario-premium",
   ],
   
   PROFESSIONAL: [
-    "redactor",
     "crm",
     "dashboard",
     "calendario",
@@ -150,7 +146,6 @@ export const MODDULO_APPS = {
     "email-marketing",
     "estratega",
     "sintesis",
-    "redactor-premium",
     "crm-premium",
     "dashboard-premium",
     "calendario-premium",
@@ -165,16 +160,6 @@ export const MODDULO_APPS = {
     "roi",
   ],
 };
-
-// ============================================================
-// APPS CON VERSIÓN FREEMIUM
-// ============================================================
-
-/**
- * Apps de Moddulo que tienen versión freemium (accesibles para TODOS los usuarios)
- * La app internamente controla las limitaciones freemium vs plan pagado
- */
-export const FREEMIUM_APPS = ["redactor"];
 
 // ============================================================
 // CONFIGURACIÓN COMPLETA DE PLANES
@@ -417,24 +402,6 @@ export function getPlanTier(plan: SubscriptionPlan | undefined | null): ModduloT
 export function getPlanFeatures(plan: SubscriptionPlan | "user" | undefined | null): PlanFeatures {
   const planKey = plan || "user";
   return PLAN_FEATURES[planKey as keyof typeof PLAN_FEATURES];
-}
-
-/**
- * Verifica si un usuario tiene acceso a una app de Moddulo
- * ACTUALIZADO: Soporta apps freemium
- */
-export function canAccessModduloApp(
-  userPlan: SubscriptionPlan | undefined | null,
-  appSlug: string
-): boolean {
-  // Si la app tiene versión freemium, siempre es accesible
-  if (FREEMIUM_APPS.includes(appSlug)) {
-    return true;
-  }
-  
-  // Para otras apps, verificar según el plan
-  const features = getPlanFeatures(userPlan || null);
-  return features.modduloAppsIncluded.includes(appSlug);
 }
 
 /**

@@ -33,6 +33,11 @@ export const maxDuration = 60;
 
 const MAX_ITERACIONES = 5;
 
+// Contenido del mensaje del asistente cuando el turno se interrumpió (error de la
+// API) después de que las herramientas ya hubieran dejado tarjetas o consultas.
+const MENSAJE_TURNO_INTERRUMPIDO =
+  "(Esta respuesta se interrumpió por un problema técnico antes de terminar. Si lo que pediste no aparece completo, vuelve a preguntarlo.)";
+
 // Guard anti-alucinación de tool call (26-09-04, incidente Cuernavaca): el
 // modelo produjo un turno completo afirmando haber generado una pirámide
 // ("genero ahora", "ya está en tu Canvas", "aquí la lectura") SIN llamar a
@@ -280,12 +285,39 @@ export async function POST(request: NextRequest) {
   };
   const assistantMessageId = crypto.randomUUID();
 
+  const col = adminDb.collection("fontana_sesiones").doc(sesionId).collection("mensajes");
+
+  // Persistencia del turno (26-10-03). Antes, la pregunta y la respuesta se
+  // escribían JUNTAS al terminar el bucle: si el cliente se desconectaba o la API
+  // fallaba a mitad, se perdía el turno completo (y los canvasItems que las
+  // herramientas ya habían escrito quedaban sin mensaje que los explicara).
+  // Ahora la pregunta se guarda ANTES de llamar al modelo.
+  let usuarioGuardado = false;
+  try {
+    await col.doc(userMessage.id).set(limpiarUndefined(userMessage));
+    usuarioGuardado = true;
+  } catch (err) {
+    // No bloquea el turno: se reintenta al cerrarlo (guardarTurno).
+    console.error("[fontana/chat] no se pudo guardar la pregunta:", err);
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (obj: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      // Si el cliente se desconecta (cierra la pestaña, pierde red), enqueue lanza
+      // sobre el stream cancelado. NO se aborta el turno: el bucle sigue hasta
+      // terminar (acotado por maxDuration y MAX_ITERACIONES) para que la respuesta
+      // se guarde y esté en el historial cuando el usuario regrese.
+      let clienteConectado = true;
+      const send = (obj: unknown) => {
+        if (!clienteConectado) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+        } catch {
+          clienteConectado = false;
+        }
+      };
 
       const toolCallsAcum: FontanaToolCall[] = [];
       const toolResultTextsAcum: string[] = [];
@@ -298,6 +330,33 @@ export async function POST(request: NextRequest) {
       let correccionReusoHecha = false;
       let correccionHermanoHecha = false;
       let correccionPersonalizacionPaisesHecha = false;
+      let turnoCompleto = false;
+
+      const construirMensajeAsistente = (interrumpido: boolean): FontanaChatMessage => ({
+        id: assistantMessageId,
+        role: "assistant",
+        content: interrumpido ? MENSAJE_TURNO_INTERRUMPIDO : fullText,
+        timestamp: nowIso(),
+        ...(interrumpido ? { interrumpido: true } : {}),
+        ...(toolCallsAcum.length > 0 ? { toolCalls: toolCallsAcum } : {}),
+        ...(canvasItemIds.length > 0 ? { canvasItemIds } : {}),
+      });
+
+      // limpiarUndefined por defensa en profundidad: FontanaToolCall.input viene
+      // JSON-parseado del SDK (sin undefined), pero está tipado Record<string,
+      // unknown> y pasa por varias capas — mismo criterio que canvasItems
+      // (Firestore Admin rechaza undefined).
+      const guardarTurno = async (mensajeAsistente: FontanaChatMessage | null) => {
+        const escrituras: Promise<unknown>[] = [];
+        if (!usuarioGuardado) {
+          escrituras.push(col.doc(userMessage.id).set(limpiarUndefined(userMessage)));
+        }
+        if (mensajeAsistente) {
+          escrituras.push(col.doc(mensajeAsistente.id).set(limpiarUndefined(mensajeAsistente)));
+        }
+        await Promise.all(escrituras);
+        usuarioGuardado = true;
+      };
 
       try {
         for (let i = 0; i < MAX_ITERACIONES; i++) {
@@ -514,36 +573,36 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const assistantMessage: FontanaChatMessage = {
-          id: assistantMessageId,
-          role: "assistant",
-          content: fullText,
-          timestamp: nowIso(),
-          ...(toolCallsAcum.length > 0 ? { toolCalls: toolCallsAcum } : {}),
-          ...(canvasItemIds.length > 0 ? { canvasItemIds } : {}),
-        };
-
-        const col = adminDb.collection("fontana_sesiones").doc(sesionId).collection("mensajes");
-        // limpiarUndefined por defensa en profundidad: FontanaToolCall.input
-        // viene JSON-parseado del SDK (sin undefined), pero está tipado
-        // Record<string, unknown> y pasa por varias capas — mismo criterio
-        // que canvasItems (Firestore Admin rechaza undefined).
-        await Promise.all([
-          col.doc(userMessage.id).set(limpiarUndefined(userMessage)),
-          col.doc(assistantMessage.id).set(limpiarUndefined(assistantMessage)),
-        ]);
-
-        send({ type: "done", mensajeId: assistantMessage.id });
+        turnoCompleto = true;
+        await guardarTurno(construirMensajeAsistente(false));
+        send({ type: "done", mensajeId: assistantMessageId });
       } catch (err) {
         const detalle = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         console.error("[fontana/chat] Error:", detalle, err instanceof Error ? err.stack : "");
+        // Lo que ya ocurrió no se pierde: si el turno había terminado y falló el
+        // guardado, se reintenta con la respuesta completa; si se interrumpió, se
+        // guarda un mensaje marcado como interrumpido SOLO cuando las herramientas
+        // ya dejaron algo (tarjetas en el Canvas, consultas), para que el historial
+        // siga siendo coherente con el Canvas.
+        try {
+          const hayRastro = toolCallsAcum.length > 0 || canvasItemIds.length > 0;
+          await guardarTurno(
+            turnoCompleto || hayRastro ? construirMensajeAsistente(!turnoCompleto) : null
+          );
+        } catch (errGuardado) {
+          console.error("[fontana/chat] no se pudo guardar el turno:", errGuardado);
+        }
         send({
           type: "error",
           message: "Hubo un problema al procesar tu mensaje. Intenta de nuevo.",
           ...(process.env.NODE_ENV === "development" ? { detalle } : {}),
         });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // el cliente ya se fue
+        }
       }
     },
   });

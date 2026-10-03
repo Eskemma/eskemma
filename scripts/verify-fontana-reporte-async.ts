@@ -53,7 +53,6 @@ async function main() {
       territorio: { nivel: "estatal", pais: "México", estado: "Oaxaca", nombre: "Oaxaca" },
       indicadoresPorFamilia: familiasVacias(),
       fechaUltimoGuardado: new Date().toISOString(),
-      versionSesion: 1,
       ...over,
     }) as FontanaSesion;
 

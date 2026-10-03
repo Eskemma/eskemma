@@ -253,7 +253,7 @@ interface FontanaSesion {
   salidasAgente?: SalidaAgente[];  // 🔧 v2 — ver definición y regla abajo
 
   fechaUltimoGuardado: string;
-  versionSesion: number;           // Fontana lleva su propio historial de versiones
+  // versionSesion: number;        // ELIMINADO 26-10-03: nunca se incrementó (siempre 1). Ver nota en Cierre_Paso4 §7.
   exportadoAF3?: {
     resultadoId: string;
     fechaExportacion: string;
@@ -295,8 +295,8 @@ interface IndicadorEntregaF3 {
 
 interface FontanaContextoTerritorial {
   familias: Record<"F1"|"F2"|"F3"|"F4"|"F5", IndicadorEntregaF3[]>;
-  familiasModificadasDesdeUltimaExportacion?: string[];
-  versionSesion: number;
+  familiasModificadasDesdeUltimaExportacion?: string[]; // NO construido (nota 26-10-03)
+  // versionSesion: number;  // ELIMINADO 26-10-03 (nunca se incrementó)
 }
 ```
 

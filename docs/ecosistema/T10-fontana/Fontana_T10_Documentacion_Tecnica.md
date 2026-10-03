@@ -6,6 +6,8 @@ Eskemma · Ecosistema digital · Julio 2026
 
 **Documentos de origen:** `Fontana_T10_Cierre_Paso2_v2.md` (catálogo de indicadores) · `Fontana_T10_Arquitectura_Paso3_v2.md` (arquitectura funcional) · `Fontana_T10_Cierre_Paso4.md` (prototipo interactivo y agente conversacional) · `fontana_prototipo.jsx` (prototipo de referencia de interacción).
 
+> **Nota 26-10-03 — `versionSesion` eliminado:** las menciones a `versionSesion` (modelo de datos, diagramas y la transición «versionSesion++») describen un diseño que no se construyó: el campo nunca se incrementó (siempre valía 1), no tenía lectores y se eliminó del código. Tampoco existe `familiasModificadasDesdeUltimaExportacion`. La entrega real a F3 vive en `entregaCanal1`.
+
 > **Nota de plantilla:** este documento sigue la misma estructura usada para las fases de Moddulo (F1, F2, F3), adaptada a que Fontana es una app del ecosistema, no una fase. En la sección 3.6 se documenta explícitamente dónde esa adaptación fue necesaria (Fontana no emite un "Dictamen de Coherencia" del tipo XPCTO/HEI; su integración con la API de Claude es el agente conversacional definido en el Paso 4).
 
 ---

@@ -87,7 +87,7 @@ SaaS (Software as a Service) con modelo freemium y planes por suscripción mensu
 
 | Plan | Precio MXN | Módulos incluidos |
 |------|-----------|-------------------|
-| Freemium | $0 | Blog, Redactor limitado |
+| Freemium | $0 | Blog |
 | Basic | $2,899/mes | + Cursos, SEFIX |
 | Premium | $5,899/mes | + Centinela (PESTEL), Moddulo |
 | Professional | $9,899/mes | + API, white label |

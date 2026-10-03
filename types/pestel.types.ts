@@ -223,6 +223,7 @@ export interface ScorecardItem {
 export interface InformeGenerado {
   id: string;
   formato: "ejecutivo" | "tecnico" | "foda_lista" | "escenarios" | "insights_por_tipo";
+  /** Texto tal como lo generó el modelo. Nunca se sobrescribe. */
   contenidoTexto: string;
   datosEstructurados: {
     escenarios?: { optimista: string; base: string; pesimista: string };
@@ -231,6 +232,22 @@ export interface InformeGenerado {
     mapaPESTEL: Partial<Record<DimensionCode, Partial<DimensionAnalysis>>>;
   };
   generadoEn: string;
+  // ── Edición del usuario (E7, 26-10-03) ──────────────────────────────
+  // IMPORTANTE: esto NO es un historial de versiones. Solo conserva la
+  // generación original (`contenidoTexto`) junto a la ÚLTIMA edición del
+  // usuario (`contenidoEditado`, que se sobrescribe en cada guardado). El
+  // versionado completo (cada edición, quién y cuándo) pertenece al
+  // principio 7 de Persistencia y se resuelve con lib/moddulo/changelog.ts
+  // en el Grupo 2 de la auditoría de principios.
+  contenidoEditado?: string;
+  editadoEn?: string;
+  editadoPor?: string;
+  /**
+   * "migrado_localstorage": el texto venía de la caché local del navegador
+   * (antes de que las ediciones se guardaran en servidor) y no es una
+   * generación del modelo; `contenidoTexto` es entonces ese texto local.
+   */
+  origen?: "generado" | "migrado_localstorage";
 }
 
 export interface PestlAnalysisV2 {

@@ -22,11 +22,6 @@ const colors = {
 // Definición de todos los íconos (25 SVGs)
 const icons = {
   // ========== TIER BASIC (8 apps) ==========
-  "redactor.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <circle cx="32" cy="32" r="28" fill="${colors.blue}" opacity="0.1"/>
-  <path d="M20 44L44 20M44 20h-8M44 20v8" stroke="${colors.blue}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M18 46l4-4 4 4-4 4-4-4z" fill="${colors.blue}"/>
-</svg>`,
 
   "crm.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <circle cx="32" cy="32" r="28" fill="${colors.bluegreen}" opacity="0.1"/>
@@ -118,13 +113,6 @@ const icons = {
   <text x="44" y="44" fill="white" font-size="8" font-weight="bold" text-anchor="middle">AI</text>
 </svg>`,
 
-  "redactor-premium.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <circle cx="32" cy="32" r="28" fill="${colors.orange}" opacity="0.1"/>
-  <path d="M20 44L44 20M44 20h-8M44 20v8" stroke="${colors.orange}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M18 46l4-4 4 4-4 4-4-4z" fill="${colors.orange}"/>
-  <circle cx="48" cy="16" r="6" fill="${colors.orange}"/>
-  <text x="48" y="19" fill="white" font-size="7" font-weight="bold" text-anchor="middle">+</text>
-</svg>`,
 
   "crm-premium.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <circle cx="32" cy="32" r="28" fill="${colors.orange}" opacity="0.1"/>

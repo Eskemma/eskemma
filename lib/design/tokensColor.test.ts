@@ -139,7 +139,7 @@ describe("PESTEL, Sefix, Moddulo y sitio principal (sub-ronda A): sin colores ge
     const rutasA = [
       "app/contacto", "app/politica-de-cookies", "app/politica-de-privacidad", "app/condiciones-de-uso",
       "app/condiciones-sesiones-diagnostico-gratuitas", "app/cursos", "app/components/componentsCursos",
-      "app/components/shared", "app/components/geo", "app/components/legal", "lib/redactor",
+      "app/components/shared", "app/components/geo", "app/components/legal",
       "app/HomeClient.tsx", "app/components/Header.tsx", "app/components/NotificationBell.tsx",
     ];
     expect(coloresGenericos(rutasA)).toEqual([]);

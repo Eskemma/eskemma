@@ -74,7 +74,6 @@ export interface FontanaSesion {
   territorio: Territorio;
   indicadoresPorFamilia: Record<FamiliaFontanaId, SeleccionFamiliaFontana>;
   fechaUltimoGuardado: string; // ISO
-  versionSesion: number;
   // T10 capa conversacional (2026-08-27) — salidas que el agente "Fontana"
   // fija en la pestaña Canvas. Aditivo, opcional: sesiones creadas antes de
   // este campo siguen válidas (se leen como []). Append-only en la práctica
@@ -195,6 +194,7 @@ export interface FontanaChatMessage {
   timestamp: string; // ISO
   toolCalls?: FontanaToolCall[]; // solo assistant
   canvasItemIds?: string[]; // solo assistant — ids generados en el turno
+  interrumpido?: boolean; // solo assistant — el turno falló antes de terminar (el contenido es un aviso, no una respuesta)
   adjuntoIds?: string[]; // solo user — adjuntos referenciados en el turno (traza)
 }
 

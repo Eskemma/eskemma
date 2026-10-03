@@ -115,8 +115,23 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   }
 
   const collection = vi.fn((name: string) => collectionRef(name));
+  // runTransaction mínimo: get/update delegan en el ref (sin aislamiento ni
+  // reintentos — solo permite probar la lógica de lectura-modificación-escritura).
+  const runTransaction = vi.fn(
+    async <T>(
+      fn: (tx: {
+        get: (ref: DocRef) => ReturnType<DocRef["get"]>;
+        update: (ref: DocRef, data: Record<string, unknown>) => Promise<void>;
+      }) => Promise<T>
+    ): Promise<T> =>
+      fn({
+        get: (ref) => ref.get(),
+        update: (ref, data) => ref.update(data),
+      })
+  );
   return {
     collection,
+    runTransaction,
     /** Reemplaza el estado en memoria — usar en beforeEach/cada test. */
     reset(newDocs: Record<string, unknown> = {}) {
       store = new Map(Object.entries(newDocs));

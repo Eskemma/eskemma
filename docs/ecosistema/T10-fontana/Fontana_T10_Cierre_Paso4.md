@@ -139,6 +139,8 @@ Antes de este paso, el botón "Regresar a Moddulo F3 con resultados" no tenía l
 2. Muestra, por familia: conteo de indicadores en sesión y estado respecto al último envío confirmado — **nunca enviada**, **modificada** o **sin cambios**.
 3. Al confirmar, Fontana congela una copia de la sesión como referencia para el siguiente diff e incrementa `versionSesion`.
 
+> **Nota 26-10-03 — este mecanismo NO se construyó.** Ni `familiasModificadasDesdeUltimaExportacion` ni el incremento de `versionSesion` existen en el código: la entrega real quedó en `entregaCanal1` y `versionSesion` solo se escribía con el valor 1, sin ningún lector, así que el campo se eliminó. El diseño de este apartado (resumen de entrega con diff por familia y copia congelada de la sesión) sigue siendo una idea no implementada.
+
 Esto hace visible al usuario el mecanismo de `familiasModificadasDesdeUltimaExportacion` y `versionSesion` ya definidos en la arquitectura del Paso 3 — no introduce cálculo nuevo, expone uno que ya existía solo en el modelo de datos. Queda documentado también como ajuste de interfaz en `Fontana_T10_Arquitectura_Paso3_v2.md`, sección 8.1.
 
 ---

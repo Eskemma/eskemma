@@ -107,7 +107,6 @@ export default function WhatIsModduloModal({ isOpen, onClose }: WhatIsModduloMod
                     Herramientas fundamentales para gestión de campañas
                   </p>
                   <ul className="text-xs max-sm:text-[11px] text-gray-eske-80 dark:text-[#9AAEBE] space-y-1">
-                    <li>• Redactor Político</li>
                     <li>• CRM Comunitario</li>
                     <li>• Dashboard, Calendario y más</li>
                   </ul>

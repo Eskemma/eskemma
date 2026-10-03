@@ -226,7 +226,6 @@ export async function POST(request: NextRequest) {
         F5: familiaVacia(),
       },
       fechaUltimoGuardado: nowIso,
-      versionSesion: 1,
     };
     const ref = await adminDb.collection(COLLECTION).add(nuevaSesion);
     const sesion: FontanaSesion = { sesionId: ref.id, ...nuevaSesion };
@@ -275,7 +274,6 @@ export async function POST(request: NextRequest) {
       F5: familiaVacia(),
     },
     fechaUltimoGuardado: nowIso,
-    versionSesion: 1,
   };
 
   const ref = await adminDb.collection(COLLECTION).add(nuevaSesion);
