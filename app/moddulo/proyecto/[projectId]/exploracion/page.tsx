@@ -1,6 +1,11 @@
 // app/moddulo/proyecto/[projectId]/exploracion/page.tsx
 "use client";
 
+import {
+  decidirResultadoGuardado,
+  esRespuestaVigente,
+  type RespuestaGuardado,
+} from "@/lib/moddulo/guardadoHonesto";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -1028,51 +1033,95 @@ export default function ExploracionPage() {
     }).catch(() => {});
   };
 
-  // Aprobación secuencial de motores M2→M5
+  // Aprobación secuencial de motores M2→M5.
+  // Decisions (success / error / revert / out-of-order) live in
+  // lib/moddulo/guardadoHonesto.ts; this handler only performs effects.
+  const aprobSeqRef = useRef<Record<string, number>>({});
+  const borradorSeqRef = useRef(0);
+
   const handleApproveMotor = async (motor: "M2" | "M3" | "M4" | "M5") => {
+    const aprobadoPrevio = motorAprobaciones[motor] === true;
+    const seq = (aprobSeqRef.current[motor] ?? 0) + 1;
+    aprobSeqRef.current[motor] = seq;
     // Actualización optimista
     setMotorAprobaciones((prev) => ({ ...prev, [motor]: true }));
 
-    if (motor !== "M5") {
-      // Persistir aprobación parcial
-      fetch("/api/moddulo/f2/approve-motor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId, motor }),
-      }).catch(() => {});
-      return;
+    const accion = motor === "M5" ? "finalizar_analisis" : "aprobar_motor";
+    let resp: RespuestaGuardado;
+    let data: { dvs?: DVSF2 } | null = null;
+    try {
+      const r = await fetch(
+        motor === "M5" ? "/api/moddulo/f2/finalize-dvs" : "/api/moddulo/f2/approve-motor",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(motor === "M5" ? { projectId, draftDVS } : { projectId, motor }),
+        }
+      );
+      let cuerpoValido: boolean | undefined;
+      if (motor === "M5" && r.ok) {
+        try {
+          data = (await r.json()) as { dvs?: DVSF2 };
+          cuerpoValido = !!data?.dvs;
+        } catch {
+          cuerpoValido = false;
+        }
+      }
+      resp = { tipo: "respuesta", ok: r.ok, status: r.status, cuerpoValido };
+    } catch {
+      resp = { tipo: "error_red" };
     }
 
-    // M5: finalizar — promueve draftDVS → dvs
+    // A slower, older request must not overwrite the screen state of a newer one.
+    if (!esRespuestaVigente(seq, aprobSeqRef.current[motor] ?? 0)) return;
+
+    const d = decidirResultadoGuardado(accion, resp, { motor, aprobadoPrevio });
+    if (!d.exito) {
+      if (d.revertirAprobacion) {
+        setMotorAprobaciones((prev) => ({ ...prev, [motor]: d.valorRestaurado === true }));
+      }
+      setSaveError(d.mensajeError);
+      return;
+    }
+    setSaveError(null);
+    if (motor === "M5" && data?.dvs) {
+      setDvs(data.dvs);
+      setDraftDVS(null);
+      setMotorAprobaciones({});
+      if (mode !== "completed") setMode("completed");
+      // showReporte queda en false — el usuario ve el panel "Análisis completo"
+      // y decide cuándo abrir el Reporte F2
+    }
+  };
+
+  // finalize-dvs promotes the draft the CLIENT sends (`clientDraft ?? storedDraft`),
+  // so a failed save-draft cannot make "Finalizar análisis" freeze an older version
+  // than the one on screen; the failed save is only reported, nothing else to gate.
+  const handleSaveMotorEdit = async (_motor: "M2" | "M3" | "M4" | "M5") => {
+    if (!draftDVS) return;
+    const seq = ++borradorSeqRef.current;
+    let resp: RespuestaGuardado;
     try {
-      const r = await fetch("/api/moddulo/f2/finalize-dvs", {
+      const r = await fetch("/api/moddulo/f2/save-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ projectId, draftDVS }),
       });
-      if (!r.ok) return;
-      const data = await r.json();
-      if (data.dvs) {
-        setDvs(data.dvs as DVSF2);
-        setDraftDVS(null);
-        setMotorAprobaciones({});
-        if (mode !== "completed") setMode("completed");
-        // showReporte queda en false — el usuario ve el panel "Análisis completo"
-        // y decide cuándo abrir el Reporte F2
-      }
-    } catch {/* silencioso */}
-  };
-
-  const handleSaveMotorEdit = (_motor: "M2" | "M3" | "M4" | "M5") => {
-    if (!draftDVS) return;
-    fetch("/api/moddulo/f2/save-draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ projectId, draftDVS }),
-    }).catch(() => {});
+      resp = { tipo: "respuesta", ok: r.ok, status: r.status };
+    } catch {
+      resp = { tipo: "error_red" };
+    }
+    // The draft is saved whole, so any later save supersedes an earlier one.
+    if (!esRespuestaVigente(seq, borradorSeqRef.current)) return;
+    const d = decidirResultadoGuardado("guardar_borrador", resp, { motor: _motor });
+    if (d.exito) {
+      setSaveError(null);
+      setLastSaved(new Date());
+    } else {
+      setSaveError(d.mensajeError);
+    }
   };
 
   const handleStartEdit = () => {
@@ -1224,6 +1273,9 @@ export default function ExploracionPage() {
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
               ) : null}
             </span>
+            {saveError && !isSaving && !generandoDVS && (
+              <span className="sm:hidden text-xs text-red-eske font-medium" role="alert">⚠ Error al guardar</span>
+            )}
             <PhaseDownloadMenu
               phaseId="exploracion"
               projectName={projectName}
