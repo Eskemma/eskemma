@@ -636,14 +636,22 @@ export default function ExploracionPage() {
     if (!projectId) return;
     setIsSaving(true);
     try {
-      await fetch(`/api/moddulo/projects/${projectId}`, {
+      const res = await fetch(`/api/moddulo/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ phaseData: { phaseId: "exploracion", data: formData } }),
       });
-      setLastSaved(new Date());
-    } catch {/* silencioso */} finally {
+      if (res.ok) {
+        setLastSaved(new Date());
+        setSaveError(null);
+      } else {
+        // H-M5 (26-10-07): never show "saved" for a failed write.
+        setSaveError("No se pudo guardar el autoguardado. Tus cambios siguen en pantalla.");
+      }
+    } catch {
+      setSaveError("Error de conexión al autoguardar. Tus cambios siguen en pantalla.");
+    } finally {
       setIsSaving(false);
     }
   }, [projectId]);
@@ -1353,8 +1361,8 @@ export default function ExploracionPage() {
                       onClick={handleRegenerarReporteF2}
                       disabled={isRegeneratingReport}
                       className="p-1 rounded text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
-                      aria-label="Regenerar reporte F2"
-                      title="Regenerar reporte F2"
+                      aria-label="Reemplazar análisis finalizado"
+                      title="Reemplazar análisis finalizado (vuelve a generar el análisis y sustituye el que finalizaste)"
                     >
                       <svg
                         className={`w-3.5 h-3.5 ${isRegeneratingReport ? "animate-spin" : ""}`}
@@ -2332,7 +2340,7 @@ function ConfirmReanalisisModal({ onCancel, onConfirm }: {
           <div>
             <h2 className="font-bold text-black-eske dark:text-[#EAF2F8]">¿Relanzar el análisis PESTEL?</h2>
             <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-1">
-              Se descartarán el mapa de dimensiones, los motores generados y las aprobaciones actuales. Esta acción no se puede deshacer.
+              Se descartarán el mapa de dimensiones y las aprobaciones de los motores, y los motores en borrador se reemplazarán cuando termine el nuevo análisis. El análisis finalizado no cambia hasta que lo vuelvas a finalizar.
             </p>
           </div>
         </div>

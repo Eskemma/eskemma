@@ -238,7 +238,7 @@ function PropositoPageContent() {
     if (!projectId) return;
     setIsSaving(true);
     try {
-      await fetch(`/api/moddulo/projects/${projectId}`, {
+      const res = await fetch(`/api/moddulo/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -252,8 +252,17 @@ function PropositoPageContent() {
           } satisfies Partial<XPCTO>,
         }),
       });
-      setLastSaved(new Date());
-    } catch {/* silencioso */} finally {
+      if (res.ok) {
+        setLastSaved(new Date());
+        setSaveStatus("idle");
+      } else {
+        // H-M5 (26-10-07): the server now rejects with 400/403/404; never
+        // show "saved" for a failed write.
+        setSaveStatus("error");
+      }
+    } catch {
+      setSaveStatus("error");
+    } finally {
       setIsSaving(false);
     }
   }, [projectId]);

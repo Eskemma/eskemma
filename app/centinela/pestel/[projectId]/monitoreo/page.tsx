@@ -369,10 +369,10 @@ export default function MonitoreoPage() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="font-semibold text-black-eske dark:text-[#EAF2F8]">
-                Ejecutar análisis manual
+                Análisis manual
               </h2>
               <p className="text-xs text-black-eske dark:text-[#9AAEBE] mt-0.5">
-                Ejecuta un análisis en cualquier momento desde la pantalla de Datos.
+                Para ejecutar un análisis en cualquier momento, ve a la pantalla de Datos y usa «Ejecutar análisis IA».
               </p>
             </div>
             <button

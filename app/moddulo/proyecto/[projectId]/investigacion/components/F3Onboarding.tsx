@@ -14,7 +14,7 @@ const MOTORES = [
   { code: "M1", title: "Gestor de tareas de investigación", desc: "Traduce el Programa de Investigación Profunda (PIP) heredado de F2 en un tablero de tareas concretas, y propone el canal más adecuado para cada una." },
   { code: "M2", title: "Receptor y validador de resultados", desc: "Organiza los resultados que van llegando por cada canal y los presenta para tu revisión y aprobación antes de que entren a la síntesis." },
   { code: "M3", title: "Síntesis de hallazgos", desc: "Cruza los resultados aprobados: identifica convergencias, contradicciones y vacíos residuales, y construye los insumos de FODA Propio y FODA de Adversarios." },
-  { code: "M4", title: "Veredicto sobre la Hipótesis Estratégica Inicial", desc: "Contrasta la HEI de F2 con la evidencia acumulada y emite un veredicto: validada, ajustada o refutada." },
+  { code: "M4", title: "Veredicto sobre la Hipótesis Estratégica Inicial", desc: "Contrasta la HEI de F2 con la evidencia acumulada y propone un veredicto que tú apruebas: validada, ajustada o refutada." },
 ];
 
 export default function F3Onboarding({
