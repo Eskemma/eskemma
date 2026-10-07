@@ -12,6 +12,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PhaseId, ChatRequest, ChatAttachment, XPCTO, PIPItem, TareaPIP } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
+import { filtrarExtraccionChat } from "@/lib/moddulo/projectPatch";
 
 export async function POST(
   request: NextRequest,
@@ -273,19 +274,15 @@ export async function POST(
         // - F1: campos xpcto.* → project.xpcto (dot-notation)
         // - F2+: campos pestl.*, semaforo.*, hipotesis.*, etc. → phases[phaseId].data (dot-notation)
         if (extractedData && Object.keys(extractedData).length > 0) {
-          const xpctoUpdates: Record<string, unknown> = {};
-          const phaseDataUpdates: Record<string, unknown> = {};
-
-          for (const [key, value] of Object.entries(extractedData)) {
-            if (key.startsWith("xpcto.")) {
-              xpctoUpdates[key] = value;
-            } else if (
-              key.startsWith("pestl.") ||
-              key.startsWith("semaforo.") ||
-              key.startsWith("hipotesis.")
-            ) {
-              phaseDataUpdates[`phases.${phaseId as string}.data.${key}`] = value;
-            }
+          // H-M5 (26-10-07): el sufijo de estas claves lo controla el MODELO (y, vía inyección en
+          // el mensaje del usuario, el usuario): solo se persisten las 8 rutas de XPCTO y, en F2,
+          // las hojas del formulario real. Lo demás se descarta (se registra solo el NOMBRE).
+          const { xpctoUpdates, phaseDataUpdates, descartadas } = filtrarExtraccionChat(
+            extractedData,
+            phaseId as PhaseId
+          );
+          if (descartadas.length > 0) {
+            console.warn("[chat/route] claves extraídas descartadas por no ser rutas válidas:", descartadas);
           }
 
           const combinedUpdates = { ...xpctoUpdates, ...phaseDataUpdates };

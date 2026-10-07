@@ -31,6 +31,10 @@ export function mockSessionPayload(session: MockSessionPayload): SessionPayload 
 
 export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   let store = new Map<string, unknown>(Object.entries(initialDocs));
+  // Bitácora de TODAS las llamadas a update() (ruta del documento + argumento tal cual), para poder
+  // asertar QUÉ se mandó a Firestore (rutas con punto incluidas) y no solo el estado resultante:
+  // el mock aplica un merge superficial con las claves literales, sin interpretar rutas con punto.
+  let updateLog: Array<{ path: string; data: Record<string, unknown> }> = [];
 
   let autoIdCounter = 0;
 
@@ -54,6 +58,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         store.set(path, data);
       }),
       update: vi.fn(async (data: Record<string, unknown>) => {
+        updateLog.push({ path, data });
         store.set(path, { ...(store.get(path) as object ?? {}), ...data });
       }),
       collection: (name: string) => collectionRef(`${path}/${name}`),
@@ -135,6 +140,11 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
     /** Reemplaza el estado en memoria — usar en beforeEach/cada test. */
     reset(newDocs: Record<string, unknown> = {}) {
       store = new Map(Object.entries(newDocs));
+      updateLog = [];
+    },
+    /** Todas las llamadas a update() desde el último reset (path + argumento literal). */
+    updates(): Array<{ path: string; data: Record<string, unknown> }> {
+      return updateLog.map((u) => ({ path: u.path, data: u.data }));
     },
     /** Estado actual en memoria (path → documento) — para asertar escrituras. */
     snapshot(): Record<string, unknown> {

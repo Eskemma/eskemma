@@ -1,10 +1,23 @@
 // app/api/moddulo/projects/[projectId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
-import { getProject, updateProject, updatePhaseData, savePhaseReportDraft, deleteProject } from "@/lib/moddulo/project";
-import type { UpdateProjectInput, ModduloProject, PhaseId } from "@/types/moddulo.types";
+import {
+  getProject,
+  updateProject,
+  updatePhaseData,
+  marcarFaseIniciada,
+  savePhaseReportDraft,
+  deleteProject,
+} from "@/lib/moddulo/project";
+import { ProyectoNoEncontradoError, SinPermisosError } from "@/lib/moddulo/projectErrors";
+import {
+  PatchInvalidoError,
+  esObjetoPlano,
+  filtrarRecuperacionXpcto,
+  validarPhaseData,
+  validarReportDraft,
+} from "@/lib/moddulo/projectPatch";
+import type { UpdateProjectInput, ModduloProject } from "@/types/moddulo.types";
 
 // GET: Obtener proyecto individual
 export async function GET(
@@ -28,7 +41,17 @@ export async function GET(
     const xpctoIsEmpty = !xpcto?.hito && !xpcto?.sujeto && !xpcto?.justificacion;
 
     if (xpctoIsEmpty) {
-      const recovered = recoverXpctoFromChatHistory(project);
+      // H-M5 (26-10-07): las claves salen del extractedData que produjo el MODELO; solo pasan las 8
+      // rutas válidas de XPCTO (antes cualquier `xpcto.<lo-que-sea>` se escribía con su ruta).
+      const bruto = recoverXpctoFromChatHistory(project);
+      let recovered: Record<string, unknown> | null = null;
+      if (bruto) {
+        const { validas, descartadas } = filtrarRecuperacionXpcto(bruto);
+        if (descartadas.length > 0) {
+          console.warn(`[projects/GET] claves xpcto descartadas por no ser rutas válidas (${projectId}):`, descartadas);
+        }
+        recovered = Object.keys(validas).length > 0 ? validas : null;
+      }
       if (recovered) {
         // Guardar los datos recuperados en Firestore para no tener que reconstruir siempre
         const { adminDb } = await import("@/lib/firebase-admin");
@@ -83,6 +106,10 @@ function recoverXpctoFromChatHistory(project: ModduloProject): Record<string, un
 }
 
 // PATCH: Actualizar proyecto o datos de una fase
+//
+// H-M5 (26-10-07): el cuerpo se valida contra una lista blanca (lib/moddulo/projectPatch.ts); lo
+// que no está en ella se rechaza con 400 (nunca se ignora en silencio) y la respuesta de error
+// NO incluye el contenido enviado, solo el nombre del campo y un motivo fijo.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
@@ -92,45 +119,46 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const { projectId } = await params;
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new PatchInvalidoError("(cuerpo)", "cuerpo_invalido");
+    }
+    if (!esObjetoPlano(body)) throw new PatchInvalidoError("(cuerpo)", "cuerpo_invalido");
 
-    // Si se envía phaseData, guardar datos de la fase específica
     if (body.phaseData) {
-      const { phaseId, data, started } = body.phaseData as {
-        phaseId: PhaseId;
-        data?: Record<string, unknown>;
-        started?: boolean;
-      };
-      // started: true → marcar la fase como iniciada sin sobreescribir datos
-      if (started === true && !data) {
-        const proj = await getProject(projectId, session.uid);
-        if (!proj) return NextResponse.json({ error: "Proyecto no encontrado o sin acceso." }, { status: 404 });
-        const phaseUpdates: Record<string, unknown> = {
-          [`phases.${phaseId}.started`]: true,
-          [`phases.${phaseId}.status`]: "in-progress",
-          updatedAt: FieldValue.serverTimestamp(),
-        };
-        // draft → active when user starts the first phase
-        if (proj.status === "draft") phaseUpdates.status = "active";
-        await adminDb.collection("moddulo_projects").doc(projectId).update(phaseUpdates);
+      const fase = validarPhaseData(body.phaseData);
+      if (fase.soloIniciar) {
+        await marcarFaseIniciada(projectId, session.uid, fase.phaseId);
       } else {
-        await updatePhaseData(projectId, session.uid, phaseId, data ?? {});
+        await updatePhaseData(projectId, session.uid, fase.phaseId, fase.data ?? {});
       }
     } else if (body.reportDraft) {
       // Guardar borrador del reporte sin completar la fase
-      const { phaseId, reportText } = body.reportDraft as { phaseId: PhaseId; reportText: string };
+      const { phaseId, reportText } = validarReportDraft(body.reportDraft);
       await savePhaseReportDraft(projectId, session.uid, phaseId, reportText);
     } else {
-      // Actualización de campos del proyecto (xpcto, name, status, etc.)
-      const input = body as UpdateProjectInput;
-      await updateProject(projectId, session.uid, input);
+      // Actualización de campos del proyecto: la lista blanca vive en updateProject
+      await updateProject(projectId, session.uid, body as UpdateProjectInput);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof PatchInvalidoError) {
+      return NextResponse.json(
+        { error: "Solicitud inválida", campo: error.campo, motivo: error.motivo },
+        { status: 400 }
+      );
+    }
+    if (error instanceof SinPermisosError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (error instanceof ProyectoNoEncontradoError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Error al actualizar proyecto:", error);
-    const message = error instanceof Error ? error.message : "Error al actualizar proyecto";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Error al actualizar proyecto" }, { status: 500 });
   }
 }
 

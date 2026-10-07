@@ -18,6 +18,12 @@ import type {
   ActorVetoF2,
 } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
+import { ProyectoNoEncontradoError, SinPermisosError } from "@/lib/moddulo/projectErrors";
+import {
+  validarPatchProyecto,
+  validarPhaseData,
+  validarReportDraft,
+} from "@/lib/moddulo/projectPatch";
 import { APP_TO_F3_CONTRACTS } from "@/types/f3.types";
 import type { TecnicaId } from "@/types/shared.types";
 
@@ -471,15 +477,22 @@ export async function updateProject(
   input: UpdateProjectInput
 ): Promise<void> {
   const project = await getProject(projectId, userId);
-  if (!project) throw new Error("Proyecto no encontrado o sin acceso.");
+  if (!project) throw new ProyectoNoEncontradoError();
 
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (!collaborator || collaborator.role === "analyst" || collaborator.role === "client") {
-    throw new Error("Sin permisos para editar este proyecto.");
+    throw new SinPermisosError("Sin permisos para editar este proyecto.");
   }
 
+  // H-M5 (26-10-07): antes `update({...input})` — el `as UpdateProjectInput` de la ruta no
+  // validaba nada en ejecución y Firestore interpreta las claves con punto como rutas de campo
+  // (collaborators, userId, deletedAt, phases.*.dvs…). Ahora solo pasa lo que valida la lista
+  // blanca; esta función es la ÚNICA línea de defensa, así que ningún llamador futuro puede
+  // reabrir el agujero. `input` es `unknown` a propósito.
+  const { update } = validarPatchProyecto(input);
+
   await adminDb.collection(COLLECTION).doc(projectId).update({
-    ...input,
+    ...update,
     updatedAt: FieldValue.serverTimestamp(),
   });
 }
@@ -496,12 +509,17 @@ export async function updatePhaseData(
   status?: PhaseStatus
 ): Promise<void> {
   const project = await getProject(projectId, userId);
-  if (!project) throw new Error("Proyecto no encontrado o sin acceso.");
+  if (!project) throw new ProyectoNoEncontradoError();
 
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (!collaborator || collaborator.role === "analyst" || collaborator.role === "client") {
-    throw new Error("Sin permisos para editar fases.");
+    throw new SinPermisosError("Sin permisos para editar fases.");
   }
+
+  // H-M5 (26-10-07): `phaseId` venía del cliente sin validar (`phases.${phaseId}.data` aceptaba
+  // "exploracion.dvs" o fases inventadas) y `data` REEMPLAZABA phases.X.data completo: cerrar F2
+  // enviaba `{aprobadoEn}` y borraba el formulario PESTL (10 de 10 proyectos con F2 cerrada).
+  const valida = validarPhaseData({ phaseId, data });
 
   // Nunca degradar una fase ya "completed" de vuelta a "in-progress" solo
   // porque este guardado de datos no especificó status explícitamente.
@@ -515,17 +533,54 @@ export async function updatePhaseData(
   // que F2 ya usa hoy — sin que vuelva a reintroducir este bug.
   const currentStatus = project.phases?.[phaseId]?.status;
   const updates: Record<string, unknown> = {
-    [`phases.${phaseId}.data`]: data,
     [`phases.${phaseId}.status`]: status ?? (currentStatus === "completed" ? "completed" : "in-progress"),
     updatedAt: FieldValue.serverTimestamp(),
   };
+  // FUSIÓN POR CLAVE de primer nivel (misma convención que el chat, que ya escribe
+  // `phases.X.data.<clave>`): las claves enviadas reemplazan esa clave completa; las demás se
+  // conservan. Un `data` vacío no borra nada.
+  for (const [k, v] of Object.entries(valida.data ?? {})) {
+    updates[`phases.${phaseId}.data.${k}`] = v;
+  }
 
   await adminDb.collection(COLLECTION).doc(projectId).update(updates);
 }
 
 // ==========================================
-// GUARDAR BORRADOR DE REPORTE (sin completar la fase)
+// MARCAR UNA FASE COMO INICIADA
 // ==========================================
+
+/**
+ * `phaseData: { phaseId, started: true }`. Antes vivía inline en la ruta, sin comprobación de
+ * rol y sin la protección de "no degradar": ponía `status: "in-progress"` incondicionalmente, así
+ * que podía revertir una fase `completed`. Ahora: mismo guard de rol que las demás mutaciones y
+ * el estado solo avanza desde `not-started`. El paso `draft → active` del proyecto se conserva.
+ */
+export async function marcarFaseIniciada(projectId: string, userId: string, phaseId: PhaseId): Promise<void> {
+  const project = await getProject(projectId, userId);
+  if (!project) throw new ProyectoNoEncontradoError("Proyecto no encontrado o sin acceso.");
+
+  const collaborator = project.collaborators.find((c) => c.uid === userId);
+  if (!collaborator || collaborator.role === "analyst" || collaborator.role === "client") {
+    throw new SinPermisosError("Sin permisos para editar fases.");
+  }
+
+  const valida = validarPhaseData({ phaseId, started: true });
+  const faseActual = project.phases?.[valida.phaseId]?.status;
+  // `started` es una marca idempotente (la pantalla de bienvenida se oculta con ella): se escribe
+  // siempre. El ESTADO solo avanza desde `not-started`; nunca degrada `in-progress`/`completed`.
+  const updates: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+    [`phases.${valida.phaseId}.started`]: true,
+  };
+  if (faseActual === undefined || faseActual === "not-started") {
+    updates[`phases.${valida.phaseId}.status`] = "in-progress";
+  }
+  // draft → active cuando el usuario inicia la primera fase
+  if (project.status === "draft") updates.status = "active";
+
+  await adminDb.collection(COLLECTION).doc(projectId).update(updates);
+}
 
 export async function savePhaseReportDraft(
   projectId: string,
@@ -534,15 +589,18 @@ export async function savePhaseReportDraft(
   reportText: string
 ): Promise<void> {
   const project = await getProject(projectId, userId);
-  if (!project) throw new Error("Proyecto no encontrado o sin acceso.");
+  if (!project) throw new ProyectoNoEncontradoError();
 
   const collaborator = project.collaborators.find((c) => c.uid === userId);
   if (!collaborator || collaborator.role === "analyst" || collaborator.role === "client") {
-    throw new Error("Sin permisos para editar fases.");
+    throw new SinPermisosError("Sin permisos para editar fases.");
   }
 
+  // H-M5 (26-10-07): `phaseId` sin validar se usaba como ruta de campo; `reportText` sin tipo ni tope.
+  const valido = validarReportDraft({ phaseId, reportText });
+
   await adminDb.collection(COLLECTION).doc(projectId).update({
-    [`phases.${phaseId}.reportText`]: reportText,
+    [`phases.${valido.phaseId}.reportText`]: valido.reportText,
     updatedAt: FieldValue.serverTimestamp(),
   });
 }
