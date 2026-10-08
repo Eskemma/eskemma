@@ -10,6 +10,7 @@ import { PHASE_NAMES, PROJECT_TYPE_LABELS } from "@/types/moddulo.types";
 import type { ModduloProject } from "@/types/moddulo.types";
 import { DIAS_RETENCION_PROYECTOS, diasRestantesEnPapelera } from "@/lib/moddulo/papelera";
 import ErrorCarga from "@/app/components/shared/ErrorCarga";
+import { SesionSinConexion } from "@/app/components/shared/SesionPendiente";
 import {
   decidirEstadoLista,
   type EstadoLista,
@@ -64,7 +65,7 @@ async function cargarListaProyectos(
 }
 
 export default function ModduloPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, sesionSinVerificar, reintentarSesion } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<ModduloProject[]>([]);
   const [estadoProyectos, setEstadoProyectos] = useState<EstadoCarga>("cargando");
@@ -75,8 +76,9 @@ export default function ModduloPage() {
   const isLoading = estadoProyectos === "cargando";
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace("/");
-  }, [user, authLoading, router]);
+    // An unverified session (network down) is NOT "signed out": no redirect.
+    if (!authLoading && !user && !sesionSinVerificar) router.replace("/");
+  }, [user, authLoading, sesionSinVerificar, router]);
 
   const cargarProyectos = useCallback(async () => {
     setEstadoProyectos("cargando");
@@ -152,6 +154,10 @@ export default function ModduloPage() {
     setProjects((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...meta } : p))
     );
+  }
+
+  if (!authLoading && !user && sesionSinVerificar) {
+    return <SesionSinConexion onReintentar={reintentarSesion} />;
   }
 
   if (authLoading) {

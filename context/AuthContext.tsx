@@ -8,6 +8,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   Dispatch,
   SetStateAction,
@@ -31,6 +32,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  runTransaction,
   collection,
   query,
   where,
@@ -39,6 +41,10 @@ import {
 } from "firebase/firestore";
 import { auth, db, providerGoogle } from "../firebase/firebaseConfig";
 import { isUserNameAvailable } from "../utils/userUtils";
+import { crearCargadorSesion, type CargadorSesion } from "../lib/auth/cargadorSesion";
+import { conLimite } from "../lib/auth/decidirSesionTrasError";
+import { crearPerfilSiNoExiste } from "../lib/auth/crearPerfilSiNoExiste";
+import { EsperaSesionPendiente } from "../app/components/shared/SesionPendiente";
 
 import type {
   UserRole,
@@ -166,6 +172,13 @@ interface AuthContextType {
   user: ExtendedUser | null;
   setUser: Dispatch<SetStateAction<ExtendedUser | null>>;
   loading: boolean;
+  /**
+   * true while the session could not be verified due to a transient error
+   * (spinner, retrying) or after the retries were exhausted (loading=false,
+   * user=null): pages must NOT treat that as "signed out".
+   */
+  sesionSinVerificar: boolean;
+  reintentarSesion: () => void;
   isSignInModalOpen: boolean;
   setIsSignInModalOpen: Dispatch<SetStateAction<boolean>>;
   isVerifyEmailModalOpen: boolean;
@@ -211,6 +224,8 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sesionSinVerificar, setSesionSinVerificar] = useState(false);
+  const cargadorRef = useRef<CargadorSesion<User> | null>(null);
 
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isVerifyEmailModalOpen, setIsVerifyEmailModalOpen] = useState(false);
@@ -225,158 +240,263 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { calculateUserRole } = require("../utils/roleUtils");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-          await currentUser.reload();
-          const updatedUser = auth.currentUser;
+    // Writes issued without network never reject, they stay queued and the
+    // awaiting promise hangs: every write of the session load is bounded.
+    const LIMITE_ESCRITURA_MS = 10000;
 
-          if (!updatedUser) {
-            console.error("Usuario no encontrado después de reload.");
-            setUser(null);
-            setLoading(false);
-            return;
-          }
+    type DatosSesion = {
+      updatedUser: User;
+      userDocRef: ReturnType<typeof doc>;
+      userData: FirestoreUserData;
+      creado: boolean;
+    };
 
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const idTokenResult = await updatedUser.getIdTokenResult(true);
+    // Warn-only, bounded write: a failure here never retries the load nor
+    // un-arms the user (the READ phase is the only thing that is retried).
+    const escribir = async (etiqueta: string, fn: () => Promise<unknown>) => {
+      try {
+        await conLimite(fn(), LIMITE_ESCRITURA_MS);
+      } catch (error) {
+        console.warn(`⚠️ [auth] No se pudo ${etiqueta}:`, error);
+      }
+    };
 
-          const userDocRef = doc(db, "users", updatedUser.uid);
-          const userDocSnapshot = await getDoc(userDocRef);
+    // READ phase (idempotent, the only part that is retried): reload, forced
+    // token refresh, profile read and — only for a brand-new user — a
+    // "create if absent" transaction, so two simultaneous loads (or two tabs)
+    // never overwrite createdAt / profileCompleted / showOnboardingModal.
+    const leerSesion = async (currentUser: User): Promise<DatosSesion | null> => {
+      await currentUser.reload();
+      const updatedUser = auth.currentUser;
 
-          if (!userDocSnapshot.exists()) {
-            const initialRole: UserRole = "visitor";
+      if (!updatedUser) {
+        console.error("Usuario no encontrado después de reload.");
+        return null;
+      }
 
-            await setDoc(userDocRef, {
-              uid: updatedUser.uid,
-              email: updatedUser.email,
-              userName: generateDefaultUserName(updatedUser.email || ""),
-              role: initialRole,
-              profileCompleted: false,
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await updatedUser.getIdTokenResult(true);
+
+      const userDocRef = doc(db, "users", updatedUser.uid);
+      const userDocSnapshot = await getDoc(userDocRef);
+
+      if (userDocSnapshot.exists()) {
+        return {
+          updatedUser,
+          userDocRef,
+          userData: userDocSnapshot.data() as FirestoreUserData,
+          creado: false,
+        };
+      }
+
+      const initialRole: UserRole = "visitor";
+      const perfilInicial = {
+        uid: updatedUser.uid,
+        email: updatedUser.email,
+        userName: generateDefaultUserName(updatedUser.email || ""),
+        role: initialRole,
+        profileCompleted: false,
+        emailVerified: updatedUser.emailVerified,
+        showOnboardingModal: true,
+        createdAt: new Date(),
+        subscriptionPlan: null,
+        subscriptionStatus: null,
+        subscriptionStartDate: null,
+        subscriptionEndDate: null,
+        previousSubscription: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      };
+      const resultado = await conLimite(
+        runTransaction(db, (tx) => crearPerfilSiNoExiste(tx, userDocRef, perfilInicial)),
+        LIMITE_ESCRITURA_MS * 1.5
+      );
+      return {
+        updatedUser,
+        userDocRef,
+        userData: resultado.data as FirestoreUserData,
+        creado: resultado.creado,
+      };
+    };
+
+    // WRITE phase: runs once per load, only after the READ phase succeeded.
+    // The user is armed first (role computed locally from verified data);
+    // later steps are bounded and warn-only.
+    const verificarYEscribir = async (
+      datos: DatosSesion,
+      _usuario: User,
+      vigente: () => boolean
+    ) => {
+      const { updatedUser, userDocRef, userData, creado } = datos;
+      try {
+        if (creado) {
+          const initialRole: UserRole = "visitor";
+          const newExtendedUser: ExtendedUser = {
+            ...updatedUser,
+            role: initialRole,
+            profileCompleted: false,
+            showOnboardingModal: true,
+          };
+          setUser(newExtendedUser);
+          setSesionSinVerificar(false);
+
+          // ← FASE 0: reemplazado fetch directo por callSetUserRole
+          // No bloqueamos el login si falla la sincronización de claims
+          await escribir("sincronizar el custom claim", () =>
+            callSetUserRole(updatedUser.uid, initialRole)
+          );
+          if (!vigente()) return;
+          await syncSessionCookie(); // ← FASE 4
+        } else if (userData.role === "admin") {
+          console.log("🔒 Usuario es admin, manteniendo rol");
+
+          const extendedUser: ExtendedUser = {
+            ...updatedUser,
+            ...userData,
+            role: "admin",
+          };
+          setUser(extendedUser);
+          setSesionSinVerificar(false);
+          await syncSessionCookie(); // ← FASE 4
+        } else {
+          const rolDesde = () =>
+            calculateUserRole({
               emailVerified: updatedUser.emailVerified,
-              showOnboardingModal: true,
-              createdAt: new Date(),
-              subscriptionPlan: null,
-              subscriptionStatus: null,
-              subscriptionStartDate: null,
-              subscriptionEndDate: null,
-              previousSubscription: null,
-              stripeCustomerId: null,
-              stripeSubscriptionId: null,
+              profileCompleted: userData.profileCompleted,
+              subscriptionPlan: userData.subscriptionPlan,
+              subscriptionStatus: userData.subscriptionStatus,
+              subscriptionEndDate: userData.subscriptionEndDate,
+              previousSubscription: userData.previousSubscription,
             });
+          const calculatedRole = rolDesde();
 
+          const extendedUser: ExtendedUser = {
+            ...updatedUser,
+            ...userData,
+            role: calculatedRole,
+          };
+          setUser(extendedUser);
+          setSesionSinVerificar(false);
+
+          if (userData.role !== calculatedRole) {
+            await escribir("actualizar el rol", () =>
+              updateDoc(userDocRef, { role: calculatedRole, updatedAt: new Date() })
+            );
+            if (!vigente()) return;
             // ← FASE 0: reemplazado fetch directo por callSetUserRole
-            try {
-              await callSetUserRole(updatedUser.uid, initialRole);
-            } catch (roleError) {
-              // No bloqueamos el login si falla la sincronización de claims
-              console.warn("⚠️ No se pudo sincronizar custom claim:", roleError);
-            }
-
-            const newExtendedUser: ExtendedUser = {
-              ...updatedUser,
-              role: initialRole,
-              profileCompleted: false,
-              showOnboardingModal: true,
-            };
-            setUser(newExtendedUser);
-            await syncSessionCookie(); // ← FASE 4
-          } else {
-            const userData = userDocSnapshot.data() as FirestoreUserData;
-
-            if (userData.role === "admin") {
-              console.log("🔒 Usuario es admin, manteniendo rol");
-
-              const extendedUser: ExtendedUser = {
-                ...updatedUser,
-                ...userData,
-                role: "admin",
-              };
-
-              console.log("Usuario autenticado:", updatedUser);
-              console.log("Datos de usuario desde Firestore:", userData);
-              console.log("Rol: admin (protegido)");
-
-              setUser(extendedUser);
-              await syncSessionCookie(); // ← FASE 4
-            } else {
-              const calculatedRole = calculateUserRole({
-                emailVerified: updatedUser.emailVerified,
-                profileCompleted: userData.profileCompleted,
-                subscriptionPlan: userData.subscriptionPlan,
-                subscriptionStatus: userData.subscriptionStatus,
-                subscriptionEndDate: userData.subscriptionEndDate,
-                previousSubscription: userData.previousSubscription,
-              });
-
-              if (userData.role !== calculatedRole) {
-                await updateDoc(userDocRef, {
-                  role: calculatedRole,
-                  updatedAt: new Date(),
-                });
-
-                // ← FASE 0: reemplazado fetch directo por callSetUserRole
-                try {
-                  await callSetUserRole(updatedUser.uid, calculatedRole);
-                } catch (roleError) {
-                  console.warn("⚠️ No se pudo sincronizar custom claim:", roleError);
-                }
-              }
-
-              if (userData.emailVerified !== updatedUser.emailVerified) {
-                const newRole = calculateUserRole({
-                  emailVerified: updatedUser.emailVerified,
-                  profileCompleted: userData.profileCompleted,
-                  subscriptionPlan: userData.subscriptionPlan,
-                  subscriptionStatus: userData.subscriptionStatus,
-                  subscriptionEndDate: userData.subscriptionEndDate,
-                  previousSubscription: userData.previousSubscription,
-                });
-
-                await updateDoc(userDocRef, {
-                  emailVerified: updatedUser.emailVerified,
-                  role: newRole,
-                  updatedAt: new Date(),
-                });
-              }
-
-              const extendedUser: ExtendedUser = {
-                ...updatedUser,
-                ...userData,
-                role: calculatedRole,
-              };
-
-              console.log("Usuario autenticado:", updatedUser);
-              console.log("Datos de usuario desde Firestore:", userData);
-              console.log("Rol calculado:", calculatedRole);
-
-              setUser(extendedUser);
-              await syncSessionCookie(); // ← FASE 4
-            }
+            await escribir("sincronizar el custom claim", () =>
+              callSetUserRole(updatedUser.uid, calculatedRole)
+            );
           }
+          if (!vigente()) return;
 
-          if (updatedUser.emailVerified) {
-            setIsVerifyEmailModalOpen(false);
-            const userData = (
-              await getDoc(userDocRef)
-            ).data() as FirestoreUserData;
-            if (!userData?.profileCompleted) {
+          if (userData.emailVerified !== updatedUser.emailVerified) {
+            const newRole = rolDesde();
+            await escribir("actualizar emailVerified", () =>
+              updateDoc(userDocRef, {
+                emailVerified: updatedUser.emailVerified,
+                role: newRole,
+                updatedAt: new Date(),
+              })
+            );
+          }
+          if (!vigente()) return;
+          await syncSessionCookie(); // ← FASE 4
+        }
+
+        if (!vigente()) return;
+        if (updatedUser.emailVerified) {
+          setIsVerifyEmailModalOpen(false);
+          try {
+            const snap = await conLimite(getDoc(userDocRef), LIMITE_ESCRITURA_MS);
+            const data = snap.data() as FirestoreUserData | undefined;
+            if (!vigente()) return;
+            if (!data?.profileCompleted) {
               setIsCompleteRegisterModalOpen(true);
-            } else if (userData.showOnboardingModal) {
+            } else if (data.showOnboardingModal) {
               setIsOnboardingModalOpen(true);
             }
+          } catch (error) {
+            console.warn("⚠️ [auth] No se pudo evaluar los modales de registro:", error);
           }
-        } catch (error) {
-          console.error("Error al verificar el estado del usuario:", error);
         }
-      } else {
-        setUser(null);
+      } finally {
+        if (vigente()) {
+          setLoading(false);
+          setSesionSinVerificar(false);
+        }
       }
-      setLoading(false);
+    };
+
+    // Network outages are not invalid sessions (4b): see lib/auth/.
+    const cargador = crearCargadorSesion<User, DatosSesion>({
+      leer: leerSesion,
+      alVerificar: verificarYEscribir,
+      alCerrar: async () => {
+        try {
+          await signOut(auth);
+        } catch {
+          // already signed out by the SDK
+        }
+        setUser(null);
+        setSesionSinVerificar(false);
+        setLoading(false);
+      },
+      alUsuarioAusente: () => {
+        setUser(null);
+        setSesionSinVerificar(false);
+        setLoading(false);
+      },
+      alPendiente: () => {
+        setSesionSinVerificar(true);
+        setLoading(true);
+      },
+      alAgotar: () => {
+        setUser(null);
+        setSesionSinVerificar(true);
+        setLoading(false);
+      },
+      alErrorDesconocido: () => {
+        setSesionSinVerificar(false);
+        setLoading(false);
+      },
+      obtenerUsuarioActual: () => auth.currentUser,
+      programar: (fn, ms) => setTimeout(fn, ms),
+      cancelarTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      log: console,
+    });
+    cargadorRef.current = cargador;
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        void cargador.cargar(currentUser);
+      } else {
+        cargador.cancelar();
+        setUser(null);
+        setSesionSinVerificar(false);
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    // The backoff timer recovers the session on its own; this just makes it
+    // immediate when the browser reports connectivity (DevTools "Offline"
+    // does not always fire it).
+    const alVolverOnline = () => {
+      void cargador.reintentarAhora();
+    };
+    window.addEventListener("online", alVolverOnline);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("online", alVolverOnline);
+      cargador.cancelar();
+      cargadorRef.current = null;
+    };
   }, []);
+
+  const reintentarSesion = () => {
+    void cargadorRef.current?.reintentarAhora();
+  };
 
   const generateDefaultUserName = (email: string): string => {
     const [username] = email.split("@");
@@ -1178,6 +1298,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         setUser,
         loading,
+        sesionSinVerificar,
+        reintentarSesion,
         isSignInModalOpen,
         setIsSignInModalOpen,
         isVerifyEmailModalOpen,
@@ -1206,7 +1328,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         checkAndUpdateExpiredSubscriptions,
       }}
     >
-      {!loading && children}
+      {loading ? (sesionSinVerificar ? <EsperaSesionPendiente /> : null) : children}
     </AuthContext.Provider>
   );
 };

@@ -5,13 +5,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SesionSinConexion } from "@/app/components/shared/SesionPendiente";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sesionSinVerificar, reintentarSesion } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
@@ -21,7 +22,8 @@ export default function AdminLayout({
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push("/");
+        // An unverified session (network down) is NOT "signed out": no redirect.
+        if (!sesionSinVerificar) router.push("/");
       } else if (user.role !== "admin") {
         alert("No tienes permisos para acceder al panel de administración.");
         router.push("/");
@@ -29,7 +31,7 @@ export default function AdminLayout({
         setIsChecking(false);
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading, sesionSinVerificar, router]);
 
   // Cerrar menú mobile al cambiar de ruta
   useEffect(() => {
@@ -64,6 +66,10 @@ export default function AdminLayout({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isMobileMenuOpen]);
+
+  if (!loading && !user && sesionSinVerificar) {
+    return <SesionSinConexion onReintentar={reintentarSesion} />;
+  }
 
   if (loading || isChecking) {
     return (
