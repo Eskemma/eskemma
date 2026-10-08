@@ -3,12 +3,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { PHASE_NAMES, PROJECT_TYPE_LABELS } from "@/types/moddulo.types";
 import type { ModduloProject } from "@/types/moddulo.types";
 import { DIAS_RETENCION_PROYECTOS, diasRestantesEnPapelera } from "@/lib/moddulo/papelera";
+import {
+  decidirEstadoLista,
+  type EstadoLista,
+  type RespuestaGuardado,
+} from "@/lib/moddulo/guardadoHonesto";
 
 // Mismo patrón ya usado por el hub de PESTEL (app/centinela/pestel/page.tsx):
 // un Timestamp de Admin SDK llega serializado como {_seconds, _nanoseconds}.
@@ -25,35 +30,73 @@ function formatDate(value: unknown): string {
   return new Date(toMs(value)).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
 }
 
+type EstadoCarga = "cargando" | EstadoLista;
+
+/**
+ * Loads a project list and classifies it as cargado / vacio / fallido (never
+ * "vacio" on a failure). Decision in lib/moddulo/guardadoHonesto.ts.
+ */
+async function cargarListaProyectos(
+  url: string,
+  lista: string
+): Promise<{ estado: EstadoLista; mensajeError: string | null; items: ModduloProject[] }> {
+  let resp: RespuestaGuardado;
+  let items: ModduloProject[] = [];
+  try {
+    const r = await fetch(url, { credentials: "include" });
+    let cuerpoValido: boolean | undefined;
+    if (r.ok) {
+      try {
+        const data = (await r.json()) as { projects?: unknown };
+        cuerpoValido = Array.isArray(data?.projects);
+        if (cuerpoValido) items = data.projects as ModduloProject[];
+      } catch {
+        cuerpoValido = false;
+      }
+    }
+    resp = { tipo: "respuesta", ok: r.ok, status: r.status, cuerpoValido };
+  } catch {
+    resp = { tipo: "error_red" };
+  }
+  return { ...decidirEstadoLista(resp, items.length, { lista }), items };
+}
+
 export default function ModduloPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<ModduloProject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [estadoProyectos, setEstadoProyectos] = useState<EstadoCarga>("cargando");
+  const [errorProyectos, setErrorProyectos] = useState<string | null>(null);
   const [papeleraProjects, setPapeleraProjects] = useState<ModduloProject[]>([]);
-  const [papeleraLoading, setPapeleraLoading] = useState(true);
+  const [estadoPapelera, setEstadoPapelera] = useState<EstadoCarga>("cargando");
+  const [errorPapelera, setErrorPapelera] = useState<string | null>(null);
+  const isLoading = estadoProyectos === "cargando";
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/");
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    fetch("/api/moddulo/projects", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setProjects(data.projects ?? []))
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [user]);
+  const cargarProyectos = useCallback(async () => {
+    setEstadoProyectos("cargando");
+    const r = await cargarListaProyectos("/api/moddulo/projects", "tus proyectos");
+    if (r.estado !== "fallido") setProjects(r.items);
+    setErrorProyectos(r.mensajeError);
+    setEstadoProyectos(r.estado);
+  }, []);
+
+  const cargarPapelera = useCallback(async () => {
+    setEstadoPapelera("cargando");
+    const r = await cargarListaProyectos("/api/moddulo/projects/papelera", "la papelera");
+    if (r.estado !== "fallido") setPapeleraProjects(r.items);
+    setErrorPapelera(r.mensajeError);
+    setEstadoPapelera(r.estado);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/moddulo/projects/papelera", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setPapeleraProjects(data.projects ?? []))
-      .catch(() => {})
-      .finally(() => setPapeleraLoading(false));
-  }, [user]);
+    void cargarProyectos();
+    void cargarPapelera();
+  }, [user, cargarProyectos, cargarPapelera]);
 
   // Al mover a papelera, el proyecto desaparece de "Mis proyectos" y aparece
   // en la sección Papelera de inmediato (sin esperar un refetch) — deletedAt
@@ -165,6 +208,8 @@ export default function ModduloPage() {
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-4 border-bluegreen-eske border-t-transparent" />
             </div>
+          ) : estadoProyectos === "fallido" ? (
+            <ErrorCarga mensaje={errorProyectos} onReintentar={cargarProyectos} />
           ) : projects.length === 0 ? (
             <EmptyState />
           ) : (
@@ -181,7 +226,11 @@ export default function ModduloPage() {
             </div>
           )}
 
-          {!papeleraLoading && papeleraProjects.length > 0 && (
+          {estadoPapelera === "fallido" && (
+            <ErrorCarga compacto mensaje={errorPapelera} onReintentar={cargarPapelera} />
+          )}
+
+          {estadoPapelera !== "cargando" && estadoPapelera !== "fallido" && papeleraProjects.length > 0 && (
             <PapeleraSection
               projects={papeleraProjects}
               onRestored={handleRestored}
@@ -887,6 +936,34 @@ function DeleteModal({
 // ==========================================
 // ESTADO VACÍO
 // ==========================================
+
+function ErrorCarga({
+  mensaje,
+  onReintentar,
+  compacto = false,
+}: {
+  mensaje: string | null;
+  onReintentar: () => void;
+  compacto?: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      className={`flex flex-wrap items-center gap-3 rounded-xl border border-red-eske/30 bg-red-eske/10 ${
+        compacto ? "px-4 py-2.5 mb-6 text-xs" : "p-8 mb-12 justify-center text-sm"
+      } text-red-eske-60 dark:text-red-eske-10`}
+    >
+      <span>{mensaje ?? "No se pudo cargar la lista."}</span>
+      <button
+        type="button"
+        onClick={onReintentar}
+        className="font-semibold underline underline-offset-2 hover:opacity-80 focus-visible:outline focus-visible:outline-2"
+      >
+        Reintentar
+      </button>
+    </div>
+  );
+}
 
 function EmptyState() {
   return (

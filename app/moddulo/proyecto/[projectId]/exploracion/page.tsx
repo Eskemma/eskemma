@@ -2,8 +2,10 @@
 "use client";
 
 import {
+  decidirCierreDeFase,
   decidirResultadoGuardado,
   esRespuestaVigente,
+  urlTrasCierre,
   type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -200,6 +202,7 @@ export default function ExploracionPage() {
   // había persistido cuando en realidad no. Ver docs de la investigación
   // de propagación PIP→tablero F3.
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
@@ -987,39 +990,66 @@ export default function ExploracionPage() {
   // C6 — Cerrar Fase 2 con propagación de PIP e incertidumbres
   const handleClosePhase = async () => {
     setIsClosingPhase(true);
+    setCloseError(null);
     try {
-      await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          phaseId: "exploracion",
-          reportText: reportText ?? undefined,
-        }),
-      });
-
-      // Propagar PIP e incertidumbres a F3 (fire-and-forget)
-      if (dvs) {
-        fetch(`/api/moddulo/projects/${projectId}`, {
-          method: "PATCH",
+      // Step 1: close the phase. Nothing else runs (and we do not navigate)
+      // unless the server confirmed it.
+      let paso1: RespuestaGuardado;
+      try {
+        const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            phaseData: {
-              phaseId: "exploracion",
-              data: { aprobadoEn: new Date().toISOString() },
-            },
-            f3Seed: {
-              pip: dvs.pip,
-              incertidumbres: dvs.incertidumbres,
-            },
+            phaseId: "exploracion",
+            reportText: reportText ?? undefined,
           }),
-        }).catch(() => {});
+        });
+        paso1 = { tipo: "respuesta", ok: r.ok, status: r.status };
+      } catch {
+        paso1 = { tipo: "error_red" };
       }
 
+      // Step 2 (only after step 1 worked): stamp `aprobadoEn`. If it fails the
+      // phase is already closed, so we still navigate and carry a notice.
+      let paso2: RespuestaGuardado | null = null;
+      if (paso1.tipo === "respuesta" && paso1.ok && dvs) {
+        try {
+          const r = await fetch(`/api/moddulo/projects/${projectId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              phaseData: {
+                phaseId: "exploracion",
+                data: { aprobadoEn: new Date().toISOString() },
+              },
+              f3Seed: {
+                pip: dvs.pip,
+                incertidumbres: dvs.incertidumbres,
+              },
+            }),
+          });
+          paso2 = { tipo: "respuesta", ok: r.ok, status: r.status };
+        } catch {
+          paso2 = { tipo: "error_red" };
+        }
+      }
+
+      const d = decidirCierreDeFase(paso1, paso2, { fase: "Fase 2" });
+      if (!d.navegar) {
+        setCloseError(d.mensajeBloqueante);
+        return;
+      }
       setShowReview(false);
-      router.push(`/moddulo/proyecto/${projectId}/investigacion`);
-    } catch {/* silencioso */} finally { setIsClosingPhase(false); }
+      router.push(
+        urlTrasCierre(`/moddulo/proyecto/${projectId}/investigacion`, d.avisoNoBloqueante)
+      );
+    } catch {
+      setCloseError("No se pudo completar el cierre de Fase 2. Inténtalo de nuevo.");
+    } finally {
+      setIsClosingPhase(false);
+    }
   };
 
   // A1 — Iniciar F2: oculta landing y persiste flag
@@ -1830,8 +1860,9 @@ export default function ExploracionPage() {
           xpcto={xpcto ?? {}}
           risks={[]}
           onConfirm={handleClosePhase}
-          onCancel={() => setShowReview(false)}
+          onCancel={() => { setShowReview(false); setCloseError(null); }}
           isSubmitting={isClosingPhase}
+          errorMessage={closeError}
           dvsChecklist={dvsChecklist.length > 0 ? dvsChecklist : undefined}
         />
       )}

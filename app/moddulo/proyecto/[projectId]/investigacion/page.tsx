@@ -2,7 +2,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  decidirCierreDeFase,
+  mensajeDeAviso,
+  urlSinAviso,
+  type RespuestaGuardado,
+} from "@/lib/moddulo/guardadoHonesto";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PillButton from "@/app/moddulo/components/PillButton";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -39,6 +45,18 @@ interface ResultadoDoc {
 export default function InvestigacionPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  // Notice carried by `?aviso=<code>` (closed list; fixed text per code, the URL
+  // value is never rendered). Read once, then removed from the URL so it does not
+  // reappear on reload or when the link is shared.
+  const [avisoCierre, setAvisoCierre] = useState<string | null>(null);
+  const [cierreError, setCierreError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!searchParams.has("aviso")) return;
+    setAvisoCierre(mensajeDeAviso(searchParams.get("aviso")));
+    router.replace(urlSinAviso(pathname, searchParams.toString()));
+  }, [searchParams, router, pathname]);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -158,8 +176,13 @@ export default function InvestigacionPage() {
       method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ modduloProjectId: projectId }),
     })
-      .then((r) => { if (r.ok) loadProject(); })
-      .catch(() => {});
+      .then((r) => {
+        if (r.ok) loadProject();
+        // Silent by design (safety net); if it fails, the fontanaPendiente
+        // banner already tells the user. Leave a trace for debugging.
+        else console.warn(`[investigacion] reintento de vinculación a Fontana falló (HTTP ${r.status})`);
+      })
+      .catch((e) => console.warn("[investigacion] reintento de vinculación a Fontana falló (red)", e));
   }, [isLoaded, searchParams, fontanaPendiente, projectId, loadProject]);
 
   // canal3/vincular ya limpia fontanaPendiente server-side (mismo write que
@@ -433,23 +456,51 @@ export default function InvestigacionPage() {
             <button
               onClick={async () => {
                 setCerrandoFase(true);
+                setCierreError(null);
+                let resp: RespuestaGuardado;
                 try {
-                  await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+                  const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
                     method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
                     body: JSON.stringify({ phaseId: "investigacion" }),
                   });
-                } finally {
-                  setCerrandoFase(false);
+                  resp = { tipo: "respuesta", ok: r.ok, status: r.status };
+                } catch {
+                  resp = { tipo: "error_red" };
                 }
+                const d = decidirCierreDeFase(resp, null, { fase: "Fase 3" });
+                if (!d.navegar) setCierreError(d.mensajeBloqueante);
+                setCerrandoFase(false);
               }}
               disabled={cerrandoFase}
               className={btnClose}
             >
               {cerrandoFase ? "Cerrando…" : "Cerrar Fase 3"}
             </button>
+            {cierreError && (
+              <p role="alert" className="basis-full text-xs font-medium text-red-eske-60 dark:text-red-eske-10">
+                {cierreError}
+              </p>
+            )}
           </div>
         )}
       </div>
+
+      {avisoCierre && (
+        <div
+          role="status"
+          className="mx-4 mt-2 flex items-start justify-between gap-3 rounded-lg border border-yellow-eske/30 bg-yellow-eske/10 px-3 py-2 text-sm text-brown-eske-60 dark:text-yellow-eske"
+        >
+          <span>{avisoCierre}</span>
+          <button
+            type="button"
+            onClick={() => setAvisoCierre(null)}
+            aria-label="Cerrar aviso"
+            className="shrink-0 font-medium underline focus-visible:outline focus-visible:outline-2"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* TABS MOBILE — la pestaña "chat" muestra en realidad lo que esté
           activo en el área central (chat, tablero o reporte final), así que

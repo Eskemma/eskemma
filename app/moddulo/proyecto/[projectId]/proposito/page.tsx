@@ -1,6 +1,10 @@
 // app/moddulo/proyecto/[projectId]/proposito/page.tsx
 "use client";
 
+import {
+  decidirCierreDeFase,
+  type RespuestaGuardado,
+} from "@/lib/moddulo/guardadoHonesto";
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
@@ -64,6 +68,7 @@ function PropositoPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [isClosingPhase, setIsClosingPhase] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -359,9 +364,12 @@ function PropositoPageContent() {
     }
   };
 
-  // Cerrar fase — guarda el reporte y navega a la siguiente fase
+  // Cerrar fase — guarda el reporte y navega a la siguiente fase.
+  // Navigation only happens when the server confirmed the close
+  // (decision in lib/moddulo/guardadoHonesto.ts); otherwise the modal stays open.
   const handleClosePhase = async () => {
     setIsClosingPhase(true);
+    setCloseError(null);
     try {
       // Usar reporte existente o generar uno nuevo
       let report = reportText ?? extractReportFromMessages(chatMessages);
@@ -369,19 +377,30 @@ function PropositoPageContent() {
         report = await generateReport(form);
       }
 
-      await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ phaseId: "proposito", reportText: report ?? undefined }),
-      });
+      let paso1: RespuestaGuardado;
+      try {
+        const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ phaseId: "proposito", reportText: report ?? undefined }),
+        });
+        paso1 = { tipo: "respuesta", ok: r.ok, status: r.status };
+      } catch {
+        paso1 = { tipo: "error_red" };
+      }
+      const d = decidirCierreDeFase(paso1, null, { fase: "Fase 1" });
+      if (!d.navegar) {
+        setCloseError(d.mensajeBloqueante);
+        return;
+      }
 
       if (report) setReportText(report);
       setShowReview(false);
       // Navegar a la siguiente fase
       router.push(`/moddulo/proyecto/${projectId}/exploracion`);
     } catch {
-      /* silencioso */
+      setCloseError("No se pudo completar el cierre de Fase 1. Inténtalo de nuevo.");
     } finally {
       setIsClosingPhase(false);
     }
@@ -781,8 +800,9 @@ function PropositoPageContent() {
           xpcto={form}
           risks={risks}
           onConfirm={handleClosePhase}
-          onCancel={() => setShowReview(false)}
+          onCancel={() => { setShowReview(false); setCloseError(null); }}
           isSubmitting={isClosingPhase}
+          errorMessage={closeError}
         />
       )}
 

@@ -15,6 +15,8 @@ interface PhaseTransitionReviewProps {
   onConfirm: () => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  /** Blocking error from the close request; the modal stays open to retry. */
+  errorMessage?: string | null;
   dvsChecklist?: CriterioDVS[];
 }
 
@@ -26,6 +28,7 @@ export default function PhaseTransitionReview({
   onConfirm,
   onCancel,
   isSubmitting = false,
+  errorMessage = null,
   dvsChecklist,
 }: PhaseTransitionReviewProps) {
   const [acknowledged, setAcknowledged] = useState(false);
@@ -193,6 +196,15 @@ export default function PhaseTransitionReview({
             </div>
           )}
         </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mx-6 mb-3 rounded-lg border border-red-eske/30 bg-red-eske/10 px-3 py-2 text-sm text-red-eske-60 dark:text-red-eske-10"
+          >
+            {errorMessage}
+          </div>
+        )}
 
         {/* Footer con acciones */}
         <div className="px-6 pb-6 flex gap-3">

@@ -11,7 +11,8 @@ export type AccionGuardado =
   | "aprobar_motor"
   | "guardar_borrador"
   | "finalizar_analisis"
-  | "cerrar_fase";
+  | "cerrar_fase"
+  | "registrar_aprobacion";
 
 export type RespuestaGuardado =
   | {
@@ -44,6 +45,11 @@ export interface DecisionGuardado {
   marcarGuardado: boolean;
   /** Whether a page may continue (navigate / next step). Equals `exito`. */
   continuar: boolean;
+  /**
+   * false when the failure must NOT stop the flow (e.g. the second step of a
+   * phase close, once the phase is already closed): show a notice only.
+   */
+  bloqueante: boolean;
 }
 
 function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
@@ -56,6 +62,8 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la finalización del análisis";
     case "cerrar_fase":
       return `el cierre de ${ctx.fase ?? "la fase"}`;
+    case "registrar_aprobacion":
+      return "la fecha de aprobación";
   }
 }
 
@@ -69,6 +77,8 @@ function consecuencia(accion: AccionGuardado): string {
       return "El análisis no se finalizó; inténtalo de nuevo.";
     case "cerrar_fase":
       return "La fase sigue abierta; inténtalo de nuevo.";
+    case "registrar_aprobacion":
+      return "";
   }
 }
 
@@ -81,6 +91,33 @@ function motivo(resp: RespuestaGuardado): string {
   if (resp.status === 404) return "El proyecto ya no existe o no tienes acceso.";
   if (resp.status === 400) return "El servidor no aceptó el cambio.";
   return "El servidor no pudo completar la operación.";
+}
+
+/**
+ * A network failure does not prove the server never received the request, so
+ * the message must not claim "it was not registered": it says it could not be
+ * CONFIRMED. The exception is the draft, whose unsaved edits live only on
+ * screen — reloading would lose them, so it says to save again first.
+ */
+function mensajeDeFallo(
+  accion: AccionGuardado,
+  resp: RespuestaGuardado,
+  ctx: ContextoGuardado
+): string {
+  const que = sujeto(accion, ctx);
+  if (resp.tipo === "error_red") {
+    if (accion === "guardar_borrador") {
+      return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Tus cambios siguen en pantalla; vuelve a intentar guardar antes de recargar, porque si recargas ahora podrías perderlos.`;
+    }
+    if (accion === "registrar_aprobacion") {
+      return "La fase se cerró, pero no se pudo confirmar el registro de la fecha de aprobación.";
+    }
+    return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
+  }
+  if (accion === "registrar_aprobacion") {
+    return "La fase se cerró, pero no se pudo registrar la fecha de aprobación.";
+  }
+  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
 }
 
 export function decidirResultadoGuardado(
@@ -98,18 +135,121 @@ export function decidirResultadoGuardado(
       valorRestaurado: undefined,
       marcarGuardado: true,
       continuar: true,
+      bloqueante: false,
     };
   }
   const revierte =
     accion === "aprobar_motor" || accion === "finalizar_analisis";
   return {
     exito: false,
-    mensajeError: `No se pudo registrar ${sujeto(accion, ctx)}. ${motivo(resp)} ${consecuencia(accion)}`,
+    mensajeError: mensajeDeFallo(accion, resp, ctx),
     revertirAprobacion: revierte,
     valorRestaurado: revierte ? (ctx.aprobadoPrevio ?? false) : undefined,
     marcarGuardado: false,
-    continuar: false,
+    continuar: accion === "registrar_aprobacion",
+    bloqueante: accion !== "registrar_aprobacion",
   };
+}
+
+/**
+ * Closing a phase: step 1 is `complete-phase`; step 2 (only F2) is the PATCH
+ * that stamps `aprobadoEn`. Step 1 failing blocks everything (and step 2 must
+ * not run). Step 1 OK + step 2 failing does NOT block: the phase is already
+ * closed, so we navigate and carry a notice. Authorship / role / closing rules
+ * are out of scope (Grupo 2).
+ */
+export interface DecisionCierre {
+  navegar: boolean;
+  /** Blocking error (stay on the page); null when the close succeeded. */
+  mensajeBloqueante: string | null;
+  /** Code from AVISOS_CIERRE to show after navigating; null if none. */
+  avisoNoBloqueante: CodigoAvisoCierre | null;
+}
+
+export function decidirCierreDeFase(
+  paso1: RespuestaGuardado,
+  paso2: RespuestaGuardado | null,
+  ctx: { fase: string }
+): DecisionCierre {
+  const d1 = decidirResultadoGuardado("cerrar_fase", paso1, ctx);
+  if (!d1.exito) {
+    return { navegar: false, mensajeBloqueante: d1.mensajeError, avisoNoBloqueante: null };
+  }
+  if (paso2 === null) {
+    return { navegar: true, mensajeBloqueante: null, avisoNoBloqueante: null };
+  }
+  const d2 = decidirResultadoGuardado("registrar_aprobacion", paso2, ctx);
+  return {
+    navegar: true,
+    mensajeBloqueante: null,
+    avisoNoBloqueante: d2.exito ? null : "aprobacion_no_registrada",
+  };
+}
+
+/**
+ * Notices carried to the destination page through `?aviso=<code>`. CLOSED list:
+ * the page only renders the fixed text of a known code and NEVER the raw URL
+ * value (an unknown / forged code yields no message at all).
+ */
+export const AVISOS_CIERRE = {
+  aprobacion_no_registrada:
+    "La fase anterior se cerró, pero no se pudo registrar la fecha de aprobación.",
+} as const;
+export type CodigoAvisoCierre = keyof typeof AVISOS_CIERRE;
+
+export function mensajeDeAviso(codigo: string | null | undefined): string | null {
+  if (typeof codigo !== "string") return null;
+  return Object.prototype.hasOwnProperty.call(AVISOS_CIERRE, codigo)
+    ? AVISOS_CIERRE[codigo as CodigoAvisoCierre]
+    : null;
+}
+
+/**
+ * URL to `router.replace` to AFTER reading the notice, so it does not reappear
+ * on reload or when the link is shared. Keeps any other query params.
+ */
+export function urlSinAviso(pathname: string, search: string): string {
+  const q = new URLSearchParams(search);
+  q.delete("aviso");
+  const resto = q.toString();
+  return resto ? `${pathname}?${resto}` : pathname;
+}
+
+/** Destination URL for the phase-2 close, carrying the notice code if any. */
+export function urlTrasCierre(base: string, aviso: CodigoAvisoCierre | null): string {
+  return aviso ? `${base}?aviso=${aviso}` : base;
+}
+
+/**
+ * List loading: "cargado" / "vacio" / "fallido". A failed load (HTTP error,
+ * network error or a body that is not the expected JSON) is NEVER "vacio".
+ * ("cargando" is page state, before any response.)
+ */
+export type EstadoLista = "cargado" | "vacio" | "fallido";
+
+export interface DecisionLista {
+  estado: EstadoLista;
+  mensajeError: string | null;
+}
+
+export function decidirEstadoLista(
+  resp: RespuestaGuardado,
+  cantidad: number,
+  ctx: { lista: string }
+): DecisionLista {
+  const ok = resp.tipo === "respuesta" && resp.ok && resp.cuerpoValido !== false;
+  if (!ok) {
+    const causa =
+      resp.tipo === "error_red"
+        ? "Revisa tu conexión."
+        : resp.ok
+          ? "La respuesta del servidor no es válida."
+          : resp.status === 401 || resp.status === 403
+            ? "Tu sesión no tiene acceso; vuelve a iniciar sesión."
+            : "El servidor no pudo responder.";
+    return { estado: "fallido", mensajeError: `No se pudo cargar ${ctx.lista}. ${causa}` };
+  }
+  return { estado: cantidad === 0 ? "vacio" : "cargado", mensajeError: null };
 }
 
 /**
