@@ -1107,7 +1107,7 @@ function FormField({ label, hint, risk, children }: {
       {hint && <p className="text-xs text-gray-eske-40 dark:text-[#6D8294] mb-1">{hint}</p>}
       {children}
       {risk && (
-        <p className={`text-xs mt-1 ${risk.level === "critical" ? "text-red-eske-60 dark:text-red-eske-20" : "text-brown-eske-60 dark:text-yellow-eske"}`}>
+        <p className={`text-xs mt-1 ${risk.level === "critical" ? "text-red-eske-60 dark:text-red-eske-10" : "text-brown-eske-60 dark:text-yellow-eske"}`}>
           {risk.title}
         </p>
       )}
@@ -1118,7 +1118,7 @@ function FormField({ label, hint, risk, children }: {
 function RiskBadge({ level }: { level: "warning" | "critical" }) {
   return (
     <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-      level === "critical" ? "bg-red-eske/20 dark:bg-red-eske/30 text-red-eske-60 dark:text-red-eske-20" : "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske"
+      level === "critical" ? "bg-red-eske/20 dark:bg-red-eske/30 text-red-eske-60 dark:text-red-eske-10" : "bg-yellow-eske/20 text-brown-eske-60 dark:text-yellow-eske"
     }`}>
       {level === "critical" ? "⚠" : "○"}
     </span>

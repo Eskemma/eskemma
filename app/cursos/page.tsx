@@ -170,7 +170,7 @@ export default async function CursosPage({ searchParams }: CursosPageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-eske-60 dark:text-red-eske-20 mb-2">¡Ups! Algo salió mal</h2>
+          <h2 className="text-2xl font-bold text-red-eske-60 dark:text-red-eske-10 mb-2">¡Ups! Algo salió mal</h2>
           <p className="text-black-eske-20 dark:text-[#9AAEBE]">No pudimos cargar los cursos en este momento.</p>
           <a
             href="/cursos"

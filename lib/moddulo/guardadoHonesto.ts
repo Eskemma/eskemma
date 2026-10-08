@@ -14,6 +14,7 @@ export type AccionGuardado =
   | "cerrar_fase"
   | "registrar_aprobacion"
   | "actualizar_proyecto"
+  | "eliminar_proyecto"
   | "importar_adjuntos_moddulo";
 
 /** Actions whose failure must NOT stop the flow: show a notice only. */
@@ -78,6 +79,8 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return ctx.cambio ?? "el cambio en el proyecto";
     case "importar_adjuntos_moddulo":
       return "la importación automática de los documentos de Moddulo F2";
+    case "eliminar_proyecto":
+      return "la eliminación del proyecto";
   }
 }
 
@@ -96,6 +99,8 @@ function consecuencia(accion: AccionGuardado): string {
       return "";
     case "actualizar_proyecto":
       return "Se conserva el valor anterior; inténtalo de nuevo.";
+    case "eliminar_proyecto":
+      return "El proyecto sigue en tu lista; inténtalo de nuevo.";
   }
 }
 
@@ -139,6 +144,11 @@ function mensajeDeFallo(
   }
   if (accion === "importar_adjuntos_moddulo") {
     return `No se pudieron importar automáticamente los documentos de Moddulo F2. ${motivo(resp)} Puedes cargarlos manualmente.`;
+  }
+  // A 404 on DELETE after an ambiguous network failure usually means the first
+  // request DID delete it: never claim "the project is still in your list".
+  if (accion === "eliminar_proyecto" && resp.tipo === "respuesta" && resp.status === 404) {
+    return "No se encontró el proyecto; puede que ya se haya eliminado. Recarga la lista para verificar.";
   }
   return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
 }

@@ -338,3 +338,62 @@ describe("importar_adjuntos_moddulo (PESTEL datos — aviso no bloqueante)", () 
     }
   });
 });
+
+describe("eliminar_proyecto (hub de PESTEL)", () => {
+  // Comportamiento anterior: el `finally` cerraba el modal siempre, no había
+  // mensaje, y un fallo de red lanzaba un rechazo no capturado.
+  const antes = (r: RespuestaGuardado) => ({
+    cierraModal: true,
+    mensaje: null as string | null,
+    quitaDeLista: r.tipo === "respuesta" && r.ok,
+  });
+  const despues = (r: RespuestaGuardado) => {
+    const d = decidirResultadoGuardado("eliminar_proyecto", r);
+    return { cierraModal: d.exito, mensaje: d.mensajeError, quitaDeLista: d.exito };
+  };
+
+  it("200 → quita de la lista y cierra el modal, sin mensaje", () => {
+    expect(despues(ok)).toEqual({ cierraModal: true, mensaje: null, quitaDeLista: true });
+  });
+
+  it.each([["400", fallo(400)], ["401", fallo(401)], ["403", fallo(403)], ["404", fallo(404)], ["500", fallo(500)], ["red", red]] as [string, RespuestaGuardado][])(
+    "%s → el modal queda abierto con mensaje y no se quita de la lista; el comportamiento anterior diverge",
+    (_n, r) => {
+      const d = despues(r);
+      expect(d.cierraModal).toBe(false);
+      expect(d.quitaDeLista).toBe(false);
+      expect(d.mensaje).toBeTruthy();
+      expect(antes(r).cierraModal).toBe(true);
+      expect(antes(r).mensaje).toBeNull();
+      expect(antes(r)).not.toEqual(d);
+    }
+  );
+
+  it("red: «No se pudo CONFIRMAR…», sugiere recargar, no afirma que no se registró", () => {
+    const m = despues(red).mensaje!;
+    expect(m).toContain("No se pudo CONFIRMAR la eliminación del proyecto");
+    expect(m).toContain("recarga");
+    expect(m).not.toContain("No se pudo registrar");
+  });
+
+  it("404: puede que ya se haya eliminado; NO dice que el proyecto sigue en la lista", () => {
+    const m = despues(fallo(404)).mensaje!;
+    expect(m).toBe("No se encontró el proyecto; puede que ya se haya eliminado. Recarga la lista para verificar.");
+    expect(m).not.toContain("sigue en tu lista");
+  });
+
+  it.each([["400", fallo(400)], ["403", fallo(403)], ["500", fallo(500)]] as [string, RespuestaGuardado][])(
+    "%s: «No se pudo registrar…» y el proyecto sigue en la lista",
+    (_n, r) => {
+      const m = despues(r).mensaje!;
+      expect(m).toContain("No se pudo registrar la eliminación del proyecto");
+      expect(m).toContain("El proyecto sigue en tu lista");
+    }
+  );
+
+  it("el 404 solo es especial para eliminar_proyecto (actualizar_proyecto conserva su texto)", () => {
+    const m = decidirResultadoGuardado("actualizar_proyecto", fallo(404), { cambio: "x" }).mensajeError!;
+    expect(m).toContain("El proyecto ya no existe o no tienes acceso");
+    expect(m).not.toContain("puede que ya se haya eliminado");
+  });
+});

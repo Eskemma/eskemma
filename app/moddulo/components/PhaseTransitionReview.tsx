@@ -265,7 +265,7 @@ function RiskCard({ risk }: { risk: RiskSignal }) {
     }`}>
       <div className="flex items-start gap-2">
         <span className={`text-xs font-bold uppercase tracking-wide mt-0.5 ${
-          isCritical ? "text-red-eske-60 dark:text-red-eske-20" : "text-brown-eske-60 dark:text-yellow-eske"
+          isCritical ? "text-red-eske-60 dark:text-red-eske-10" : "text-brown-eske-60 dark:text-yellow-eske"
         }`}>
           {isCritical ? "⚠ Crítico" : "○ Aviso"}
         </span>

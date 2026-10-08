@@ -97,6 +97,7 @@ function ProjectCard({
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
   const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const stage = project.currentStage ?? 1;
@@ -183,16 +184,26 @@ function ProjectCard({
 
   async function handleDelete() {
     setIsDeleting(true);
+    setDeleteError(null);
+    let resp: RespuestaGuardado;
     try {
       const r = await fetch(`/api/centinela/pestel/project/${project.id}`, {
         method: "DELETE",
         credentials: "include",
       });
-      if (r.ok) onDeleted(project.id);
-    } finally {
-      setIsDeleting(false);
-      setConfirmDelete(false);
+      resp = { tipo: "respuesta", ok: r.ok, status: r.status };
+    } catch {
+      resp = { tipo: "error_red" };
     }
+    setIsDeleting(false);
+    const d = decidirResultadoGuardado("eliminar_proyecto", resp);
+    if (!d.exito) {
+      // The modal stays open with the message; nothing is removed from the list.
+      setDeleteError(d.mensajeError);
+      return;
+    }
+    setConfirmDelete(false);
+    onDeleted(project.id);
   }
 
   function buildKebabItems() {
@@ -457,8 +468,9 @@ function ProjectCard({
         <PESTELDeleteModal
           projectName={project.nombre}
           isDeleting={isDeleting}
+          error={deleteError}
           onConfirm={handleDelete}
-          onCancel={() => setConfirmDelete(false)}
+          onCancel={() => { setConfirmDelete(false); setDeleteError(null); }}
         />
       )}
     </>
@@ -470,11 +482,13 @@ function ProjectCard({
 function PESTELDeleteModal({
   projectName,
   isDeleting,
+  error,
   onConfirm,
   onCancel,
 }: {
   projectName: string;
   isDeleting: boolean;
+  error: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -492,6 +506,11 @@ function PESTELDeleteModal({
             Esta acción es permanente. Se eliminarán el proyecto y todos los análisis,
             variables, fuentes de datos y alertas asociadas.
           </p>
+          {error && (
+            <p role="alert" className="text-xs mt-3 text-red-eske-60 dark:text-red-eske-10">
+              {error}
+            </p>
+          )}
         </div>
         <div className="flex items-center justify-end gap-3">
           <button

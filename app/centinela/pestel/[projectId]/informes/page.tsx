@@ -706,7 +706,7 @@ export default function InformesPage() {
                       estadoGuardado === "error" ||
                       estadoGuardado === "lleno" ||
                       estadoGuardado === "sin_guardar"
-                        ? "text-xs text-red-eske-60 dark:text-red-eske-20"
+                        ? "text-xs text-red-eske-60 dark:text-red-eske-10"
                         : "text-xs text-black-eske-20 dark:text-[#9AAEBE]"
                     }
                     role="status"
@@ -782,7 +782,7 @@ export default function InformesPage() {
             role="alert"
             className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/20 dark:border-red-eske/40 rounded-xl p-4"
           >
-            <p className="text-sm text-red-eske-60 dark:text-red-eske-20 font-medium">
+            <p className="text-sm text-red-eske-60 dark:text-red-eske-10 font-medium">
               {estadoGuardado === "lleno"
                 ? "Este análisis no admite más cambios guardados"
                 : "El informe se generó, pero no se pudo guardar en tu cuenta"}

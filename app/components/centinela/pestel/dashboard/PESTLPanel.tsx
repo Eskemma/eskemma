@@ -19,7 +19,7 @@ const DIMENSIONS: {key: DimensionKey; label: string; icon: string}[] = [
 
 function impactoStyles(impacto: Factor["impacto"]) {
   switch (impacto) {
-  case "alto":   return {dot: "bg-red-eske",    badge: "bg-red-eske/20 dark:bg-red-eske/30 text-red-eske-60 dark:text-red-eske-20"};
+  case "alto":   return {dot: "bg-red-eske",    badge: "bg-red-eske/20 dark:bg-[#112230] dark:border dark:border-red-eske/40 text-red-eske-60 dark:text-red-eske-10"};
   case "medio":  return {dot: "bg-yellow-eske", badge: "bg-yellow-eske/20 dark:bg-yellow-eske/30 text-brown-eske-60 dark:text-yellow-eske"};
   case "bajo":   return {dot: "bg-gray-eske-40 dark:bg-[#9AAEBE]",   badge: "bg-gray-eske-10 dark:bg-[#21425E] text-black-eske-10 dark:text-[#9AAEBE]"};
   }
