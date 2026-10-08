@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { useParams, useRouter } from "next/navigation";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import type {
   PESTELProject,
   CoverageStatus,
@@ -75,6 +76,7 @@ export default function DatosPage() {
   // Import from Moddulo
   const [importingModdulo, setImportingModdulo] = useState(false);
   const [modduloImportMsg, setModduloImportMsg] = useState<string | null>(null);
+  const [modduloImportError, setModduloImportError] = useState<string | null>(null);
 
   const loadProject = useCallback(async () => {
     try {
@@ -148,12 +150,21 @@ export default function DatosPage() {
     if (!p?.modduloProjectId || p.modduloAttachmentsImported) return;
 
     setImportingModdulo(true);
+    setModduloImportError(null);
     fetch(`/api/centinela/pestel/project/${projectId}/import-moddulo-attachments`, {
       method: "POST",
       credentials: "include",
     })
       .then(async (r) => {
-        if (!r.ok) return;
+        if (!r.ok) {
+          setModduloImportError(
+            decidirResultadoGuardado(
+              "importar_adjuntos_moddulo",
+              { tipo: "respuesta", ok: false, status: r.status }
+            ).mensajeError
+          );
+          return;
+        }
         const data = (await r.json()) as { imported: number };
         if (data.imported > 0) {
           setModduloImportMsg(
@@ -164,7 +175,11 @@ export default function DatosPage() {
           setTimeout(() => setModduloImportMsg(null), 6000);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setModduloImportError(
+          decidirResultadoGuardado("importar_adjuntos_moddulo", { tipo: "error_red" }).mensajeError
+        );
+      })
       .finally(() => setImportingModdulo(false));
   }, [loading, project, projectId, loadCoverage]);
 
@@ -330,6 +345,11 @@ export default function DatosPage() {
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bluegreen-eske/5 border border-bluegreen-eske/20 text-sm text-bluegreen-eske">
             <div className="w-4 h-4 border-2 border-bluegreen-eske/30 border-t-bluegreen-eske rounded-full animate-spin shrink-0" aria-hidden="true" />
             Importando documentos de Moddulo F2 y clasificando por dimensión…
+          </div>
+        )}
+        {modduloImportError && !importingModdulo && (
+          <div role="status" className="px-4 py-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm text-brown-eske-60 dark:text-yellow-eske">
+            {modduloImportError}
           </div>
         )}
         {modduloImportMsg && !importingModdulo && (

@@ -20,11 +20,14 @@ import { COLOR_SWATCHES } from "@/lib/fontana/colorSwatches";
 import FontanaOnboarding from "./FontanaOnboarding";
 import FontanaMain from "./FontanaMain";
 import FontanaSesionesHub, { type SesionConProyecto } from "./FontanaSesionesHub";
+import ErrorCarga from "@/app/components/shared/ErrorCarga";
+import { decidirEstadoLista, type RespuestaGuardado } from "@/lib/moddulo/guardadoHonesto";
 
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "standalone_inicio" }
   | { tipo: "hub"; sesiones: SesionConProyecto[] }
+  | { tipo: "hub_fallido"; mensaje: string }
   | { tipo: "error"; mensaje: string }
   | {
       tipo: "wizard";
@@ -92,17 +95,33 @@ export default function FontanaPage() {
       // Revisión tras verificación en navegador (2026-08-19, 4ª pasada):
       // corrige la decisión anterior de saltar standalone_inicio cuando
       // la lista viene vacía.
+      // Una carga fallida NO es "sin sesiones": se avisa y se ofrece reintentar,
+      // dejando el formulario de sesión nueva como opción secundaria.
+      setEstado({ tipo: "cargando" });
+      let resp: RespuestaGuardado;
+      let sesiones: SesionConProyecto[] = [];
       try {
         const res = await fetch("/api/fontana/sesion/mias");
+        let cuerpoValido: boolean | undefined;
         if (res.ok) {
-          const data = (await res.json()) as { sesiones: SesionConProyecto[] };
-          setEstado({ tipo: "hub", sesiones: data.sesiones ?? [] });
-          return;
+          try {
+            const data = (await res.json()) as { sesiones?: unknown };
+            cuerpoValido = Array.isArray(data?.sesiones);
+            if (cuerpoValido) sesiones = data.sesiones as SesionConProyecto[];
+          } catch {
+            cuerpoValido = false;
+          }
         }
+        resp = { tipo: "respuesta", ok: res.ok, status: res.status, cuerpoValido };
       } catch {
-        // Si falla la lista, se cae al formulario como red de seguridad.
+        resp = { tipo: "error_red" };
       }
-      setEstado({ tipo: "standalone_inicio" });
+      const d = decidirEstadoLista(resp, sesiones.length, { lista: "tus sesiones", plural: true });
+      if (d.estado === "fallido") {
+        setEstado({ tipo: "hub_fallido", mensaje: d.mensajeError ?? "No se pudieron cargar tus sesiones." });
+      } else {
+        setEstado({ tipo: "hub", sesiones });
+      }
       return;
     }
     setEstado({ tipo: "cargando" });
@@ -210,9 +229,14 @@ export default function FontanaPage() {
     return <FontanaSesionesHub sesiones={estado.sesiones} onExplorarNuevo={() => setEstado({ tipo: "standalone_inicio" })} />;
   }
 
-  if (estado.tipo === "standalone_inicio") {
+  if (estado.tipo === "standalone_inicio" || estado.tipo === "hub_fallido") {
     return (
       <main className="min-h-screen bg-gray-eske-10 dark:bg-[#0B1620] py-10 px-4">
+        {estado.tipo === "hub_fallido" && (
+          <div className="max-w-lg mx-auto">
+            <ErrorCarga compacto mensaje={estado.mensaje} onReintentar={cargar} />
+          </div>
+        )}
         <div className="max-w-lg mx-auto bg-white-eske dark:bg-[#18324A] rounded-xl shadow-sm border border-gray-eske-20 dark:border-white/10 p-6 flex flex-col gap-5">
           <div>
             <h1 className="text-lg font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">Fontana</h1>

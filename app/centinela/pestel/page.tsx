@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { PESTELProject } from "@/types/pestel.types";
+import ErrorCarga from "@/app/components/shared/ErrorCarga";
+import {
+  decidirEstadoLista,
+  decidirResultadoGuardado,
+  type RespuestaGuardado,
+} from "@/lib/moddulo/guardadoHonesto";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -89,6 +95,8 @@ function ProjectCard({
   const [editName, setEditName] = useState(project.nombre);
   const [editColor, setEditColor] = useState(project.color ?? "#026988");
   const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
   const colorCustomInputRef = useRef<HTMLInputElement>(null);
   const stage = project.currentStage ?? 1;
@@ -124,34 +132,53 @@ function ProjectCard({
     }
   }
 
-  async function handleStatusChange(newStatus: string) {
-    setKebabOpen(false);
+  async function patchProyecto(
+    body: Record<string, unknown>
+  ): Promise<RespuestaGuardado> {
     try {
-      await fetch(`/api/centinela/pestel/project/${project.id}`, {
+      const r = await fetch(`/api/centinela/pestel/project/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       });
-      onStatusChanged(project.id, newStatus);
-    } catch {}
+      return { tipo: "respuesta", ok: r.ok, status: r.status };
+    } catch {
+      return { tipo: "error_red" };
+    }
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    setKebabOpen(false);
+    setStatusError(null);
+    const d = decidirResultadoGuardado(
+      "actualizar_proyecto",
+      await patchProyecto({ status: newStatus }),
+      { cambio: "el cambio de estado del proyecto" }
+    );
+    if (!d.exito) {
+      setStatusError(d.mensajeError);
+      return;
+    }
+    onStatusChanged(project.id, newStatus);
   }
 
   async function handleSaveEdit() {
     if (editName.trim().length < 3) return;
     setSaving(true);
-    try {
-      await fetch(`/api/centinela/pestel/project/${project.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ nombre: editName.trim(), color: editColor }),
-      });
-      onUpdated(project.id, { nombre: editName.trim(), color: editColor });
-      setEditOpen(false);
-    } catch {} finally {
-      setSaving(false);
+    setEditError(null);
+    const d = decidirResultadoGuardado(
+      "actualizar_proyecto",
+      await patchProyecto({ nombre: editName.trim(), color: editColor }),
+      { cambio: "tus cambios de nombre y color" }
+    );
+    setSaving(false);
+    if (!d.exito) {
+      setEditError(d.mensajeError);
+      return;
     }
+    onUpdated(project.id, { nombre: editName.trim(), color: editColor });
+    setEditOpen(false);
   }
 
   async function handleDelete() {
@@ -307,6 +334,11 @@ function ProjectCard({
             {project.horizonte === 1 ? "mes" : "meses"}
           </p>
         </button>
+        {statusError && (
+          <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10">
+            {statusError}
+          </p>
+        )}
       </div>
 
       {/* Edit modal */}
@@ -391,10 +423,15 @@ function ProjectCard({
                 </div>
               </div>
             </div>
+            {editError && (
+              <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10">
+                {editError}
+              </p>
+            )}
             <div className="flex items-center justify-end gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setEditOpen(false)}
+                onClick={() => { setEditOpen(false); setEditError(null); }}
                 disabled={saving}
                 className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
               >
@@ -490,21 +527,44 @@ export default function PESTELHubPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<PESTELProjectWithId[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadProjects = useCallback(async () => {
+    let resp: RespuestaGuardado;
+    let items: PESTELProjectWithId[] = [];
     try {
       const res = await fetch("/api/centinela/pestel/project");
-      if (!res.ok) return;
-      const data = (await res.json()) as { projects: PESTELProjectWithId[] };
-      setProjects(data.projects ?? []);
+      let cuerpoValido: boolean | undefined;
+      if (res.ok) {
+        try {
+          const data = (await res.json()) as { projects?: unknown };
+          cuerpoValido = Array.isArray(data?.projects);
+          if (cuerpoValido) items = data.projects as PESTELProjectWithId[];
+        } catch {
+          cuerpoValido = false;
+        }
+      }
+      resp = { tipo: "respuesta", ok: res.ok, status: res.status, cuerpoValido };
     } catch {
-      // Silent — show empty state
+      resp = { tipo: "error_red" };
     }
+    const d = decidirEstadoLista(resp, items.length, {
+      lista: "tus proyectos",
+      plural: true,
+    });
+    setLoadError(d.estado === "fallido" ? d.mensajeError : null);
+    if (d.estado !== "fallido") setProjects(items);
   }, []);
 
   useEffect(() => {
     loadProjects().finally(() => setLoading(false));
   }, [loadProjects]);
+
+  async function handleReintentar() {
+    setLoading(true);
+    await loadProjects();
+    setLoading(false);
+  }
 
   function handleDeleted(id: string) {
     setProjects((prev) => prev.filter((p) => p.id !== id));
@@ -584,7 +644,9 @@ export default function PESTELHubPage() {
         </div>
 
         {/* Project grid — active + paused */}
-        {activeAndPaused.length === 0 && archived.length === 0 ? (
+        {loadError ? (
+          <ErrorCarga mensaje={loadError} onReintentar={handleReintentar} />
+        ) : activeAndPaused.length === 0 && archived.length === 0 ? (
           <div className="flex flex-col items-center gap-6 py-16 bg-white-eske dark:bg-[#18324A]
             rounded-xl border border-dashed border-gray-eske-30 dark:border-white/10 text-center">
             <span className="text-5xl" aria-hidden="true">🛡️</span>

@@ -232,7 +232,7 @@ describe("urlSinAviso — quita el aviso de la URL conservando el resto", () => 
 });
 
 describe("decidirEstadoLista — cargando / vacío / fallido", () => {
-  const ctx = { lista: "tus proyectos" };
+  const ctx = { lista: "tus proyectos", plural: true };
   it("200 con 0 elementos → vacío", () => {
     expect(decidirEstadoLista(ok, 0, ctx)).toEqual({ estado: "vacio", mensajeError: null });
   });
@@ -244,7 +244,7 @@ describe("decidirEstadoLista — cargando / vacío / fallido", () => {
     (_n, r) => {
       const d = decidirEstadoLista(r, 0, ctx);
       expect(d.estado).toBe("fallido");
-      expect(d.mensajeError).toContain("No se pudo cargar tus proyectos");
+      expect(d.mensajeError).toContain("No se pudieron cargar tus proyectos");
     }
   );
   it("el comportamiento anterior (lista [] ante cualquier fallo) se leía como «vacío»", () => {
@@ -257,3 +257,84 @@ describe("decidirEstadoLista — cargando / vacío / fallido", () => {
 });
 
 type EstadoLista = "cargado" | "vacio" | "fallido";
+
+describe("concordancia del mensaje de lista", () => {
+  it("singular: «No se pudo cargar la papelera»", () => {
+    expect(decidirEstadoLista(red, 0, { lista: "la papelera" }).mensajeError).toContain(
+      "No se pudo cargar la papelera"
+    );
+  });
+  it("plural: «No se pudieron cargar tus sesiones»", () => {
+    expect(
+      decidirEstadoLista(fallo(500), 0, { lista: "tus sesiones", plural: true }).mensajeError
+    ).toContain("No se pudieron cargar tus sesiones");
+  });
+});
+
+describe("actualizar_proyecto (hub de PESTEL: estado, nombre y color)", () => {
+  const ctx = { cambio: "el cambio de estado del proyecto" };
+  // Comportamiento anterior: try/catch vacío que llamaba onStatusChanged /
+  // onUpdated y cerraba el editor aunque el PATCH fallara (o ni se revisara).
+  const antes = (_r: RespuestaGuardado) => ({ llamaCallback: true, cierraEditor: true });
+  const despues = (r: RespuestaGuardado) => {
+    const d = decidirResultadoGuardado("actualizar_proyecto", r, ctx);
+    return { llamaCallback: d.exito, cierraEditor: d.exito };
+  };
+
+  it("200 → éxito: llama al callback y cierra el editor", () => {
+    expect(despues(ok)).toEqual({ llamaCallback: true, cierraEditor: true });
+    expect(decidirResultadoGuardado("actualizar_proyecto", ok, ctx).mensajeError).toBeNull();
+  });
+
+  it.each([["400", fallo(400)], ["401", fallo(401)], ["403", fallo(403)], ["404", fallo(404)], ["500", fallo(500)], ["red", red]] as [string, RespuestaGuardado][])(
+    "%s → no llama al callback, no cierra el editor, hay mensaje; el comportamiento anterior diverge",
+    (_n, r) => {
+      const d = decidirResultadoGuardado("actualizar_proyecto", r, ctx);
+      expect(d.exito).toBe(false);
+      expect(d.bloqueante).toBe(true);
+      expect(d.revertirAprobacion).toBe(false);
+      expect(d.marcarGuardado).toBe(false);
+      expect(d.mensajeError).toContain("el cambio de estado del proyecto");
+      expect(despues(r)).toEqual({ llamaCallback: false, cierraEditor: false });
+      expect(antes(r)).not.toEqual(despues(r));
+    }
+  );
+
+  it("error de red: dice «no se pudo CONFIRMAR» y sugiere recargar; nunca «no se registró»", () => {
+    const m = decidirResultadoGuardado("actualizar_proyecto", red, ctx).mensajeError!;
+    expect(m).toContain("No se pudo CONFIRMAR");
+    expect(m).toContain("recarga");
+    expect(m).not.toContain("No se pudo registrar");
+  });
+
+  it("respuesta con status: «No se pudo registrar» y conserva el valor anterior", () => {
+    const m = decidirResultadoGuardado("actualizar_proyecto", fallo(500), ctx).mensajeError!;
+    expect(m).toContain("No se pudo registrar");
+    expect(m).toContain("Se conserva el valor anterior");
+  });
+});
+
+describe("importar_adjuntos_moddulo (PESTEL datos — aviso no bloqueante)", () => {
+  it.each([["400", fallo(400)], ["403", fallo(403)], ["404", fallo(404)], ["500", fallo(500)], ["red", red]] as [string, RespuestaGuardado][])(
+    "%s → aviso no bloqueante con mensaje",
+    (_n, r) => {
+      const d = decidirResultadoGuardado("importar_adjuntos_moddulo", r);
+      expect(d.exito).toBe(false);
+      expect(d.bloqueante).toBe(false);
+      expect(d.continuar).toBe(true);
+      expect(d.mensajeError).toBeTruthy();
+    }
+  );
+  it("200 → sin mensaje", () => {
+    expect(decidirResultadoGuardado("importar_adjuntos_moddulo", ok).mensajeError).toBeNull();
+  });
+  it("red: «no se pudo CONFIRMAR»; con status: «No se pudieron importar» (concordancia)", () => {
+    expect(decidirResultadoGuardado("importar_adjuntos_moddulo", red).mensajeError).toContain("No se pudo CONFIRMAR");
+    expect(decidirResultadoGuardado("importar_adjuntos_moddulo", fallo(500)).mensajeError).toContain("No se pudieron importar");
+  });
+  it("el comportamiento anterior (.catch vacío) no producía ningún mensaje", () => {
+    for (const r of [fallo(500), red]) {
+      expect(decidirResultadoGuardado("importar_adjuntos_moddulo", r).mensajeError).not.toBeNull();
+    }
+  });
+});

@@ -12,7 +12,15 @@ export type AccionGuardado =
   | "guardar_borrador"
   | "finalizar_analisis"
   | "cerrar_fase"
-  | "registrar_aprobacion";
+  | "registrar_aprobacion"
+  | "actualizar_proyecto"
+  | "importar_adjuntos_moddulo";
+
+/** Actions whose failure must NOT stop the flow: show a notice only. */
+const ACCIONES_NO_BLOQUEANTES: readonly AccionGuardado[] = [
+  "registrar_aprobacion",
+  "importar_adjuntos_moddulo",
+];
 
 export type RespuestaGuardado =
   | {
@@ -31,6 +39,8 @@ export interface ContextoGuardado {
   fase?: string;
   /** Approval value before the optimistic update (edit mode starts approved). */
   aprobadoPrevio?: boolean;
+  /** For actualizar_proyecto: what changed ("el cambio de estado del proyecto"). */
+  cambio?: string;
 }
 
 export interface DecisionGuardado {
@@ -64,6 +74,10 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return `el cierre de ${ctx.fase ?? "la fase"}`;
     case "registrar_aprobacion":
       return "la fecha de aprobación";
+    case "actualizar_proyecto":
+      return ctx.cambio ?? "el cambio en el proyecto";
+    case "importar_adjuntos_moddulo":
+      return "la importación automática de los documentos de Moddulo F2";
   }
 }
 
@@ -78,7 +92,10 @@ function consecuencia(accion: AccionGuardado): string {
     case "cerrar_fase":
       return "La fase sigue abierta; inténtalo de nuevo.";
     case "registrar_aprobacion":
+    case "importar_adjuntos_moddulo":
       return "";
+    case "actualizar_proyecto":
+      return "Se conserva el valor anterior; inténtalo de nuevo.";
   }
 }
 
@@ -112,10 +129,16 @@ function mensajeDeFallo(
     if (accion === "registrar_aprobacion") {
       return "La fase se cerró, pero no se pudo confirmar el registro de la fecha de aprobación.";
     }
+    if (accion === "importar_adjuntos_moddulo") {
+      return "No se pudo CONFIRMAR la importación automática de los documentos de Moddulo F2: sin conexión con el servidor. Puede que sí se hayan importado; recarga la página para verificar.";
+    }
     return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
   }
   if (accion === "registrar_aprobacion") {
     return "La fase se cerró, pero no se pudo registrar la fecha de aprobación.";
+  }
+  if (accion === "importar_adjuntos_moddulo") {
+    return `No se pudieron importar automáticamente los documentos de Moddulo F2. ${motivo(resp)} Puedes cargarlos manualmente.`;
   }
   return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
 }
@@ -146,8 +169,8 @@ export function decidirResultadoGuardado(
     revertirAprobacion: revierte,
     valorRestaurado: revierte ? (ctx.aprobadoPrevio ?? false) : undefined,
     marcarGuardado: false,
-    continuar: accion === "registrar_aprobacion",
-    bloqueante: accion !== "registrar_aprobacion",
+    continuar: ACCIONES_NO_BLOQUEANTES.includes(accion),
+    bloqueante: !ACCIONES_NO_BLOQUEANTES.includes(accion),
   };
 }
 
@@ -235,7 +258,7 @@ export interface DecisionLista {
 export function decidirEstadoLista(
   resp: RespuestaGuardado,
   cantidad: number,
-  ctx: { lista: string }
+  ctx: { lista: string; plural?: boolean }
 ): DecisionLista {
   const ok = resp.tipo === "respuesta" && resp.ok && resp.cuerpoValido !== false;
   if (!ok) {
@@ -247,7 +270,8 @@ export function decidirEstadoLista(
           : resp.status === 401 || resp.status === 403
             ? "Tu sesión no tiene acceso; vuelve a iniciar sesión."
             : "El servidor no pudo responder.";
-    return { estado: "fallido", mensajeError: `No se pudo cargar ${ctx.lista}. ${causa}` };
+    const verbo = ctx.plural ? "No se pudieron cargar" : "No se pudo cargar";
+    return { estado: "fallido", mensajeError: `${verbo} ${ctx.lista}. ${causa}` };
   }
   return { estado: cantidad === 0 ? "vacio" : "cargado", mensajeError: null };
 }

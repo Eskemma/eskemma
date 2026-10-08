@@ -1298,13 +1298,13 @@ export default function ExploracionPage() {
               {isSaving || generandoDVS ? (
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">{generandoDVS ? "Generando..." : "Guardando..."}</span>
               ) : saveError ? (
-                <span className="text-red-eske font-medium">⚠ {saveError}</span>
+                <span className="text-red-eske-60 dark:text-red-eske-10 font-medium">⚠ {saveError}</span>
               ) : lastSaved ? (
                 <span className="text-gray-eske-40 dark:text-[#6D8294]">✓ {lastSaved.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
               ) : null}
             </span>
             {saveError && !isSaving && !generandoDVS && (
-              <span className="sm:hidden text-xs text-red-eske font-medium" role="alert">⚠ Error al guardar</span>
+              <span className="sm:hidden text-xs text-red-eske-60 dark:text-red-eske-10 font-medium" role="alert">⚠ Error al guardar</span>
             )}
             <PhaseDownloadMenu
               phaseId="exploracion"

@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PHASE_NAMES, PROJECT_TYPE_LABELS } from "@/types/moddulo.types";
 import type { ModduloProject } from "@/types/moddulo.types";
 import { DIAS_RETENCION_PROYECTOS, diasRestantesEnPapelera } from "@/lib/moddulo/papelera";
+import ErrorCarga from "@/app/components/shared/ErrorCarga";
 import {
   decidirEstadoLista,
   type EstadoLista,
@@ -38,7 +39,8 @@ type EstadoCarga = "cargando" | EstadoLista;
  */
 async function cargarListaProyectos(
   url: string,
-  lista: string
+  lista: string,
+  plural = false
 ): Promise<{ estado: EstadoLista; mensajeError: string | null; items: ModduloProject[] }> {
   let resp: RespuestaGuardado;
   let items: ModduloProject[] = [];
@@ -58,7 +60,7 @@ async function cargarListaProyectos(
   } catch {
     resp = { tipo: "error_red" };
   }
-  return { ...decidirEstadoLista(resp, items.length, { lista }), items };
+  return { ...decidirEstadoLista(resp, items.length, { lista, plural }), items };
 }
 
 export default function ModduloPage() {
@@ -78,7 +80,7 @@ export default function ModduloPage() {
 
   const cargarProyectos = useCallback(async () => {
     setEstadoProyectos("cargando");
-    const r = await cargarListaProyectos("/api/moddulo/projects", "tus proyectos");
+    const r = await cargarListaProyectos("/api/moddulo/projects", "tus proyectos", true);
     if (r.estado !== "fallido") setProjects(r.items);
     setErrorProyectos(r.mensajeError);
     setEstadoProyectos(r.estado);
@@ -936,34 +938,6 @@ function DeleteModal({
 // ==========================================
 // ESTADO VACÍO
 // ==========================================
-
-function ErrorCarga({
-  mensaje,
-  onReintentar,
-  compacto = false,
-}: {
-  mensaje: string | null;
-  onReintentar: () => void;
-  compacto?: boolean;
-}) {
-  return (
-    <div
-      role="alert"
-      className={`flex flex-wrap items-center gap-3 rounded-xl border border-red-eske/30 bg-red-eske/10 ${
-        compacto ? "px-4 py-2.5 mb-6 text-xs" : "p-8 mb-12 justify-center text-sm"
-      } text-red-eske-60 dark:text-red-eske-10`}
-    >
-      <span>{mensaje ?? "No se pudo cargar la lista."}</span>
-      <button
-        type="button"
-        onClick={onReintentar}
-        className="font-semibold underline underline-offset-2 hover:opacity-80 focus-visible:outline focus-visible:outline-2"
-      >
-        Reintentar
-      </button>
-    </div>
-  );
-}
 
 function EmptyState() {
   return (
