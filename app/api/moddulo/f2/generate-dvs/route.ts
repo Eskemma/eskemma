@@ -30,6 +30,7 @@ import type {
 } from "@/types/moddulo.types";
 import { DIMENSION_META } from "@/types/pestel.types";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
+import { reemplazarDVSConVersion } from "@/lib/moddulo/dvsVersiones";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -132,12 +133,12 @@ export async function POST(request: NextRequest) {
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
       projectId, project.type, xpcto, mapaPESTEL, saveas,
-      JSON.stringify(project.xpcto ?? {})
+      JSON.stringify(project.xpcto ?? {}), session.uid
     );
   }
 
   // ── Fallback: legacy single-call (pestel_analyses o form data) ────────────
-  return runLegacyPath(projectId, project, xpcto, saveas);
+  return runLegacyPath(projectId, project, xpcto, saveas, session.uid);
 }
 
 // ── Multi-motor path ──────────────────────────────────────────────────────────
@@ -148,7 +149,8 @@ async function runMultiMotorPath(
   xpcto: Partial<XPCTO>,
   mapaPESTEL: Record<string, unknown>,
   saveas: "draft" | "final",
-  xpctoSnapshot: string
+  xpctoSnapshot: string,
+  uid: string
 ): Promise<NextResponse> {
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
@@ -282,7 +284,7 @@ async function runMultiMotorPath(
     pip: m5.pip,
   };
 
-  return persistAndReturn(projectId, dvs, saveas, xpctoSnapshot);
+  return persistAndReturn(projectId, dvs, saveas, uid, xpctoSnapshot);
 }
 
 // ── Legacy single-call path ───────────────────────────────────────────────────
@@ -291,7 +293,8 @@ async function runLegacyPath(
   projectId: string,
   project: Awaited<ReturnType<typeof getProject>>,
   xpcto: Partial<XPCTO>,
-  saveas: "draft" | "final"
+  saveas: "draft" | "final",
+  uid: string
 ): Promise<NextResponse> {
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
@@ -348,7 +351,7 @@ async function runLegacyPath(
     );
   }
 
-  return persistAndReturn(projectId, dvs, saveas);
+  return persistAndReturn(projectId, dvs, saveas, uid);
 }
 
 // ── sanitize ──────────────────────────────────────────────────────────────────
@@ -413,6 +416,7 @@ async function persistAndReturn(
   projectId: string,
   rawDvs: DVSF2,
   saveas: "draft" | "final",
+  uid: string,
   xpctoSnapshot?: string
 ): Promise<NextResponse> {
   const dvs = sanitizeDVS(rawDvs);
@@ -433,11 +437,25 @@ async function persistAndReturn(
       updatedAt: FieldValue.serverTimestamp(),
     });
   } else {
-    await adminDb.collection("moddulo_projects").doc(projectId).update({
-      "phases.exploracion.dvs": dvs,
-      "phases.exploracion.estado": "lista",
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    // Replaces the finalized dvs: the previous one is copied to dvsVersiones in the
+    // same transaction (if the copy fails nothing is overwritten).
+    try {
+      await reemplazarDVSConVersion(adminDb, projectId, {
+        nuevoDvs: dvs,
+        updates: {
+          "phases.exploracion.estado": "lista",
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        origen: "generate-dvs-final",
+        uid,
+      });
+    } catch (err) {
+      console.error("[generate-dvs] no se pudo guardar el análisis (ni su versión anterior):", err);
+      return NextResponse.json(
+        { error: "No se pudo guardar el análisis nuevo; el anterior se conserva sin cambios. Intenta de nuevo." },
+        { status: 500 }
+      );
+    }
   }
   return NextResponse.json({ dvs }, { status: 200 });
 }

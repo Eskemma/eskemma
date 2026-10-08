@@ -8,6 +8,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { DVSF2 } from "@/types/moddulo.types";
+import { reemplazarDVSConVersion } from "@/lib/moddulo/dvsVersiones";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -49,13 +50,28 @@ export async function POST(request: NextRequest) {
     dvs.pip = dvs.pip.map((p) => ({ ...p, pipItemId: p.pipItemId ?? `legacy-${p.numero}` }));
   }
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.dvs": dvs,
-    "phases.exploracion.estado": "lista",
-    "phases.exploracion.draftDVS": FieldValue.delete(),
-    "phases.exploracion.motorAprobaciones": FieldValue.delete(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  // If a finalized dvs already exists and the new one differs, it is copied to
+  // dvsVersiones in the same transaction (a failed copy aborts the overwrite).
+  // The first finalization has no previous dvs, so no copy is made.
+  try {
+    await reemplazarDVSConVersion(adminDb, projectId, {
+      nuevoDvs: dvs,
+      updates: {
+        "phases.exploracion.estado": "lista",
+        "phases.exploracion.draftDVS": FieldValue.delete(),
+        "phases.exploracion.motorAprobaciones": FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      origen: "finalize-dvs",
+      uid: session.uid,
+    });
+  } catch (err) {
+    console.error("[finalize-dvs] no se pudo guardar el análisis (ni su versión anterior):", err);
+    return NextResponse.json(
+      { error: "No se pudo guardar el análisis; el anterior se conserva sin cambios. Intenta de nuevo." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ dvs }, { status: 200 });
 }

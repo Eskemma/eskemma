@@ -18,6 +18,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { TareaPIP, PIPItem } from "@/types/moddulo.types";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import { generarTareasParaPIPItems } from "@/lib/moddulo/f3TareasGenerator";
+import { tareaTieneProgreso } from "@/lib/moddulo/impactoReemplazoDVS";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -55,9 +56,7 @@ export async function POST(request: NextRequest) {
   // se detiene y reporta qué se perdería — el diff/merge selectivo que
   // permitiría regenerar sin pedir esto queda para un incremento aparte.
   const existingTareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
-  const tieneProgresoReal = (t: TareaPIP) =>
-    (t.asignaciones ?? []).some((a) => a.estado !== "pendiente" || !!a.resultadoId || a.activada === false);
-  const tareasConProgreso = existingTareas.filter(tieneProgresoReal);
+  const tareasConProgreso = existingTareas.filter(tareaTieneProgreso);
 
   if (tareasConProgreso.length > 0 && confirmar !== true) {
     const resultadosSnap = await adminDb
