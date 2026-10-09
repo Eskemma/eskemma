@@ -169,3 +169,103 @@ describe("comportamiento ACTUAL de M8 (reemplaza siempre, sin avisar) vs el nuev
     expect(d.requiereConfirmacion || d.bloquear).toBe(true);
   });
 });
+
+// ── commit 2: candado, líneas de impacto, huella con hash del dvs ────────────
+
+import {
+  ReemplazoRechazadoError,
+  decidirCandadoReemplazo,
+  lineasDeImpacto,
+} from "./impactoReemplazoDVS";
+
+describe("MOTIVO_BLOQUEO_DIE — verdadero por construcción y sin «DIE»", () => {
+  it("usa los rótulos de pantalla y no la sigla", () => {
+    expect(MOTIVO_BLOQUEO_DIE).not.toMatch(/\bDIE\b/);
+    expect(MOTIVO_BLOQUEO_DIE).toContain("«M4 · Veredicto HEI»");
+    expect(MOTIVO_BLOQUEO_DIE).toContain("«Reporte F3»");
+    expect(MOTIVO_BLOQUEO_DIE).toContain("reabrir la Fase 3 aún no está disponible");
+  });
+});
+
+describe("huella — incluye el hash del dvs vigente", () => {
+  const dvsA = { hei: { tensionCentral: "A" }, contrasteXPCTO: [], semaforo: [], incertidumbres: [], pip: [] } as unknown as DVSF2;
+  const dvsB = { hei: { tensionCentral: "B" }, contrasteXPCTO: [], semaforo: [], incertidumbres: [], pip: [] } as unknown as DVSF2;
+  it("otro dvs con el mismo impacto de F3 → otra huella", () => {
+    const a = calcularImpactoReemplazoDVS(base({ dvs: dvsA }), "reemplazo_total");
+    const b = calcularImpactoReemplazoDVS(base({ dvs: dvsB }), "reemplazo_total");
+    expect(a.impacto).toEqual(b.impacto);
+    expect(a.huella).not.toBe(b.huella);
+  });
+  it("el mismo dvs con claves en otro orden → misma huella", () => {
+    const reordenado = { pip: [], incertidumbres: [], semaforo: [], contrasteXPCTO: [], hei: { tensionCentral: "A" } } as unknown as DVSF2;
+    expect(calcularImpactoReemplazoDVS(base({ dvs: dvsA }), "reemplazo_total").huella).toBe(
+      calcularImpactoReemplazoDVS(base({ dvs: reordenado }), "reemplazo_total").huella
+    );
+  });
+});
+
+describe("decidirCandadoReemplazo", () => {
+  const conTablero = calcularImpactoReemplazoDVS(base({ tareas: [tarea("p1")] }), "reemplazo_total");
+  const conDie = calcularImpactoReemplazoDVS(base({ die: { x: 1 } }), "reemplazo_total");
+  const sinDvs = calcularImpactoReemplazoDVS(base({ dvs: null }), "reemplazo_total");
+
+  it("sin confirmar → requiere confirmación (aunque no haya impacto en F3)", () => {
+    expect(decidirCandadoReemplazo({ decision: conTablero, confirmar: false, huellaRecibida: null }).accion).toBe("requiere_confirmacion");
+    const sinTablero = calcularImpactoReemplazoDVS(base(), "reemplazo_total");
+    expect(decidirCandadoReemplazo({ decision: sinTablero, confirmar: false, huellaRecibida: undefined }).accion).toBe("requiere_confirmacion");
+  });
+  it("confirmar sin huella, o huella sin confirmar → sigue pidiendo confirmación", () => {
+    expect(decidirCandadoReemplazo({ decision: conTablero, confirmar: true, huellaRecibida: null }).accion).toBe("requiere_confirmacion");
+    expect(decidirCandadoReemplazo({ decision: conTablero, confirmar: false, huellaRecibida: conTablero.huella }).accion).toBe("requiere_confirmacion");
+  });
+  it("confirmar con la huella vigente → continuar", () => {
+    expect(decidirCandadoReemplazo({ decision: conTablero, confirmar: true, huellaRecibida: conTablero.huella }).accion).toBe("continuar");
+  });
+  it("confirmar con una huella distinta → huella vencida", () => {
+    expect(decidirCandadoReemplazo({ decision: conTablero, confirmar: true, huellaRecibida: "otra" }).accion).toBe("huella_vencida");
+  });
+  it("DIE → bloqueado, aunque venga la huella correcta", () => {
+    expect(decidirCandadoReemplazo({ decision: conDie, confirmar: true, huellaRecibida: conDie.huella }).accion).toBe("bloqueado");
+  });
+  it("sin dvs → continuar (primera generación, nada que reemplazar)", () => {
+    expect(decidirCandadoReemplazo({ decision: sinDvs, confirmar: false, huellaRecibida: null }).accion).toBe("continuar");
+  });
+  it("ReemplazoRechazadoError conserva la acción y la decisión", () => {
+    const e = new ReemplazoRechazadoError("huella_vencida", conTablero);
+    expect(e.accion).toBe("huella_vencida");
+    expect(e.decision).toBe(conTablero);
+  });
+});
+
+describe("lineasDeImpacto — rótulos y palabras que F3 ya muestra", () => {
+  it("sin impacto en F3 → ninguna línea", () => {
+    expect(lineasDeImpacto(calcularImpactoReemplazoDVS(base(), "reemplazo_total"))).toEqual([]);
+  });
+  it("tablero con avance: usa «M1 · Tablero de tareas», el aviso real de F3 y «Sincronizar tablero ↺»", () => {
+    const l = lineasDeImpacto(
+      calcularImpactoReemplazoDVS(base({ tareas: [tarea("p1", [asig({ estado: "recibido" })]), tarea("p2")] }), "reemplazo_total")
+    );
+    expect(l).toHaveLength(1);
+    expect(l[0]).toContain("2 tareas de «M1 · Tablero de tareas» (1 con avance) quedarán sin su pregunta");
+    expect(l[0]).toContain("«El PIP cambió desde que se generó el tablero de investigación»");
+    expect(l[0]).toContain("«Sincronizar tablero ↺» las retirará");
+  });
+  it("singular: 1 tarea, 1 resultado", () => {
+    const l = lineasDeImpacto(
+      calcularImpactoReemplazoDVS(base({ tareas: [tarea("p1")], resultados: [{ resultadoId: "r1", aprobado: true }] }), "reemplazo_total")
+    );
+    expect(l[0]).toContain("1 tarea de «M1 · Tablero de tareas» quedará sin su pregunta");
+    expect(l[0]).toContain("la retirará");
+    expect(l[1]).toContain("1 resultado de «M2 · Resultados recibidos» (1 aprobado) quedará asociado");
+  });
+  it("síntesis y veredicto: dice qué pasará, sin inventar un aviso que F3 no muestra", () => {
+    const l = lineasDeImpacto(
+      calcularImpactoReemplazoDVS(base({ sintesis: { vaciosResiduales: [] }, veredicto: { resultado: "validada" } }), "reemplazo_total")
+    );
+    const texto = l.join(" ");
+    expect(texto).toContain("«M3 · Síntesis de hallazgos» seguirá citando");
+    expect(texto).toContain("F3 no lo señalará");
+    expect(texto).toContain("«M4 · Veredicto HEI» ya se generó");
+    expect(texto).not.toContain("desactualizada");
+  });
+});

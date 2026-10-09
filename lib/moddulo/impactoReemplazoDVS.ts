@@ -76,8 +76,12 @@ export interface DecisionReemplazo {
   huella: string;
 }
 
+// PROVISIONAL. Wording uses what the user sees on screen, never "DIE": a DIE is
+// written in the SAME update as the approved verdict (veredicto/aprobar), so
+// "approved «M4 · Veredicto HEI»" is true by construction, and F3 shows the
+// «Reporte F3» tab exactly when the DIE exists (`isLista = !!die`).
 export const MOTIVO_BLOQUEO_DIE =
-  "La Fase 3 ya emitió su veredicto (DIE) y está cerrada. Reemplazar el análisis la dejaría inconsistente, y reabrir la Fase 3 aún no está disponible.";
+  "La Fase 3 ya aprobó su «M4 · Veredicto HEI» y cuenta con su «Reporte F3». Reemplazar el análisis las dejaría inconsistentes, y reabrir la Fase 3 aún no está disponible.";
 
 function hashEstable(texto: string): string {
   // cyrb53: deterministic, dependency-free (also safe for client bundles). It
@@ -137,12 +141,16 @@ export function calcularImpactoReemplazoDVS(
     idsResultadosAprobados: sortedUnique(aprobados.map((r) => r.resultadoId)),
   };
 
+  // The fingerprint also covers WHAT is being replaced (the current dvs): two
+  // confirmations of the same impact cannot both replace it, and an edit of the
+  // dvs between "ask" and "confirm" invalidates the confirmation.
   const huella = hashEstable(
     serializacionEstable({
       modo: total
         ? "total"
         : { pip: sortedUnique([...idsPipEliminados]), actor: sortedUnique([...idsActorEliminados]) },
       impacto,
+      dvs: estado.dvs ?? null,
     })
   );
 
@@ -161,4 +169,88 @@ export function calcularImpactoReemplazoDVS(
     impacto,
     huella,
   };
+}
+
+// ── Server-side lock ─────────────────────────────────────────────────────────
+
+export type AccionCandado =
+  | "continuar"
+  | "requiere_confirmacion"
+  | "bloqueado"
+  | "huella_vencida";
+
+export interface ResultadoCandado {
+  accion: AccionCandado;
+  decision: DecisionReemplazo;
+}
+
+/**
+ * The single decision used BEFORE calling Claude and again INSIDE the write
+ * transaction. `huellaRecibida` is the fingerprint the user confirmed (null when
+ * nothing was confirmed); it is compared with the fingerprint of the state read
+ * at the moment of the check.
+ */
+export function decidirCandadoReemplazo(args: {
+  decision: DecisionReemplazo;
+  confirmar: boolean;
+  huellaRecibida: string | null | undefined;
+}): ResultadoCandado {
+  const { decision, confirmar, huellaRecibida } = args;
+  if (decision.bloquear) return { accion: "bloqueado", decision };
+  if (!decision.requiereConfirmacion) return { accion: "continuar", decision };
+  if (confirmar !== true || !huellaRecibida) return { accion: "requiere_confirmacion", decision };
+  if (huellaRecibida !== decision.huella) return { accion: "huella_vencida", decision };
+  return { accion: "continuar", decision };
+}
+
+/** Thrown inside the write transaction when the lock rejects the replacement. */
+export class ReemplazoRechazadoError extends Error {
+  constructor(
+    public readonly accion: Exclude<AccionCandado, "continuar">,
+    public readonly decision: DecisionReemplazo
+  ) {
+    super(`Reemplazo rechazado: ${accion}`);
+    this.name = "ReemplazoRechazadoError";
+  }
+}
+
+const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
+
+/**
+ * Impact lines for the confirmation modal, built with the labels the user sees
+ * in F3 («M1 · Tablero de tareas», «M2 · Resultados recibidos», «M3 · Síntesis
+ * de hallazgos», «M4 · Veredicto HEI») and the words F3 already uses when the
+ * PIP changes («El PIP cambió desde que se generó el tablero de investigación»,
+ * «Sincronizar tablero ↺»). F3 never flags the synthesis or the verdict as
+ * stale (no such banner exists), so those lines say what will happen, not a
+ * state F3 would display. Empty when there is no real impact on F3.
+ */
+export function lineasDeImpacto(decision: DecisionReemplazo): string[] {
+  if (!decision.hayImpactoF3) return [];
+  const i = decision.impacto;
+  const lineas: string[] = [];
+  if (i.tareasAfectadas > 0) {
+    const avance = i.tareasConAvance > 0 ? ` (${i.tareasConAvance} con avance)` : "";
+    lineas.push(
+      `${i.tareasAfectadas} ${plural(i.tareasAfectadas, "tarea", "tareas")} de «M1 · Tablero de tareas»${avance} ${plural(i.tareasAfectadas, "quedará", "quedarán")} sin su pregunta: F3 avisará «El PIP cambió desde que se generó el tablero de investigación» y «Sincronizar tablero ↺» ${plural(i.tareasAfectadas, "la retirará", "las retirará")}.`
+    );
+  }
+  if (i.resultadosRecibidos > 0) {
+    const aprob =
+      i.resultadosAprobados > 0
+        ? ` (${i.resultadosAprobados} ${plural(i.resultadosAprobados, "aprobado", "aprobados")})`
+        : "";
+    lineas.push(
+      `${i.resultadosRecibidos} ${plural(i.resultadosRecibidos, "resultado", "resultados")} de «M2 · Resultados recibidos»${aprob} ${plural(i.resultadosRecibidos, "quedará asociado", "quedarán asociados")} a preguntas que ya no existen en el análisis nuevo.`
+    );
+  }
+  if (i.sintesisAfectada) {
+    lineas.push(
+      "«M3 · Síntesis de hallazgos» seguirá citando las preguntas y los actores del análisis anterior; F3 no lo señalará."
+    );
+  }
+  if (i.veredictoExiste) {
+    lineas.push("«M4 · Veredicto HEI» ya se generó sobre el análisis anterior y no se actualizará.");
+  }
+  return lineas;
 }

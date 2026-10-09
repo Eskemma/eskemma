@@ -53,7 +53,7 @@ function recalcularEstadoApp(a: AsignacionCanal): AsignacionCanal {
 // creados antes de ese cambio siguen así en Firestore — normalizeTareaPIP
 // los reacomoda al leer, sin fabricar datos: reconstruye una única
 // asignación primaria a partir de los campos planos que sí existen.
-interface LegacyTareaPIP {
+export interface LegacyTareaPIP {
   numero: number;
   pipItemId?: string;
   canalAsignado?: "canal1" | "canal2" | "canal3";
@@ -76,7 +76,7 @@ function legacyPipItemId(numero: number): string {
   return `legacy-${numero}`;
 }
 
-function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
+export function normalizeTareaPIP(t: LegacyTareaPIP): TareaPIP {
   const pipItemId = t.pipItemId ?? legacyPipItemId(t.numero);
   if (Array.isArray(t.asignaciones)) {
     // Defensivo: asignaciones de antes de la Ronda 5 (activar/desactivar

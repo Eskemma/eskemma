@@ -31,6 +31,43 @@ import type {
 import { DIMENSION_META } from "@/types/pestel.types";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { reemplazarDVSConVersion } from "@/lib/moddulo/dvsVersiones";
+import {
+  ReemplazoRechazadoError,
+  calcularImpactoReemplazoDVS,
+  decidirCandadoReemplazo,
+  lineasDeImpacto,
+  type AccionCandado,
+  type DecisionReemplazo,
+} from "@/lib/moddulo/impactoReemplazoDVS";
+import {
+  estadoParaImpactoDesdeProyecto,
+  leerEstadoParaImpacto,
+} from "@/lib/moddulo/impactoReemplazoServidor";
+
+// A full generation is 4+ sequential Claude calls (M2||M3 → M4 → M5, with one
+// retry for M5): same ceiling as generate-m1-express. The route used to declare
+// none, so the platform default applied.
+export const maxDuration = 300;
+
+// ── replace lock (H15 / M8) ──────────────────────────────────────────────────
+
+function respuestaCandado(accion: Exclude<AccionCandado, "continuar">, decision: DecisionReemplazo): NextResponse {
+  if (accion === "bloqueado") {
+    return NextResponse.json(
+      { error: "reemplazo_bloqueado", mensaje: decision.motivoBloqueo },
+      { status: 409 }
+    );
+  }
+  return NextResponse.json(
+    {
+      error: accion === "huella_vencida" ? "reemplazo_huella_vencida" : "reemplazo_requiere_confirmacion",
+      lineas: lineasDeImpacto(decision),
+      hayImpactoF3: decision.hayImpactoF3,
+      huella: decision.huella,
+    },
+    { status: 409 }
+  );
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,14 +145,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string; saveas?: "draft" | "final" };
+  let body: { projectId?: string; saveas?: "draft" | "final"; confirmar?: boolean; huella?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { projectId, saveas = "final" } = body;
+  const { projectId, saveas = "final", confirmar, huella } = body;
   if (!projectId) {
     return NextResponse.json({ error: "projectId es requerido" }, { status: 400 });
   }
@@ -127,18 +164,37 @@ export async function POST(request: NextRequest) {
 
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
+  // ── Replace lock, step 1 (BEFORE the legacy / multi-motor fork, so no path
+  // can skip it, and before any Claude call so a 409 costs nothing). It reads
+  // the RAW document, not getProject(): the in-transaction check must compute
+  // the same fingerprint from the same shape. Note `saveas` defaults to "final":
+  // a request that omits it is guarded too.
+  let huellaConfirmada: string | null = null;
+  if (saveas === "final") {
+    const estado = await leerEstadoParaImpacto(adminDb, projectId);
+    if (estado.dvs) {
+      const candado = decidirCandadoReemplazo({
+        decision: calcularImpactoReemplazoDVS(estado, "reemplazo_total"),
+        confirmar: confirmar === true,
+        huellaRecibida: huella,
+      });
+      if (candado.accion !== "continuar") return respuestaCandado(candado.accion, candado.decision);
+      huellaConfirmada = huella ?? null;
+    }
+  }
+
   // ── Try new path: mapaPESTEL en phases.exploracion ───────────────────────
   const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
 
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
       projectId, project.type, xpcto, mapaPESTEL, saveas,
-      JSON.stringify(project.xpcto ?? {}), session.uid
+      JSON.stringify(project.xpcto ?? {}), session.uid, huellaConfirmada
     );
   }
 
   // ── Fallback: legacy single-call (pestel_analyses o form data) ────────────
-  return runLegacyPath(projectId, project, xpcto, saveas, session.uid);
+  return runLegacyPath(projectId, project, xpcto, saveas, session.uid, huellaConfirmada);
 }
 
 // ── Multi-motor path ──────────────────────────────────────────────────────────
@@ -150,7 +206,8 @@ async function runMultiMotorPath(
   mapaPESTEL: Record<string, unknown>,
   saveas: "draft" | "final",
   xpctoSnapshot: string,
-  uid: string
+  uid: string,
+  huellaConfirmada: string | null
 ): Promise<NextResponse> {
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
@@ -284,7 +341,7 @@ async function runMultiMotorPath(
     pip: m5.pip,
   };
 
-  return persistAndReturn(projectId, dvs, saveas, uid, xpctoSnapshot);
+  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada, xpctoSnapshot);
 }
 
 // ── Legacy single-call path ───────────────────────────────────────────────────
@@ -294,7 +351,8 @@ async function runLegacyPath(
   project: Awaited<ReturnType<typeof getProject>>,
   xpcto: Partial<XPCTO>,
   saveas: "draft" | "final",
-  uid: string
+  uid: string,
+  huellaConfirmada: string | null
 ): Promise<NextResponse> {
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
@@ -333,12 +391,21 @@ async function runLegacyPath(
   const { system, user } = getDVSGenerationPrompt(project.type, xpcto as Record<string, unknown>, pestelContext);
   const systemPrompt = knowledgeContext ? `${knowledgeContext}\n\n${system}` : system;
 
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 4000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: user }],
-  });
+  // Claude may fail here, before any write: answer a JSON 500 (like the
+  // multi-motor path) so the client can say the previous analysis is untouched.
+  let response: Anthropic.Message;
+  try {
+    response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 4000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: user }],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logAnthropicError("generate-dvs legacy", err);
+    return NextResponse.json({ error: `Error al generar el análisis: ${msg}`, motor: "legacy" }, { status: 500 });
+  }
 
   const rawText = extractText(response);
   let dvs: DVSF2;
@@ -351,7 +418,7 @@ async function runLegacyPath(
     );
   }
 
-  return persistAndReturn(projectId, dvs, saveas, uid);
+  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada);
 }
 
 // ── sanitize ──────────────────────────────────────────────────────────────────
@@ -417,6 +484,7 @@ async function persistAndReturn(
   rawDvs: DVSF2,
   saveas: "draft" | "final",
   uid: string,
+  huellaConfirmada: string | null,
   xpctoSnapshot?: string
 ): Promise<NextResponse> {
   const dvs = sanitizeDVS(rawDvs);
@@ -437,8 +505,11 @@ async function persistAndReturn(
       updatedAt: FieldValue.serverTimestamp(),
     });
   } else {
-    // Replaces the finalized dvs: the previous one is copied to dvsVersiones in the
-    // same transaction (if the copy fails nothing is overwritten).
+    // Replace lock, step 2: the ONLY writer of the final dvs on both paths. The
+    // check runs INSIDE the same transaction that copies the previous dvs and
+    // writes the new one, comparing against the fingerprint the user confirmed
+    // (not the one computed by the pre-check), so a change in F3 — or another
+    // replacement — while Claude was generating rejects the write.
     try {
       await reemplazarDVSConVersion(adminDb, projectId, {
         nuevoDvs: dvs,
@@ -448,11 +519,33 @@ async function persistAndReturn(
         },
         origen: "generate-dvs-final",
         uid,
+        guardia: ({ proyecto, resultados }) => {
+          const estado = estadoParaImpactoDesdeProyecto(proyecto, resultados);
+          if (!estado.dvs) return; // nothing to replace (first generation)
+          const candado = decidirCandadoReemplazo({
+            decision: calcularImpactoReemplazoDVS(estado, "reemplazo_total"),
+            confirmar: huellaConfirmada !== null,
+            huellaRecibida: huellaConfirmada,
+          });
+          if (candado.accion !== "continuar") {
+            throw new ReemplazoRechazadoError(candado.accion, candado.decision);
+          }
+        },
       });
     } catch (err) {
-      console.error("[generate-dvs] no se pudo guardar el análisis (ni su versión anterior):", err);
+      if (err instanceof ReemplazoRechazadoError) {
+        // Nothing was written: the state changed since the user confirmed.
+        return respuestaCandado(err.accion, err.decision);
+      }
+      // Whether the commit reached the server is unknown (the copy and the
+      // overwrite are one atomic commit, but a lost response is possible), so
+      // this does NOT claim the previous analysis is untouched.
+      console.error("[generate-dvs] no se pudo confirmar el guardado del análisis:", err);
       return NextResponse.json(
-        { error: "No se pudo guardar el análisis nuevo; el anterior se conserva sin cambios. Intenta de nuevo." },
+        {
+          error: "reemplazo_escritura_incierta",
+          mensaje: "No se pudo confirmar el guardado del análisis nuevo. Recarga la página para verificar el estado.",
+        },
         { status: 500 }
       );
     }

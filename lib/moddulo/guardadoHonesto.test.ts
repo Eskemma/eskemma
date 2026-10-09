@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   AVISOS_CIERRE,
   decidirCierreDeFase,
+  decidirReemplazoAnalisis,
+  decidirResultadoGeneracionF2,
   decidirEstadoLista,
   decidirResultadoGuardado,
   esRespuestaVigente,
@@ -395,5 +397,122 @@ describe("eliminar_proyecto (hub de PESTEL)", () => {
     const m = decidirResultadoGuardado("actualizar_proyecto", fallo(404), { cambio: "x" }).mensajeError!;
     expect(m).toContain("El proyecto ya no existe o no tienes acceso");
     expect(m).not.toContain("puede que ya se haya eliminado");
+  });
+});
+
+// ── commit 2: reemplazar_analisis (M8) y generar_analisis (#8) ───────────────
+
+const con409 = (codigo: string): RespuestaGuardado => ({ tipo: "respuesta", ok: false, status: 409, codigo });
+const conCodigo = (status: number, codigo?: string, motor?: string): RespuestaGuardado => ({
+  tipo: "respuesta", ok: false, status, codigo, motor,
+});
+const okConDvs: RespuestaGuardado = { tipo: "respuesta", ok: true, status: 200, cuerpoValido: true };
+
+describe("decidirReemplazoAnalisis — tres 409 que NO son fallos, y fallos reales", () => {
+  it("200 con dvs → éxito", () => {
+    expect(decidirReemplazoAnalisis(okConDvs, { confirmado: true })).toEqual({ tipo: "exito" });
+  });
+  it("200 sin dvs en el cuerpo → error (nunca éxito)", () => {
+    const d = decidirReemplazoAnalisis({ tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }, { confirmado: true });
+    expect(d.tipo).toBe("error");
+  });
+  it("los tres 409 se distinguen entre sí y de un fallo", () => {
+    expect(decidirReemplazoAnalisis(con409("reemplazo_requiere_confirmacion"))).toEqual({ tipo: "requiere_confirmacion" });
+    expect(decidirReemplazoAnalisis(con409("reemplazo_bloqueado"))).toEqual({ tipo: "bloqueado" });
+    expect(decidirReemplazoAnalisis(con409("reemplazo_huella_vencida"))).toEqual({ tipo: "huella_vencida" });
+  });
+  it("un 409 con otro código es un fallo real, no una confirmación", () => {
+    expect(decidirReemplazoAnalisis(con409("otra_cosa")).tipo).toBe("error");
+    expect(decidirReemplazoAnalisis({ tipo: "respuesta", ok: false, status: 409 }).tipo).toBe("error");
+  });
+  it("red con confirmación → «No se pudo CONFIRMAR…», nunca «no se registró»", () => {
+    const d = decidirReemplazoAnalisis(red, { confirmado: true });
+    expect(d.tipo).toBe("error");
+    const m = (d as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR el reemplazo del análisis finalizado");
+    expect(m).toContain("Puede que sí se haya reemplazado");
+    expect(m).not.toContain("No se pudo registrar");
+  });
+  it("red en la verificación inicial (sin confirmar) → no se reemplazó nada, y es verdad por construcción", () => {
+    const m = (decidirReemplazoAnalisis(red, { confirmado: false }) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo verificar el impacto del reemplazo");
+    expect(m).toContain("No se reemplazó nada, porque aún no habías confirmado");
+  });
+  it.each([502, 503, 504])("%s con confirmación es ambiguo (el servidor pudo escribir)", (status) => {
+    const m = (decidirReemplazoAnalisis(conCodigo(status), { confirmado: true }) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR el reemplazo");
+    expect(m).not.toContain("sigue vigente");
+  });
+  it("el código «escritura incierta» del servidor también es ambiguo", () => {
+    const m = (decidirReemplazoAnalisis(conCodigo(500, "reemplazo_escritura_incierta"), { confirmado: true }) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR el reemplazo");
+  });
+  it("500 de un motor (Claude falló antes de escribir) → «sigue vigente» y nombra el motor", () => {
+    const m = (decidirReemplazoAnalisis(conCodigo(500, undefined, "M5"), { confirmado: true }) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar el reemplazo del análisis finalizado (falló M5)");
+    expect(m).toContain("El análisis anterior sigue vigente; inténtalo de nuevo.");
+  });
+  it.each([401, 403, 404])("%s → error con «sigue vigente»", (status) => {
+    const m = (decidirReemplazoAnalisis(conCodigo(status), { confirmado: true }) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar el reemplazo");
+    expect(m).toContain("sigue vigente");
+  });
+  it("negativo — el handler anterior trataba todo como éxito o texto genérico, sin distinguir los 409", () => {
+    const antes = (_r: RespuestaGuardado) => ({ abreModal: false, mensaje: "No se pudo regenerar el reporte. Intenta de nuevo." });
+    for (const r of [con409("reemplazo_requiere_confirmacion"), con409("reemplazo_bloqueado"), con409("reemplazo_huella_vencida")]) {
+      expect(antes(r).abreModal).toBe(false);
+      expect(["requiere_confirmacion", "bloqueado", "huella_vencida"]).toContain(decidirReemplazoAnalisis(r).tipo);
+    }
+    expect((decidirReemplazoAnalisis(red, { confirmado: true }) as { mensajeError: string }).mensajeError).not.toBe(antes(red).mensaje);
+  });
+});
+
+describe("decidirResultadoGeneracionF2 — camino #8", () => {
+  // Comportamiento anterior: ejecutaba checkBackPropagation, setMode("completed") y
+  // setShowReporte(true) aunque generate-dvs fallara.
+  const antes = () => ({ propagar: true, pasarACompleted: true, abrirReporte: true });
+
+  it("éxito → propaga, pasa a completed y abre el reporte", () => {
+    expect(decidirResultadoGeneracionF2(okConDvs)).toEqual({
+      exito: true, mensajeError: null, propagar: true, pasarACompleted: true, abrirReporte: true,
+    });
+  });
+  it.each([
+    ["400", fallo(400)], ["403", fallo(403)], ["500", conCodigo(500, undefined, "M5")], ["red", red],
+    ["409 (pantalla desactualizada)", con409("reemplazo_requiere_confirmacion")],
+    ["200 sin dvs", { tipo: "respuesta", ok: true, status: 200, cuerpoValido: false } as RespuestaGuardado],
+  ] as [string, RespuestaGuardado][])("%s → no propaga, no pasa a completed, no abre el reporte, y hay mensaje; el comportamiento anterior diverge", (_n, r) => {
+    const d = decidirResultadoGeneracionF2(r);
+    expect(d).toMatchObject({ exito: false, propagar: false, pasarACompleted: false, abrirReporte: false });
+    expect(d.mensajeError).toBeTruthy();
+    expect(antes()).not.toEqual({ propagar: d.propagar, pasarACompleted: d.pasarACompleted, abrirReporte: d.abrirReporte });
+  });
+  it("409: dice que la pantalla está desactualizada y que no se reemplazó nada; no ofrece confirmar", () => {
+    const m = decidirResultadoGeneracionF2(con409("reemplazo_huella_vencida")).mensajeError!;
+    expect(m).toContain("esta pantalla está desactualizada");
+    expect(m).toContain("Los cambios del formulario sí se guardaron. No se reemplazó nada");
+    expect(m).toContain("recarga la página");
+  });
+  it("500 de la ruta legacy (motor «legacy»): «sigue vigente» en reemplazar_analisis y «formulario guardado» en generar_analisis", () => {
+    const r = conCodigo(500, undefined, "legacy");
+    const a = (decidirReemplazoAnalisis(r, { confirmado: true }) as { mensajeError: string }).mensajeError;
+    expect(a).toContain("No se pudo registrar el reemplazo del análisis finalizado (falló legacy)");
+    expect(a).toContain("El análisis anterior sigue vigente");
+    expect(a).not.toContain("CONFIRMAR");
+    const g = decidirResultadoGeneracionF2(r).mensajeError!;
+    expect(g).toContain("No se pudo registrar la generación del análisis (falló legacy)");
+    expect(g).toContain("Los cambios del formulario sí se guardaron");
+    expect(g).not.toContain("CONFIRMAR");
+  });
+  it("red: «No se pudo CONFIRMAR…» y aclara que los cambios del formulario sí se guardaron", () => {
+    const m = decidirResultadoGeneracionF2(red).mensajeError!;
+    expect(m).toContain("No se pudo CONFIRMAR la generación del análisis");
+    expect(m).toContain("Los cambios del formulario sí se guardaron");
+    expect(m).not.toContain("No se pudo registrar");
+  });
+  it("500 con motor: «No se pudo registrar la generación del análisis (falló M5)» + formulario guardado", () => {
+    const m = decidirResultadoGeneracionF2(conCodigo(500, undefined, "M5")).mensajeError!;
+    expect(m).toContain("No se pudo registrar la generación del análisis (falló M5)");
+    expect(m).toContain("Los cambios del formulario sí se guardaron; vuelve a intentarlo.");
   });
 });

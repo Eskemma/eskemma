@@ -3,6 +3,8 @@
 
 import {
   decidirCierreDeFase,
+  decidirReemplazoAnalisis,
+  decidirResultadoGeneracionF2,
   decidirResultadoGuardado,
   esRespuestaVigente,
   urlTrasCierre,
@@ -16,6 +18,7 @@ import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionRevie
 import DVSView from "./components/DVSView";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import OrphanRecoveryView from "./components/OrphanRecoveryView";
+import ReemplazarAnalisisModal, { type ModoReemplazo } from "./components/ReemplazarAnalisisModal";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import ConfirmReplacePestelModal from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -950,36 +953,108 @@ export default function ExploracionPage() {
   }, [pendingReplaceConfirm, importPestel]);
 
   const [isRegeneratingReport, setIsRegeneratingReport] = useState(false);
+  const [isVerificandoReemplazo, setIsVerificandoReemplazo] = useState(false);
   const [reportRegenError, setReportRegenError] = useState<string | null>(null);
+  // "Reemplazar análisis finalizado…" (H15 / M8). The server decides: without the
+  // user's confirmation it answers 409 with the real impact (no Claude call), and
+  // it re-checks that impact inside the write transaction. This page only performs
+  // effects; the decisions live in lib/moddulo/guardadoHonesto.ts.
+  const [reemplazoModal, setReemplazoModal] = useState<{
+    modo: ModoReemplazo;
+    lineas: string[];
+    huella: string | null;
+    motivoBloqueo: string | null;
+    aviso: string | null;
+  } | null>(null);
 
-  const handleRegenerarReporteF2 = useCallback(async () => {
-    setIsRegeneratingReport(true);
-    setReportRegenError(null);
-    try {
-      const r = await fetch("/api/moddulo/f2/generate-dvs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId, saveas: "final" }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        if (data.dvs) setDvs(data.dvs as DVSF2);
+  const ejecutarReemplazo = useCallback(
+    async (huellaConfirmada: string | null) => {
+      const confirmando = huellaConfirmada !== null;
+      setReportRegenError(null);
+      if (confirmando) {
+        setReemplazoModal(null);
+        setIsRegeneratingReport(true);
       } else {
-        const err = await r.json().catch(() => ({}));
-        const motor = (err as { motor?: string }).motor;
-        setReportRegenError(
-          motor
-            ? `Error en ${motor}. Intenta de nuevo.`
-            : "No se pudo regenerar el reporte. Intenta de nuevo."
-        );
+        setIsVerificandoReemplazo(true);
       }
-    } catch {
-      setReportRegenError("Error de red. Verifica tu conexión e intenta de nuevo.");
-    } finally {
-      setIsRegeneratingReport(false);
-    }
-  }, [projectId]);
+      try {
+        let resp: RespuestaGuardado;
+        let cuerpo: {
+          dvs?: DVSF2;
+          error?: string;
+          motor?: string;
+          mensaje?: string;
+          lineas?: string[];
+          huella?: string;
+        } = {};
+        try {
+          const r = await fetch("/api/moddulo/f2/generate-dvs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              projectId,
+              saveas: "final",
+              ...(confirmando ? { confirmar: true, huella: huellaConfirmada } : {}),
+            }),
+          });
+          let cuerpoValido: boolean | undefined;
+          try {
+            cuerpo = (await r.json()) as typeof cuerpo;
+            cuerpoValido = r.ok ? Boolean(cuerpo?.dvs) : undefined;
+          } catch {
+            cuerpoValido = r.ok ? false : undefined;
+          }
+          resp = {
+            tipo: "respuesta",
+            ok: r.ok,
+            status: r.status,
+            cuerpoValido,
+            codigo: typeof cuerpo?.error === "string" ? cuerpo.error : undefined,
+            motor: typeof cuerpo?.motor === "string" ? cuerpo.motor : undefined,
+          };
+        } catch {
+          resp = { tipo: "error_red" };
+        }
+
+        const d = decidirReemplazoAnalisis(resp, { confirmado: confirmando });
+        switch (d.tipo) {
+          case "exito":
+            if (cuerpo.dvs) setDvs(cuerpo.dvs);
+            break;
+          case "requiere_confirmacion":
+          case "huella_vencida":
+            setReemplazoModal({
+              modo: "confirmar",
+              lineas: cuerpo.lineas ?? [],
+              huella: cuerpo.huella ?? null,
+              motivoBloqueo: null,
+              aviso:
+                d.tipo === "huella_vencida"
+                  ? "El estado de tu Fase 3 cambió. No se reemplazó nada: revisa el impacto actualizado y confirma de nuevo."
+                  : null,
+            });
+            break;
+          case "bloqueado":
+            setReemplazoModal({
+              modo: "bloqueado",
+              lineas: [],
+              huella: null,
+              motivoBloqueo: cuerpo.mensaje ?? null,
+              aviso: null,
+            });
+            break;
+          case "error":
+            setReportRegenError(d.mensajeError);
+            break;
+        }
+      } finally {
+        setIsRegeneratingReport(false);
+        setIsVerificandoReemplazo(false);
+      }
+    },
+    [projectId]
+  );
 
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
@@ -1230,23 +1305,48 @@ export default function ExploracionPage() {
       setLastSaved(new Date());
 
       setGenerandoDVS(true);
-      const r = await fetch("/api/moddulo/f2/generate-dvs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        if (data.dvs) {
-          setDvs(data.dvs as DVSF2);
-          setShowReporte(true);
+      // The form data above was already saved (rForm.ok). If the generation does
+      // not succeed, the page must NOT run the back-propagation check, switch to
+      // "completed" or open the report (camino #8). The decision is pure.
+      let respGen: RespuestaGuardado;
+      let dvsNuevo: DVSF2 | undefined;
+      try {
+        const r = await fetch("/api/moddulo/f2/generate-dvs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId, saveas: "final" }),
+        });
+        type CuerpoGenerate = { dvs?: DVSF2; error?: string; motor?: string };
+        let cuerpo: CuerpoGenerate | null = null;
+        try {
+          cuerpo = (await r.json()) as CuerpoGenerate;
+        } catch {
+          cuerpo = null;
         }
+        dvsNuevo = cuerpo?.dvs;
+        respGen = {
+          tipo: "respuesta",
+          ok: r.ok,
+          status: r.status,
+          cuerpoValido: r.ok ? Boolean(cuerpo?.dvs) : undefined,
+          codigo: typeof cuerpo?.error === "string" ? cuerpo.error : undefined,
+          motor: typeof cuerpo?.motor === "string" ? cuerpo.motor : undefined,
+        };
+      } catch {
+        respGen = { tipo: "error_red" };
       }
+      const dg = decidirResultadoGeneracionF2(respGen);
+      if (!dg.exito) {
+        setSaveError(dg.mensajeError);
+        return;
+      }
+      if (dvsNuevo) setDvs(dvsNuevo);
+      if (dg.abrirReporte) setShowReporte(true);
 
-      const affected = await checkBackPropagation(projectId);
+      const affected = dg.propagar ? await checkBackPropagation(projectId) : [];
       if (affected.length > 0) setPropagationWarning(affected);
-      else { setMode("completed"); setShowReporte(true); }
+      else if (dg.pasarACompleted) { setMode("completed"); setShowReporte(true); }
     } catch {
       setSaveError("Error de conexión al guardar. Intenta de nuevo.");
     } finally {
@@ -1423,7 +1523,7 @@ export default function ExploracionPage() {
           {showReporte && dvs !== null && mode !== "editing" ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="shrink-0 mb-3 space-y-1.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     onClick={() => setShowReporte(false)}
                     className="flex items-center gap-1.5 text-sm font-medium text-bluegreen-eske dark:text-blue-eske-20 hover:text-bluegreen-eske/80 transition-colors"
@@ -1440,24 +1540,17 @@ export default function ExploracionPage() {
                       <span className="text-xs text-green-eske-60 dark:text-green-eske-30 font-medium">Reporte generado</span>
                     )}
                     <button
-                      onClick={handleRegenerarReporteF2}
-                      disabled={isRegeneratingReport}
-                      className="p-1 rounded text-bluegreen-eske dark:text-blue-eske-20 hover:bg-bluegreen-eske/10 disabled:opacity-40 transition-colors"
-                      aria-label="Reemplazar análisis finalizado"
-                      title="Reemplazar análisis finalizado (vuelve a generar el análisis y sustituye el que finalizaste)"
+                      type="button"
+                      onClick={() => void ejecutarReemplazo(null)}
+                      disabled={isRegeneratingReport || isVerificandoReemplazo || reemplazoModal !== null}
+                      className="text-xs font-medium text-bluegreen-eske-60 dark:text-blue-eske-20 underline-offset-2 hover:underline disabled:opacity-40 disabled:no-underline transition-colors focus-visible:outline focus-visible:outline-2"
                     >
-                      <svg
-                        className={`w-3.5 h-3.5 ${isRegeneratingReport ? "animate-spin" : ""}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
+                      {isVerificandoReemplazo ? "Verificando…" : "Reemplazar análisis finalizado…"}
                     </button>
                   </div>
                 </div>
                 {reportRegenError && (
-                  <p className="text-xs text-red-eske text-right">{reportRegenError}</p>
+                  <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 text-right">{reportRegenError}</p>
                 )}
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -1864,6 +1957,19 @@ export default function ExploracionPage() {
           isSubmitting={isClosingPhase}
           errorMessage={closeError}
           dvsChecklist={dvsChecklist.length > 0 ? dvsChecklist : undefined}
+        />
+      )}
+
+      {reemplazoModal && (
+        <ReemplazarAnalisisModal
+          modo={reemplazoModal.modo}
+          lineas={reemplazoModal.lineas}
+          motivoBloqueo={reemplazoModal.motivoBloqueo}
+          aviso={reemplazoModal.aviso}
+          onConfirmar={() => {
+            if (reemplazoModal.huella) void ejecutarReemplazo(reemplazoModal.huella);
+          }}
+          onCancelar={() => setReemplazoModal(null)}
         />
       )}
 

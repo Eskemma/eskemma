@@ -99,3 +99,45 @@ describe("reemplazarDVSConVersion", () => {
     expect(versiones()).toHaveLength(1); // ahora se conserva
   });
 });
+
+// ── commit 2: guardia transaccional ──────────────────────────────────────────
+
+import { ReemplazoRechazadoError, type DecisionReemplazo } from "./impactoReemplazoDVS";
+
+describe("reemplazarDVSConVersion — guardia", () => {
+  const rechazo = () => new ReemplazoRechazadoError("huella_vencida", {} as DecisionReemplazo);
+
+  it("la guardia recibe el documento crudo y los f3Resultados leídos DENTRO de la transacción", async () => {
+    db.reset({
+      [P]: { phases: { exploracion: { dvs: dvsA } } },
+      [`${P}/f3Resultados/r1`]: { aprobado: true },
+      [`${P}/f3Resultados/r2`]: { aprobado: false },
+    });
+    const guardia = vi.fn();
+    await reemplazarDVSConVersion(asDb, "p1", { nuevoDvs: dvsB, updates, origen: "generate-dvs-final", uid: "u1", guardia });
+    expect(guardia).toHaveBeenCalledOnce();
+    const lectura = guardia.mock.calls[0][0];
+    expect(lectura.proyecto).toMatchObject({ phases: { exploracion: { dvs: dvsA } } });
+    expect(lectura.resultados.map((r: { id: string }) => r.id).sort()).toEqual(["r1", "r2"]);
+    expect(lectura.resultados.find((r: { id: string }) => r.id === "r1").data).toEqual({ aprobado: true });
+  });
+
+  it("si la guardia lanza: no se copia ni se escribe nada y el error sale tal cual", async () => {
+    db.reset({ [P]: { phases: { exploracion: { dvs: dvsA } } } });
+    await expect(
+      reemplazarDVSConVersion(asDb, "p1", {
+        nuevoDvs: dvsB, updates, origen: "generate-dvs-final", uid: "u1",
+        guardia: () => { throw rechazo(); },
+      })
+    ).rejects.toBeInstanceOf(ReemplazoRechazadoError);
+    expect(versiones()).toHaveLength(0);
+    expect(db.updates()).toHaveLength(0);
+  });
+
+  it("sin guardia (finalize-dvs, commit 1) se comporta igual que antes: copia y reemplaza", async () => {
+    db.reset({ [P]: { phases: { exploracion: { dvs: dvsA } } }, [`${P}/f3Resultados/r1`]: {} });
+    const r = await reemplazarDVSConVersion(asDb, "p1", { nuevoDvs: dvsB, updates, origen: "finalize-dvs", uid: "u1" });
+    expect(r.versionId).toBeTruthy();
+    expect(versiones()).toHaveLength(1);
+  });
+});

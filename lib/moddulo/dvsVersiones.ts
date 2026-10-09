@@ -16,12 +16,25 @@ import { sonIgualesEstable } from "./serializacionEstable";
 
 export type OrigenReemplazoDVS = "generate-dvs-final" | "finalize-dvs";
 
+/**
+ * What the lock sees, read INSIDE the transaction: the raw project document and
+ * the `f3Resultados` subcollection. Everything that enters the impact
+ * fingerprint (dvs, tablero, síntesis, veredicto, DIE and the results) lives in
+ * one of these two places, so nothing is validated from a read made outside it.
+ */
+export interface LecturaTransaccional {
+  proyecto: Record<string, unknown> | undefined;
+  resultados: { id: string; data: Record<string, unknown> }[];
+}
+
 export interface ReemplazoDVS {
   nuevoDvs: DVSF2;
   /** Extra field updates applied together with the new dvs (estado, updatedAt...). */
   updates: Record<string, unknown>;
   origen: OrigenReemplazoDVS;
   uid: string;
+  /** Throws (e.g. ReemplazoRechazadoError) to abort BEFORE any write. */
+  guardia?: (lectura: LecturaTransaccional) => void;
 }
 
 /**
@@ -31,12 +44,20 @@ export interface ReemplazoDVS {
 export async function reemplazarDVSConVersion(
   db: Firestore,
   projectId: string,
-  { nuevoDvs, updates, origen, uid }: ReemplazoDVS
+  { nuevoDvs, updates, origen, uid, guardia }: ReemplazoDVS
 ): Promise<{ versionId: string | null }> {
   const proyectoRef = db.collection("moddulo_projects").doc(projectId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(proyectoRef);
     if (!snap.exists) throw new Error("Proyecto no encontrado");
+    if (guardia) {
+      // All reads before any write (Firestore transaction rule).
+      const resSnap = await tx.get(proyectoRef.collection("f3Resultados"));
+      guardia({
+        proyecto: snap.data() as Record<string, unknown> | undefined,
+        resultados: resSnap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })),
+      });
+    }
     const anterior = (snap.data() as { phases?: { exploracion?: { dvs?: DVSF2 } } } | undefined)
       ?.phases?.exploracion?.dvs;
 

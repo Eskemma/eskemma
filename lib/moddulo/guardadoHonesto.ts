@@ -15,7 +15,9 @@ export type AccionGuardado =
   | "registrar_aprobacion"
   | "actualizar_proyecto"
   | "eliminar_proyecto"
-  | "importar_adjuntos_moddulo";
+  | "importar_adjuntos_moddulo"
+  | "reemplazar_analisis"
+  | "generar_analisis";
 
 /** Actions whose failure must NOT stop the flow: show a notice only. */
 const ACCIONES_NO_BLOQUEANTES: readonly AccionGuardado[] = [
@@ -30,6 +32,10 @@ export type RespuestaGuardado =
       status: number;
       /** Only for requests whose success body is read (finalizar_analisis). */
       cuerpoValido?: boolean;
+      /** `error` field of the JSON body (e.g. "reemplazo_bloqueado"), when present. */
+      codigo?: string;
+      /** `motor` field of the JSON body (the Claude motor that failed), when present. */
+      motor?: string;
     }
   | { tipo: "error_red" };
 
@@ -42,6 +48,8 @@ export interface ContextoGuardado {
   aprobadoPrevio?: boolean;
   /** For actualizar_proyecto: what changed ("el cambio de estado del proyecto"). */
   cambio?: string;
+  /** For reemplazar_analisis: whether the request carried the user's confirmation. */
+  confirmado?: boolean;
 }
 
 export interface DecisionGuardado {
@@ -81,6 +89,10 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la importación automática de los documentos de Moddulo F2";
     case "eliminar_proyecto":
       return "la eliminación del proyecto";
+    case "reemplazar_analisis":
+      return "el reemplazo del análisis finalizado";
+    case "generar_analisis":
+      return "la generación del análisis";
   }
 }
 
@@ -101,6 +113,10 @@ function consecuencia(accion: AccionGuardado): string {
       return "Se conserva el valor anterior; inténtalo de nuevo.";
     case "eliminar_proyecto":
       return "El proyecto sigue en tu lista; inténtalo de nuevo.";
+    case "reemplazar_analisis":
+      return "El análisis anterior sigue vigente; inténtalo de nuevo.";
+    case "generar_analisis":
+      return "Los cambios del formulario sí se guardaron; vuelve a intentarlo.";
   }
 }
 
@@ -137,7 +153,30 @@ function mensajeDeFallo(
     if (accion === "importar_adjuntos_moddulo") {
       return "No se pudo CONFIRMAR la importación automática de los documentos de Moddulo F2: sin conexión con el servidor. Puede que sí se hayan importado; recarga la página para verificar.";
     }
+    if (accion === "reemplazar_analisis") {
+      // Without the user's confirmation the server never writes, so "nothing was
+      // replaced" is true by construction; with it, the request may have landed.
+      if (ctx.confirmado === false) {
+        return "No se pudo verificar el impacto del reemplazo: sin conexión con el servidor. No se reemplazó nada, porque aún no habías confirmado.";
+      }
+      return "No se pudo CONFIRMAR el reemplazo del análisis finalizado: sin conexión con el servidor. Puede que sí se haya reemplazado; recarga la página para verificar el estado.";
+    }
+    if (accion === "generar_analisis") {
+      return "No se pudo CONFIRMAR la generación del análisis: sin conexión con el servidor. Los cambios del formulario sí se guardaron; puede que el análisis sí se haya generado, recarga la página para verificar el estado.";
+    }
     return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
+  }
+  // A gateway timeout (or the server's own "write outcome unknown" code) does not
+  // prove the replacement did not happen: same ambiguity as a network failure.
+  if (
+    (accion === "reemplazar_analisis" || accion === "generar_analisis") &&
+    resp.tipo === "respuesta" &&
+    (resp.status === 502 || resp.status === 503 || resp.status === 504 || resp.codigo === "reemplazo_escritura_incierta") &&
+    ctx.confirmado !== false
+  ) {
+    return accion === "reemplazar_analisis"
+      ? "No se pudo CONFIRMAR el reemplazo del análisis finalizado: el servidor no respondió a tiempo. Puede que sí se haya reemplazado; recarga la página para verificar el estado."
+      : "No se pudo CONFIRMAR la generación del análisis: el servidor no respondió a tiempo. Los cambios del formulario sí se guardaron; puede que el análisis sí se haya generado, recarga la página para verificar el estado.";
   }
   if (accion === "registrar_aprobacion") {
     return "La fase se cerró, pero no se pudo registrar la fecha de aprobación.";
@@ -150,7 +189,11 @@ function mensajeDeFallo(
   if (accion === "eliminar_proyecto" && resp.tipo === "respuesta" && resp.status === 404) {
     return "No se encontró el proyecto; puede que ya se haya eliminado. Recarga la lista para verificar.";
   }
-  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
+  const queConMotor =
+    resp.tipo === "respuesta" && resp.motor && (accion === "reemplazar_analisis" || accion === "generar_analisis")
+      ? `${que} (falló ${resp.motor})`
+      : que;
+  return `No se pudo registrar ${queConMotor}. ${motivo(resp)} ${consecuencia(accion)}`;
 }
 
 export function decidirResultadoGuardado(
@@ -297,4 +340,57 @@ export function esRespuestaVigente(
   secuenciaActual: number
 ): boolean {
   return secuenciaPeticion === secuenciaActual;
+}
+
+/**
+ * M8 "Reemplazar análisis finalizado…": the server answers 409 with one of three
+ * codes (needs confirmation / blocked / fingerprint expired) that are NOT
+ * failures, plus real failures. Any other 409 is a real failure.
+ */
+export type DecisionReemplazoUI =
+  | { tipo: "exito" }
+  | { tipo: "requiere_confirmacion" }
+  | { tipo: "bloqueado" }
+  | { tipo: "huella_vencida" }
+  | { tipo: "error"; mensajeError: string };
+
+export function decidirReemplazoAnalisis(
+  resp: RespuestaGuardado,
+  ctx: ContextoGuardado = {}
+): DecisionReemplazoUI {
+  if (resp.tipo === "respuesta" && resp.status === 409) {
+    if (resp.codigo === "reemplazo_requiere_confirmacion") return { tipo: "requiere_confirmacion" };
+    if (resp.codigo === "reemplazo_bloqueado") return { tipo: "bloqueado" };
+    if (resp.codigo === "reemplazo_huella_vencida") return { tipo: "huella_vencida" };
+  }
+  const d = decidirResultadoGuardado("reemplazar_analisis", resp, ctx);
+  if (d.exito) return { tipo: "exito" };
+  return { tipo: "error", mensajeError: d.mensajeError ?? "" };
+}
+
+/**
+ * Form branch of "Guardar cambios" (camino #8): after saving the form data the
+ * page asks for a first generation. If the generation does not succeed the page
+ * must not run the back-propagation check, switch to "completed" or open the
+ * report. A 409 here means the screen is stale (a finalized analysis already
+ * exists on the server): never offer to confirm from this branch.
+ */
+export interface DecisionGeneracionF2 {
+  exito: boolean;
+  mensajeError: string | null;
+  propagar: boolean;
+  pasarACompleted: boolean;
+  abrirReporte: boolean;
+}
+
+export function decidirResultadoGeneracionF2(resp: RespuestaGuardado): DecisionGeneracionF2 {
+  const ok = resp.tipo === "respuesta" && resp.ok && resp.cuerpoValido !== false;
+  if (ok) {
+    return { exito: true, mensajeError: null, propagar: true, pasarACompleted: true, abrirReporte: true };
+  }
+  const desactualizada = resp.tipo === "respuesta" && resp.status === 409;
+  const mensajeError = desactualizada
+    ? "Ya existe un análisis finalizado en el servidor; esta pantalla está desactualizada. Los cambios del formulario sí se guardaron. No se reemplazó nada: recarga la página."
+    : (decidirResultadoGuardado("generar_analisis", resp).mensajeError ?? "");
+  return { exito: false, mensajeError, propagar: false, pasarACompleted: false, abrirReporte: false };
 }

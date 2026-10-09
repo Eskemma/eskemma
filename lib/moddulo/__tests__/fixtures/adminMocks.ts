@@ -78,6 +78,9 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         return ref;
       }),
       where: (field: string, _op: "==", value: unknown) => queryRef(path, [[field, value]]),
+      // Lista los hijos directos (sin filtros) — lo usa el candado de reemplazo del dvs
+      // para leer f3Resultados, también dentro de una transacción (tx.get(coleccion)).
+      get: () => queryRef(path, []).get(),
     };
   }
 
