@@ -18,7 +18,11 @@ import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionRevie
 import DVSView from "./components/DVSView";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import OrphanRecoveryView from "./components/OrphanRecoveryView";
-import ReemplazarAnalisisModal, { type ModoReemplazo } from "./components/ReemplazarAnalisisModal";
+import ReemplazarAnalisisModal, {
+  type EliminadosModal,
+  type ModoReemplazo,
+  type VarianteReemplazo,
+} from "./components/ReemplazarAnalisisModal";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import ConfirmReplacePestelModal from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -961,11 +965,40 @@ export default function ExploracionPage() {
   // effects; the decisions live in lib/moddulo/guardadoHonesto.ts.
   const [reemplazoModal, setReemplazoModal] = useState<{
     modo: ModoReemplazo;
+    variante: VarianteReemplazo;
     lineas: string[];
     huella: string | null;
     motivoBloqueo: string | null;
     aviso: string | null;
+    eliminados: EliminadosModal | null;
   } | null>(null);
+
+  // Opens the modal for the 409s of finalize-dvs ("Guardar cambios" and
+  // "Finalizar análisis"): same codes and body as generate-dvs, plus `eliminados`.
+  const abrirModalDeCandado = (
+    tipo: "requiere_confirmacion" | "huella_vencida" | "bloqueado",
+    variante: VarianteReemplazo,
+    cuerpo: { lineas?: string[]; huella?: string; mensaje?: string; eliminados?: EliminadosModal }
+  ) => {
+    if (tipo === "bloqueado") {
+      setReemplazoModal({
+        modo: "bloqueado", variante, lineas: [], huella: null,
+        motivoBloqueo: cuerpo.mensaje ?? null, aviso: null, eliminados: null,
+      });
+      return;
+    }
+    setReemplazoModal({
+      modo: "confirmar", variante,
+      lineas: cuerpo.lineas ?? [],
+      huella: cuerpo.huella ?? null,
+      motivoBloqueo: null,
+      aviso:
+        tipo === "huella_vencida"
+          ? "El estado de tu Fase 3 cambió. No se reemplazó nada: revisa el impacto actualizado y confirma de nuevo."
+          : null,
+      eliminados: cuerpo.eliminados ?? null,
+    });
+  };
 
   const ejecutarReemplazo = useCallback(
     async (huellaConfirmada: string | null) => {
@@ -1026,6 +1059,8 @@ export default function ExploracionPage() {
           case "huella_vencida":
             setReemplazoModal({
               modo: "confirmar",
+              variante: "regenerar",
+              eliminados: null,
               lineas: cuerpo.lineas ?? [],
               huella: cuerpo.huella ?? null,
               motivoBloqueo: null,
@@ -1038,6 +1073,8 @@ export default function ExploracionPage() {
           case "bloqueado":
             setReemplazoModal({
               modo: "bloqueado",
+              variante: "regenerar",
+              eliminados: null,
               lineas: [],
               huella: null,
               motivoBloqueo: cuerpo.mensaje ?? null,
@@ -1144,16 +1181,20 @@ export default function ExploracionPage() {
   const aprobSeqRef = useRef<Record<string, number>>({});
   const borradorSeqRef = useRef(0);
 
-  const handleApproveMotor = async (motor: "M2" | "M3" | "M4" | "M5") => {
+  const handleApproveMotor = async (motor: "M2" | "M3" | "M4" | "M5", huellaConfirmada: string | null = null) => {
     const aprobadoPrevio = motorAprobaciones[motor] === true;
     const seq = (aprobSeqRef.current[motor] ?? 0) + 1;
     aprobSeqRef.current[motor] = seq;
     // Actualización optimista
     setMotorAprobaciones((prev) => ({ ...prev, [motor]: true }));
+    if (huellaConfirmada) setReemplazoModal(null);
 
     const accion = motor === "M5" ? "finalizar_analisis" : "aprobar_motor";
     let resp: RespuestaGuardado;
-    let data: { dvs?: DVSF2 } | null = null;
+    type CuerpoFinalize = {
+      dvs?: DVSF2; error?: string; mensaje?: string; lineas?: string[]; huella?: string; eliminados?: EliminadosModal;
+    };
+    let data = null as CuerpoFinalize | null;
     try {
       const r = await fetch(
         motor === "M5" ? "/api/moddulo/f2/finalize-dvs" : "/api/moddulo/f2/approve-motor",
@@ -1161,19 +1202,28 @@ export default function ExploracionPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(motor === "M5" ? { projectId, draftDVS } : { projectId, motor }),
+          body: JSON.stringify(
+            motor === "M5"
+              ? { projectId, draftDVS, ...(huellaConfirmada ? { confirmar: true, huella: huellaConfirmada } : {}) }
+              : { projectId, motor }
+          ),
         }
       );
       let cuerpoValido: boolean | undefined;
-      if (motor === "M5" && r.ok) {
+      if (motor === "M5") {
+        // The body is read for every status: the 409s of the lock carry the
+        // impact lines, the fingerprint and the removed ids.
         try {
-          data = (await r.json()) as { dvs?: DVSF2 };
-          cuerpoValido = !!data?.dvs;
+          data = (await r.json()) as CuerpoFinalize;
+          cuerpoValido = r.ok ? !!data?.dvs : undefined;
         } catch {
-          cuerpoValido = false;
+          cuerpoValido = r.ok ? false : undefined;
         }
       }
-      resp = { tipo: "respuesta", ok: r.ok, status: r.status, cuerpoValido };
+      resp = {
+        tipo: "respuesta", ok: r.ok, status: r.status, cuerpoValido,
+        ...(motor === "M5" && typeof data?.error === "string" ? { codigo: data.error } : {}),
+      };
     } catch {
       resp = { tipo: "error_red" };
     }
@@ -1181,12 +1231,27 @@ export default function ExploracionPage() {
     // A slower, older request must not overwrite the screen state of a newer one.
     if (!esRespuestaVigente(seq, aprobSeqRef.current[motor] ?? 0)) return;
 
-    const d = decidirResultadoGuardado(accion, resp, { motor, aprobadoPrevio });
-    if (!d.exito) {
-      if (d.revertirAprobacion) {
-        setMotorAprobaciones((prev) => ({ ...prev, [motor]: d.valorRestaurado === true }));
+    // M5 can be answered with the lock's 409s (a finalized analysis already exists
+    // and the draft removes ids F3 uses). Whatever does not end in a finalized
+    // analysis — including those 409s — puts the approval back to its previous
+    // value, so Cancel leaves the screen as it was before the click.
+    const d =
+      motor === "M5"
+        ? decidirReemplazoAnalisis(resp, { aprobadoPrevio, confirmado: huellaConfirmada !== null }, "finalizar_analisis")
+        : null;
+    const dg = d === null ? decidirResultadoGuardado(accion, resp, { motor, aprobadoPrevio }) : null;
+    const exito = d !== null ? d.tipo === "exito" : dg!.exito;
+    if (!exito) {
+      const revierte = d !== null ? d.revertirAprobacion === true : dg!.revertirAprobacion;
+      const restaurado = d !== null ? d.valorRestaurado : dg!.valorRestaurado;
+      if (revierte) {
+        setMotorAprobaciones((prev) => ({ ...prev, [motor]: restaurado === true }));
       }
-      setSaveError(d.mensajeError);
+      if (d !== null && (d.tipo === "requiere_confirmacion" || d.tipo === "huella_vencida" || d.tipo === "bloqueado")) {
+        abrirModalDeCandado(d.tipo, "finalizar", data ?? {});
+        return;
+      }
+      setSaveError(d !== null ? (d as { mensajeError: string }).mensajeError : dg!.mensajeError);
       return;
     }
     setSaveError(null);
@@ -1250,39 +1315,71 @@ export default function ExploracionPage() {
     setMode(dvs ? "completed" : "active");
   };
 
-  const handleSaveEdit = async () => {
-    // ── Modo edición de motores (dvs ya existe) ──────────────────────────────
-    if (dvs !== null) {
-      if (!draftDVS) return;
-      setIsSaving(true);
-      setSaveError(null);
+  // "Guardar cambios" over a finalized analysis. finalize-dvs only asks for
+  // confirmation when the edit REMOVES ids F3 uses (409 + impact + fingerprint);
+  // an edit that keeps every id saves as before. Decisions live in guardadoHonesto.
+  const guardarEdicionDvs = async (huellaConfirmada: string | null) => {
+    if (!draftDVS) return;
+    const confirmando = huellaConfirmada !== null;
+    if (confirmando) setReemplazoModal(null);
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      let resp: RespuestaGuardado;
+      let cuerpo: {
+        dvs?: DVSF2; error?: string; mensaje?: string; lineas?: string[]; huella?: string; eliminados?: EliminadosModal;
+      } = {};
       try {
         const r = await fetch("/api/moddulo/f2/finalize-dvs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ projectId, draftDVS }),
+          body: JSON.stringify({ projectId, draftDVS, ...(confirmando ? { confirmar: true, huella: huellaConfirmada } : {}) }),
         });
-        if (r.ok) {
-          const data = await r.json();
-          if (data.dvs) {
-            setDvs(data.dvs as DVSF2);
+        let cuerpoValido: boolean | undefined;
+        try {
+          cuerpo = (await r.json()) as typeof cuerpo;
+          cuerpoValido = r.ok ? Boolean(cuerpo?.dvs) : undefined;
+        } catch {
+          cuerpoValido = r.ok ? false : undefined;
+        }
+        resp = {
+          tipo: "respuesta", ok: r.ok, status: r.status, cuerpoValido,
+          codigo: typeof cuerpo?.error === "string" ? cuerpo.error : undefined,
+        };
+      } catch {
+        resp = { tipo: "error_red" };
+      }
+      const d = decidirReemplazoAnalisis(resp, { confirmado: confirmando }, "guardar_analisis");
+      switch (d.tipo) {
+        case "exito":
+          if (cuerpo.dvs) {
+            setDvs(cuerpo.dvs);
             setDraftDVS(null);
             setMotorAprobaciones({});
             setMode("completed");
             setShowReporte(true);
             setLastSaved(new Date());
-          } else {
-            setSaveError("No se pudo guardar — respuesta inesperada del servidor. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
           }
-        } else {
-          setSaveError("No se pudo guardar los cambios. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
-        }
-      } catch {
-        setSaveError("Error de conexión al guardar. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo.");
-      } finally {
-        setIsSaving(false);
+          break;
+        case "requiere_confirmacion":
+        case "huella_vencida":
+        case "bloqueado":
+          abrirModalDeCandado(d.tipo, "guardar", cuerpo);
+          break;
+        case "error":
+          setSaveError(d.mensajeError);
+          break;
       }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    // ── Modo edición de motores (dvs ya existe) ──────────────────────────────
+    if (dvs !== null) {
+      await guardarEdicionDvs(null);
       return;
     }
 
@@ -1963,11 +2060,17 @@ export default function ExploracionPage() {
       {reemplazoModal && (
         <ReemplazarAnalisisModal
           modo={reemplazoModal.modo}
+          variante={reemplazoModal.variante}
+          eliminados={reemplazoModal.eliminados}
           lineas={reemplazoModal.lineas}
           motivoBloqueo={reemplazoModal.motivoBloqueo}
           aviso={reemplazoModal.aviso}
           onConfirmar={() => {
-            if (reemplazoModal.huella) void ejecutarReemplazo(reemplazoModal.huella);
+            const huella = reemplazoModal.huella;
+            if (!huella) return;
+            if (reemplazoModal.variante === "guardar") void guardarEdicionDvs(huella);
+            else if (reemplazoModal.variante === "finalizar") void handleApproveMotor("M5", huella);
+            else void ejecutarReemplazo(huella);
           }}
           onCancelar={() => setReemplazoModal(null)}
         />

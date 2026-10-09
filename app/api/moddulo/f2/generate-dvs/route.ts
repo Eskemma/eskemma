@@ -31,13 +31,11 @@ import type {
 import { DIMENSION_META } from "@/types/pestel.types";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { reemplazarDVSConVersion } from "@/lib/moddulo/dvsVersiones";
+import { respuestaCandado } from "@/lib/moddulo/respuestaCandado";
 import {
   ReemplazoRechazadoError,
   calcularImpactoReemplazoDVS,
   decidirCandadoReemplazo,
-  lineasDeImpacto,
-  type AccionCandado,
-  type DecisionReemplazo,
 } from "@/lib/moddulo/impactoReemplazoDVS";
 import {
   estadoParaImpactoDesdeProyecto,
@@ -48,26 +46,6 @@ import {
 // retry for M5): same ceiling as generate-m1-express. The route used to declare
 // none, so the platform default applied.
 export const maxDuration = 300;
-
-// ── replace lock (H15 / M8) ──────────────────────────────────────────────────
-
-function respuestaCandado(accion: Exclude<AccionCandado, "continuar">, decision: DecisionReemplazo): NextResponse {
-  if (accion === "bloqueado") {
-    return NextResponse.json(
-      { error: "reemplazo_bloqueado", mensaje: decision.motivoBloqueo },
-      { status: 409 }
-    );
-  }
-  return NextResponse.json(
-    {
-      error: accion === "huella_vencida" ? "reemplazo_huella_vencida" : "reemplazo_requiere_confirmacion",
-      lineas: lineasDeImpacto(decision),
-      hayImpactoF3: decision.hayImpactoF3,
-      huella: decision.huella,
-    },
-    { status: 409 }
-  );
-}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

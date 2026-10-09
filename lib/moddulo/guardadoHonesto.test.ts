@@ -516,3 +516,97 @@ describe("decidirResultadoGeneracionF2 — camino #8", () => {
     expect(m).toContain("Los cambios del formulario sí se guardaron; vuelve a intentarlo.");
   });
 });
+
+// ── commit 3: «Guardar cambios» (guardar_analisis) y «Finalizar análisis» sobre un dvs ya finalizado ──
+
+const TRES_409 = ["reemplazo_requiere_confirmacion", "reemplazo_bloqueado", "reemplazo_huella_vencida"] as const;
+const TIPO_409 = { reemplazo_requiere_confirmacion: "requiere_confirmacion", reemplazo_bloqueado: "bloqueado", reemplazo_huella_vencida: "huella_vencida" } as const;
+
+describe("guardar_analisis — «Guardar cambios» de un análisis finalizado", () => {
+  it.each(TRES_409)("%s se distingue de un fallo y NO lleva reversión de aprobación", (codigo) => {
+    const d = decidirReemplazoAnalisis(con409(codigo), { confirmado: false }, "guardar_analisis");
+    expect(d.tipo).toBe(TIPO_409[codigo]);
+    expect(d).toEqual({ tipo: TIPO_409[codigo] });
+  });
+  it("200 con dvs → éxito; 200 sin dvs → error", () => {
+    expect(decidirReemplazoAnalisis(okConDvs, {}, "guardar_analisis")).toEqual({ tipo: "exito" });
+    expect(decidirReemplazoAnalisis({ tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }, {}, "guardar_analisis").tipo).toBe("error");
+  });
+  it.each([false, true])("red (confirmado=%s) → SIEMPRE «No se pudo CONFIRMAR…»: sin confirmación el servidor también puede haber escrito", (confirmado) => {
+    const m = (decidirReemplazoAnalisis(red, { confirmado }, "guardar_analisis") as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR el guardado de los cambios del análisis");
+    expect(m).toContain("Puede que sí se hayan guardado");
+    expect(m).toContain("tus cambios siguen en pantalla");
+    expect(m).not.toContain("No se guardó nada");
+  });
+  it.each([502, 503, 504])("%s y el código «escritura incierta» → ambiguo, sin «sigue vigente»", (status) => {
+    for (const codigo of [undefined, "reemplazo_escritura_incierta"]) {
+      const m = (decidirReemplazoAnalisis(conCodigo(status, codigo), { confirmado: false }, "guardar_analisis") as { mensajeError: string }).mensajeError;
+      expect(m).toContain("No se pudo CONFIRMAR el guardado");
+      expect(m).not.toContain("sigue vigente");
+    }
+    const inc = (decidirReemplazoAnalisis(conCodigo(500, "reemplazo_escritura_incierta"), {}, "guardar_analisis") as { mensajeError: string }).mensajeError;
+    expect(inc).toContain("No se pudo CONFIRMAR el guardado");
+  });
+  it("F — 500 de antes de la transacción: «sigue vigente», «tus cambios siguen en pantalla» y se queda en edición", () => {
+    const m = (decidirReemplazoAnalisis(conCodigo(500, "finalize_fallo_previo"), { confirmado: false }, "guardar_analisis") as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar el guardado de los cambios del análisis");
+    expect(m).toContain("Sigues en modo edición y tus cambios siguen en pantalla");
+    expect(m).toContain("el análisis anterior sigue vigente");
+    expect(m).not.toContain("CONFIRMAR");
+  });
+  it.each([401, 403, 404])("%s → error con «Sigues en modo edición»", (status) => {
+    const m = (decidirReemplazoAnalisis(conCodigo(status), {}, "guardar_analisis") as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar el guardado");
+    expect(m).toContain("Sigues en modo edición");
+  });
+  it("negativo — el handler anterior respondía lo mismo ante cualquier fallo (texto genérico, ninguna distinción de 409)", () => {
+    const antes = (_r: RespuestaGuardado) => ({ abreModal: false, mensaje: "No se pudo guardar los cambios. Sigues en modo edición, tus cambios no se han perdido: intenta guardar de nuevo." });
+    for (const c of TRES_409) {
+      expect(antes(con409(c)).abreModal).toBe(false);
+      expect(decidirReemplazoAnalisis(con409(c), {}, "guardar_analisis").tipo).not.toBe("error");
+    }
+    expect((decidirReemplazoAnalisis(red, {}, "guardar_analisis") as { mensajeError: string }).mensajeError).not.toBe(antes(red).mensaje);
+  });
+});
+
+describe("finalizar_analisis sobre un análisis ya finalizado (A) — reversión de la aprobación de M5", () => {
+  it.each(TRES_409)("A — %s: la aprobación vuelve a su valor previo (Cancelar deja la pantalla como antes del clic)", (codigo) => {
+    for (const aprobadoPrevio of [false, true]) {
+      const d = decidirReemplazoAnalisis(con409(codigo), { aprobadoPrevio, confirmado: false }, "finalizar_analisis");
+      expect(d.tipo).toBe(TIPO_409[codigo]);
+      expect(d).toMatchObject({ revertirAprobacion: true, valorRestaurado: aprobadoPrevio });
+    }
+  });
+  it("A — sin valor previo conocido restaura «no aprobado»", () => {
+    expect(decidirReemplazoAnalisis(con409("reemplazo_requiere_confirmacion"), {}, "finalizar_analisis")).toMatchObject({
+      revertirAprobacion: true, valorRestaurado: false,
+    });
+  });
+  it("A — un fallo real (500, red) también revierte, igual que antes", () => {
+    for (const r of [conCodigo(500), red]) {
+      expect(decidirReemplazoAnalisis(r, { aprobadoPrevio: false }, "finalizar_analisis")).toMatchObject({ tipo: "error", revertirAprobacion: true, valorRestaurado: false });
+    }
+  });
+  it("A — el éxito no revierte nada", () => {
+    expect(decidirReemplazoAnalisis(okConDvs, { aprobadoPrevio: false }, "finalizar_analisis")).toEqual({ tipo: "exito" });
+  });
+  it("F — el error previo a la transacción NO dice «tus cambios siguen en pantalla» (no hay cambios del usuario que conservar)", () => {
+    const m = (decidirReemplazoAnalisis(conCodigo(500, "finalize_fallo_previo"), {}, "finalizar_analisis") as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar la finalización del análisis");
+    expect(m).toContain("El análisis no se finalizó; inténtalo de nuevo.");
+    expect(m).not.toContain("cambios siguen en pantalla");
+    expect(m).not.toContain("CONFIRMAR");
+  });
+  it("500 incierto o 502/503/504 al finalizar → «No se pudo CONFIRMAR la finalización»", () => {
+    for (const r of [conCodigo(502), conCodigo(504), conCodigo(500, "reemplazo_escritura_incierta")]) {
+      const m = (decidirReemplazoAnalisis(r, {}, "finalizar_analisis") as { mensajeError: string }).mensajeError;
+      expect(m).toContain("No se pudo CONFIRMAR la finalización del análisis");
+      expect(m).toContain("recarga la página");
+    }
+  });
+  it("los otros dos usos de decidirReemplazoAnalisis no llevan campos de reversión (regresión de commit 2)", () => {
+    expect(decidirReemplazoAnalisis(con409("reemplazo_bloqueado"))).toEqual({ tipo: "bloqueado" });
+    expect(decidirReemplazoAnalisis(con409("reemplazo_huella_vencida"), {}, "reemplazar_analisis")).toEqual({ tipo: "huella_vencida" });
+  });
+});

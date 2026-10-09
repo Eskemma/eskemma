@@ -55,6 +55,10 @@ export interface ImpactoReemplazo {
   resultadosRecibidos: number;
   resultadosAprobados: number;
   sintesisAfectada: boolean;
+  /** The synthesis cites a question that would disappear (or all, in "total" mode). */
+  sintesisPorPregunta: boolean;
+  /** The synthesis holds the adversary FODA of an actor that would disappear. */
+  sintesisPorActor: boolean;
   veredictoExiste: boolean;
   dieExiste: boolean;
   /** ids included in the fingerprint (not only counts) */
@@ -80,8 +84,24 @@ export interface DecisionReemplazo {
 // written in the SAME update as the approved verdict (veredicto/aprobar), so
 // "approved «M4 · Veredicto HEI»" is true by construction, and F3 shows the
 // «Reporte F3» tab exactly when the DIE exists (`isLista = !!die`).
-export const MOTIVO_BLOQUEO_DIE =
-  "La Fase 3 ya aprobó su «M4 · Veredicto HEI» y cuenta con su «Reporte F3». Reemplazar el análisis las dejaría inconsistentes, y reabrir la Fase 3 aún no está disponible.";
+export type VerboReemplazo = "reemplazar" | "guardar" | "finalizar";
+
+const BASE_BLOQUEO_DIE =
+  "La Fase 3 ya aprobó su «M4 · Veredicto HEI» y cuenta con su «Reporte F3».";
+
+/** Block reason worded for what the user is doing (replace / save an edit / finalize). */
+export function motivoBloqueoDIE(verbo: VerboReemplazo): string {
+  switch (verbo) {
+    case "reemplazar":
+      return `${BASE_BLOQUEO_DIE} Reemplazar el análisis las dejaría inconsistentes, y reabrir la Fase 3 aún no está disponible.`;
+    case "guardar":
+      return `${BASE_BLOQUEO_DIE} Guardar estos cambios las dejaría inconsistentes, y reabrir la Fase 3 aún no está disponible. Puedes guardar cambios que conserven todas las preguntas y actores.`;
+    case "finalizar":
+      return `${BASE_BLOQUEO_DIE} Finalizar este análisis las dejaría inconsistentes, y reabrir la Fase 3 aún no está disponible.`;
+  }
+}
+
+export const MOTIVO_BLOQUEO_DIE = motivoBloqueoDIE("reemplazar");
 
 function hashEstable(texto: string): string {
   // cyrb53: deterministic, dependency-free (also safe for client bundles). It
@@ -122,11 +142,12 @@ export function calcularImpactoReemplazoDVS(
   const aprobados = resultadosAfectados.filter((r) => r.aprobado === true);
 
   const sintesis = estado.sintesis ?? null;
-  const sintesisAfectada = !sintesis
-    ? false
-    : total ||
-      (sintesis.vaciosResiduales ?? []).some((v) => !!v.pipItemId && idsPipEliminados.has(v.pipItemId)) ||
-      Object.keys(sintesis.fodaAdversariosInsumo ?? {}).some((k) => idsActorEliminados.has(k));
+  const sintesisPorPregunta =
+    !!sintesis &&
+    (total || (sintesis.vaciosResiduales ?? []).some((v) => !!v.pipItemId && idsPipEliminados.has(v.pipItemId)));
+  const sintesisPorActor =
+    !!sintesis && !total && Object.keys(sintesis.fodaAdversariosInsumo ?? {}).some((k) => idsActorEliminados.has(k));
+  const sintesisAfectada = sintesisPorPregunta || sintesisPorActor;
 
   const impacto: ImpactoReemplazo = {
     tareasAfectadas: tareasAfectadas.length,
@@ -134,6 +155,8 @@ export function calcularImpactoReemplazoDVS(
     resultadosRecibidos: resultadosAfectados.length,
     resultadosAprobados: aprobados.length,
     sintesisAfectada,
+    sintesisPorPregunta,
+    sintesisPorActor,
     veredictoExiste: !!estado.veredicto,
     dieExiste: !!estado.die,
     idsTareasConAvance: sortedUnique(conAvance.map((t) => t.pipItemId)),
@@ -247,6 +270,53 @@ export function lineasDeImpacto(decision: DecisionReemplazo): string[] {
   if (i.sintesisAfectada) {
     lineas.push(
       "«M3 · Síntesis de hallazgos» seguirá citando las preguntas y los actores del análisis anterior; F3 no lo señalará."
+    );
+  }
+  if (i.veredictoExiste) {
+    lineas.push("«M4 · Veredicto HEI» ya se generó sobre el análisis anterior y no se actualizará.");
+  }
+  return lineas;
+}
+
+/**
+ * Impact lines when a manual edit (or a finalization of a regenerated draft)
+ * removes ids that F3 uses. Same labels as `lineasDeImpacto`; the wording differs
+ * because here only some questions / actors disappear and F3 reacts to each part
+ * differently (verified in F3Tablero, tareas/sincronizar and F3Sintesis):
+ *  - tareas: F3Tablero shows the banner and «Sincronizar tablero ↺» RETIRES the
+ *    tasks of removed questions with their asignaciones and progress (the
+ *    f3Resultados documents are not touched);
+ *  - síntesis: a removed ACTOR keeps its frozen FODA with the note
+ *    «(ya no está en el Semáforo vigente)»; a removed QUESTION is not flagged.
+ */
+export function lineasDeImpactoEdicion(decision: DecisionReemplazo): string[] {
+  if (!decision.hayImpactoF3) return [];
+  const i = decision.impacto;
+  const lineas: string[] = [];
+  if (i.tareasAfectadas > 0) {
+    const avance = i.tareasConAvance > 0 ? ` (${i.tareasConAvance} con avance)` : "";
+    const retira = i.tareasConAvance > 0 ? "junto con sus asignaciones y su avance" : "del tablero";
+    lineas.push(
+      `${i.tareasAfectadas} ${plural(i.tareasAfectadas, "tarea", "tareas")} de «M1 · Tablero de tareas»${avance} ${plural(i.tareasAfectadas, "quedará", "quedarán")} sin su pregunta: F3 avisará «El PIP cambió desde que se generó el tablero de investigación» y «Sincronizar tablero ↺» ${plural(i.tareasAfectadas, "la retirará", "las retirará")} ${retira}.`
+    );
+  }
+  if (i.resultadosRecibidos > 0) {
+    const aprob =
+      i.resultadosAprobados > 0
+        ? ` (${i.resultadosAprobados} ${plural(i.resultadosAprobados, "aprobado", "aprobados")})`
+        : "";
+    lineas.push(
+      `${i.resultadosRecibidos} ${plural(i.resultadosRecibidos, "resultado", "resultados")} de «M2 · Resultados recibidos»${aprob} ${plural(i.resultadosRecibidos, "quedará asociado", "quedarán asociados")} a preguntas que ya no existen en el análisis.`
+    );
+  }
+  if (i.sintesisPorPregunta) {
+    lineas.push(
+      "«M3 · Síntesis de hallazgos» seguirá citando preguntas que ya no existen en el análisis; F3 no lo señalará."
+    );
+  }
+  if (i.sintesisPorActor) {
+    lineas.push(
+      "«M3 · Síntesis de hallazgos» conservará el insumo FODA de los actores eliminados, marcado «(ya no está en el Semáforo vigente)»."
     );
   }
   if (i.veredictoExiste) {
