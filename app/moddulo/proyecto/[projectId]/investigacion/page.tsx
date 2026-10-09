@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   decidirCierreDeFase,
+  decidirGeneracionF3UI,
   mensajeDeAviso,
   urlSinAviso,
   type RespuestaGuardado,
@@ -247,44 +248,74 @@ export default function InvestigacionPage() {
     }).catch(() => {});
   }, [projectId]);
 
+  // H-M3: the F3 generators answer 409/5xx that used to be ignored in silence. Decisions
+  // live in lib/moddulo/guardadoHonesto.ts; these handlers only perform effects.
+  const [avisoErrorF3, setAvisoErrorF3] = useState<string | null>(null);
+
+  async function pedirF3(url: string, cuerpo: Record<string, unknown>) {
+    let datos: Record<string, unknown> = {};
+    let resp: RespuestaGuardado;
+    try {
+      const r = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify(cuerpo),
+      });
+      try { datos = (await r.json()) as Record<string, unknown>; } catch { datos = {}; }
+      resp = {
+        tipo: "respuesta", ok: r.ok, status: r.status,
+        codigo: typeof datos.error === "string" ? datos.error : undefined,
+        motor: typeof datos.motor === "string" ? datos.motor : undefined,
+        mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
+      };
+    } catch {
+      resp = { tipo: "error_red" };
+    }
+    return { resp, datos };
+  }
+
   const handleGenerarTareas = useCallback(async (confirmar = false) => {
     setGenerandoTareas(true);
+    setAvisoErrorF3(null);
     try {
-      const r = await fetch("/api/moddulo/f3/tareas/generar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId, confirmar }),
-      });
-      if (r.status === 409) {
-        const d = await r.json();
-        setConflictoRegenerar({ mensaje: d.mensaje, resumen: d.resumen });
+      const { resp, datos } = await pedirF3("/api/moddulo/f3/tareas/generar", { projectId, confirmar });
+      if (resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "progreso_existente") {
+        setConflictoRegenerar({
+          mensaje: datos.mensaje as string,
+          resumen: datos.resumen as NonNullable<typeof conflictoRegenerar>["resumen"],
+        });
         return;
       }
-      if (r.ok) {
-        const d = await r.json();
-        setTareas(d.tareas);
+      const d = decidirGeneracionF3UI("generar_tablero", resp);
+      if (d.tipo === "exito" && Array.isArray(datos.tareas)) {
+        setTareas(datos.tareas as typeof tareas);
         setConflictoRegenerar(null);
+      } else if (d.tipo !== "exito") {
+        setConflictoRegenerar(null);
+        setAvisoErrorF3(d.mensajeError);
+      } else {
+        setAvisoErrorF3("No se pudo registrar la generación del tablero. El servidor respondió algo inesperado; recarga la página para verificar el estado.");
       }
     } finally {
       setGenerandoTareas(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSincronizarTablero = useCallback(async () => {
     setSincronizandoPip(true);
+    setAvisoErrorF3(null);
     try {
-      const r = await fetch("/api/moddulo/f3/tareas/sincronizar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        setTareas(d.tareas);
+      const { resp, datos } = await pedirF3("/api/moddulo/f3/tareas/sincronizar", { projectId });
+      const d = decidirGeneracionF3UI("sincronizar_tablero", resp);
+      if (d.tipo === "exito" && Array.isArray(datos.tareas)) {
+        setTareas(datos.tareas as typeof tareas);
         setPipStaleChanges([]);
+      } else if (d.tipo !== "exito") {
+        setAvisoErrorF3(d.mensajeError);
       }
     } finally {
       setSincronizandoPip(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ronda 13 (26-08-18) — propagación de cambios de territorio (Canal 3).
   // Actualiza `resultados` in-place con el veredicto/snapshot frescos —
@@ -328,29 +359,31 @@ export default function InvestigacionPage() {
 
   const handleGenerarSintesis = useCallback(async () => {
     setGenerandoSintesis(true);
+    setAvisoErrorF3(null);
     try {
-      const r = await fetch("/api/moddulo/f3/sintesis/generar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) { const d = await r.json(); setSintesis(d.sintesis); }
+      const { resp, datos } = await pedirF3("/api/moddulo/f3/sintesis/generar", { projectId });
+      const d = decidirGeneracionF3UI("generar_sintesis", resp);
+      if (d.tipo === "exito" && datos.sintesis) setSintesis(datos.sintesis as typeof sintesis);
+      else if (d.tipo !== "exito") setAvisoErrorF3(d.mensajeError);
+      else setAvisoErrorF3("No se pudo CONFIRMAR la generación de la síntesis: el servidor respondió algo inesperado. Recarga la página para verificar el estado.");
     } finally {
       setGenerandoSintesis(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerarVeredicto = useCallback(async () => {
     setGenerandoVeredicto(true);
+    setAvisoErrorF3(null);
     try {
-      const r = await fetch("/api/moddulo/f3/veredicto/generar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) { const d = await r.json(); setVeredicto(d.veredicto); }
+      const { resp, datos } = await pedirF3("/api/moddulo/f3/veredicto/generar", { projectId });
+      const d = decidirGeneracionF3UI("generar_veredicto", resp);
+      if (d.tipo === "exito" && datos.veredicto) setVeredicto(datos.veredicto as typeof veredicto);
+      else if (d.tipo !== "exito") setAvisoErrorF3(d.mensajeError);
+      else setAvisoErrorF3("No se pudo CONFIRMAR la generación del veredicto: el servidor respondió algo inesperado. Recarga la página para verificar el estado.");
     } finally {
       setGenerandoVeredicto(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAprobarVeredicto = useCallback(async () => {
     setAprobandoVeredicto(true);
@@ -393,6 +426,8 @@ export default function InvestigacionPage() {
     onCerrarVeredictoTerritorio: () => setUltimoVeredictoTerritorio(null),
     fontanaPendiente,
     onDismissFontanaPendiente: handleDismissFontanaPendiente,
+    avisoError: avisoErrorF3,
+    onCerrarAvisoError: () => setAvisoErrorF3(null),
   };
 
   return (

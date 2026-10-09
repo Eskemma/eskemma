@@ -610,3 +610,83 @@ describe("finalizar_analisis sobre un análisis ya finalizado (A) — reversión
     expect(decidirReemplazoAnalisis(con409("reemplazo_huella_vencida"), {}, "reemplazar_analisis")).toEqual({ tipo: "huella_vencida" });
   });
 });
+
+// ── commit 4 (H-M3): generar_sintesis / generar_veredicto / generar_tablero / sincronizar_tablero ──
+
+import { decidirGeneracionF3UI } from "./guardadoHonesto";
+
+const conMensaje = (status: number, codigo: string, mensaje?: string): RespuestaGuardado => ({ tipo: "respuesta", ok: false, status, codigo, mensaje });
+const ACCIONES_GEN = ["generar_sintesis", "generar_veredicto"] as const;
+const ACCIONES_TAB = ["generar_tablero", "sincronizar_tablero"] as const;
+
+describe("decidirGeneracionF3UI", () => {
+  it("200 → éxito", () => {
+    for (const a of [...ACCIONES_GEN, ...ACCIONES_TAB]) expect(decidirGeneracionF3UI(a, ok)).toEqual({ tipo: "exito" });
+  });
+  it("409 «ya existe»: pantalla desactualizada, nada generado, recarga — sin ofrecer confirmar", () => {
+    const s = decidirGeneracionF3UI("generar_sintesis", con409("f3_ya_existe"));
+    expect(s).toEqual({
+      tipo: "ya_existe",
+      mensajeError: "Esta pantalla está desactualizada: la síntesis ya existe. No se generó nada; recarga la página.",
+    });
+    const v = decidirGeneracionF3UI("generar_veredicto", con409("f3_ya_existe"));
+    expect(v).toEqual({
+      tipo: "ya_existe",
+      mensajeError: "Esta pantalla está desactualizada: el veredicto ya existe. No se generó nada; recarga la página.",
+    });
+  });
+  it("409 bloqueado usa el motivo del servidor; sin él, el de la acción; nunca «DIE»", () => {
+    const conSrv = decidirGeneracionF3UI("generar_sintesis", conMensaje(409, "reemplazo_bloqueado", "MOTIVO DEL SERVIDOR"));
+    expect(conSrv).toEqual({ tipo: "bloqueado", mensajeError: "MOTIVO DEL SERVIDOR" });
+    for (const [a, frase] of [
+      ["generar_sintesis", "Generar la síntesis de nuevo"], ["generar_veredicto", "Generar el veredicto de nuevo"],
+      ["generar_tablero", "Generar el tablero de nuevo"], ["sincronizar_tablero", "Sincronizar el tablero"],
+    ] as const) {
+      const d = decidirGeneracionF3UI(a, con409("reemplazo_bloqueado")) as { tipo: string; mensajeError: string };
+      expect(d.tipo).toBe("bloqueado");
+      expect(d.mensajeError).toContain(frase);
+      expect(d.mensajeError).not.toMatch(/\bDIE\b/);
+    }
+  });
+  it("un 409 con otro código (o «ya existe» en el tablero) es un fallo real, no un caso especial", () => {
+    expect(decidirGeneracionF3UI("generar_sintesis", con409("otra_cosa")).tipo).toBe("error");
+    expect(decidirGeneracionF3UI("generar_tablero", con409("f3_ya_existe")).tipo).toBe("error");
+  });
+  it.each([...ACCIONES_GEN, ...ACCIONES_TAB])("%s — red: SIEMPRE «No se pudo CONFIRMAR…», nunca «no se registró»", (a) => {
+    const m = (decidirGeneracionF3UI(a, red) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR");
+    expect(m).toContain("Puede que sí se haya");
+    expect(m).not.toContain("No se pudo registrar");
+  });
+  it.each([...ACCIONES_GEN, ...ACCIONES_TAB])("%s — 502/503/504 y «escritura incierta» → ambiguo", (a) => {
+    for (const r of [conCodigo(502), conCodigo(503), conCodigo(504), conCodigo(500, "reemplazo_escritura_incierta")]) {
+      const m = (decidirGeneracionF3UI(a, r) as { mensajeError: string }).mensajeError;
+      expect(m).toContain("No se pudo CONFIRMAR");
+      expect(m).not.toContain("sigue como estaba");
+    }
+  });
+  it.each([...ACCIONES_GEN, ...ACCIONES_TAB])("%s — 500 que nombra el motor (falló antes de escribir) → «sigue como estaba»", (a) => {
+    const m = (decidirGeneracionF3UI(a, conCodigo(500, undefined, "M3")) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar");
+    expect(m).toContain("(falló M3)");
+    expect(m).toContain("No se guardó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.");
+    expect(m).not.toContain("CONFIRMAR");
+  });
+  it.each([...ACCIONES_GEN, ...ACCIONES_TAB])("%s — 500 sin motor ni código (pudo escribir) → ambiguo", (a) => {
+    const m = (decidirGeneracionF3UI(a, fallo(500)) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo CONFIRMAR");
+  });
+  it.each([401, 403, 404])("%s → «No se pudo registrar» con la consecuencia", (status) => {
+    const m = (decidirGeneracionF3UI("generar_sintesis", fallo(status)) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar la generación de la síntesis");
+    expect(m).toContain("la Fase 3 sigue como estaba");
+  });
+  it("negativo — el handler anterior ignoraba todo lo que no fuera 200 (sin mensaje alguno)", () => {
+    const antes = (r: RespuestaGuardado) => (r.tipo === "respuesta" && r.ok ? "exito" : "silencio");
+    for (const r of [con409("f3_ya_existe"), con409("reemplazo_bloqueado"), conCodigo(500, undefined, "M3"), red]) {
+      expect(antes(r)).toBe("silencio");
+      expect(decidirGeneracionF3UI("generar_sintesis", r).tipo).not.toBe("exito");
+      expect((decidirGeneracionF3UI("generar_sintesis", r) as { mensajeError: string }).mensajeError).toBeTruthy();
+    }
+  });
+});

@@ -119,6 +119,10 @@ interface Props {
   // Piezas 1/2 del plan de escenarios (b)/(c) (2026-08-19).
   fontanaPendiente?: { sesionId: string; territorio: Territorio; fechaCreacion: string } | null;
   onDismissFontanaPendiente?: () => void;
+  // H-M3: result of a generation the server refused or could not complete (stale screen,
+  // closed F3, failure). Never silent.
+  avisoError?: string | null;
+  onCerrarAvisoError?: () => void;
 }
 
 export default function F3Tablero({
@@ -130,6 +134,7 @@ export default function F3Tablero({
   onRevisarTerritorioFuente, revisandoTerritorioResultadoId,
   ultimoVeredictoTerritorio, onCerrarVeredictoTerritorio,
   fontanaPendiente, onDismissFontanaPendiente,
+  avisoError, onCerrarAvisoError,
 }: Props) {
   const [modalAbierto, setModalAbierto] = useState<"incertidumbres" | "semaforo" | null>(null);
   const incertidumbresF3 = incertidumbres.filter((i) => i.destino === "F3");
@@ -152,6 +157,21 @@ export default function F3Tablero({
 
   return (
     <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-6">
+      {avisoError && (
+        <div role="alert" className="shrink-0 flex items-start justify-between gap-3 rounded-lg border border-red-eske/30 bg-red-eske/10 p-3">
+          <p className="text-sm text-red-eske-60 dark:text-red-eske-10">{avisoError}</p>
+          {onCerrarAvisoError && (
+            <button
+              type="button"
+              onClick={onCerrarAvisoError}
+              aria-label="Cerrar aviso"
+              className="shrink-0 text-xs font-semibold text-red-eske-60 dark:text-red-eske-10 hover:underline focus-visible:outline focus-visible:outline-2"
+            >
+              Cerrar
+            </button>
+          )}
+        </div>
+      )}
       {/* Propagación PIP(F2)→tablero(F3) — mismo estilo visual que el
           banner de staleness XPCTO en exploracion/page.tsx. Solo tiene
           sentido mostrarlo cuando ya hay tablero generado (readOnly o no):

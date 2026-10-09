@@ -7,6 +7,8 @@
 // Extensible by design: add a new `AccionGuardado` and its label in ETIQUETAS.
 // Out of scope on purpose: authorship, dates, roles (Grupo 2 / H03 / H-M7).
 
+import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
+
 export type AccionGuardado =
   | "aprobar_motor"
   | "guardar_borrador"
@@ -18,7 +20,20 @@ export type AccionGuardado =
   | "importar_adjuntos_moddulo"
   | "reemplazar_analisis"
   | "generar_analisis"
-  | "guardar_analisis";
+  | "guardar_analisis"
+  | "generar_sintesis"
+  | "generar_veredicto"
+  | "generar_tablero"
+  | "sincronizar_tablero";
+
+/** F3 generators (H-M3): they write only when nothing was there; no confirmation exists. */
+const ACCIONES_F3: readonly AccionGuardado[] = [
+  "generar_sintesis",
+  "generar_veredicto",
+  "generar_tablero",
+  "sincronizar_tablero",
+];
+const esAccionF3 = (a: AccionGuardado) => ACCIONES_F3.includes(a);
 
 /** Actions whose failure must NOT stop the flow: show a notice only. */
 const ACCIONES_NO_BLOQUEANTES: readonly AccionGuardado[] = [
@@ -37,6 +52,8 @@ export type RespuestaGuardado =
       codigo?: string;
       /** `motor` field of the JSON body (the Claude motor that failed), when present. */
       motor?: string;
+      /** `mensaje` field of the JSON body (e.g. the block reason), when present. */
+      mensaje?: string;
     }
   | { tipo: "error_red" };
 
@@ -96,6 +113,14 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la generación del análisis";
     case "guardar_analisis":
       return "el guardado de los cambios del análisis";
+    case "generar_sintesis":
+      return "la generación de la síntesis";
+    case "generar_veredicto":
+      return "la generación del veredicto";
+    case "generar_tablero":
+      return "la generación del tablero";
+    case "sincronizar_tablero":
+      return "la sincronización del tablero";
   }
 }
 
@@ -122,6 +147,11 @@ function consecuencia(accion: AccionGuardado): string {
       return "Los cambios del formulario sí se guardaron; vuelve a intentarlo.";
     case "guardar_analisis":
       return "Sigues en modo edición y tus cambios siguen en pantalla; el análisis anterior sigue vigente. Inténtalo de nuevo.";
+    case "generar_sintesis":
+    case "generar_veredicto":
+    case "generar_tablero":
+    case "sincronizar_tablero":
+      return "No se guardó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.";
   }
 }
 
@@ -196,6 +226,16 @@ function mensajeDeFallo(
     }
     return "No se pudo CONFIRMAR la generación del análisis: el servidor no respondió a tiempo. Los cambios del formulario sí se guardaron; puede que el análisis sí se haya generado, recarga la página para verificar el estado.";
   }
+  // F3 generators: a 500 that names a Claude motor failed BEFORE any write (certain);
+  // any other 5xx / gateway timeout / "uncertain write" code may have written.
+  if (
+    esAccionF3(accion) &&
+    resp.tipo === "respuesta" &&
+    !resp.motor &&
+    (resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta")
+  ) {
+    return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
+  }
   if (accion === "registrar_aprobacion") {
     return "La fase se cerró, pero no se pudo registrar la fecha de aprobación.";
   }
@@ -208,7 +248,7 @@ function mensajeDeFallo(
     return "No se encontró el proyecto; puede que ya se haya eliminado. Recarga la lista para verificar.";
   }
   const queConMotor =
-    resp.tipo === "respuesta" && resp.motor && (accion === "reemplazar_analisis" || accion === "generar_analisis" || accion === "guardar_analisis")
+    resp.tipo === "respuesta" && resp.motor && (accion === "reemplazar_analisis" || accion === "generar_analisis" || accion === "guardar_analisis" || esAccionF3(accion))
       ? `${que} (falló ${resp.motor})`
       : que;
   return `No se pudo registrar ${queConMotor}. ${motivo(resp)} ${consecuencia(accion)}`;
@@ -403,6 +443,47 @@ export function decidirReemplazoAnalisis(
   const d = decidirResultadoGuardado(accion, resp, ctx);
   if (d.exito) return { tipo: "exito" };
   return { tipo: "error", mensajeError: d.mensajeError ?? "", ...revert };
+}
+
+/**
+ * H-M3: the answer of the F3 generators. Two 409s that are NOT failures: "ya existe"
+ * (the screen is stale: what it offered to generate already exists) and "bloqueado"
+ * (the Reporte F3 / approved verdict exists; PROVISIONAL). Neither offers to confirm
+ * or retry: there is no regenerate function. Any other answer is a failure or success.
+ */
+export type DecisionGeneracionF3UI =
+  | { tipo: "exito" }
+  | { tipo: "ya_existe"; mensajeError: string }
+  | { tipo: "bloqueado"; mensajeError: string }
+  | { tipo: "error"; mensajeError: string };
+
+const VERBO_F3: Partial<Record<AccionGuardado, VerboF3>> = {
+  generar_sintesis: "generar_sintesis",
+  generar_veredicto: "generar_veredicto",
+  generar_tablero: "generar_tablero",
+  sincronizar_tablero: "sincronizar_tablero",
+};
+
+export function decidirGeneracionF3UI(accion: AccionGuardado, resp: RespuestaGuardado): DecisionGeneracionF3UI {
+  if (resp.tipo === "respuesta" && resp.status === 409) {
+    if (resp.codigo === "f3_ya_existe" && (accion === "generar_sintesis" || accion === "generar_veredicto")) {
+      const que = accion === "generar_sintesis" ? "la síntesis" : "el veredicto";
+      return {
+        tipo: "ya_existe",
+        mensajeError: `Esta pantalla está desactualizada: ${que} ya existe. No se generó nada; recarga la página.`,
+      };
+    }
+    if (resp.codigo === "reemplazo_bloqueado") {
+      const verbo = VERBO_F3[accion];
+      return {
+        tipo: "bloqueado",
+        mensajeError: resp.mensaje ?? (verbo ? motivoBloqueoF3(verbo) : "La Fase 3 está cerrada."),
+      };
+    }
+  }
+  const d = decidirResultadoGuardado(accion, resp);
+  if (d.exito) return { tipo: "exito" };
+  return { tipo: "error", mensajeError: d.mensajeError ?? "" };
 }
 
 /**

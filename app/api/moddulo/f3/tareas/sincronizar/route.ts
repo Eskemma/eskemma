@@ -20,6 +20,8 @@ import type { TareaPIP, PIPItem } from "@/types/moddulo.types";
 import { computePipCambios, type PipCambio } from "@/lib/moddulo/pipPropagation";
 import { generarTareasParaPIPItems } from "@/lib/moddulo/f3TareasGenerator";
 import { preguntaEliminadaToRDAItem } from "@/lib/moddulo/criterios-investigacion";
+import { decidirGeneracionF3, estadoF3Desde } from "@/lib/moddulo/impactoRegeneracionF3";
+import { respuestaBloqueadoF3 } from "@/lib/moddulo/respuestaCandado";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -43,6 +45,11 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // H-M3: with the Reporte F3 (or an approved verdict) the board is not synchronized
+  // (F3 is read-only and its banner is hidden). Block only (PROVISIONAL).
+  const cierre = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "sincronizar_tablero");
+  if (cierre.accion === "bloqueado") return respuestaBloqueadoF3(cierre.mensaje);
 
   const currentPip = (project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const tareasExistentes = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
       tareasGeneradas = await generarTareasParaPIPItems(pipItemsParaGenerar);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: `Error generando el tablero: ${msg}` }, { status: 500 });
+      return NextResponse.json({ error: `Error generando el tablero: ${msg}`, motor: "M1" }, { status: 500 });
     }
   }
 

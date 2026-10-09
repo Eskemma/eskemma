@@ -103,6 +103,26 @@ export function motivoBloqueoDIE(verbo: VerboReemplazo): string {
 
 export const MOTIVO_BLOQUEO_DIE = motivoBloqueoDIE("reemplazar");
 
+/**
+ * H-M3 (commit 4): the same block reason for the F3 writers (generate synthesis /
+ * verdict / board, sync the board). `conReporte=false` is the anomalous "verdict
+ * approved but no Reporte F3" data: the sentence then does not claim a report.
+ */
+export type VerboF3 = "generar_sintesis" | "generar_veredicto" | "generar_tablero" | "sincronizar_tablero";
+
+const ACCION_F3: Record<VerboF3, string> = {
+  generar_sintesis: "Generar la síntesis de nuevo",
+  generar_veredicto: "Generar el veredicto de nuevo",
+  generar_tablero: "Generar el tablero de nuevo",
+  sincronizar_tablero: "Sincronizar el tablero",
+};
+
+export function motivoBloqueoF3(verbo: VerboF3, conReporte = true): string {
+  const base = conReporte ? BASE_BLOQUEO_DIE : "La Fase 3 ya aprobó su «M4 · Veredicto HEI».";
+  const ellas = conReporte ? "las" : "la";
+  return `${base} ${ACCION_F3[verbo]} ${ellas} dejaría inconsistente${conReporte ? "s" : ""}, y reabrir la Fase 3 aún no está disponible.`;
+}
+
 function hashEstable(texto: string): string {
   // cyrb53: deterministic, dependency-free (also safe for client bundles). It
   // detects accidental state changes between "ask" and "confirm"; it is not a

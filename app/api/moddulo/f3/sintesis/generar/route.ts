@@ -14,12 +14,25 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { TareaPIP, PIPItem, SintesisF3, ActorVetoF2, FODAInsumo } from "@/types/moddulo.types";
 import { tareasConSustentoUnico } from "@/lib/moddulo/triangulacion";
+import {
+  GeneracionF3RechazadaError,
+  decidirGeneracionF3,
+  estadoF3Desde,
+  type DecisionGeneracionF3,
+} from "@/lib/moddulo/impactoRegeneracionF3";
+import { escribirF3Condicional } from "@/lib/moddulo/escrituraF3Guardada";
+import { respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
 
 function extractText(response: Anthropic.Message): string {
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
+}
+
+/** 409 for a generation the state no longer allows (nothing was written). */
+function respuestaRechazo(decision: Exclude<DecisionGeneracionF3, { accion: "continuar" }>): NextResponse {
+  return decision.accion === "bloqueado" ? respuestaBloqueadoF3(decision.mensaje) : respuestaYaExisteF3();
 }
 
 function parseSintesisJSON(raw: string): SintesisF3 {
@@ -50,6 +63,12 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // H-M3, step 1 (BEFORE Claude, so a refusal costs nothing): the UI has no
+  // "regenerate", so an existing synthesis means a stale tab; a closed F3 (Reporte
+  // F3 or approved verdict) blocks. The write below re-checks inside a transaction.
+  const previa = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "sintesis");
+  if (previa.accion !== "continuar") return respuestaRechazo(previa);
 
   const pip = (project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
@@ -111,14 +130,14 @@ Responde ÚNICAMENTE con JSON con esta forma exacta:
     raw = extractText(res);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Error llamando a Claude: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `Error llamando a Claude: ${msg}`, motor: "M3" }, { status: 500 });
   }
 
   let sintesis: SintesisF3;
   try {
     sintesis = parseSintesisJSON(raw);
   } catch {
-    return NextResponse.json({ error: "No se pudo parsear la respuesta de Claude", raw: raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo parsear la respuesta de Claude", motor: "M3", raw: raw.slice(0, 400) }, { status: 500 });
   }
 
   // Claude recibe y devuelve `numero` (número de despliegue vigente al
@@ -152,10 +171,25 @@ Responde ÚNICAMENTE con JSON con esta forma exacta:
   }
   sintesis.fodaAdversariosInsumo = fodaAdversariosPorActorId;
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.investigacion.f3Sintesis": sintesis,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  // H-M3, step 2: conditional write. If a synthesis (or a closed F3) appeared while
+  // Claude generated, 409 and nothing is written.
+  try {
+    await escribirF3Condicional(adminDb, projectId, {
+      updates: { "phases.investigacion.f3Sintesis": sintesis, updatedAt: FieldValue.serverTimestamp() },
+      guardia: (proyecto) => {
+        const d = decidirGeneracionF3(estadoF3Desde((proyecto?.phases as Record<string, unknown> | undefined)?.investigacion), "sintesis");
+        if (d.accion !== "continuar") throw new GeneracionF3RechazadaError(d);
+      },
+    });
+  } catch (err) {
+    if (err instanceof GeneracionF3RechazadaError) return respuestaRechazo(err.decision);
+    // The commit may or may not have reached the server: do not claim it did not.
+    console.error("[sintesis/generar] no se pudo confirmar el guardado:", err);
+    return NextResponse.json(
+      { error: "reemplazo_escritura_incierta", mensaje: "No se pudo confirmar el guardado de la síntesis. Recarga la página para verificar el estado." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ sintesis }, { status: 200 });
 }

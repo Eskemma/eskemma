@@ -19,6 +19,8 @@ import type { TareaPIP, PIPItem } from "@/types/moddulo.types";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import { generarTareasParaPIPItems } from "@/lib/moddulo/f3TareasGenerator";
 import { tareaTieneProgreso } from "@/lib/moddulo/impactoReemplazoDVS";
+import { decidirGeneracionF3, estadoF3Desde } from "@/lib/moddulo/impactoRegeneracionF3";
+import { respuestaBloqueadoF3 } from "@/lib/moddulo/respuestaCandado";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -42,6 +44,12 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // H-M3: with the Reporte F3 (or an approved verdict) the board cannot be
+  // regenerated — not even with `confirmar:true`, which only covers the progress
+  // guard below. Block only (PROVISIONAL until F3 can be reopened).
+  const cierre = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "tablero");
+  if (cierre.accion === "bloqueado") return respuestaBloqueadoF3(cierre.mensaje);
 
   const pip = (project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   if (pip.length === 0) {
@@ -111,7 +119,7 @@ export async function POST(request: NextRequest) {
     tareas = await generarTareasParaPIPItems(pip);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Error generando el tablero: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `Error generando el tablero: ${msg}`, motor: "M1" }, { status: 500 });
   }
 
   // Nunca se escribe el `numero` adjunto en lectura (ver getProject()) de

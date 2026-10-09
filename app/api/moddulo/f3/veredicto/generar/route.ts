@@ -13,12 +13,25 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import { tareasSinCubrir, contarTareasCubiertas } from "@/lib/moddulo/f3Suficiencia";
 import type { TareaPIP, SintesisF3, HEIF2, VeredictoHEI } from "@/types/moddulo.types";
+import {
+  GeneracionF3RechazadaError,
+  decidirGeneracionF3,
+  estadoF3Desde,
+  type DecisionGeneracionF3,
+} from "@/lib/moddulo/impactoRegeneracionF3";
+import { escribirF3Condicional } from "@/lib/moddulo/escrituraF3Guardada";
+import { respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
 
 function extractText(response: Anthropic.Message): string {
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
+}
+
+/** 409 for a generation the state no longer allows (nothing was written). */
+function respuestaRechazo(decision: Exclude<DecisionGeneracionF3, { accion: "continuar" }>): NextResponse {
+  return decision.accion === "bloqueado" ? respuestaBloqueadoF3(decision.mensaje) : respuestaYaExisteF3();
 }
 
 function parseVeredictoJSON(raw: string): Omit<VeredictoHEI, "aprobadoPorUsuario"> {
@@ -49,6 +62,11 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // H-M3, step 1 (BEFORE Claude): an existing verdict (draft or approved) means a
+  // stale tab; a closed F3 (Reporte F3 or approved verdict) blocks.
+  const previa = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "veredicto");
+  if (previa.accion !== "continuar") return respuestaRechazo(previa);
 
   const tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
   const sintesis = project.phases?.investigacion?.f3Sintesis as SintesisF3 | undefined;
@@ -91,22 +109,35 @@ Responde ÚNICAMENTE con JSON: {"resultado": "validada|ajustada|refutada", "cont
     raw = extractText(res);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Error llamando a Claude: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `Error llamando a Claude: ${msg}`, motor: "M4" }, { status: 500 });
   }
 
   let parsed: Omit<VeredictoHEI, "aprobadoPorUsuario">;
   try {
     parsed = parseVeredictoJSON(raw);
   } catch {
-    return NextResponse.json({ error: "No se pudo parsear la respuesta de Claude", raw: raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo parsear la respuesta de Claude", motor: "M4", raw: raw.slice(0, 400) }, { status: 500 });
   }
 
   const veredicto: VeredictoHEI = { ...parsed, aprobadoPorUsuario: false };
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.investigacion.f3Veredicto": veredicto,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  // H-M3, step 2: conditional write (see sintesis/generar).
+  try {
+    await escribirF3Condicional(adminDb, projectId, {
+      updates: { "phases.investigacion.f3Veredicto": veredicto, updatedAt: FieldValue.serverTimestamp() },
+      guardia: (proyecto) => {
+        const d = decidirGeneracionF3(estadoF3Desde((proyecto?.phases as Record<string, unknown> | undefined)?.investigacion), "veredicto");
+        if (d.accion !== "continuar") throw new GeneracionF3RechazadaError(d);
+      },
+    });
+  } catch (err) {
+    if (err instanceof GeneracionF3RechazadaError) return respuestaRechazo(err.decision);
+    console.error("[veredicto/generar] no se pudo confirmar el guardado:", err);
+    return NextResponse.json(
+      { error: "reemplazo_escritura_incierta", mensaje: "No se pudo confirmar el guardado del veredicto. Recarga la página para verificar el estado." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ veredicto }, { status: 200 });
 }

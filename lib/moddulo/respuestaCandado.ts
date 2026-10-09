@@ -32,3 +32,13 @@ export function respuestaCandado(
     { status: 409 }
   );
 }
+
+/** H-M3: the F3 generators refuse to write because F3 is closed (PROVISIONAL). */
+export function respuestaBloqueadoF3(mensaje: string): NextResponse {
+  return NextResponse.json({ error: "reemplazo_bloqueado", mensaje }, { status: 409 });
+}
+
+/** H-M3: what would be generated already exists (stale screen). Nothing was written. */
+export function respuestaYaExisteF3(): NextResponse {
+  return NextResponse.json({ error: "f3_ya_existe" }, { status: 409 });
+}
