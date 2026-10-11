@@ -32,21 +32,56 @@ export type AccionGuardado =
   | "eliminar_tarjeta_canvas"
   | "aceptar_condicion_rda";
 
+/**
+ * Single catalog of every action and the group that decides how its failure is worded
+ * (6a, H25). `satisfies Record<AccionGuardado, …>` makes a NEW action a compile error
+ * until it is classified here; the group arrays below are derived from it, so they
+ * cannot drift from the union. The compiler forces a classification, not the RIGHT one:
+ * only the "simple" group is further guarded (its `TEXTOS_SIMPLES` must exist); one
+ * wrongly tagged "clasica" would fall into the generic branch of `mensajeDeFallo`.
+ *   - "clasica": the original actions, worded by the branches of `mensajeDeFallo`;
+ *   - "f3": F3 writers (H-M3), written only when nothing was there, no confirmation;
+ *   - "simple": single writes with their own table of texts (`TEXTOS_SIMPLES`, which is a
+ *     `Record<AccionSimple, …>`, so a new "simple" action also fails to compile until it
+ *     has its texts). `sujeto` and `consecuencia` are exhaustive switches as well.
+ */
+type GrupoAccion = "clasica" | "f3" | "simple";
+export const GRUPO_ACCION = {
+  aprobar_motor: "clasica",
+  guardar_borrador: "clasica",
+  finalizar_analisis: "clasica",
+  cerrar_fase: "clasica",
+  registrar_aprobacion: "clasica",
+  actualizar_proyecto: "clasica",
+  eliminar_proyecto: "clasica",
+  importar_adjuntos_moddulo: "clasica",
+  reemplazar_analisis: "clasica",
+  generar_analisis: "clasica",
+  guardar_analisis: "clasica",
+  generar_sintesis: "f3",
+  generar_veredicto: "f3",
+  generar_tablero: "f3",
+  sincronizar_tablero: "f3",
+  aprobar_veredicto: "f3",
+  revisar_territorio_fuente: "simple",
+  eliminar_sesion: "simple",
+  eliminar_tarjeta_canvas: "simple",
+  aceptar_condicion_rda: "simple",
+} as const satisfies Record<AccionGuardado, GrupoAccion>;
+
+const accionesDelGrupo = (g: GrupoAccion): readonly AccionGuardado[] =>
+  (Object.keys(GRUPO_ACCION) as AccionGuardado[]).filter((a) => GRUPO_ACCION[a] === g);
+
 /** F3 writers (H-M3): they write only when nothing was there; no confirmation exists. */
-const ACCIONES_F3: readonly AccionGuardado[] = [
-  "generar_sintesis",
-  "generar_veredicto",
-  "generar_tablero",
-  "sincronizar_tablero",
-  "aprobar_veredicto",
-];
-const esAccionF3 = (a: AccionGuardado) => ACCIONES_F3.includes(a);
+export const ACCIONES_F3: readonly AccionGuardado[] = accionesDelGrupo("f3");
+const esAccionF3 = (a: AccionGuardado) => GRUPO_ACCION[a] === "f3";
 
 /** Actions whose failure must NOT stop the flow: show a notice only. */
-const ACCIONES_NO_BLOQUEANTES: readonly AccionGuardado[] = [
+export const ACCIONES_NO_BLOQUEANTES = [
   "registrar_aprobacion",
   "importar_adjuntos_moddulo",
-];
+] as const satisfies readonly AccionGuardado[];
+const esNoBloqueante = (a: AccionGuardado) => (ACCIONES_NO_BLOQUEANTES as readonly AccionGuardado[]).includes(a);
 
 export type RespuestaGuardado =
   | {
@@ -204,22 +239,15 @@ function motivo(resp: RespuestaGuardado): string {
 //   - only a 4xx may say "stays as it was" / "stays active" — and a 404 or a
 //     "no longer active" 400 never does: after an ambiguous network failure it
 //     usually means the FIRST request already did the work (H22).
-type Accion5b =
-  | "revisar_territorio_fuente"
-  | "eliminar_sesion"
-  | "eliminar_tarjeta_canvas"
-  | "aceptar_condicion_rda";
+type AccionSimple = {
+  [K in AccionGuardado]: (typeof GRUPO_ACCION)[K] extends "simple" ? K : never;
+}[AccionGuardado];
 
-const ACCIONES_5B: readonly AccionGuardado[] = [
-  "revisar_territorio_fuente",
-  "eliminar_sesion",
-  "eliminar_tarjeta_canvas",
-  "aceptar_condicion_rda",
-];
-const esAccion5b = (a: AccionGuardado): a is Accion5b => ACCIONES_5B.includes(a);
+export const ACCIONES_SIMPLES: readonly AccionGuardado[] = accionesDelGrupo("simple");
+const esAccionSimple = (a: AccionGuardado): a is AccionSimple => GRUPO_ACCION[a] === "simple";
 
-const TEXTOS_5B: Record<
-  Accion5b,
+const TEXTOS_SIMPLES: Record<
+  AccionSimple,
   {
     /** Past participle used in "Puede que sí se haya …". */
     hecho: string;
@@ -265,8 +293,8 @@ const TEXTOS_5B: Record<
   },
 };
 
-function mensajeDeFallo5b(accion: Accion5b, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
-  const t = TEXTOS_5B[accion];
+function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
+  const t = TEXTOS_SIMPLES[accion];
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
     return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
@@ -291,7 +319,7 @@ function mensajeDeFallo(
   resp: RespuestaGuardado,
   ctx: ContextoGuardado
 ): string {
-  if (esAccion5b(accion)) return mensajeDeFallo5b(accion, resp, ctx);
+  if (esAccionSimple(accion)) return mensajeDeFalloSimple(accion, resp, ctx);
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
     if (accion === "guardar_borrador") {
@@ -400,8 +428,8 @@ export function decidirResultadoGuardado(
     revertirAprobacion: revierte,
     valorRestaurado: revierte ? (ctx.aprobadoPrevio ?? false) : undefined,
     marcarGuardado: false,
-    continuar: ACCIONES_NO_BLOQUEANTES.includes(accion),
-    bloqueante: !ACCIONES_NO_BLOQUEANTES.includes(accion),
+    continuar: esNoBloqueante(accion),
+    bloqueante: !esNoBloqueante(accion),
   };
 }
 

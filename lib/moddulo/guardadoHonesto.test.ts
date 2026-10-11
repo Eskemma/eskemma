@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCIONES_F3,
+  ACCIONES_NO_BLOQUEANTES,
+  ACCIONES_SIMPLES,
+  GRUPO_ACCION,
   AVISOS_CIERRE,
   decidirCierreDeFase,
   decidirReemplazoAnalisis,
@@ -842,6 +846,61 @@ describe("decidirResultadoGuardado — acciones del commit 5b", () => {
         expect(d.exito).toBe(false);
         expect(d.mensajeError).toBeTruthy();
       }
+    }
+  });
+});
+
+// ── 6a (H25): catálogo único de acciones — no-regresión de la infraestructura ──
+describe("catálogo de acciones (6a): la infraestructura derivada no cambia la pertenencia de ningún grupo", () => {
+  // Snapshot LITERAL de los tres arrays tal como eran antes de derivarlos del catálogo
+  // (ACCIONES_5B se llama ahora ACCIONES_SIMPLES).
+  it("ACCIONES_F3 es exactamente la lista anterior", () => {
+    expect([...ACCIONES_F3]).toEqual([
+      "generar_sintesis",
+      "generar_veredicto",
+      "generar_tablero",
+      "sincronizar_tablero",
+      "aprobar_veredicto",
+    ]);
+  });
+  it("ACCIONES_SIMPLES (antes ACCIONES_5B) es exactamente la lista anterior", () => {
+    expect([...ACCIONES_SIMPLES]).toEqual([
+      "revisar_territorio_fuente",
+      "eliminar_sesion",
+      "eliminar_tarjeta_canvas",
+      "aceptar_condicion_rda",
+    ]);
+  });
+  it("ACCIONES_NO_BLOQUEANTES es exactamente la lista anterior", () => {
+    expect([...ACCIONES_NO_BLOQUEANTES]).toEqual(["registrar_aprobacion", "importar_adjuntos_moddulo"]);
+  });
+
+  it("el catálogo clasifica TODAS las acciones (20), sin duplicar grupos ni dejar ninguna fuera", () => {
+    const todas = Object.keys(GRUPO_ACCION).sort();
+    expect(todas).toEqual(
+      [
+        "aprobar_motor", "guardar_borrador", "finalizar_analisis", "cerrar_fase", "registrar_aprobacion",
+        "actualizar_proyecto", "eliminar_proyecto", "importar_adjuntos_moddulo", "reemplazar_analisis",
+        "generar_analisis", "guardar_analisis", "generar_sintesis", "generar_veredicto", "generar_tablero",
+        "sincronizar_tablero", "aprobar_veredicto", "revisar_territorio_fuente", "eliminar_sesion",
+        "eliminar_tarjeta_canvas", "aceptar_condicion_rda",
+      ].sort()
+    );
+    const clasicas = todas.filter((a) => GRUPO_ACCION[a as keyof typeof GRUPO_ACCION] === "clasica");
+    expect(clasicas.length + ACCIONES_F3.length + ACCIONES_SIMPLES.length).toBe(todas.length);
+  });
+
+  it("toda acción del catálogo produce un mensaje de fallo no vacío y respeta bloqueante / no bloqueante", () => {
+    const fallo403: RespuestaGuardado = { tipo: "respuesta", ok: false, status: 403 };
+    for (const a of Object.keys(GRUPO_ACCION) as AccionGuardado[]) {
+      const d = decidirResultadoGuardado(a, fallo403, { motor: "M2", fase: "Fase 1", cambio: "el cambio", nombre: "X" });
+      expect(d.exito).toBe(false);
+      expect((d.mensajeError ?? "").length).toBeGreaterThan(10);
+      expect(d.bloqueante).toBe(!(ACCIONES_NO_BLOQUEANTES as readonly string[]).includes(a));
+      // Ambiguo siempre ante la red: nunca «no se registró» sin confirmar (salvo las 2 no bloqueantes con texto propio).
+      const red = decidirResultadoGuardado(a, { tipo: "error_red" }, { motor: "M2", fase: "Fase 1", cambio: "el cambio", nombre: "X" });
+      expect(red.exito).toBe(false);
+      expect((red.mensajeError ?? "").length).toBeGreaterThan(10);
     }
   });
 });
