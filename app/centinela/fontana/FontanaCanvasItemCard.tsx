@@ -19,6 +19,8 @@ import NaturalezaBadge from "./NaturalezaBadge";
 import FontanaComparativeTable from "./FontanaComparativeTable";
 import { canvasItemToMarkdown } from "@/lib/fontana/canvasExport";
 import { exportToPdf, buildFilename } from "@/lib/shared/reportExport";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { exportElementAsImage, type FormatoImagen } from "@/app/components/shared/exportElementAsImage";
 
 interface Props {
@@ -54,6 +56,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!kebabOpen) return;
@@ -106,18 +109,29 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
     }
   }
 
+  // H25 (5b): the `finally` used to close the modal always, so a failed delete looked
+  // like a success (and a thrown fetch was never caught). Only a confirmed delete
+  // closes it; otherwise it stays open with the reason.
   async function handleEliminar() {
     setDeleting(true);
+    setDeleteError(null);
     try {
-      const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canvasItemId: item.id, eliminarCanvasItem: true }),
-      });
-      if (res.ok) onEliminado?.(item.id);
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ canvasItemId: item.id, eliminarCanvasItem: true }),
+        })
+      );
+      const decision = decidirResultadoGuardado("eliminar_tarjeta_canvas", resp);
+      if (decision.exito) {
+        setConfirmDelete(false);
+        onEliminado?.(item.id);
+      } else {
+        setDeleteError(decision.mensajeError);
+      }
     } finally {
       setDeleting(false);
-      setConfirmDelete(false);
     }
   }
 
@@ -329,7 +343,7 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setConfirmDelete(false);
+            if (e.target === e.currentTarget && !deleting) { setConfirmDelete(false); setDeleteError(null); }
           }}
         >
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
@@ -338,11 +352,16 @@ export default function FontanaCanvasItemCard({ item, sesion, onEliminado }: Pro
               <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
                 Dejará de verse en tu Canvas.
               </p>
+              {deleteError && (
+                <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mt-2 leading-relaxed">
+                  {deleteError}
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmDelete(false)}
+                onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
                 disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
               >

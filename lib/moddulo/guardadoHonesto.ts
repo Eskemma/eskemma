@@ -25,7 +25,12 @@ export type AccionGuardado =
   | "generar_veredicto"
   | "generar_tablero"
   | "sincronizar_tablero"
-  | "aprobar_veredicto";
+  | "aprobar_veredicto"
+  // Commit 5b (H25): single writes whose result the screen used to ignore.
+  | "revisar_territorio_fuente"
+  | "eliminar_sesion"
+  | "eliminar_tarjeta_canvas"
+  | "aceptar_condicion_rda";
 
 /** F3 writers (H-M3): they write only when nothing was there; no confirmation exists. */
 const ACCIONES_F3: readonly AccionGuardado[] = [
@@ -70,6 +75,8 @@ export interface ContextoGuardado {
   cambio?: string;
   /** For reemplazar_analisis: whether the request carried the user's confirmation. */
   confirmado?: boolean;
+  /** For aceptar_condicion_rda: the name of the RDA item, shown in the message. */
+  nombre?: string;
 }
 
 export interface DecisionGuardado {
@@ -125,6 +132,14 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la sincronización del tablero";
     case "aprobar_veredicto":
       return "la aprobación del veredicto";
+    case "revisar_territorio_fuente":
+      return "la revisión del territorio de la fuente";
+    case "eliminar_sesion":
+      return "la eliminación de la exploración";
+    case "eliminar_tarjeta_canvas":
+      return "la eliminación de la tarjeta";
+    case "aceptar_condicion_rda":
+      return `la aceptación de ${ctx.nombre ? `«${ctx.nombre}»` : "este ítem"} como condición`;
   }
 }
 
@@ -158,6 +173,14 @@ function consecuencia(accion: AccionGuardado): string {
       return "No se guardó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.";
     case "aprobar_veredicto":
       return "No se aprobó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.";
+    case "revisar_territorio_fuente":
+      return "Tu veredicto de territorio anterior sigue como estaba; inténtalo de nuevo.";
+    case "eliminar_sesion":
+      return "La exploración sigue en tu lista; inténtalo de nuevo.";
+    case "eliminar_tarjeta_canvas":
+      return "La tarjeta sigue en tu Canvas; inténtalo de nuevo.";
+    case "aceptar_condicion_rda":
+      return "El ítem sigue activo; inténtalo de nuevo.";
   }
 }
 
@@ -172,6 +195,91 @@ function motivo(resp: RespuestaGuardado): string {
   return "El servidor no pudo completar la operación.";
 }
 
+
+// ── Commit 5b (H25) ──────────────────────────────────────────────────────────
+// Four single writes (territory review, deleting a Fontana exploration, deleting a
+// Canvas card, accepting an RDA item). Same rule as the rest of the series:
+//   - network error, any 5xx (a route that throws answers a bare 500) and a 200
+//     whose body is not usable are ALWAYS ambiguous ("No se pudo CONFIRMAR…");
+//   - only a 4xx may say "stays as it was" / "stays active" — and a 404 or a
+//     "no longer active" 400 never does: after an ambiguous network failure it
+//     usually means the FIRST request already did the work (H22).
+type Accion5b =
+  | "revisar_territorio_fuente"
+  | "eliminar_sesion"
+  | "eliminar_tarjeta_canvas"
+  | "aceptar_condicion_rda";
+
+const ACCIONES_5B: readonly AccionGuardado[] = [
+  "revisar_territorio_fuente",
+  "eliminar_sesion",
+  "eliminar_tarjeta_canvas",
+  "aceptar_condicion_rda",
+];
+const esAccion5b = (a: AccionGuardado): a is Accion5b => ACCIONES_5B.includes(a);
+
+const TEXTOS_5B: Record<
+  Accion5b,
+  {
+    /** Past participle used in "Puede que sí se haya …". */
+    hecho: string;
+    /** What to do to verify the real state. */
+    verificar: string;
+    noEncontrado: string;
+    /** Specific 4xx with their own text (checked before the generic one). */
+    especifico: (resp: Extract<RespuestaGuardado, { tipo: "respuesta" }>) => string | null;
+  }
+> = {
+  revisar_territorio_fuente: {
+    hecho: "registrado",
+    verificar: "vuelve a pulsar «Revisar» para repetirla.",
+    noEncontrado: "No se encontró la fuente; puede que ya no esté vinculada. Recarga la página para verificar.",
+    especifico: (r) =>
+      r.status === 400 && (r.codigo ?? "").includes("Canal 3")
+        ? "Esta fuente no es de Canal 3: no aplica la revisión de territorio."
+        : null,
+  },
+  eliminar_sesion: {
+    hecho: "eliminado",
+    verificar: "recarga la lista para verificar.",
+    noEncontrado: "No se encontró la exploración; puede que ya se haya eliminado. Recarga la lista para verificar.",
+    especifico: (r) =>
+      r.status === 409 && r.codigo === "sesion_vinculada"
+        ? "Esta exploración ya está vinculada a un proyecto de Moddulo y no se puede eliminar desde aquí. Recarga la lista."
+        : null,
+  },
+  eliminar_tarjeta_canvas: {
+    hecho: "eliminado",
+    verificar: "recarga el Canvas para verificar.",
+    noEncontrado: "No se encontró la tarjeta; puede que ya se haya eliminado. Recarga el Canvas para verificar.",
+    especifico: () => null,
+  },
+  aceptar_condicion_rda: {
+    hecho: "aceptado",
+    verificar: "recarga la página para verificar.",
+    noEncontrado: "No se encontró el proyecto; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
+    especifico: (r) =>
+      r.status === 400 && r.codigo === "item_no_activo"
+        ? "Este ítem ya no está activo; puede que ya se haya aceptado. Recarga la página para verificar."
+        : null,
+  },
+};
+
+function mensajeDeFallo5b(accion: Accion5b, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
+  const t = TEXTOS_5B[accion];
+  const que = sujeto(accion, ctx);
+  if (resp.tipo === "error_red") {
+    return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
+  }
+  if (resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta") {
+    return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
+  }
+  if (resp.status === 404) return t.noEncontrado;
+  const propio = t.especifico(resp);
+  if (propio) return propio;
+  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
+}
+
 /**
  * A network failure does not prove the server never received the request, so
  * the message must not claim "it was not registered": it says it could not be
@@ -183,6 +291,7 @@ function mensajeDeFallo(
   resp: RespuestaGuardado,
   ctx: ContextoGuardado
 ): string {
+  if (esAccion5b(accion)) return mensajeDeFallo5b(accion, resp, ctx);
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
     if (accion === "guardar_borrador") {

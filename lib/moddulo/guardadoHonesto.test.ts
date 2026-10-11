@@ -742,3 +742,106 @@ describe("decidirGeneracionF3UI — aprobar_veredicto", () => {
     }
   });
 });
+
+// ── Commit 5b (H25): revisar territorio, eliminar exploración, eliminar tarjeta, aceptar RDA ──
+describe("decidirResultadoGuardado — acciones del commit 5b", () => {
+  const conCodigo5b = (status: number, codigo?: string): RespuestaGuardado => ({ tipo: "respuesta", ok: false, status, codigo });
+  const msg = (a: AccionGuardado, r: RespuestaGuardado, ctx = {}) => {
+    const d = decidirResultadoGuardado(a, r, ctx);
+    expect(d.exito).toBe(false);
+    expect(d.bloqueante).toBe(true);
+    return d.mensajeError as string;
+  };
+  const casos: Array<{ accion: AccionGuardado; hecho: string; verificar: string; ctx?: object; que: string }> = [
+    { accion: "revisar_territorio_fuente", hecho: "registrado", verificar: "vuelve a pulsar «Revisar» para repetirla.", que: "la revisión del territorio de la fuente" },
+    { accion: "eliminar_sesion", hecho: "eliminado", verificar: "recarga la lista para verificar.", que: "la eliminación de la exploración" },
+    { accion: "eliminar_tarjeta_canvas", hecho: "eliminado", verificar: "recarga el Canvas para verificar.", que: "la eliminación de la tarjeta" },
+    { accion: "aceptar_condicion_rda", hecho: "aceptado", verificar: "recarga la página para verificar.", ctx: { nombre: "Variable X" }, que: "la aceptación de «Variable X» como condición" },
+  ];
+
+  describe.each(casos)("$accion", ({ accion, hecho, verificar, ctx, que }) => {
+    it("éxito: 200 → exito, sin mensaje", () => {
+      expect(decidirResultadoGuardado(accion, ok, ctx)).toMatchObject({ exito: true, mensajeError: null });
+    });
+    it("un 200 con cuerpo inválido es AMBIGUO (el servidor pudo escribir)", () => {
+      const m = msg(accion, { tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }, ctx);
+      expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+      expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+    });
+    it("red, 500 sin código, 502/503/504 y «escritura incierta» son AMBIGUOS siempre", () => {
+      for (const r of [red, fallo(500), fallo(502), fallo(503), fallo(504), conCodigo5b(500, "reemplazo_escritura_incierta")]) {
+        const m = msg(accion, r, ctx);
+        expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+        expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+        expect(m).not.toContain("sigue");
+      }
+    });
+    it("un 404 NO afirma que el objeto sigue ahí (H22: tras una red ambigua suele ser que ya se hizo)", () => {
+      const m = msg(accion, fallo(404), ctx);
+      expect(m).not.toMatch(/sigue (en tu|activo|como estaba)/);
+      expect(m).not.toContain("CONFIRMAR");
+      expect(m).toMatch(/Recarga/);
+    });
+    it("401 y 403: solo un 4xx puede afirmar que el estado anterior se conserva", () => {
+      for (const status of [401, 403]) {
+        const m = msg(accion, fallo(status), ctx);
+        expect(m).toContain(`No se pudo registrar ${que}`);
+        expect(m).toMatch(/sigue (como estaba|en tu|activo)|sigue como estaba/);
+        expect(m).not.toContain("CONFIRMAR");
+      }
+    });
+  });
+
+  it("revisar territorio: 404 → fuente no encontrada; 400 → no es de Canal 3", () => {
+    expect(msg("revisar_territorio_fuente", fallo(404))).toBe(
+      "No se encontró la fuente; puede que ya no esté vinculada. Recarga la página para verificar."
+    );
+    // The route puts its text in `error`: only the real "not Canal 3" 400 gets that message.
+    expect(msg("revisar_territorio_fuente", conCodigo5b(400, "Este resultado no es de Canal 3 — no aplica"))).toBe(
+      "Esta fuente no es de Canal 3: no aplica la revisión de territorio."
+    );
+    expect(msg("revisar_territorio_fuente", conCodigo5b(400, "projectId y resultadoId son requeridos"))).toContain(
+      "No se pudo registrar la revisión del territorio de la fuente."
+    );
+  });
+  it("revisar territorio: un 401 conserva el veredicto anterior", () => {
+    expect(msg("revisar_territorio_fuente", fallo(401))).toContain("Tu veredicto de territorio anterior sigue como estaba; inténtalo de nuevo.");
+  });
+  it("eliminar exploración: 404 nunca dice «sigue en tu lista»; 409 sesion_vinculada tiene su texto", () => {
+    expect(msg("eliminar_sesion", fallo(404))).toBe(
+      "No se encontró la exploración; puede que ya se haya eliminado. Recarga la lista para verificar."
+    );
+    expect(msg("eliminar_sesion", conCodigo5b(409, "sesion_vinculada"))).toBe(
+      "Esta exploración ya está vinculada a un proyecto de Moddulo y no se puede eliminar desde aquí. Recarga la lista."
+    );
+    expect(msg("eliminar_sesion", fallo(403))).toContain("La exploración sigue en tu lista; inténtalo de nuevo.");
+  });
+  it("eliminar tarjeta: 404 → «puede que ya se haya eliminado»; 403 → «sigue en tu Canvas»", () => {
+    expect(msg("eliminar_tarjeta_canvas", fallo(404))).toBe(
+      "No se encontró la tarjeta; puede que ya se haya eliminado. Recarga el Canvas para verificar."
+    );
+    expect(msg("eliminar_tarjeta_canvas", fallo(403))).toContain("La tarjeta sigue en tu Canvas; inténtalo de nuevo.");
+  });
+  it("RDA: item_no_activo dice «puede que ya se haya aceptado» (no «sigue activo»); 403 sí conserva «sigue activo»", () => {
+    const m = msg("aceptar_condicion_rda", conCodigo5b(400, "item_no_activo"), { nombre: "Variable X" });
+    expect(m).toBe("Este ítem ya no está activo; puede que ya se haya aceptado. Recarga la página para verificar.");
+    expect(msg("aceptar_condicion_rda", fallo(403), { nombre: "Variable X" })).toContain("El ítem sigue activo; inténtalo de nuevo.");
+  });
+  it("RDA sin nombre: usa «este ítem»", () => {
+    expect(msg("aceptar_condicion_rda", red)).toContain("la aceptación de este ítem como condición");
+  });
+
+  it("negativo — los handlers anteriores cerraban el modal siempre o callaban: ningún fallo se distinguía de un éxito", () => {
+    // Antes: el modal se cerraba en `finally` (tarjeta, RDA) o quedaba sin mensaje (exploración,
+    // revisar territorio), salvo un 200 que sí avisaba al padre. Es decir, todo fallo se veía igual.
+    const antes = (r: RespuestaGuardado) => (r.tipo === "respuesta" && r.ok ? "éxito" : "se cierra o calla");
+    for (const a of ["revisar_territorio_fuente", "eliminar_sesion", "eliminar_tarjeta_canvas", "aceptar_condicion_rda"] as AccionGuardado[]) {
+      for (const r of [red, fallo(404), fallo(409), fallo(500), fallo(504)]) {
+        expect(antes(r)).toBe("se cierra o calla");
+        const d = decidirResultadoGuardado(a, r);
+        expect(d.exito).toBe(false);
+        expect(d.mensajeError).toBeTruthy();
+      }
+    }
+  });
+});

@@ -6,10 +6,12 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import {
   decidirCierreDeFase,
   decidirGeneracionF3UI,
+  decidirResultadoGuardado,
   mensajeDeAviso,
   urlSinAviso,
   type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PillButton from "@/app/moddulo/components/PillButton";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -252,30 +254,19 @@ export default function InvestigacionPage() {
   // live in lib/moddulo/guardadoHonesto.ts; these handlers only perform effects.
   const [avisoErrorF3, setAvisoErrorF3] = useState<string | null>(null);
 
-  async function pedirF3(
+  // Thin wrapper over the shared helper (the fetch -> RespuestaGuardado mapping lives in one place).
+  function pedirF3(
     url: string,
     cuerpo: Record<string, unknown>,
     cuerpoEsValido?: (datos: Record<string, unknown>) => boolean
   ) {
-    let datos: Record<string, unknown> = {};
-    let resp: RespuestaGuardado;
-    try {
-      const r = await fetch(url, {
+    return leerRespuestaGuardado(
+      () => fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify(cuerpo),
-      });
-      try { datos = (await r.json()) as Record<string, unknown>; } catch { datos = {}; }
-      resp = {
-        tipo: "respuesta", ok: r.ok, status: r.status,
-        ...(cuerpoEsValido ? { cuerpoValido: r.ok ? cuerpoEsValido(datos) : undefined } : {}),
-        codigo: typeof datos.error === "string" ? datos.error : undefined,
-        motor: typeof datos.motor === "string" ? datos.motor : undefined,
-        mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
-      };
-    } catch {
-      resp = { tipo: "error_red" };
-    }
-    return { resp, datos };
+      }),
+      cuerpoEsValido
+    );
   }
 
   const handleGenerarTareas = useCallback(async (confirmar = false) => {
@@ -331,36 +322,43 @@ export default function InvestigacionPage() {
   const [ultimoVeredictoTerritorio, setUltimoVeredictoTerritorio] = useState<{ nombre: string; match: string } | null>(null);
   const handleRevisarTerritorioFuente = useCallback(async (resultadoId: string) => {
     setRevisandoTerritorioResultadoId(resultadoId);
+    setAvisoErrorF3(null);
+    setUltimoVeredictoTerritorio(null); // a failed review must not leave another source's verdict on screen
     try {
-      const r = await fetch("/api/moddulo/f3/canal3/revisar-territorio", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId, resultadoId }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        setResultados((prev) =>
-          prev.map((res) =>
-            res.resultadoId === resultadoId
-              ? {
-                  ...res,
-                  compatibilidad: d.compatibilidad,
-                  proyectoTerritorioSnapshotAtVinculacion: projectTerritory
-                    ? JSON.stringify(extraerTerritorioEscalar(projectTerritory))
-                    : undefined,
-                }
-              : res
-          ) as typeof prev
-        );
-        const fuente = resultados.find((res) => res.resultadoId === resultadoId);
-        setUltimoVeredictoTerritorio({
-          nombre: fuente?.metadatosFuente?.nombreHerramienta ?? resultadoId,
-          match: d.compatibilidad?.pertinencia?.territorioDetalle ?? "Territorio verificado — sin problema de compatibilidad.",
-        });
+      // H25 (5b): the review used to be silent on any failure ("Revisando…" just turned off).
+      const { resp, datos: d } = await pedirF3(
+        "/api/moddulo/f3/canal3/revisar-territorio",
+        { projectId, resultadoId },
+        (datos) => !!datos.compatibilidad
+      );
+      const decision = decidirResultadoGuardado("revisar_territorio_fuente", resp);
+      if (!decision.exito) {
+        setAvisoErrorF3(decision.mensajeError);
+        return;
       }
+      setResultados((prev) =>
+        prev.map((res) =>
+          res.resultadoId === resultadoId
+            ? {
+                ...res,
+                compatibilidad: d.compatibilidad,
+                proyectoTerritorioSnapshotAtVinculacion: projectTerritory
+                  ? JSON.stringify(extraerTerritorioEscalar(projectTerritory))
+                  : undefined,
+              }
+            : res
+        ) as typeof prev
+      );
+      const fuente = resultados.find((res) => res.resultadoId === resultadoId);
+      const compat = d.compatibilidad as { pertinencia?: { territorioDetalle?: string } } | undefined;
+      setUltimoVeredictoTerritorio({
+        nombre: fuente?.metadatosFuente?.nombreHerramienta ?? resultadoId,
+        match: compat?.pertinencia?.territorioDetalle ?? "Territorio verificado — sin problema de compatibilidad.",
+      });
     } finally {
       setRevisandoTerritorioResultadoId(null);
     }
-  }, [projectId, projectTerritory, resultados]);
+  }, [projectId, projectTerritory, resultados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerarSintesis = useCallback(async () => {
     setGenerandoSintesis(true);

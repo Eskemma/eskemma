@@ -13,11 +13,14 @@ import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 export default function ConfirmAcceptRDAModal({
   itemNombre,
   isConfirming,
+  errorMessage,
   onCancel,
   onConfirm,
 }: {
   itemNombre: string;
   isConfirming: boolean;
+  /** Failure of the last attempt; the confirmation stays open while it is shown. */
+  errorMessage?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -50,6 +53,11 @@ export default function ConfirmAcceptRDAModal({
             </p>
           </div>
         </div>
+        {errorMessage && (
+          <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mb-4 leading-relaxed">
+            {errorMessage}
+          </p>
+        )}
         <div className="flex gap-3">
           <button
             onClick={onCancel}

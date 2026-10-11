@@ -19,6 +19,8 @@ import type { FontanaSesion } from "@/types/fontana.types";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
 import { COLOR_SWATCHES, COLOR_DEFAULT } from "@/lib/fontana/colorSwatches";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 
 // 2026-08-21 — el hub ahora también lista sesiones vinculadas (antes
 // desaparecían sin dejar rastro al vincularse — hueco real de
@@ -190,6 +192,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   // Fix 4 (2026-08-21) — mismo patrón ya usado en PESTELHubPage.ProjectCard
@@ -212,11 +215,21 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
     if (actualizada) onChanged(actualizada);
   }
 
+  // H25 (5b): the modal used to stay open with no message on a failure and, if the
+  // network threw, `deleting` stayed on forever. Only a confirmed delete closes it.
   async function handleEliminar() {
     setDeleting(true);
-    const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, { method: "DELETE" });
-    setDeleting(false);
-    if (res.ok) onDeleted();
+    setDeleteError(null);
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/fontana/sesion/${sesion.sesionId}`, { method: "DELETE" })
+      );
+      const decision = decidirResultadoGuardado("eliminar_sesion", resp);
+      if (decision.exito) onDeleted();
+      else setDeleteError(decision.mensajeError);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -273,7 +286,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) setConfirmDelete(false); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={(e) => { if (e.target === e.currentTarget && !deleting) { setConfirmDelete(false); setDeleteError(null); } }}>
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
             <div>
               <h3 className="font-semibold text-black-eske dark:text-[#EAF2F8] text-base">
@@ -282,9 +295,14 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
               <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1.5 leading-relaxed">
                 Esta acción es permanente. Se perderán los indicadores seleccionados en esta exploración.
               </p>
+              {deleteError && (
+                <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mt-2 leading-relaxed">
+                  {deleteError}
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-end gap-3">
-              <button type="button" onClick={() => setConfirmDelete(false)} disabled={deleting} className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50">
+              <button type="button" onClick={() => { setConfirmDelete(false); setDeleteError(null); }} disabled={deleting} className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50">
                 Cancelar
               </button>
               <button type="button" onClick={handleEliminar} disabled={deleting} className="px-4 py-2 text-sm font-medium bg-red-eske text-white-eske rounded-lg hover:bg-red-eske/90 transition-colors disabled:opacity-50 flex items-center gap-2">

@@ -15,6 +15,8 @@ import { getVinculacionPESTEL } from "@/lib/moddulo/rdaPestelLink";
 import { getDisplayTextForRDAItem } from "@/lib/moddulo/rda";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import ConfirmAcceptRDAModal from "@/app/moddulo/components/ConfirmAcceptRDAModal";
 
 const DIMENSION_LABEL_ES: Record<string, string> = {
@@ -37,6 +39,7 @@ export default function RDAHistoryModal({
 
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
 
   const gruposPorFase = PHASE_ORDER.map((phaseId) => ({
     phaseId,
@@ -45,20 +48,34 @@ export default function RDAHistoryModal({
 
   const acceptingItem = acceptingId ? rda[acceptingId] : undefined;
 
+  // H25 (5b): the `finally` used to close the confirmation always, so a failed accept
+  // looked like a success (a thrown fetch was never caught either). Only a confirmed
+  // accept closes it and calls `onAccepted`; otherwise it stays open with the reason.
   const handleConfirmAccept = async () => {
     if (!acceptingId) return;
     setIsAccepting(true);
+    setAcceptError(null);
     try {
-      const r = await fetch(`/api/moddulo/projects/${projectId}/rda/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ itemId: acceptingId }),
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/moddulo/projects/${projectId}/rda/accept`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ itemId: acceptingId }),
+        })
+      );
+      const decision = decidirResultadoGuardado("aceptar_condicion_rda", resp, {
+        nombre: acceptingItem ? getDisplayTextForRDAItem(acceptingItem).nombre : undefined,
       });
-      if (r.ok) onAccepted(acceptingId);
+      if (decision.exito) {
+        const id = acceptingId;
+        setAcceptingId(null);
+        onAccepted(id);
+      } else {
+        setAcceptError(decision.mensajeError);
+      }
     } finally {
       setIsAccepting(false);
-      setAcceptingId(null);
     }
   };
 
@@ -166,7 +183,8 @@ export default function RDAHistoryModal({
         <ConfirmAcceptRDAModal
           itemNombre={getDisplayTextForRDAItem(acceptingItem).nombre}
           isConfirming={isAccepting}
-          onCancel={() => setAcceptingId(null)}
+          errorMessage={acceptError}
+          onCancel={() => { setAcceptingId(null); setAcceptError(null); }}
           onConfirm={handleConfirmAccept}
         />
       )}
