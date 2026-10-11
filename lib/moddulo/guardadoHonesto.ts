@@ -24,14 +24,16 @@ export type AccionGuardado =
   | "generar_sintesis"
   | "generar_veredicto"
   | "generar_tablero"
-  | "sincronizar_tablero";
+  | "sincronizar_tablero"
+  | "aprobar_veredicto";
 
-/** F3 generators (H-M3): they write only when nothing was there; no confirmation exists. */
+/** F3 writers (H-M3): they write only when nothing was there; no confirmation exists. */
 const ACCIONES_F3: readonly AccionGuardado[] = [
   "generar_sintesis",
   "generar_veredicto",
   "generar_tablero",
   "sincronizar_tablero",
+  "aprobar_veredicto",
 ];
 const esAccionF3 = (a: AccionGuardado) => ACCIONES_F3.includes(a);
 
@@ -121,6 +123,8 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la generación del tablero";
     case "sincronizar_tablero":
       return "la sincronización del tablero";
+    case "aprobar_veredicto":
+      return "la aprobación del veredicto";
   }
 }
 
@@ -152,6 +156,8 @@ function consecuencia(accion: AccionGuardado): string {
     case "generar_tablero":
     case "sincronizar_tablero":
       return "No se guardó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.";
+    case "aprobar_veredicto":
+      return "No se aprobó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.";
   }
 }
 
@@ -205,7 +211,7 @@ function mensajeDeFallo(
       // written: always ambiguous.
       return "No se pudo CONFIRMAR el guardado de los cambios del análisis: sin conexión con el servidor. Puede que sí se hayan guardado; tus cambios siguen en pantalla, pero recarga la página para verificar el estado antes de volver a editar.";
     }
-    return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
+    return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${accion === "aprobar_veredicto" ? "aprobado" : "registrado"}; recarga la página para verificar el estado.`;
   }
   // A gateway timeout (or the server's own "write outcome unknown" code) does not
   // prove the replacement did not happen: same ambiguity as a network failure.
@@ -226,6 +232,11 @@ function mensajeDeFallo(
     }
     return "No se pudo CONFIRMAR la generación del análisis: el servidor no respondió a tiempo. Los cambios del formulario sí se guardaron; puede que el análisis sí se haya generado, recarga la página para verificar el estado.";
   }
+  // F3 writers: a 200 whose body is not what the screen needs (e.g. no `die` after an
+  // approval) means the server may well have written: ambiguous, never "not registered".
+  if (esAccionF3(accion) && resp.tipo === "respuesta" && resp.ok) {
+    return `No se pudo CONFIRMAR ${que}: el servidor respondió algo inesperado. Puede que sí se haya ${accion === "aprobar_veredicto" ? "aprobado" : "registrado"}; recarga la página para verificar el estado.`;
+  }
   // F3 generators: a 500 that names a Claude motor failed BEFORE any write (certain);
   // any other 5xx / gateway timeout / "uncertain write" code may have written.
   if (
@@ -234,7 +245,7 @@ function mensajeDeFallo(
     !resp.motor &&
     (resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta")
   ) {
-    return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya registrado; recarga la página para verificar el estado.`;
+    return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${accion === "aprobar_veredicto" ? "aprobado" : "registrado"}; recarga la página para verificar el estado.`;
   }
   if (accion === "registrar_aprobacion") {
     return "La fase se cerró, pero no se pudo registrar la fecha de aprobación.";
@@ -455,6 +466,8 @@ export type DecisionGeneracionF3UI =
   | { tipo: "exito" }
   | { tipo: "ya_existe"; mensajeError: string }
   | { tipo: "bloqueado"; mensajeError: string }
+  // aprobar_veredicto: the screen is stale (already approved elsewhere / the verdict changed).
+  | { tipo: "desactualizado"; mensajeError: string }
   | { tipo: "error"; mensajeError: string };
 
 const VERBO_F3: Partial<Record<AccionGuardado, VerboF3>> = {
@@ -466,6 +479,20 @@ const VERBO_F3: Partial<Record<AccionGuardado, VerboF3>> = {
 
 export function decidirGeneracionF3UI(accion: AccionGuardado, resp: RespuestaGuardado): DecisionGeneracionF3UI {
   if (resp.tipo === "respuesta" && resp.status === 409) {
+    if (accion === "aprobar_veredicto") {
+      if (resp.codigo === "f3_ya_aprobado") {
+        return {
+          tipo: "desactualizado",
+          mensajeError: "Esta pantalla está desactualizada: el veredicto ya fue aprobado. No se aprobó nada de nuevo; recarga la página.",
+        };
+      }
+      if (resp.codigo === "f3_estado_cambio") {
+        return {
+          tipo: "desactualizado",
+          mensajeError: "El veredicto cambió desde que lo viste. No se aprobó nada; recarga la página y revísalo.",
+        };
+      }
+    }
     if (resp.codigo === "f3_ya_existe" && (accion === "generar_sintesis" || accion === "generar_veredicto")) {
       const que = accion === "generar_sintesis" ? "la síntesis" : "el veredicto";
       return {

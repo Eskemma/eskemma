@@ -690,3 +690,55 @@ describe("decidirGeneracionF3UI", () => {
     }
   });
 });
+
+// ── commit 5a (H25 #6): aprobar_veredicto ────────────────────────────────────
+
+describe("decidirGeneracionF3UI — aprobar_veredicto", () => {
+  const aprobar = (r: RespuestaGuardado) => decidirGeneracionF3UI("aprobar_veredicto", r);
+  const okConDie: RespuestaGuardado = { tipo: "respuesta", ok: true, status: 200, cuerpoValido: true };
+  it("200 con die → éxito", () => expect(aprobar(okConDie)).toEqual({ tipo: "exito" }));
+  it("2 — 200 SIN die: ambiguo («No se pudo CONFIRMAR…»), nunca «no se registró»", () => {
+    const m = (aprobar({ tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }) as { tipo: string; mensajeError: string });
+    expect(m.tipo).toBe("error");
+    expect(m.mensajeError).toContain("No se pudo CONFIRMAR la aprobación del veredicto");
+    expect(m.mensajeError).toContain("Puede que sí se haya aprobado");
+    expect(m.mensajeError).not.toContain("No se pudo registrar");
+    expect(m.mensajeError).not.toContain("No se aprobó nada");
+  });
+  it("409 f3_ya_aprobado: pantalla desactualizada, sin afirmar que NO lo aprobaste tú", () => {
+    expect(aprobar(con409("f3_ya_aprobado"))).toEqual({
+      tipo: "desactualizado",
+      mensajeError: "Esta pantalla está desactualizada: el veredicto ya fue aprobado. No se aprobó nada de nuevo; recarga la página.",
+    });
+  });
+  it("409 f3_estado_cambio: el veredicto cambió, no se aprobó nada", () => {
+    expect(aprobar(con409("f3_estado_cambio"))).toEqual({
+      tipo: "desactualizado",
+      mensajeError: "El veredicto cambió desde que lo viste. No se aprobó nada; recarga la página y revísalo.",
+    });
+  });
+  it("un 409 con otro código es un fallo real", () => {
+    expect(aprobar(con409("otra_cosa")).tipo).toBe("error");
+  });
+  it("3 — red, 502/503/504, 500 sin código y «escritura incierta» son AMBIGUOS siempre", () => {
+    for (const r of [red, conCodigo(502), conCodigo(503), conCodigo(504), fallo(500), conCodigo(500, "reemplazo_escritura_incierta")]) {
+      const m = (aprobar(r) as { mensajeError: string }).mensajeError;
+      expect(m).toContain("No se pudo CONFIRMAR la aprobación del veredicto");
+      expect(m).toContain("Puede que sí se haya aprobado");
+      expect(m).not.toContain("sigue como estaba");
+    }
+  });
+  it.each([400, 401, 403, 404])("%s → solo un 4xx puede afirmar «la Fase 3 sigue como estaba»", (status) => {
+    const m = (aprobar(fallo(status)) as { mensajeError: string }).mensajeError;
+    expect(m).toContain("No se pudo registrar la aprobación del veredicto");
+    expect(m).toContain("No se aprobó nada; la Fase 3 sigue como estaba. Inténtalo de nuevo.");
+    expect(m).not.toContain("CONFIRMAR");
+  });
+  it("negativo — el handler anterior no distinguía nada: silencio ante todo lo que no fuera 200 y una excepción ante un 200 sin die", () => {
+    const antes = (r: RespuestaGuardado) => (r.tipo === "respuesta" && r.ok ? "lee d.die" : "silencio");
+    for (const r of [con409("f3_ya_aprobado"), con409("f3_estado_cambio"), fallo(500), red]) {
+      expect(antes(r)).toBe("silencio");
+      expect((aprobar(r) as { mensajeError: string }).mensajeError).toBeTruthy();
+    }
+  });
+});

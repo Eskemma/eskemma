@@ -17,6 +17,7 @@
 // transaction) belong.
 
 import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
+import { sonIgualesEstable } from "./serializacionEstable";
 
 export type DestinoF3 = "sintesis" | "veredicto" | "tablero";
 
@@ -68,5 +69,55 @@ export class GeneracionF3RechazadaError extends Error {
   constructor(public readonly decision: Exclude<DecisionGeneracionF3, { accion: "continuar" }>) {
     super(`Generación F3 rechazada: ${decision.accion}`);
     this.name = "GeneracionF3RechazadaError";
+  }
+}
+
+// ── veredicto/aprobar (commit 5a, H25 #6) ────────────────────────────────────
+// Approving writes the verdict (approved) + the Reporte F3 (DIE) + estado "lista"
+// in ONE update. It used to have no guard: re-approving rebuilt the DIE from the
+// CURRENT synthesis and board, and two tabs overwrote each other.
+//   - Reporte F3 exists, or the verdict is already approved (anomalous without the
+//     report: conservative 409, no repair through the route) -> "ya_aprobado";
+//   - no verdict / no synthesis -> the existing 400s;
+//   - otherwise continue. Inside the transaction the verdict AND the synthesis
+//     (the DIE embeds both) must still be the ones the user is approving.
+
+export type DecisionAprobacionVeredicto =
+  | { accion: "continuar" }
+  | { accion: "ya_aprobado" }
+  | { accion: "sin_veredicto" }
+  | { accion: "sin_sintesis" }
+  | { accion: "estado_cambio" };
+
+export function decidirAprobacionVeredicto(estado: EstadoF3): DecisionAprobacionVeredicto {
+  if (!!estado.die || estado.veredicto?.aprobadoPorUsuario === true) return { accion: "ya_aprobado" };
+  if (!estado.veredicto) return { accion: "sin_veredicto" };
+  if (!estado.sintesis) return { accion: "sin_sintesis" };
+  return { accion: "continuar" };
+}
+
+/**
+ * Same decision with the state read INSIDE the transaction, plus the check that the
+ * verdict and the synthesis are still (key order aside) the ones read before. A
+ * verdict or synthesis that vanished or changed is "estado_cambio".
+ */
+export function decidirAprobacionEnTransaccion(
+  actual: EstadoF3,
+  previo: { veredicto: unknown; sintesis: unknown }
+): DecisionAprobacionVeredicto {
+  const d = decidirAprobacionVeredicto(actual);
+  if (d.accion === "ya_aprobado") return d;
+  if (d.accion !== "continuar") return { accion: "estado_cambio" };
+  if (!sonIgualesEstable(actual.veredicto, previo.veredicto) || !sonIgualesEstable(actual.sintesis, previo.sintesis)) {
+    return { accion: "estado_cambio" };
+  }
+  return d;
+}
+
+/** Thrown inside the approval transaction when the guard rejects. */
+export class AprobacionVeredictoRechazadaError extends Error {
+  constructor(public readonly decision: Extract<DecisionAprobacionVeredicto, { accion: "ya_aprobado" | "estado_cambio" }>) {
+    super(`Aprobación de veredicto rechazada: ${decision.accion}`);
+    this.name = "AprobacionVeredictoRechazadaError";
   }
 }

@@ -252,7 +252,11 @@ export default function InvestigacionPage() {
   // live in lib/moddulo/guardadoHonesto.ts; these handlers only perform effects.
   const [avisoErrorF3, setAvisoErrorF3] = useState<string | null>(null);
 
-  async function pedirF3(url: string, cuerpo: Record<string, unknown>) {
+  async function pedirF3(
+    url: string,
+    cuerpo: Record<string, unknown>,
+    cuerpoEsValido?: (datos: Record<string, unknown>) => boolean
+  ) {
     let datos: Record<string, unknown> = {};
     let resp: RespuestaGuardado;
     try {
@@ -263,6 +267,7 @@ export default function InvestigacionPage() {
       try { datos = (await r.json()) as Record<string, unknown>; } catch { datos = {}; }
       resp = {
         tipo: "respuesta", ok: r.ok, status: r.status,
+        ...(cuerpoEsValido ? { cuerpoValido: r.ok ? cuerpoEsValido(datos) : undefined } : {}),
         codigo: typeof datos.error === "string" ? datos.error : undefined,
         motor: typeof datos.motor === "string" ? datos.motor : undefined,
         mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
@@ -385,22 +390,32 @@ export default function InvestigacionPage() {
     }
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // H25 #6: the approval is the most serious write of F3. Nothing is optimistic here
+  // (the screen only changes once the server returns the Reporte F3), so there is
+  // nothing to revert; what was missing was any message, and the guard against a body
+  // without `die` (which used to throw). A 200 without `die` is AMBIGUOUS: the server
+  // may have approved.
   const handleAprobarVeredicto = useCallback(async () => {
     setAprobandoVeredicto(true);
+    setAvisoErrorF3(null);
     try {
-      const r = await fetch("/api/moddulo/f3/veredicto/aprobar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        setDie(d.die);
-        setVeredicto(d.die.veredictoHEI);
+      const { resp, datos } = await pedirF3(
+        "/api/moddulo/f3/veredicto/aprobar",
+        { projectId },
+        (d) => !!(d.die && (d.die as { veredictoHEI?: unknown }).veredictoHEI)
+      );
+      const decision = decidirGeneracionF3UI("aprobar_veredicto", resp);
+      if (decision.tipo === "exito") {
+        const nuevoDie = datos.die as DIE;
+        setDie(nuevoDie);
+        setVeredicto(nuevoDie.veredictoHEI);
+      } else {
+        setAvisoErrorF3(decision.mensajeError);
       }
     } finally {
       setAprobandoVeredicto(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isLista = !!die;
   const btnBase = "px-2.5 py-1.5 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 bg-transparent rounded-full text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-bluegreen-eske/5 dark:hover:bg-blue-eske-20/10";

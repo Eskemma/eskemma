@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  AprobacionVeredictoRechazadaError,
+  decidirAprobacionEnTransaccion,
+  decidirAprobacionVeredicto,
   GeneracionF3RechazadaError,
   decidirGeneracionF3,
   estadoF3Desde,
@@ -110,5 +113,42 @@ describe("negativo — el comportamiento anterior de las rutas nunca rechazaba",
     const antes = () => ({ accion: "continuar" });
     expect(acc(cerrado, "sintesis")).not.toBe(antes().accion);
     expect(acc(sintesisYBorrador, "veredicto")).not.toBe(antes().accion);
+  });
+});
+
+describe("decidirAprobacionVeredicto — matriz de estados (commit 5a)", () => {
+  const ap = (e: EstadoF3) => decidirAprobacionVeredicto(e).accion;
+  it("síntesis + borrador sin aprobar: continúa", () => expect(ap(sintesisYBorrador)).toBe("continuar"));
+  it("nada existe: sin veredicto", () => expect(ap(nada)).toBe("sin_veredicto"));
+  it("solo síntesis: sin veredicto", () => expect(ap(conSintesis)).toBe("sin_veredicto"));
+  it("veredicto sin síntesis: sin síntesis", () => expect(ap({ veredicto: SIEMBRA_VEREDICTO })).toBe("sin_sintesis"));
+  it("Reporte F3 existente: ya aprobado (re-aprobar NO reconstruye el Reporte)", () => expect(ap(cerrado)).toBe("ya_aprobado"));
+  it("veredicto aprobado sin Reporte F3 (anómalo): ya aprobado, sin reparar por la ruta", () => expect(ap(aprobadoSinDie)).toBe("ya_aprobado"));
+  it("Reporte F3 sin veredicto (anómalo): ya aprobado (el Reporte gana)", () => expect(ap(dieSinVeredicto)).toBe("ya_aprobado"));
+});
+
+describe("decidirAprobacionEnTransaccion — el veredicto Y la síntesis siguen siendo los que se aprueban", () => {
+  const previo = { veredicto: SIEMBRA_VEREDICTO, sintesis: SIEMBRA_SINTESIS };
+  it("mismo estado (aunque cambie el orden de las claves): continúa", () => {
+    const reordenado = { sintesis: { ...SIEMBRA_SINTESIS, fodaPropioInsumo: { amenazas: [], debilidades: [], oportunidades: [], fortalezas: [] } }, veredicto: { aprobadoPorUsuario: false, premisaResultante: "p", argumentacion: "a", contraste: "c", resultado: "ajustada" } };
+    expect(decidirAprobacionEnTransaccion(reordenado, previo).accion).toBe("continuar");
+  });
+  it("el Reporte F3 aparece: ya aprobado", () => {
+    expect(decidirAprobacionEnTransaccion(cerrado, previo).accion).toBe("ya_aprobado");
+  });
+  it("el veredicto cambió: estado_cambio", () => {
+    const e = { sintesis: SIEMBRA_SINTESIS, veredicto: { ...SIEMBRA_VEREDICTO, resultado: "refutada" } } as EstadoF3;
+    expect(decidirAprobacionEnTransaccion(e, previo).accion).toBe("estado_cambio");
+  });
+  it("la síntesis cambió (el DIE la embebe): estado_cambio", () => {
+    const e = { sintesis: { ...SIEMBRA_SINTESIS, convergencias: [{ texto: "nueva" }] }, veredicto: SIEMBRA_VEREDICTO } as EstadoF3;
+    expect(decidirAprobacionEnTransaccion(e, previo).accion).toBe("estado_cambio");
+  });
+  it("el veredicto o la síntesis desaparecieron: estado_cambio", () => {
+    expect(decidirAprobacionEnTransaccion(conSintesis, previo).accion).toBe("estado_cambio");
+    expect(decidirAprobacionEnTransaccion({ veredicto: SIEMBRA_VEREDICTO }, previo).accion).toBe("estado_cambio");
+  });
+  it("AprobacionVeredictoRechazadaError lleva la decisión", () => {
+    expect(new AprobacionVeredictoRechazadaError({ accion: "estado_cambio" }).decision.accion).toBe("estado_cambio");
   });
 });

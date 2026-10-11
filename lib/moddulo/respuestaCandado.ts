@@ -42,3 +42,11 @@ export function respuestaBloqueadoF3(mensaje: string): NextResponse {
 export function respuestaYaExisteF3(): NextResponse {
   return NextResponse.json({ error: "f3_ya_existe" }, { status: 409 });
 }
+
+/** H25 #6: the verdict approval was refused; nothing was written. */
+export function respuestaAprobacionRechazada(accion: "ya_aprobado" | "estado_cambio"): NextResponse {
+  return NextResponse.json(
+    { error: accion === "ya_aprobado" ? "f3_ya_aprobado" : "f3_estado_cambio" },
+    { status: 409 }
+  );
+}
