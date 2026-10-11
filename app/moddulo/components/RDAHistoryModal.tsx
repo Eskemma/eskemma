@@ -164,7 +164,7 @@ export default function RDAHistoryModal({
                       )}
                       {!mostrarComoAceptado && (
                         <button
-                          onClick={() => setAcceptingId(item.id)}
+                          onClick={() => { setAcceptError(null); setAcceptingId(item.id); }}
                           className="mt-1 text-xs font-medium text-bluegreen-eske underline hover:text-bluegreen-eske-60 dark:text-[#6BA4C6]"
                         >
                           Aceptar como condición del proyecto
