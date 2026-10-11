@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import type {
   PestlAnalysisV2,
   DimensionAnalysis,
@@ -43,6 +45,8 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
   const [chainsExpanded, setChainsExpanded] = useState(true);
   const [showAddChain, setShowAddChain] = useState(false);
   const [addingChain, setAddingChain] = useState(false);
+  const [deletingChain, setDeletingChain] = useState(false);
+  const [chainError, setChainError] = useState<string | null>(null);
   const [chainForm, setChainForm] = useState<{
     dimensions: DimensionCode[];
     description: string;
@@ -70,6 +74,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
 
   async function handleSubmitChain() {
     if (!analysis.id || chainForm.dimensions.length === 0 || !chainForm.description.trim()) return;
+    setChainError(null);
     setAddingChain(true);
     try {
       await fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
@@ -85,14 +90,34 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
     }
   }
 
+  // H25 (6b): the result of the DELETE used to be ignored. The route deletes by INDEX, so
+  // the list is ALWAYS reloaded afterwards (also on failure): a retry or a second click with
+  // a stale list would otherwise delete a DIFFERENT analyst chain. Clicks are ignored while
+  // a delete is in flight for the same reason.
   async function handleDeleteChain(index: number) {
-    if (!analysis.id) return;
-    await fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index }),
-    });
-    if (onChainAdded) await onChainAdded();
+    if (!analysis.id || deletingChain) return;
+    setDeletingChain(true);
+    setChainError(null);
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ index }),
+        })
+      );
+      const decision = decidirResultadoGuardado("eliminar_cadena_impacto", resp);
+      if (!decision.exito) setChainError(decision.mensajeError);
+    } finally {
+      try {
+        if (onChainAdded) await onChainAdded();
+      } catch {
+        // The reload is what protects the next index-based delete: if it fails, say so.
+        setChainError((previo) => previo ?? "No se pudo actualizar la lista de cadenas. Recarga la página antes de eliminar otra, porque el borrado se hace por posición.");
+      } finally {
+        setDeletingChain(false);
+      }
+    }
   }
 
   function toggleChainDim(code: DimensionCode) {
@@ -390,6 +415,12 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
               </button>
             </div>
           </div>
+        )}
+
+        {chainError && (
+          <p role="alert" className="mt-3 text-sm text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+            {chainError}
+          </p>
         )}
 
         {chainsExpanded && analysis.impactChains.length > 0 && (

@@ -22,6 +22,8 @@ import type { Components } from "react-markdown";
 import type { FontanaCanvasItem, FontanaSesion } from "@/types/fontana.types";
 import { exportToPdf, exportToDocx } from "@/lib/shared/reportExport";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 
 const BTN_OUTLINE =
   "text-xs px-2.5 py-1 rounded-lg border border-bluegreen-eske-60 dark:border-blue-eske-20 " +
@@ -100,6 +102,7 @@ export default function FontanaReportePanel({
   const [submenuDescarga, setSubmenuDescarga] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -338,13 +341,22 @@ export default function FontanaReportePanel({
     }
   }, [guardarContenido]);
 
+  // H25 (6b): the `finally` used to close the confirmation always (the error landed outside
+  // it) and `res.json()` threw on a bare 500. Only a confirmed delete (the body carries the
+  // updated session) closes it; otherwise it stays open with the reason.
   const handleEliminar = useCallback(async () => {
     setDeleting(true);
-    setError(null);
+    setDeleteError(null);
     try {
-      const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}/reporte`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.mensaje ?? data.error ?? "No se pudo eliminar el reporte.");
+      const { resp, datos } = await leerRespuestaGuardado(
+        () => fetch(`/api/fontana/sesion/${sesion.sesionId}/reporte`, { method: "DELETE" }),
+        (d) => !!d.sesion
+      );
+      const decision = decidirResultadoGuardado("eliminar_reporte_sesion", resp);
+      if (!decision.exito) {
+        setDeleteError(decision.mensajeError);
+        return;
+      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
       detenerPolling();
       pendienteRef.current = null;
@@ -353,12 +365,11 @@ export default function FontanaReportePanel({
       setEditMode(false);
       setJobStatus("idle");
       setJobError(null);
-      onSesionActualizada(data.sesion);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      setError(null);
+      setConfirmDelete(false);
+      onSesionActualizada(datos.sesion as FontanaSesion);
     } finally {
       setDeleting(false);
-      setConfirmDelete(false);
     }
   }, [sesion.sesionId, onSesionActualizada, detenerPolling]);
 
@@ -566,7 +577,7 @@ export default function FontanaReportePanel({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setConfirmDelete(false);
+            if (e.target === e.currentTarget && !deleting) { setConfirmDelete(false); setDeleteError(null); }
           }}
         >
           <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
@@ -579,11 +590,16 @@ export default function FontanaReportePanel({
                 a Moddulo quedarán deshabilitados hasta que generes uno nuevo. Un reporte que ya
                 hayas entregado a Moddulo no se ve afectado.
               </p>
+              {deleteError && (
+                <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mt-2 leading-relaxed">
+                  {deleteError}
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmDelete(false)}
+                onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
                 disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-gray-eske-60 hover:text-gray-eske-80 transition-colors disabled:opacity-50"
               >

@@ -30,7 +30,13 @@ export type AccionGuardado =
   | "revisar_territorio_fuente"
   | "eliminar_sesion"
   | "eliminar_tarjeta_canvas"
-  | "aceptar_condicion_rda";
+  | "aceptar_condicion_rda"
+  // Commit 6b (H25): the pending single writes of PESTEL, Fontana and Moddulo F2.
+  | "eliminar_cadena_impacto"
+  | "eliminar_reporte_sesion"
+  | "desvincular_sesion"
+  | "cambiar_monitoreo_automatico"
+  | "desvincular_pestel";
 
 /**
  * Single catalog of every action and the group that decides how its failure is worded
@@ -67,6 +73,11 @@ export const GRUPO_ACCION = {
   eliminar_sesion: "simple",
   eliminar_tarjeta_canvas: "simple",
   aceptar_condicion_rda: "simple",
+  eliminar_cadena_impacto: "simple",
+  eliminar_reporte_sesion: "simple",
+  desvincular_sesion: "simple",
+  cambiar_monitoreo_automatico: "simple",
+  desvincular_pestel: "simple",
 } as const satisfies Record<AccionGuardado, GrupoAccion>;
 
 const accionesDelGrupo = (g: GrupoAccion): readonly AccionGuardado[] =>
@@ -175,6 +186,16 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la eliminación de la tarjeta";
     case "aceptar_condicion_rda":
       return `la aceptación de ${ctx.nombre ? `«${ctx.nombre}»` : "este ítem"} como condición`;
+    case "eliminar_cadena_impacto":
+      return "la eliminación de la cadena de impacto";
+    case "eliminar_reporte_sesion":
+      return "la eliminación del reporte";
+    case "desvincular_sesion":
+      return "la desvinculación de la exploración";
+    case "cambiar_monitoreo_automatico":
+      return ctx.cambio ?? "el cambio del monitoreo automático";
+    case "desvincular_pestel":
+      return "la desvinculación del análisis de Centinela PESTEL";
   }
 }
 
@@ -216,6 +237,16 @@ function consecuencia(accion: AccionGuardado): string {
       return "La tarjeta sigue en tu Canvas; inténtalo de nuevo.";
     case "aceptar_condicion_rda":
       return "El ítem sigue activo; inténtalo de nuevo.";
+    case "eliminar_cadena_impacto":
+      return "La cadena sigue en la lista.";
+    case "eliminar_reporte_sesion":
+      return "El reporte sigue en tu exploración; inténtalo de nuevo.";
+    case "desvincular_sesion":
+      return "La exploración sigue vinculada; inténtalo de nuevo.";
+    case "cambiar_monitoreo_automatico":
+      return "El monitoreo automático queda como estaba; inténtalo de nuevo.";
+    case "desvincular_pestel":
+      return "El proyecto sigue vinculado; inténtalo de nuevo.";
   }
 }
 
@@ -231,9 +262,9 @@ function motivo(resp: RespuestaGuardado): string {
 }
 
 
-// ── Commit 5b (H25) ──────────────────────────────────────────────────────────
-// Four single writes (territory review, deleting a Fontana exploration, deleting a
-// Canvas card, accepting an RDA item). Same rule as the rest of the series:
+// ── "Simple" actions (commits 5b and 6b, H25) ────────────────────────────────
+// Single writes (territory review, deleting a Fontana exploration, deleting a Canvas card,
+// accepting an RDA item and, from 6b, chain/report deletion, unlinking, monitoring toggle). Same rule as the rest of the series:
 //   - network error, any 5xx (a route that throws answers a bare 500) and a 200
 //     whose body is not usable are ALWAYS ambiguous ("No se pudo CONFIRMAR…");
 //   - only a 4xx may say "stays as it was" / "stays active" — and a 404 or a
@@ -254,6 +285,8 @@ const TEXTOS_SIMPLES: Record<
     /** What to do to verify the real state. */
     verificar: string;
     noEncontrado: string;
+    /** Wording for a 401/403 when "guardar en este proyecto" does not fit the action. */
+    permiso?: string;
     /** Specific 4xx with their own text (checked before the generic one). */
     especifico: (resp: Extract<RespuestaGuardado, { tipo: "respuesta" }>) => string | null;
   }
@@ -291,6 +324,54 @@ const TEXTOS_SIMPLES: Record<
         ? "Este ítem ya no está activo; puede que ya se haya aceptado. Recarga la página para verificar."
         : null,
   },
+  // 6b. The impact chains are deleted by INDEX: after an ambiguous failure the user must look at
+  // the (refreshed) list before trying again, or a retry could delete a different chain.
+  eliminar_cadena_impacto: {
+    hecho: "eliminado",
+    verificar: "revisa la lista antes de volver a intentarlo.",
+    noEncontrado: "No se encontró la cadena; puede que ya se haya eliminado. La lista se actualizó.",
+    permiso: "No tienes permiso para eliminarla.",
+    especifico: () => null,
+  },
+  eliminar_reporte_sesion: {
+    hecho: "eliminado",
+    verificar: "recarga la página para verificar.",
+    noEncontrado: "No se encontró la exploración; puede que ya se haya eliminado el reporte. Recarga la página para verificar.",
+    permiso: "No tienes permiso para eliminar este reporte.",
+    especifico: () => null,
+  },
+  desvincular_sesion: {
+    hecho: "desvinculado",
+    verificar: "recarga la lista para verificar.",
+    noEncontrado: "No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.",
+    permiso: "No tienes permiso para desvincular esta exploración.",
+    especifico: (r) => {
+      if (r.status === 400 && r.codigo === "sesion_no_vinculada") {
+        return "Esta exploración ya no está vinculada a ningún proyecto; puede que ya se haya desvinculado. Recarga la lista para verificar.";
+      }
+      if (r.status === 409 && r.codigo === "escenario_a_no_desvinculable") {
+        return "Esta exploración nace de una tarea del PIP de un proyecto y no se puede desvincular desde aquí. Recarga la lista.";
+      }
+      return null;
+    },
+  },
+  cambiar_monitoreo_automatico: {
+    hecho: "registrado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "No se encontró el proyecto; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
+    permiso: "No tienes permiso para cambiar este ajuste.",
+    especifico: () => null,
+  },
+  desvincular_pestel: {
+    hecho: "desvinculado",
+    verificar: "recarga la página para verificar.",
+    noEncontrado: "No se encontró el proyecto; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
+    permiso: "No tienes permiso para desvincular este proyecto.",
+    especifico: (r) =>
+      r.status === 400 && r.codigo === "not_linked"
+        ? "Este proyecto ya no está vinculado a ningún análisis de Centinela PESTEL; puede que ya se haya desvinculado. Recarga la página para verificar."
+        : null,
+  },
 };
 
 function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
@@ -305,7 +386,8 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   if (resp.status === 404) return t.noEncontrado;
   const propio = t.especifico(resp);
   if (propio) return propio;
-  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
+  const porQue = t.permiso && (resp.status === 401 || resp.status === 403) ? t.permiso : motivo(resp);
+  return `No se pudo registrar ${que}. ${porQue} ${consecuencia(accion)}`;
 }
 
 /**

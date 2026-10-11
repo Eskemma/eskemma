@@ -324,6 +324,7 @@ function VinculadaCard({ sesion, onDesvinculada }: {
   const router = useRouter();
   const [kebabOpen, setKebabOpen] = useState(false);
   const [desvinculando, setDesvinculando] = useState(false);
+  const [desvincularError, setDesvincularError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
   const destino = sesion.proyectoVinculado
     ? `/moddulo/proyecto/${sesion.modduloProjectId}/${sesion.proyectoVinculado.currentPhase}`
@@ -343,15 +344,25 @@ function VinculadaCard({ sesion, onDesvinculada }: {
     return () => document.removeEventListener("mousedown", onOutsideClick);
   }, [kebabOpen]);
 
+  // H25 (6b): there was no `try` and no message — a failure (or a thrown fetch, which left
+  // `desvinculando` on forever) was silent. `onDesvinculada` only runs on a confirmed unlink.
   async function handleDesvincular() {
     setKebabOpen(false);
     setDesvinculando(true);
-    const res = await fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ desvincular: true }),
-    });
-    setDesvinculando(false);
-    if (res.ok) onDesvinculada();
+    setDesvincularError(null);
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/fontana/sesion/${sesion.sesionId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ desvincular: true }),
+        })
+      );
+      const decision = decidirResultadoGuardado("desvincular_sesion", resp);
+      if (decision.exito) onDesvinculada();
+      else setDesvincularError(decision.mensajeError);
+    } finally {
+      setDesvinculando(false);
+    }
   }
 
   return (
@@ -392,6 +403,11 @@ function VinculadaCard({ sesion, onDesvinculada }: {
           </div>
         )}
       </div>
+      {desvincularError && (
+        <p role="alert" className="mt-2 text-xs text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+          {desvincularError}
+        </p>
+      )}
     </div>
   );
 }

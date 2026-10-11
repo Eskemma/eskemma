@@ -863,19 +863,25 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "aprobar_veredicto",
     ]);
   });
-  it("ACCIONES_SIMPLES (antes ACCIONES_5B) es exactamente la lista anterior", () => {
+  it("ACCIONES_SIMPLES: las 4 de 5b en el mismo orden, seguidas de las 5 de 6b", () => {
     expect([...ACCIONES_SIMPLES]).toEqual([
       "revisar_territorio_fuente",
       "eliminar_sesion",
       "eliminar_tarjeta_canvas",
       "aceptar_condicion_rda",
+      // 6b
+      "eliminar_cadena_impacto",
+      "eliminar_reporte_sesion",
+      "desvincular_sesion",
+      "cambiar_monitoreo_automatico",
+      "desvincular_pestel",
     ]);
   });
   it("ACCIONES_NO_BLOQUEANTES es exactamente la lista anterior", () => {
     expect([...ACCIONES_NO_BLOQUEANTES]).toEqual(["registrar_aprobacion", "importar_adjuntos_moddulo"]);
   });
 
-  it("el catálogo clasifica TODAS las acciones (20), sin duplicar grupos ni dejar ninguna fuera", () => {
+  it("el catálogo clasifica TODAS las acciones (25), sin duplicar grupos ni dejar ninguna fuera", () => {
     const todas = Object.keys(GRUPO_ACCION).sort();
     expect(todas).toEqual(
       [
@@ -884,6 +890,8 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
         "generar_analisis", "guardar_analisis", "generar_sintesis", "generar_veredicto", "generar_tablero",
         "sincronizar_tablero", "aprobar_veredicto", "revisar_territorio_fuente", "eliminar_sesion",
         "eliminar_tarjeta_canvas", "aceptar_condicion_rda",
+        "eliminar_cadena_impacto", "eliminar_reporte_sesion", "desvincular_sesion",
+        "cambiar_monitoreo_automatico", "desvincular_pestel",
       ].sort()
     );
     const clasicas = todas.filter((a) => GRUPO_ACCION[a as keyof typeof GRUPO_ACCION] === "clasica");
@@ -901,6 +909,125 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       const red = decidirResultadoGuardado(a, { tipo: "error_red" }, { motor: "M2", fase: "Fase 1", cambio: "el cambio", nombre: "X" });
       expect(red.exito).toBe(false);
       expect((red.mensajeError ?? "").length).toBeGreaterThan(10);
+    }
+  });
+});
+
+// ── Commit 6b (H25): cadenas de impacto, reporte de sesión, desvincular exploración,
+//    monitoreo automático y desvincular PESTEL ──
+describe("decidirResultadoGuardado — acciones del commit 6b", () => {
+  const conCodigo6b = (status: number, codigo?: string): RespuestaGuardado => ({ tipo: "respuesta", ok: false, status, codigo });
+  const msg = (a: AccionGuardado, r: RespuestaGuardado, ctx = {}) => {
+    const d = decidirResultadoGuardado(a, r, ctx);
+    expect(d.exito).toBe(false);
+    expect(d.bloqueante).toBe(true);
+    return d.mensajeError as string;
+  };
+  const casos: Array<{ accion: AccionGuardado; que: string; hecho: string; verificar: string; ctx?: object; permiso: string; sigue: string }> = [
+    {
+      accion: "eliminar_cadena_impacto", que: "la eliminación de la cadena de impacto", hecho: "eliminado",
+      verificar: "revisa la lista antes de volver a intentarlo.", permiso: "No tienes permiso para eliminarla.",
+      sigue: "La cadena sigue en la lista.",
+    },
+    {
+      accion: "eliminar_reporte_sesion", que: "la eliminación del reporte", hecho: "eliminado",
+      verificar: "recarga la página para verificar.", permiso: "No tienes permiso para eliminar este reporte.",
+      sigue: "El reporte sigue en tu exploración; inténtalo de nuevo.",
+    },
+    {
+      accion: "desvincular_sesion", que: "la desvinculación de la exploración", hecho: "desvinculado",
+      verificar: "recarga la lista para verificar.", permiso: "No tienes permiso para desvincular esta exploración.",
+      sigue: "La exploración sigue vinculada; inténtalo de nuevo.",
+    },
+    {
+      accion: "cambiar_monitoreo_automatico", que: "la activación del monitoreo automático", hecho: "registrado",
+      verificar: "recarga la página para verificar el estado.", permiso: "No tienes permiso para cambiar este ajuste.",
+      sigue: "El monitoreo automático queda como estaba; inténtalo de nuevo.",
+      ctx: { cambio: "la activación del monitoreo automático" },
+    },
+    {
+      accion: "desvincular_pestel", que: "la desvinculación del análisis de Centinela PESTEL", hecho: "desvinculado",
+      verificar: "recarga la página para verificar.", permiso: "No tienes permiso para desvincular este proyecto.",
+      sigue: "El proyecto sigue vinculado; inténtalo de nuevo.",
+    },
+  ];
+
+  describe.each(casos)("$accion", ({ accion, que, hecho, verificar, ctx, permiso, sigue }) => {
+    it("éxito: 200 → exito, sin mensaje", () => {
+      expect(decidirResultadoGuardado(accion, ok, ctx)).toMatchObject({ exito: true, mensajeError: null });
+    });
+    it("un 200 con cuerpo inválido es AMBIGUO (el servidor pudo escribir)", () => {
+      const m = msg(accion, { tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }, ctx);
+      expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+      expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+    });
+    it("red, 500 sin código, 502/503/504 y «escritura incierta» son AMBIGUOS siempre", () => {
+      for (const r of [red, fallo(500), fallo(502), fallo(503), fallo(504), conCodigo6b(500, "reemplazo_escritura_incierta")]) {
+        const m = msg(accion, r, ctx);
+        expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+        expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+        expect(m).not.toMatch(/sigue (en la lista|en tu|vinculad|como estaba)|queda como estaba/);
+      }
+    });
+    it("un 404 NO afirma que el objeto sigue ahí (H22)", () => {
+      const m = msg(accion, fallo(404), ctx);
+      expect(m).not.toContain("CONFIRMAR");
+      expect(m).not.toMatch(/sigue (en la lista|en tu|vinculad)|queda como estaba/);
+      expect(m).toMatch(/Recarga|se actualizó/);
+    });
+    it("401 y 403: solo un 4xx afirma que el estado anterior se conserva, con el texto de permiso propio", () => {
+      for (const status of [401, 403]) {
+        const m = msg(accion, fallo(status), ctx);
+        expect(m).toContain(`No se pudo registrar ${que}`);
+        expect(m).toContain(permiso);
+        expect(m).toContain(sigue);
+        expect(m).not.toContain("CONFIRMAR");
+        expect(m).not.toContain("en este proyecto");
+      }
+    });
+  });
+
+  it("textos propios por acción", () => {
+    expect(msg("eliminar_cadena_impacto", fallo(404))).toBe("No se encontró la cadena; puede que ya se haya eliminado. La lista se actualizó.");
+    expect(msg("eliminar_reporte_sesion", fallo(404))).toBe(
+      "No se encontró la exploración; puede que ya se haya eliminado el reporte. Recarga la página para verificar."
+    );
+    expect(msg("desvincular_sesion", fallo(404))).toBe("No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.");
+    expect(msg("desvincular_sesion", conCodigo6b(400, "sesion_no_vinculada"))).toBe(
+      "Esta exploración ya no está vinculada a ningún proyecto; puede que ya se haya desvinculado. Recarga la lista para verificar."
+    );
+    expect(msg("desvincular_sesion", conCodigo6b(409, "escenario_a_no_desvinculable"))).toBe(
+      "Esta exploración nace de una tarea del PIP de un proyecto y no se puede desvincular desde aquí. Recarga la lista."
+    );
+    expect(msg("cambiar_monitoreo_automatico", fallo(404))).toBe(
+      "No se encontró el proyecto; puede que ya no exista o no tengas acceso. Recarga la página para verificar."
+    );
+    expect(msg("desvincular_pestel", conCodigo6b(400, "not_linked"))).toBe(
+      "Este proyecto ya no está vinculado a ningún análisis de Centinela PESTEL; puede que ya se haya desvinculado. Recarga la página para verificar."
+    );
+  });
+  it("un 400 o 409 con otro código es un fallo real, no el texto propio", () => {
+    expect(msg("desvincular_sesion", conCodigo6b(400, "otra_cosa"))).toContain("No se pudo registrar la desvinculación de la exploración.");
+    expect(msg("desvincular_pestel", conCodigo6b(400, "otra_cosa"))).toContain("No se pudo registrar la desvinculación del análisis");
+  });
+  it("monitoreo: el texto sigue a la acción (activar / desactivar)", () => {
+    expect(msg("cambiar_monitoreo_automatico", red, { cambio: "la desactivación del monitoreo automático" })).toContain(
+      "No se pudo CONFIRMAR la desactivación del monitoreo automático"
+    );
+  });
+
+  it("negativo (local, sin DOM) — los handlers anteriores ignoraban el resultado o lo trataban como éxito", () => {
+    // Antes: DELETE de cadena sin leer la respuesta; eliminar reporte cerraba el modal en `finally`;
+    // desvincular y el toggle solo actuaban con `ok` y callaban el resto; desvincular PESTEL cerraba
+    // la confirmación ANTES de pedir. Es decir: ningún fallo se distinguía de un éxito.
+    const antes = (r: RespuestaGuardado) => (r.tipo === "respuesta" && r.ok ? "éxito" : "se cierra o calla");
+    for (const a of ["eliminar_cadena_impacto", "eliminar_reporte_sesion", "desvincular_sesion", "cambiar_monitoreo_automatico", "desvincular_pestel"] as AccionGuardado[]) {
+      for (const r of [red, fallo(404), fallo(409), fallo(500), fallo(504)]) {
+        expect(antes(r)).toBe("se cierra o calla");
+        const d = decidirResultadoGuardado(a, r);
+        expect(d.exito).toBe(false);
+        expect(d.mensajeError).toBeTruthy();
+      }
     }
   });
 });

@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useRouter } from "next/navigation";
 import DimensionStatusGrid from "@/app/components/centinela/pestel/monitoreo/DimensionStatusGrid";
 import HistoryChart from "@/app/components/centinela/pestel/monitoreo/HistoryChart";
@@ -75,6 +77,7 @@ export default function MonitoreoPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoMonitor, setAutoMonitor] = useState(false);
   const [togglingAuto, setTogglingAuto] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -138,19 +141,26 @@ export default function MonitoreoPage() {
     loadAll();
   }, [loadAll]);
 
+  // H25 (6b): a failed PATCH used to leave the switch where it was with no message. The
+  // switch only changes once the server confirmed (nothing optimistic), and the write is
+  // idempotent (it sets a value).
   const handleToggleAutoMonitor = async () => {
     const next = !autoMonitor;
     setTogglingAuto(true);
+    setAutoError(null);
     try {
-      const res = await fetch(
-        `/api/centinela/pestel/project/${projectId}/auto-centinela`,
-        {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/centinela/pestel/project/${projectId}/auto-centinela`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled: next }),
-        }
+        })
       );
-      if (res.ok) setAutoMonitor(next);
+      const decision = decidirResultadoGuardado("cambiar_monitoreo_automatico", resp, {
+        cambio: next ? "la activación del monitoreo automático" : "la desactivación del monitoreo automático",
+      });
+      if (decision.exito) setAutoMonitor(next);
+      else setAutoError(decision.mensajeError);
     } finally {
       setTogglingAuto(false);
     }
@@ -362,6 +372,11 @@ export default function MonitoreoPage() {
                 : "Análisis automáticos desactivados"}
             </span>
           </label>
+          {autoError && (
+            <p role="alert" className="mt-3 text-sm text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+              {autoError}
+            </p>
+          )}
         </section>
 
         {/* ── Análisis manual ── */}

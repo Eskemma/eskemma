@@ -10,6 +10,7 @@ import {
   urlTrasCierre,
   type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -890,6 +891,7 @@ export default function ExploracionPage() {
 
   const [isUnlinkingPestel, setIsUnlinkingPestel] = useState(false);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState(false);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [isRelinkingPestel, setIsRelinkingPestel] = useState(false);
   const [showLinkExistingPicker, setShowLinkExistingPicker] = useState(false);
 
@@ -897,29 +899,38 @@ export default function ExploracionPage() {
   // pestAnalysisId/pestProjectId/mapaPESTEL en el servidor (que además
   // conserva el pestAnalysisId anterior para poder deshacer) y resetea el
   // estado local para que el usuario pueda regenerar vía express de inmediato.
+  // H25 (6b): the confirmation used to close BEFORE the request and a failure was silent
+  // (and a thrown fetch left `isUnlinkingPestel` on). Now it stays open with the error and
+  // the local state only resets once the server confirmed.
   const handleUnlinkPestel = useCallback(async () => {
-    setShowConfirmUnlink(false);
     setIsUnlinkingPestel(true);
+    setUnlinkError(null);
     try {
-      const r = await fetch("/api/moddulo/f2/unlink-pestel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (r.ok) {
-        setLastUnlinkedPestAnalysisId(pestAnalysisId);
-        setPestlVia(null);
-        setPestProjectId(null);
-        setPestAnalysisId(null);
-        setMapaPESTEL(null);
-        setXpctoStaleChanges([]);
-        setTerritorioStaleChanges([]);
-        setMotorAprobaciones({});
-        // draftDVS NO se limpia: si el usuario restaura el vínculo o
-        // regenera vía express, sigue teniendo su último estado válido
-        // visible mientras la regeneración corre.
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch("/api/moddulo/f2/unlink-pestel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId }),
+        })
+      );
+      const decision = decidirResultadoGuardado("desvincular_pestel", resp);
+      if (!decision.exito) {
+        setUnlinkError(decision.mensajeError);
+        return;
       }
+      setShowConfirmUnlink(false);
+      setLastUnlinkedPestAnalysisId(pestAnalysisId);
+      setPestlVia(null);
+      setPestProjectId(null);
+      setPestAnalysisId(null);
+      setMapaPESTEL(null);
+      setXpctoStaleChanges([]);
+      setTerritorioStaleChanges([]);
+      setMotorAprobaciones({});
+      // draftDVS NO se limpia: si el usuario restaura el vínculo o
+      // regenera vía express, sigue teniendo su último estado válido
+      // visible mientras la regeneración corre.
     } finally {
       setIsUnlinkingPestel(false);
     }
@@ -2017,7 +2028,9 @@ export default function ExploracionPage() {
       {/* Modal confirmación desvincular de Centinela PESTEL */}
       {showConfirmUnlink && (
         <ConfirmUnlinkPestelModal
-          onCancel={() => setShowConfirmUnlink(false)}
+          isConfirming={isUnlinkingPestel}
+          errorMessage={unlinkError}
+          onCancel={() => { setShowConfirmUnlink(false); setUnlinkError(null); }}
           onConfirm={handleUnlinkPestel}
         />
       )}
@@ -2655,7 +2668,10 @@ function ConfirmReanalisisModal({ onCancel, onConfirm }: {
   );
 }
 
-function ConfirmUnlinkPestelModal({ onCancel, onConfirm }: {
+function ConfirmUnlinkPestelModal({ isConfirming, errorMessage, onCancel, onConfirm }: {
+  isConfirming: boolean;
+  /** Failure of the last attempt; the confirmation stays open while it is shown. */
+  errorMessage?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -2677,17 +2693,25 @@ function ConfirmUnlinkPestelModal({ onCancel, onConfirm }: {
             </p>
           </div>
         </div>
+        {errorMessage && (
+          <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mb-4 leading-relaxed">
+            {errorMessage}
+          </p>
+        )}
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors"
+            disabled={isConfirming}
+            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors"
+            disabled={isConfirming}
+            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            {isConfirming && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             Desvincular
           </button>
         </div>
