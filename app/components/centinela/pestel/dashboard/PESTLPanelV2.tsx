@@ -103,11 +103,11 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
     }
   }
 
-  // H25 (6b): the result of the DELETE used to be ignored. The route deletes by INDEX, so
-  // the list is ALWAYS reloaded afterwards (also on failure): a retry or a second click with
-  // a stale list would otherwise delete a DIFFERENT analyst chain. Clicks are ignored while
-  // a delete is in flight for the same reason.
-  async function handleDeleteChain(index: number) {
+  // H25 (6b/7a): the result of the DELETE used to be ignored. Since 7a the chain is deleted by
+  // its id, so a stale list can no longer delete ANOTHER chain; the list is still ALWAYS
+  // reloaded afterwards (also on failure) so what the user sees is what exists, and clicks are
+  // ignored while a delete is in flight. Chains without an id (older ones) still go by position.
+  async function handleDeleteChain(chain: ImpactChain, index: number) {
     if (!analysis.id || deletingChain) return;
     setDeletingChain(true);
     setChainError(null);
@@ -116,7 +116,9 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
         fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ index }),
+          // 7a: delete by id. The position is sent ONLY for a chain without id (created before
+          // 7a): the server refuses to delete by position a chain that has an id.
+          body: JSON.stringify(chain.id ? { chainId: chain.id } : { index }),
         })
       );
       const decision = decidirResultadoGuardado("eliminar_cadena_impacto", resp);
@@ -125,8 +127,8 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
       try {
         if (onChainAdded) await onChainAdded();
       } catch {
-        // The reload is what protects the next index-based delete: if it fails, say so.
-        setChainError((previo) => previo ?? "No se pudo actualizar la lista de cadenas. Recarga la página antes de eliminar otra, porque el borrado se hace por posición.");
+        // If the reload fails the list on screen may be stale: say so.
+        setChainError((previo) => previo ?? "No se pudo actualizar la lista de cadenas. Recarga la página para ver cuáles existen antes de eliminar otra.");
       } finally {
         setDeletingChain(false);
       }
@@ -440,9 +442,9 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
           <div id="chains-list" className="flex flex-col gap-3 mt-3">
             {analysis.impactChains.map((chain, i) => (
               <ImpactChainCard
-                key={i}
+                key={chain.id ?? `idx-${i}`}
                 chain={chain}
-                onDelete={chain.source === "analyst" ? () => handleDeleteChain(i) : undefined}
+                onDelete={chain.source === "analyst" ? () => handleDeleteChain(chain, i) : undefined}
               />
             ))}
           </div>

@@ -367,8 +367,10 @@ const TEXTOS_SIMPLES: Record<
         ? "Este ítem ya no está activo; puede que ya se haya aceptado. Recarga la página para verificar."
         : null,
   },
-  // 6b. The impact chains are deleted by INDEX: after an ambiguous failure the user must look at
-  // the (refreshed) list before trying again, or a retry could delete a different chain.
+  // 6b/7a. Since 7a an impact chain is deleted by its id (the position is only a fallback for
+  // chains without one), so a retry can no longer delete a DIFFERENT chain; the text is kept
+  // (no screen text changed): after an ambiguous failure it is still right to look at the
+  // (refreshed) list to see whether the chain is gone.
   eliminar_cadena_impacto: {
     hecho: "eliminado",
     verificar: "revisa la lista antes de volver a intentarlo.",
