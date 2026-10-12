@@ -6,6 +6,8 @@ import { useState } from "react";
 import type { TareaPIP, PIPItem, AsignacionCanal } from "@/types/moddulo.types";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import PillButton from "@/app/moddulo/components/PillButton";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import MarkdownContent from "@/app/components/shared/chat/MarkdownContent";
 
 interface ResultadoDoc {
@@ -46,6 +48,27 @@ function sourceKindToCanal(sourceKind: string): AsignacionCanal["canal"] {
 export default function F3ResultadosRecibidos({ resultados, tareas, pip, projectId, readOnly, onAprobado }: Props) {
   const [pipItemIdSeleccion, setPipItemIdSeleccion] = useState<Record<string, string>>({});
   const [asignacionSeleccion, setAsignacionSeleccion] = useState<Record<string, string>>({});
+  // H25 (6c): approving used to ignore the server's answer and refresh as if it had worked.
+  const [aprobandoId, setAprobandoId] = useState<string | null>(null);
+  const [erroresAprobar, setErroresAprobar] = useState<Record<string, string>>({});
+
+  async function aprobarResultado(resultadoId: string, pipItemId: string, asignacionId: string) {
+    setAprobandoId(resultadoId);
+    setErroresAprobar((prev) => { const siguiente = { ...prev }; delete siguiente[resultadoId]; return siguiente; });
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch("/api/moddulo/f3/resultados/aprobar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, resultadoId, pipItemId, asignacionId, aprobado: true }),
+        })
+      );
+      const decision = decidirResultadoGuardado("aprobar_resultado", resp);
+      if (decision.exito) onAprobado();
+      else setErroresAprobar((prev) => ({ ...prev, [resultadoId]: decision.mensajeError ?? "" }));
+    } finally {
+      setAprobandoId(null);
+    }
+  }
   // Vista previa del reporte interpretativo de Fontana — se resuelve por
   // resultado en la primera expansión (lectura server-side de Storage).
   const [reportes, setReportes] = useState<Record<string, EstadoReporte>>({});
@@ -178,18 +201,18 @@ export default function F3ResultadosRecibidos({ resultados, tareas, pip, project
                 )}
 
                 <PillButton
-                  disabled={!pipItemId || !asignacionId}
-                  onClick={async () => {
-                    await fetch("/api/moddulo/f3/resultados/aprobar", {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ projectId, resultadoId: r.resultadoId, pipItemId, asignacionId, aprobado: true }),
-                    });
-                    onAprobado();
-                  }}
+                  disabled={!pipItemId || !asignacionId || aprobandoId === r.resultadoId}
+                  onClick={() => aprobarResultado(r.resultadoId, pipItemId, asignacionId)}
                 >
-                  Aprobar
+                  {aprobandoId === r.resultadoId ? "Aprobando…" : "Aprobar"}
                 </PillButton>
               </div>
+            )}
+
+            {erroresAprobar[r.resultadoId] && (
+              <p role="alert" className="mt-2 text-xs lg:text-sm text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+                {erroresAprobar[r.resultadoId]}
+              </p>
             )}
           </div>
         );

@@ -72,16 +72,29 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
     }
   }
 
+  // H25 (6c): the form used to be cleared and closed whatever the server answered, so a
+  // failed (or unconfirmed) add lost what the user had typed. Now it is cleared and closed
+  // only after the server confirmed; otherwise it stays open, with its content, and the
+  // error shows next to the list.
   async function handleSubmitChain() {
     if (!analysis.id || chainForm.dimensions.length === 0 || !chainForm.description.trim()) return;
     setChainError(null);
     setAddingChain(true);
     try {
-      await fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(chainForm),
-      });
+      const { resp } = await leerRespuestaGuardado(
+        () =>
+          fetch(`/api/centinela/pestel/analysis/${analysis.id}/impact-chain`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(chainForm),
+          }),
+        (d) => d.ok === true
+      );
+      const decision = decidirResultadoGuardado("agregar_cadena_impacto", resp);
+      if (!decision.exito) {
+        setChainError(decision.mensajeError);
+        return;
+      }
       setChainForm({ dimensions: [], description: "", riskLevel: "MODERADO", recommendation: "" });
       setShowAddChain(false);
       if (onChainAdded) await onChainAdded();

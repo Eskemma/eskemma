@@ -36,7 +36,15 @@ export type AccionGuardado =
   | "eliminar_reporte_sesion"
   | "desvincular_sesion"
   | "cambiar_monitoreo_automatico"
-  | "desvincular_pestel";
+  | "desvincular_pestel"
+  // Commit 6c (H25): the sibling writes found by the repo-wide audit.
+  | "agregar_cadena_impacto"
+  | "marcar_alerta_leida"
+  | "aprobar_resultado"
+  | "cambiar_asignacion"
+  | "reconocer_sesgo"
+  | "editar_exploracion"
+  | "archivar_exploracion";
 
 /**
  * Single catalog of every action and the group that decides how its failure is worded
@@ -78,6 +86,13 @@ export const GRUPO_ACCION = {
   desvincular_sesion: "simple",
   cambiar_monitoreo_automatico: "simple",
   desvincular_pestel: "simple",
+  agregar_cadena_impacto: "simple",
+  marcar_alerta_leida: "simple",
+  aprobar_resultado: "simple",
+  cambiar_asignacion: "simple",
+  reconocer_sesgo: "simple",
+  editar_exploracion: "simple",
+  archivar_exploracion: "simple",
 } as const satisfies Record<AccionGuardado, GrupoAccion>;
 
 const accionesDelGrupo = (g: GrupoAccion): readonly AccionGuardado[] =>
@@ -196,6 +211,20 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return ctx.cambio ?? "el cambio del monitoreo automático";
     case "desvincular_pestel":
       return "la desvinculación del análisis de Centinela PESTEL";
+    case "agregar_cadena_impacto":
+      return "la adición de la cadena de impacto";
+    case "marcar_alerta_leida":
+      return "el marcado de la alerta como leída";
+    case "aprobar_resultado":
+      return "la aprobación del resultado";
+    case "cambiar_asignacion":
+      return ctx.cambio ?? "el cambio de la asignación";
+    case "reconocer_sesgo":
+      return "el reconocimiento del sesgo";
+    case "editar_exploracion":
+      return "el guardado de los cambios de la exploración";
+    case "archivar_exploracion":
+      return ctx.cambio ?? "el archivado de la exploración";
   }
 }
 
@@ -247,6 +276,20 @@ function consecuencia(accion: AccionGuardado): string {
       return "El monitoreo automático queda como estaba; inténtalo de nuevo.";
     case "desvincular_pestel":
       return "El proyecto sigue vinculado; inténtalo de nuevo.";
+    case "agregar_cadena_impacto":
+      return "La cadena no se agregó; lo que escribiste sigue en el formulario.";
+    case "marcar_alerta_leida":
+      return "La alerta sigue sin leer; inténtalo de nuevo.";
+    case "aprobar_resultado":
+      return "El resultado sigue sin aprobar; inténtalo de nuevo.";
+    case "cambiar_asignacion":
+      return "La asignación queda como estaba; inténtalo de nuevo.";
+    case "reconocer_sesgo":
+      return "El sesgo sigue sin reconocer; inténtalo de nuevo.";
+    case "editar_exploracion":
+      return "Se conservan los datos anteriores; tus cambios siguen en el formulario. Inténtalo de nuevo.";
+    case "archivar_exploracion":
+      return "La exploración queda como estaba; inténtalo de nuevo.";
   }
 }
 
@@ -372,6 +415,63 @@ const TEXTOS_SIMPLES: Record<
         ? "Este proyecto ya no está vinculado a ningún análisis de Centinela PESTEL; puede que ya se haya desvinculado. Recarga la página para verificar."
         : null,
   },
+  // 6c. POST of an analyst chain: the form keeps what the user typed on any failure.
+  agregar_cadena_impacto: {
+    hecho: "agregado",
+    verificar: "revisa la lista de cadenas antes de volver a intentarlo; lo que escribiste sigue en el formulario.",
+    noEncontrado: "No se encontró el análisis; puede que ya no exista. Recarga la página para verificar.",
+    permiso: "No tienes permiso para agregar cadenas a este análisis.",
+    especifico: () => null,
+  },
+  marcar_alerta_leida: {
+    hecho: "marcado",
+    verificar: "recarga la página para verificar.",
+    noEncontrado: "No se encontró la alerta; puede que ya no exista. Recarga la página para verificar.",
+    permiso: "No tienes permiso para marcar esta alerta.",
+    especifico: () => null,
+  },
+  // 6c. `resultados/aprobar` WRITES `aprobado` BEFORE it looks for the assignment in the
+  // board, so its "Asignación no encontrada" 404 can arrive with the write already done:
+  // that 404 is ambiguous, unlike a "Resultado/Proyecto no encontrado" one.
+  aprobar_resultado: {
+    hecho: "aprobado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "No se encontró el resultado o el proyecto; puede que ya no exista. Recarga la página para verificar.",
+    permiso: "No tienes permiso para aprobar este resultado.",
+    especifico: (r) =>
+      r.status === 404 && (r.codigo ?? "").startsWith("Asignación no encontrada")
+        ? "No se pudo CONFIRMAR la aprobación del resultado: el servidor pudo marcarlo como aprobado, pero no encontró la asignación en el tablero. Recarga la página para verificar el estado antes de volver a intentarlo."
+        : null,
+  },
+  cambiar_asignacion: {
+    hecho: "registrado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "No se encontró la asignación; puede que el tablero haya cambiado. Recarga la página para verificar.",
+    permiso: "No tienes permiso para cambiar esta asignación.",
+    especifico: () => null,
+  },
+  // 6c. `acknowledge-bias` does two updates in a row (the alerts, then `status`).
+  reconocer_sesgo: {
+    hecho: "registrado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "No se encontró el análisis o la alerta de sesgo; puede que ya no exista. Recarga la página para verificar.",
+    permiso: "No tienes permiso para reconocer este sesgo.",
+    especifico: () => null,
+  },
+  editar_exploracion: {
+    hecho: "guardado",
+    verificar: "recarga la lista para verificar.",
+    noEncontrado: "No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.",
+    permiso: "No tienes permiso para editar esta exploración.",
+    especifico: () => null,
+  },
+  archivar_exploracion: {
+    hecho: "registrado",
+    verificar: "recarga la lista para verificar.",
+    noEncontrado: "No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.",
+    permiso: "No tienes permiso para cambiar esta exploración.",
+    especifico: () => null,
+  },
 };
 
 function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
@@ -383,9 +483,11 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   if (resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta") {
     return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
   }
-  if (resp.status === 404) return t.noEncontrado;
+  // `especifico` goes first: a 404 can have its own text (aprobar_resultado). For the 5b/6b
+  // entries it only matches 400/409, so checking it before the 404 changes nothing for them.
   const propio = t.especifico(resp);
   if (propio) return propio;
+  if (resp.status === 404) return t.noEncontrado;
   const porQue = t.permiso && (resp.status === 401 || resp.status === 403) ? t.permiso : motivo(resp);
   return `No se pudo registrar ${que}. ${porQue} ${consecuencia(accion)}`;
 }

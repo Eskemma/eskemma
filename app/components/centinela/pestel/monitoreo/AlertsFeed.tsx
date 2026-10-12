@@ -4,6 +4,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import type { PESTELAlertV2 } from "@/types/pestel.types";
 
 interface Props {
@@ -48,6 +50,7 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
   const [alerts, setAlerts] = useState<PESTELAlertV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingRead, setMarkingRead] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -57,6 +60,7 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
       if (!res.ok) return;
       const data = (await res.json()) as { alerts: PESTELAlertV2[] };
       setAlerts(data.alerts);
+      setReadError(null); // fresh data supersedes a stale "could not mark as read" notice
       onAlertsChange?.(data.alerts);
     } catch {
       // silent — keep showing last known state
@@ -71,17 +75,22 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
     return () => clearInterval(interval);
   }, [fetchAlerts]);
 
+  // H25 (6c): the alert used to be marked as read on screen whatever the server answered.
+  // It is marked only after the server confirmed; a failure shows a notice instead.
   async function handleMarkRead(alertId: string) {
     setMarkingRead(alertId);
+    setReadError(null);
     try {
-      await fetch(`/api/centinela/pestel/alerts/${alertId}/read`, {
-        method: "POST",
-      });
-      // Optimistic update
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch(`/api/centinela/pestel/alerts/${alertId}/read`, { method: "POST" })
+      );
+      const decision = decidirResultadoGuardado("marcar_alerta_leida", resp);
+      if (!decision.exito) {
+        setReadError(decision.mensajeError);
+        return;
+      }
       setAlerts((prev) =>
-        prev.map((a) =>
-          a.id === alertId ? { ...a, readAt: new Date().toISOString() } : a
-        )
+        prev.map((a) => (a.id === alertId ? { ...a, readAt: new Date().toISOString() } : a))
       );
     } finally {
       setMarkingRead(null);
@@ -117,6 +126,12 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
   }
 
   return (
+    <>
+    {readError && (
+      <p role="alert" className="mb-2 text-sm text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+        {readError}
+      </p>
+    )}
     <ul className="flex flex-col divide-y divide-gray-eske-10 dark:divide-white/10" role="list">
       {alerts.map((alert) => {
         const isRead = Boolean(alert.readAt);
@@ -161,5 +176,6 @@ export default function AlertsFeed({ projectId, onAlertsChange }: Props) {
         );
       })}
     </ul>
+    </>
   );
 }

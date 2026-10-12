@@ -7,6 +7,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useRouter } from "next/navigation";
 import type {
   PestlAnalysisV2,
@@ -33,6 +35,9 @@ export default function InterpretacionPage() {
   const [sources, setSources] = useState<DataSourceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Own state: the shared `error` is also written by approve/adjust, and clearing or replacing
+  // it from here would hide an unrelated error (e.g. a refused approval).
+  const [sesgoError, setSesgoError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [activeSection, setActiveSection] = useState<ActiveSection>("matrix");
@@ -152,17 +157,23 @@ export default function InterpretacionPage() {
     }
   }
 
+  // H25 (6c): a failed acknowledge used to return in silence (or throw on a dropped network)
+  // and the bias stayed pending, blocking "approve" with no explanation.
   async function handleAcknowledgeBias(biasType: string) {
     if (!analysis) return;
-    const res = await fetch(
-      `/api/centinela/pestel/analysis/${analysis.id}/acknowledge-bias`,
-      {
+    setSesgoError(null);
+    const { resp } = await leerRespuestaGuardado(() =>
+      fetch(`/api/centinela/pestel/analysis/${analysis.id}/acknowledge-bias`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ biasType }),
-      }
+      })
     );
-    if (!res.ok) return;
+    const decision = decidirResultadoGuardado("reconocer_sesgo", resp);
+    if (!decision.exito) {
+      setSesgoError(decision.mensajeError);
+      return;
+    }
     // Refresh analysis to get updated biasAlerts
     await loadAnalysis();
   }
@@ -300,9 +311,18 @@ export default function InterpretacionPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Error banner */}
         {error && (
-          <div className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske dark:text-red-eske-10
+          <div role="alert" className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske dark:text-red-eske-10
             text-sm px-4 py-2.5 rounded-lg">
             {error}
+          </div>
+        )}
+
+        {sesgoError && (
+          <div
+            role="alert"
+            className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske-60 dark:text-red-eske-10 text-sm px-4 py-2.5 rounded-lg"
+          >
+            {sesgoError}
           </div>
         )}
 

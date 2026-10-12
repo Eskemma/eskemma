@@ -863,7 +863,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "aprobar_veredicto",
     ]);
   });
-  it("ACCIONES_SIMPLES: las 4 de 5b en el mismo orden, seguidas de las 5 de 6b", () => {
+  it("ACCIONES_SIMPLES: las 4 de 5b y las 5 de 6b en el mismo orden, seguidas de las 7 de 6c", () => {
     expect([...ACCIONES_SIMPLES]).toEqual([
       "revisar_territorio_fuente",
       "eliminar_sesion",
@@ -875,13 +875,21 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "desvincular_sesion",
       "cambiar_monitoreo_automatico",
       "desvincular_pestel",
+      // 6c
+      "agregar_cadena_impacto",
+      "marcar_alerta_leida",
+      "aprobar_resultado",
+      "cambiar_asignacion",
+      "reconocer_sesgo",
+      "editar_exploracion",
+      "archivar_exploracion",
     ]);
   });
   it("ACCIONES_NO_BLOQUEANTES es exactamente la lista anterior", () => {
     expect([...ACCIONES_NO_BLOQUEANTES]).toEqual(["registrar_aprobacion", "importar_adjuntos_moddulo"]);
   });
 
-  it("el catálogo clasifica TODAS las acciones (25), sin duplicar grupos ni dejar ninguna fuera", () => {
+  it("el catálogo clasifica TODAS las acciones (32), sin duplicar grupos ni dejar ninguna fuera", () => {
     const todas = Object.keys(GRUPO_ACCION).sort();
     expect(todas).toEqual(
       [
@@ -892,6 +900,8 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
         "eliminar_tarjeta_canvas", "aceptar_condicion_rda",
         "eliminar_cadena_impacto", "eliminar_reporte_sesion", "desvincular_sesion",
         "cambiar_monitoreo_automatico", "desvincular_pestel",
+        "agregar_cadena_impacto", "marcar_alerta_leida", "aprobar_resultado", "cambiar_asignacion",
+        "reconocer_sesgo", "editar_exploracion", "archivar_exploracion",
       ].sort()
     );
     const clasicas = todas.filter((a) => GRUPO_ACCION[a as keyof typeof GRUPO_ACCION] === "clasica");
@@ -1024,6 +1034,140 @@ describe("decidirResultadoGuardado — acciones del commit 6b", () => {
     for (const a of ["eliminar_cadena_impacto", "eliminar_reporte_sesion", "desvincular_sesion", "cambiar_monitoreo_automatico", "desvincular_pestel"] as AccionGuardado[]) {
       for (const r of [red, fallo(404), fallo(409), fallo(500), fallo(504)]) {
         expect(antes(r)).toBe("se cierra o calla");
+        const d = decidirResultadoGuardado(a, r);
+        expect(d.exito).toBe(false);
+        expect(d.mensajeError).toBeTruthy();
+      }
+    }
+  });
+});
+
+// ── Commit 6c (H25): hermanos de la auditoría (cadena, alerta, resultado, asignación, sesgo,
+//    editar y archivar exploración) ──
+describe("decidirResultadoGuardado — acciones del commit 6c", () => {
+  const conCodigo6c = (status: number, codigo?: string): RespuestaGuardado => ({ tipo: "respuesta", ok: false, status, codigo });
+  const msg = (a: AccionGuardado, r: RespuestaGuardado, ctx = {}) => {
+    const d = decidirResultadoGuardado(a, r, ctx);
+    expect(d.exito).toBe(false);
+    expect(d.bloqueante).toBe(true);
+    return d.mensajeError as string;
+  };
+  const casos: Array<{ accion: AccionGuardado; que: string; hecho: string; verificar: string; ctx?: object; permiso: string; sigue: string; noEncontrado: string }> = [
+    {
+      accion: "agregar_cadena_impacto", que: "la adición de la cadena de impacto", hecho: "agregado",
+      verificar: "revisa la lista de cadenas antes de volver a intentarlo; lo que escribiste sigue en el formulario.",
+      permiso: "No tienes permiso para agregar cadenas a este análisis.",
+      sigue: "La cadena no se agregó; lo que escribiste sigue en el formulario.",
+      noEncontrado: "No se encontró el análisis; puede que ya no exista. Recarga la página para verificar.",
+    },
+    {
+      accion: "marcar_alerta_leida", que: "el marcado de la alerta como leída", hecho: "marcado",
+      verificar: "recarga la página para verificar.", permiso: "No tienes permiso para marcar esta alerta.",
+      sigue: "La alerta sigue sin leer; inténtalo de nuevo.",
+      noEncontrado: "No se encontró la alerta; puede que ya no exista. Recarga la página para verificar.",
+    },
+    {
+      accion: "aprobar_resultado", que: "la aprobación del resultado", hecho: "aprobado",
+      verificar: "recarga la página para verificar el estado.", permiso: "No tienes permiso para aprobar este resultado.",
+      sigue: "El resultado sigue sin aprobar; inténtalo de nuevo.",
+      noEncontrado: "No se encontró el resultado o el proyecto; puede que ya no exista. Recarga la página para verificar.",
+    },
+    {
+      accion: "cambiar_asignacion", que: "la activación de la asignación", hecho: "registrado",
+      verificar: "recarga la página para verificar el estado.", ctx: { cambio: "la activación de la asignación" },
+      permiso: "No tienes permiso para cambiar esta asignación.",
+      sigue: "La asignación queda como estaba; inténtalo de nuevo.",
+      noEncontrado: "No se encontró la asignación; puede que el tablero haya cambiado. Recarga la página para verificar.",
+    },
+    {
+      accion: "reconocer_sesgo", que: "el reconocimiento del sesgo", hecho: "registrado",
+      verificar: "recarga la página para verificar el estado.", permiso: "No tienes permiso para reconocer este sesgo.",
+      sigue: "El sesgo sigue sin reconocer; inténtalo de nuevo.",
+      noEncontrado: "No se encontró el análisis o la alerta de sesgo; puede que ya no exista. Recarga la página para verificar.",
+    },
+    {
+      accion: "editar_exploracion", que: "el guardado de los cambios de la exploración", hecho: "guardado",
+      verificar: "recarga la lista para verificar.", permiso: "No tienes permiso para editar esta exploración.",
+      sigue: "Se conservan los datos anteriores; tus cambios siguen en el formulario. Inténtalo de nuevo.",
+      noEncontrado: "No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.",
+    },
+    {
+      accion: "archivar_exploracion", que: "el archivado de la exploración", hecho: "registrado",
+      verificar: "recarga la lista para verificar.", permiso: "No tienes permiso para cambiar esta exploración.",
+      sigue: "La exploración queda como estaba; inténtalo de nuevo.",
+      noEncontrado: "No se encontró la exploración; puede que ya no exista. Recarga la lista para verificar.",
+    },
+  ];
+
+  describe.each(casos)("$accion", ({ accion, que, hecho, verificar, ctx, permiso, sigue, noEncontrado }) => {
+    it("éxito: 200 → exito, sin mensaje", () => {
+      expect(decidirResultadoGuardado(accion, ok, ctx)).toMatchObject({ exito: true, mensajeError: null });
+    });
+    it("un 200 con cuerpo inválido es AMBIGUO (el servidor pudo escribir)", () => {
+      const m = msg(accion, { tipo: "respuesta", ok: true, status: 200, cuerpoValido: false }, ctx);
+      expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+      expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+    });
+    it("red, 500 sin código, 502/503/504 y «escritura incierta» son AMBIGUOS siempre", () => {
+      for (const r of [red, fallo(500), fallo(502), fallo(503), fallo(504), conCodigo6c(500, "reemplazo_escritura_incierta")]) {
+        const m = msg(accion, r, ctx);
+        expect(m).toContain(`No se pudo CONFIRMAR ${que}`);
+        expect(m).toContain(`Puede que sí se haya ${hecho}; ${verificar}`);
+        expect(m).not.toContain(sigue);
+      }
+    });
+    it("un 404 no afirma el estado previo ni que el objeto sigue ahí (H22)", () => {
+      const m = msg(accion, fallo(404), ctx);
+      expect(m).toBe(noEncontrado);
+      expect(m).not.toContain(sigue);
+    });
+    it("401 y 403: solo un 4xx afirma que el estado anterior se conserva, con el texto de permiso propio", () => {
+      for (const status of [401, 403]) {
+        const m = msg(accion, fallo(status), ctx);
+        expect(m).toContain(`No se pudo registrar ${que}`);
+        expect(m).toContain(permiso);
+        expect(m).toContain(sigue);
+        expect(m).not.toContain("CONFIRMAR");
+        expect(m).not.toContain("en este proyecto");
+      }
+    });
+  });
+
+  it("aprobar resultado: el 404 «Asignación no encontrada» es AMBIGUO (la ruta ya escribió `aprobado`)", () => {
+    const m = msg("aprobar_resultado", conCodigo6c(404, "Asignación no encontrada en el tablero"));
+    expect(m).toBe(
+      "No se pudo CONFIRMAR la aprobación del resultado: el servidor pudo marcarlo como aprobado, pero no encontró la asignación en el tablero. Recarga la página para verificar el estado antes de volver a intentarlo."
+    );
+    expect(m).not.toContain("sigue sin aprobar");
+    // Los otros 404 de la ruta ocurren ANTES de escribir, pero tampoco afirman nada.
+    expect(msg("aprobar_resultado", conCodigo6c(404, "Resultado no encontrado"))).not.toContain("sigue sin aprobar");
+  });
+  it("cambiar asignación y editar/archivar: el texto sigue a la acción", () => {
+    expect(msg("cambiar_asignacion", red, { cambio: "la desactivación de la asignación" })).toContain(
+      "No se pudo CONFIRMAR la desactivación de la asignación"
+    );
+    expect(msg("archivar_exploracion", red, { cambio: "la reactivación de la exploración" })).toContain(
+      "No se pudo CONFIRMAR la reactivación de la exploración"
+    );
+    expect(msg("archivar_exploracion", red)).toContain("No se pudo CONFIRMAR el archivado de la exploración");
+  });
+  it("las entradas de 5b y 6b no cambian al evaluar `especifico` antes del 404", () => {
+    expect(msg("eliminar_sesion", fallo(404))).toBe(
+      "No se encontró la exploración; puede que ya se haya eliminado. Recarga la lista para verificar."
+    );
+    expect(msg("desvincular_pestel", conCodigo6c(400, "not_linked"))).toContain("ya no está vinculado");
+    expect(msg("aceptar_condicion_rda", conCodigo6c(400, "item_no_activo"))).toContain("ya no está activo");
+  });
+
+  it("negativo (local, sin DOM) — los handlers anteriores ignoraban el resultado o lo trataban como éxito", () => {
+    // Antes: el POST de cadena limpiaba y cerraba el formulario siempre; «marcar leída» marcaba en
+    // pantalla sin mirar `ok`; «Aprobar» y el select de asignación refrescaban como si hubiera
+    // funcionado; los dos reconocimientos de sesgo callaban o recargaban igual; patchSesion
+    // devolvía `null` (texto genérico «No se pudo guardar» que afirmaba más de lo que sabía).
+    const antes = (r: RespuestaGuardado) => (r.tipo === "respuesta" && r.ok ? "éxito" : "se cierra, refresca o calla");
+    for (const a of ["agregar_cadena_impacto", "marcar_alerta_leida", "aprobar_resultado", "cambiar_asignacion", "reconocer_sesgo", "editar_exploracion", "archivar_exploracion"] as AccionGuardado[]) {
+      for (const r of [red, fallo(404), fallo(409), fallo(500), fallo(504)]) {
+        expect(antes(r)).toBe("se cierra, refresca o calla");
         const d = decidirResultadoGuardado(a, r);
         expect(d.exito).toBe(false);
         expect(d.mensajeError).toBeTruthy();

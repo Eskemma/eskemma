@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PESTLPanelV2 from "@/app/components/centinela/pestel/dashboard/PESTLPanelV2";
 import ModduloButton from "@/app/components/centinela/pestel/ModduloButton";
@@ -109,6 +111,9 @@ export default function AnalisisPage() {
   const [analysis, setAnalysis] = useState<PestlAnalysisV2 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Own state: `error` above drives the "Error en el análisis" banner (a failed job), which
+  // would be the wrong message for a failed acknowledge.
+  const [sesgoError, setSesgoError] = useState<string | null>(null);
 
   const { status: jobStatus, analysisId, error: jobError } =
     usePESTELJobV2(jobIdParam);
@@ -188,16 +193,23 @@ export default function AnalisisPage() {
     }
   }, [jobStatus, analysisId, loadAnalysis]);
 
+  // H25 (6c): the answer used to be ignored (and a dropped network threw): the page reloaded
+  // as if the bias had been acknowledged.
   async function handleAcknowledgeBias(biasType: string) {
     if (!analysis?.id) return;
-    await fetch(
-      `/api/centinela/pestel/analysis/${analysis.id}/acknowledge-bias`,
-      {
+    setSesgoError(null);
+    const { resp } = await leerRespuestaGuardado(() =>
+      fetch(`/api/centinela/pestel/analysis/${analysis.id}/acknowledge-bias`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ biasType }),
-      }
+      })
     );
+    const decision = decidirResultadoGuardado("reconocer_sesgo", resp);
+    if (!decision.exito) {
+      setSesgoError(decision.mensajeError);
+      return;
+    }
     // Refresh analysis
     await loadAnalysis(analysis.id);
   }
@@ -294,6 +306,15 @@ export default function AnalisisPage() {
             <div className="w-full max-w-xs h-1.5 bg-gray-eske-20 dark:bg-[#21425E] rounded-full overflow-hidden">
               <div className="h-1.5 bg-bluegreen-eske rounded-full animate-pulse w-2/3" />
             </div>
+          </div>
+        )}
+
+        {sesgoError && (
+          <div
+            role="alert"
+            className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/30 dark:border-red-eske/40 text-red-eske-60 dark:text-red-eske-10 text-sm px-4 py-2.5 rounded-lg mb-6"
+          >
+            {sesgoError}
           </div>
         )}
 

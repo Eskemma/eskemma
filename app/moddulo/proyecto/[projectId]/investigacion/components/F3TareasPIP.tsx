@@ -11,6 +11,8 @@ import type { FamiliaMetodologica } from "@/types/f3.types";
 import { sugerirFamiliaMetodologica } from "@/lib/moddulo/sugerirFamiliaMetodologica";
 import { asignacionEtiquetaCompleta } from "@/lib/moddulo/asignacionLabel";
 import PillButton from "@/app/moddulo/components/PillButton";
+import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import VincularFuenteForm from "./VincularFuenteForm";
 import { FieldLabel, FileSelectButton, inputClass } from "./F3FormHelpers";
 
@@ -60,6 +62,30 @@ export default function F3TareasPIP({
   fontanaPendiente, onDismissFontanaPendiente,
 }: Props) {
   const [expandedAsignacionId, setExpandedAsignacionId] = useState<string | null>(null);
+  // H25 (6c): the activate/deactivate select used to ignore the answer and refresh as if it had
+  // worked. No confirmation is asked here (H-M2 is a separate pending item): only an honest notice.
+  const [cambiandoAsignacionId, setCambiandoAsignacionId] = useState<string | null>(null);
+  const [erroresAsignacion, setErroresAsignacion] = useState<Record<string, string>>({});
+
+  async function cambiarActivacion(pipItemId: string, asignacionId: string, activada: boolean) {
+    setCambiandoAsignacionId(asignacionId);
+    setErroresAsignacion((prev) => { const siguiente = { ...prev }; delete siguiente[asignacionId]; return siguiente; });
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch("/api/moddulo/f3/tareas/aprobar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, pipItemId, asignacionId, activada }),
+        })
+      );
+      const decision = decidirResultadoGuardado("cambiar_asignacion", resp, {
+        cambio: activada ? "la activación de la asignación" : "la desactivación de la asignación",
+      });
+      if (decision.exito) onRefresh();
+      else setErroresAsignacion((prev) => ({ ...prev, [asignacionId]: decision.mensajeError ?? "" }));
+    } finally {
+      setCambiandoAsignacionId(null);
+    }
+  }
   // "externo" — id sintético reservado para el formulario fuera del loop de
   // tareas (botón "Vincular resultado externo" y el banner de Fontana
   // pendiente comparten este mismo slot, nunca 2 formularios abiertos a la
@@ -247,17 +273,8 @@ export default function F3TareasPIP({
                       <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-center gap-1.5">
                         <select
                           value={asig.activada ? "activada" : "desactivada"}
-                          disabled={readOnly}
-                          onChange={async (e) => {
-                            await fetch("/api/moddulo/f3/tareas/aprobar", {
-                              method: "POST", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                projectId, pipItemId: tarea.pipItemId, asignacionId: asig.asignacionId,
-                                activada: e.target.value === "activada",
-                              }),
-                            });
-                            onRefresh();
-                          }}
+                          disabled={readOnly || cambiandoAsignacionId === asig.asignacionId}
+                          onChange={(e) => cambiarActivacion(tarea.pipItemId, asig.asignacionId, e.target.value === "activada")}
                           className="text-[10px] lg:text-xs px-1.5 py-0.5 rounded border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske-40 dark:text-[#C5D8E8]"
                         >
                           <option value="activada">Activada</option>
@@ -282,6 +299,11 @@ export default function F3TareasPIP({
                       </div>
                     )}
                     <p className="text-xs lg:text-sm text-black-eske-40 dark:text-[#9AAEBE] mt-1">{asig.justificacion}</p>
+                    {erroresAsignacion[asig.asignacionId] && (
+                      <p role="alert" className="mt-1.5 text-xs lg:text-sm text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+                        {erroresAsignacion[asig.asignacionId]}
+                      </p>
+                    )}
 
                     {expandedAsignacionId === asig.asignacionId && !readOnly && (
                       <div className="mt-3 pt-3 border-t border-gray-eske-20 dark:border-white/10">

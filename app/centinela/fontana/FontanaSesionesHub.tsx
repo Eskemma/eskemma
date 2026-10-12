@@ -19,7 +19,7 @@ import type { FontanaSesion } from "@/types/fontana.types";
 import type { ProjectType, Territorio } from "@/types/moddulo.types";
 import TerritorySelector from "@/app/components/shared/TerritorySelector";
 import { COLOR_SWATCHES, COLOR_DEFAULT } from "@/lib/fontana/colorSwatches";
-import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
+import { decidirResultadoGuardado, type AccionGuardado, type ContextoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 
 // 2026-08-21 — el hub ahora también lista sesiones vinculadas (antes
@@ -49,14 +49,26 @@ function labelTerritorio(sesion: FontanaSesion): string {
   return t.nombre || [t.estado, t.municipio].filter(Boolean).join(" › ") || "Territorio sin definir";
 }
 
-async function patchSesion(sesionId: string, body: Record<string, unknown>): Promise<FontanaSesion | null> {
-  const res = await fetch(`/api/fontana/sesion/${sesionId}`, {
-    method: "PATCH", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { sesion: FontanaSesion };
-  return data.sesion;
+// H25 (6c): the helper had no `try` (a dropped network left the modal on "guardando") and
+// it collapsed every failure into `null`, so each caller had to guess a message. It now
+// returns the honest message from guardadoHonesto together with the updated session.
+async function patchSesion(
+  sesionId: string,
+  body: Record<string, unknown>,
+  accion: AccionGuardado,
+  ctx: ContextoGuardado = {}
+): Promise<{ sesion: FontanaSesion | null; mensajeError: string | null }> {
+  const { resp, datos } = await leerRespuestaGuardado(
+    () =>
+      fetch(`/api/fontana/sesion/${sesionId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    (d) => !!d.sesion
+  );
+  const decision = decidirResultadoGuardado(accion, resp, ctx);
+  if (!decision.exito) return { sesion: null, mensajeError: decision.mensajeError };
+  return { sesion: datos.sesion as FontanaSesion, mensajeError: null };
 }
 
 function EditModal({ sesion, onClose, onSaved }: {
@@ -74,10 +86,17 @@ function EditModal({ sesion, onClose, onSaved }: {
     if (!territorio) return;
     setSaving(true);
     setError(null);
-    const actualizada = await patchSesion(sesion.sesionId, { nombre: nombre.trim() || sesion.nombre, tipoProyecto: tipo, territorio, color });
-    setSaving(false);
-    if (!actualizada) { setError("No se pudo guardar. Intenta de nuevo."); return; }
-    onSaved(actualizada);
+    try {
+      const { sesion: actualizada, mensajeError } = await patchSesion(
+        sesion.sesionId,
+        { nombre: nombre.trim() || sesion.nombre, tipoProyecto: tipo, territorio, color },
+        "editar_exploracion"
+      );
+      if (!actualizada) { setError(mensajeError); return; }
+      onSaved(actualizada);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -176,7 +195,7 @@ function EditModal({ sesion, onClose, onSaved }: {
           label="Territorio"
           nextLabel={saving ? "Guardando…" : "Guardar"}
         />
-        {error && <p className="text-sm text-red-eske">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10">{error}</p>}
       </div>
     </div>
   );
@@ -193,6 +212,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   // Fix 4 (2026-08-21) — mismo patrón ya usado en PESTELHubPage.ProjectCard
@@ -209,10 +229,18 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
     return () => document.removeEventListener("mousedown", onOutsideClick);
   }, [kebabOpen]);
 
+  // H25 (6c): a failed archive used to do nothing and say nothing.
   async function handleArchivar(archivada: boolean) {
     setKebabOpen(false);
-    const actualizada = await patchSesion(sesion.sesionId, { archivada });
+    setArchiveError(null);
+    const { sesion: actualizada, mensajeError } = await patchSesion(
+      sesion.sesionId,
+      { archivada },
+      "archivar_exploracion",
+      { cambio: archivada ? "el archivado de la exploración" : "la reactivación de la exploración" }
+    );
     if (actualizada) onChanged(actualizada);
+    else setArchiveError(mensajeError);
   }
 
   // H25 (5b): the modal used to stay open with no message on a failure and, if the
@@ -247,7 +275,7 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
             <button
               type="button"
               aria-label="Opciones de la sesión"
-              onClick={() => setKebabOpen((o) => !o)}
+              onClick={() => { setArchiveError(null); setKebabOpen((o) => !o); }}
               className="flex items-center justify-center w-7 h-7 rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -275,6 +303,11 @@ function SesionCard({ sesion, onOpen, onChanged, onDeleted }: {
             {new Date(sesion.fechaUltimoGuardado).toLocaleDateString("es-MX")} · {contarIndicadores(sesion)} indicadores seleccionados
           </p>
         </button>
+        {archiveError && (
+          <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 leading-relaxed">
+            {archiveError}
+          </p>
+        )}
       </div>
 
       {editOpen && (
