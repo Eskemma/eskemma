@@ -15,16 +15,31 @@
 // lado de Fontana.
 
 import { FieldValue } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
+/**
+ * Las tres operaciones (puntero + `reporte/actual` + `reporte/job`) salen en UN WriteBatch: o se
+ * aplican todas o ninguna (7b-1, H25). Sin `batch` crea el suyo y lo confirma; con `batch` solo
+ * AGREGA sus operaciones y NO confirma — quien lo pasó lo confirma junto con las suyas
+ * (`repuntarSiCorresponde` suma aquí su propio `update` de la sesión: 4 operaciones atómicas).
+ *
+ * Diferencia con la versión anterior (update + 2 delete por separado): si el documento de la
+ * sesión NO existe, el `update` hace fallar el batch completo y no se aplica ninguna operación.
+ * Antes fallaba el `update` (primera operación) y los `delete` ni se intentaban, así que para
+ * «Eliminar reporte» no cambia nada observable; en el repunte, la sesión ya se leyó en la misma
+ * petición, de modo que solo difiere si otra petición la borró en medio (ahora: nada se aplica).
+ */
 export async function invalidarReporteSesion(
-  sesionRef: FirebaseFirestore.DocumentReference
+  sesionRef: FirebaseFirestore.DocumentReference,
+  batch?: FirebaseFirestore.WriteBatch
 ): Promise<void> {
-  await sesionRef.update({ reporteSesion: FieldValue.delete() });
+  const propio = batch === undefined;
+  const lote = batch ?? adminDb.batch();
+  lote.update(sesionRef, { reporteSesion: FieldValue.delete() });
   // delete() es idempotente si el doc no existe. También el doc de job
   // (estado de la generación asíncrona) — al invalidar, cualquier job
   // previo deja de ser relevante.
-  await Promise.all([
-    sesionRef.collection("reporte").doc("actual").delete(),
-    sesionRef.collection("reporte").doc("job").delete(),
-  ]);
+  lote.delete(sesionRef.collection("reporte").doc("actual"));
+  lote.delete(sesionRef.collection("reporte").doc("job"));
+  if (propio) await lote.commit();
 }

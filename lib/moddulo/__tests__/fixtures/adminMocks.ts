@@ -36,19 +36,56 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   // el mock aplica un merge superficial con las claves literales, sin interpretar rutas con punto.
   let updateLog: Array<{ path: string; data: Record<string, unknown> }> = [];
 
+  // 7b-1 — bitácora de delete() y de batches, y modo ATÓMICO opt-in (ver `atomico()` abajo).
+  let deleteLog: string[] = [];
+  let batchesCommitted = 0;
+  let batchCommitFalla = false;
+  let rutasQueFallan = new Set<string>();
+  let modoAtomico = false;
+
   let autoIdCounter = 0;
 
   interface DocRef {
     id: string;
+    path: string;
     get: () => Promise<{ exists: boolean; data: () => unknown; ref: DocRef }>;
     set: (data: unknown) => Promise<void>;
     update: (data: Record<string, unknown>) => Promise<void>;
+    delete: () => Promise<void>;
     collection: (name: string) => ReturnType<typeof collectionRef>;
+  }
+
+  type Escritura =
+    | { tipo: "set"; ref: DocRef; data: unknown }
+    | { tipo: "update"; ref: DocRef; data: Record<string, unknown> }
+    | { tipo: "delete"; ref: DocRef };
+
+  // Aplica un lote de escrituras TODO O NADA (modelo de WriteBatch/transacción de Firestore):
+  // si una escritura falla —ruta marcada con failUpdateOn, o update() de un documento que no
+  // existe (NOT_FOUND real)— no se aplica ninguna. Esto MODELA la garantía; no la demuestra.
+  function aplicarLote(escrituras: Escritura[]): void {
+    for (const e of escrituras) {
+      if (rutasQueFallan.has(e.ref.path)) throw new Error(`mock: escritura fallida en ${e.ref.path}`);
+      if (e.tipo === "update" && !store.has(e.ref.path)) {
+        throw new Error(`mock: NOT_FOUND al hacer update() de ${e.ref.path}`);
+      }
+    }
+    for (const e of escrituras) {
+      if (e.tipo === "set") store.set(e.ref.path, e.data);
+      else if (e.tipo === "update") {
+        updateLog.push({ path: e.ref.path, data: e.data });
+        store.set(e.ref.path, { ...(store.get(e.ref.path) as object ?? {}), ...e.data });
+      } else {
+        deleteLog.push(e.ref.path);
+        store.delete(e.ref.path);
+      }
+    }
   }
 
   function docRef(path: string): DocRef {
     const ref: DocRef = {
       id: path.split("/").at(-1) as string,
+      path,
       get: vi.fn(async () => ({
         exists: store.has(path),
         data: () => store.get(path),
@@ -58,8 +95,14 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         store.set(path, data);
       }),
       update: vi.fn(async (data: Record<string, unknown>) => {
+        if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
         updateLog.push({ path, data });
         store.set(path, { ...(store.get(path) as object ?? {}), ...data });
+      }),
+      delete: vi.fn(async () => {
+        if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
+        deleteLog.push(path);
+        store.delete(path);
       }),
       collection: (name: string) => collectionRef(`${path}/${name}`),
     };
@@ -123,29 +166,88 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   }
 
   const collection = vi.fn((name: string) => collectionRef(name));
-  // runTransaction mínimo: get/set/update delegan en el ref (sin aislamiento ni
-  // reintentos — solo permite probar la lógica de lectura-modificación-escritura).
+  // runTransaction: por DEFECTO mínimo (get/set/update delegan en el ref, sin aislamiento ni
+  // reintentos — solo permite probar la lógica de lectura-modificación-escritura). Con
+  // `atomico(true)` (opt-in, 7b-1) las escrituras quedan en búfer y se aplican TODO O NADA solo si
+  // el callback termina bien. Las pruebas que ya existían no lo activan: su semántica no cambia.
   const runTransaction = vi.fn(
     async <T>(
       fn: (tx: {
         get: (ref: DocRef) => ReturnType<DocRef["get"]>;
         set: (ref: DocRef, data: unknown) => Promise<void>;
         update: (ref: DocRef, data: Record<string, unknown>) => Promise<void>;
+        delete: (ref: DocRef) => Promise<void>;
       }) => Promise<T>
-    ): Promise<T> =>
-      fn({
+    ): Promise<T> => {
+      if (!modoAtomico) {
+        return fn({
+          get: (ref) => ref.get(),
+          set: (ref, data) => ref.set(data),
+          update: (ref, data) => ref.update(data),
+          delete: (ref) => ref.delete(),
+        });
+      }
+      const buffer: Escritura[] = [];
+      const resultado = await fn({
         get: (ref) => ref.get(),
-        set: (ref, data) => ref.set(data),
-        update: (ref, data) => ref.update(data),
-      })
+        set: async (ref, data) => void buffer.push({ tipo: "set", ref, data }),
+        update: async (ref, data) => void buffer.push({ tipo: "update", ref, data }),
+        delete: async (ref) => void buffer.push({ tipo: "delete", ref }),
+      });
+      aplicarLote(buffer);
+      return resultado;
+    }
   );
+  // WriteBatch: las operaciones se acumulan y SOLO se aplican en commit() (todo o nada).
+  const batch = vi.fn(() => {
+    const buffer: Escritura[] = [];
+    return {
+      set: (ref: DocRef, data: unknown) => void buffer.push({ tipo: "set", ref, data }),
+      update: (ref: DocRef, data: Record<string, unknown>) => void buffer.push({ tipo: "update", ref, data }),
+      delete: (ref: DocRef) => void buffer.push({ tipo: "delete", ref }),
+      commit: vi.fn(async () => {
+        if (batchCommitFalla) {
+          batchCommitFalla = false;
+          throw new Error("mock: commit del batch fallido");
+        }
+        aplicarLote(buffer);
+        batchesCommitted++;
+      }),
+    };
+  });
   return {
     collection,
     runTransaction,
+    batch,
     /** Reemplaza el estado en memoria — usar en beforeEach/cada test. */
     reset(newDocs: Record<string, unknown> = {}) {
       store = new Map(Object.entries(newDocs));
       updateLog = [];
+      deleteLog = [];
+      batchesCommitted = 0;
+      batchCommitFalla = false;
+      rutasQueFallan = new Set();
+      modoAtomico = false;
+    },
+    /** Opt-in: las transacciones aplican sus escrituras en búfer, todo o nada (7b-1). */
+    atomico(activo = true) {
+      modoAtomico = activo;
+    },
+    /** Hace que toda escritura sobre `path` (update/delete directo, batch o transacción) falle. */
+    failUpdateOn(path: string) {
+      rutasQueFallan.add(path);
+    },
+    /** El próximo commit() de un batch lanza y no aplica nada. */
+    failNextBatchCommit() {
+      batchCommitFalla = true;
+    },
+    /** Rutas de documentos borrados con delete() desde el último reset. */
+    deletes(): string[] {
+      return [...deleteLog];
+    },
+    /** Cuántos batches se confirmaron con éxito desde el último reset. */
+    batchesCommitted(): number {
+      return batchesCommitted;
     },
     /** Todas las llamadas a update() desde el último reset (path + argumento literal). */
     updates(): Array<{ path: string; data: Record<string, unknown> }> {

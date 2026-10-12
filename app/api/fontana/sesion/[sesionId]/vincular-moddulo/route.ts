@@ -80,19 +80,42 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  await adminDb.collection("moddulo_projects").doc(modduloProjectId).update({
-    "phases.investigacion.fontanaPendiente": {
-      sesionId,
-      territorio: sesion.territorio,
-      fechaCreacion: new Date().toISOString(),
-    },
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-
+  // 7b-1 (H25): el marcador del proyecto y el vínculo de la sesión se escriben en UNA transacción
+  // (antes, dos escrituras sueltas: si fallaba la segunda quedaba un marcador apuntando a una
+  // sesión no vinculada). Se RELEE la sesión dentro para revalidar idempotencia/conflicto con el
+  // estado vigente. El callback puede reintentarse: lee antes de escribir, sin efectos externos.
+  const proyectoRef = adminDb.collection("moddulo_projects").doc(modduloProjectId);
   // fechaUltimoGuardado se bumpea aquí también (Fix 3, hub — 2026-08-21)
   // para que la card "Vinculadas" muestre la fecha real de vinculación,
   // no la última vez que se guardó exploración libre.
-  await sesionRef.update({ modduloProjectId, fechaUltimoGuardado: new Date().toISOString() });
+  const nowIso = new Date().toISOString();
+  type ResultadoVinculo = "ok" | "idempotente" | "conflicto" | "no_encontrada";
+  const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoVinculo> => {
+    const snap = await tx.get(sesionRef);
+    if (!snap.exists || snap.data()?.uid !== session.uid) return "no_encontrada";
+    const actual = snap.data() as FontanaSesion;
+    if (actual.modduloProjectId === modduloProjectId) return "idempotente";
+    if (actual.modduloProjectId) return "conflicto";
+    tx.update(proyectoRef, {
+      "phases.investigacion.fontanaPendiente": {
+        sesionId,
+        territorio: actual.territorio,
+        fechaCreacion: nowIso,
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.update(sesionRef, { modduloProjectId, fechaUltimoGuardado: nowIso });
+    return "ok";
+  });
 
+  if (resultado === "no_encontrada") {
+    return NextResponse.json({ error: "Sesión de Fontana no encontrada" }, { status: 404 });
+  }
+  if (resultado === "conflicto") {
+    return NextResponse.json(
+      { error: "sesion_already_linked", message: "Esta sesión de Fontana ya está vinculada a otro proyecto de Moddulo." },
+      { status: 409 }
+    );
+  }
   return NextResponse.json({ modduloProjectId, currentPhase }, { status: 200 });
 }

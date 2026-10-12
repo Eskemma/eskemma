@@ -90,14 +90,18 @@ async function repuntarSiCorresponde(
   // entregaCanal1 queda obsoleto al repuntar (Punto A): el botón de
   // "Entregar a Moddulo F3" debe volver a su estado inicial.
   const sesionRef = adminDb.collection(COLLECTION).doc(sesion.sesionId);
-  await sesionRef.update({
+  // 7b-1 (H25): el repunte y la invalidación del reporte salen en UN batch (4 operaciones, todo o
+  // nada): antes la sesión podía quedar apuntando a la tarea nueva con el reporte de la anterior.
+  const lote = adminDb.batch();
+  lote.update(sesionRef, {
     tareaPipIds: [pipItemIdActual],
     indicadoresPorFamilia,
     entregaCanal1: FieldValue.delete(),
   });
   // El reporte de sesión ya no refleja el conjunto de indicadores heredados
   // (cambió al cambiar de tarea PIP) — mismo mecanismo que "Eliminar reporte".
-  await invalidarReporteSesion(sesionRef);
+  await invalidarReporteSesion(sesionRef, lote);
+  await lote.commit();
 
   return {
     ...sesion,

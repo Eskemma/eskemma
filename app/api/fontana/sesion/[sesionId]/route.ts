@@ -120,15 +120,41 @@ export async function PATCH(
       );
     }
 
-    const proyectoRef = adminDb.collection("moddulo_projects").doc(sesion.modduloProjectId);
-    const proyectoSnap = await proyectoRef.get();
-    // Nunca borrar fontanaPendiente si ya no apunta a ESTA sesión — solo
-    // si el marcador sigue siendo el que esta sesión escribió.
-    if (proyectoSnap.exists && proyectoSnap.data()?.phases?.investigacion?.fontanaPendiente?.sesionId === sesionId) {
-      await proyectoRef.update({ "phases.investigacion.fontanaPendiente": FieldValue.delete() });
-    }
+    // 7b-1 (H25): el marcador del proyecto y la sesión se escriben en UNA transacción (antes, dos
+    // escrituras sueltas: si fallaba la segunda quedaba una sesión vinculada sin marcador). El
+    // callback puede reintentarse: lee todo antes de escribir, no tiene efectos externos y
+    // devuelve un resultado; la respuesta HTTP se arma fuera.
+    const nowIso = new Date().toISOString();
+    type ResultadoDesvincular = "ok" | "no_encontrada" | "no_vinculada" | "escenario_a";
+    const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoDesvincular> => {
+      const sesionSnap = await tx.get(ref);
+      if (!sesionSnap.exists) return "no_encontrada";
+      const actual = sesionSnap.data() as FontanaSesion;
+      if (!actual.modduloProjectId) return "no_vinculada";
+      if ((actual.tareaPipIds ?? []).length > 0) return "escenario_a";
+      const proyectoRef = adminDb.collection("moddulo_projects").doc(actual.modduloProjectId);
+      const proyectoSnap = await tx.get(proyectoRef);
+      // Nunca borrar fontanaPendiente si ya no apunta a ESTA sesión — solo
+      // si el marcador sigue siendo el que esta sesión escribió.
+      if (proyectoSnap.exists && proyectoSnap.data()?.phases?.investigacion?.fontanaPendiente?.sesionId === sesionId) {
+        tx.update(proyectoRef, { "phases.investigacion.fontanaPendiente": FieldValue.delete() });
+      }
+      tx.update(ref, { modduloProjectId: FieldValue.delete(), fechaUltimoGuardado: nowIso });
+      return "ok";
+    });
 
-    await ref.update({ modduloProjectId: FieldValue.delete(), fechaUltimoGuardado: new Date().toISOString() });
+    if (resultado === "no_encontrada") {
+      return NextResponse.json({ error: "Sesión no encontrada" }, { status: 404 });
+    }
+    if (resultado === "no_vinculada") {
+      return NextResponse.json({ error: "sesion_no_vinculada", message: "Esta sesión no está vinculada a ningún proyecto." }, { status: 400 });
+    }
+    if (resultado === "escenario_a") {
+      return NextResponse.json(
+        { error: "escenario_a_no_desvinculable", message: "Una sesión de Escenario (a) no puede desvincularse desde aquí." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
