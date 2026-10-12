@@ -139,31 +139,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     console.error("[link-moddulo] error buscando análisis para projectId:", projectId, err);
   }
 
-  // If Moddulo already has mapaPESTEL FROM A TRACKED CENTINELA ANALYSIS, check
-  // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
-  // from the express flow — that's the express→Centinela upgrade path this
-  // endpoint must allow, not a conflict to protect against.
-  const existingAnalysisId = explorarPhase?.linkedSource?.sourceAnalysisId;
-  const existingMapa = explorarPhase?.linkedSource?.payload as MapaPESTEL | undefined;
-
-  if (existingMapa && existingAnalysisId) {
-    if (existingAnalysisId === latestAnalysisId) {
-      // Same analysis already imported — idempotent, just ensure PESTEL write-back
-      await adminDb.collection("pestel_projects").doc(projectId).update({
-        modduloProjectId,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 200 });
-    }
-    return NextResponse.json(
-      {
-        error: "moddulo_already_linked",
-        message: "Este proyecto de Moddulo ya tiene un análisis PESTEL importado. Para cambiar la vinculación, contacta soporte.",
-      },
-      { status: 409 }
-    );
-  }
-
   // Write MapaPESTEL to Moddulo project (if analysis available)
   const linkedSource: LinkedSourceRef<MapaPESTEL> = {
     kind: "T22",
@@ -190,13 +165,91 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
   updatePayload["phases.exploracion.linkedSource"] = linkedSource;
 
-  await adminDb.collection("moddulo_projects").doc(modduloProjectId).update(updatePayload);
+  // 7b-2 (H25): TODA decisión que depende del estado vigente se toma dentro de UNA transacción que
+  // relee los dos documentos y escribe ambos (antes: lecturas previas fuera y dos `update` sueltos —si
+  // fallaba el segundo quedaba el Moddulo vinculado sin back-link— y los guards de doble vínculo se
+  // evaluaban con una lectura que otra petición pudo invalidar: dos vinculaciones simultáneas del
+  // mismo PESTEL a dos Moddulo, o de dos PESTEL al mismo Moddulo, podían pasar ambas). El callback
+  // puede reintentarse: lee antes de escribir, sin efectos externos, y devuelve un resultado; la
+  // respuesta HTTP se arma fuera. Las lecturas previas de arriba solo ordenan las respuestas (mismos
+  // códigos y orden de siempre); el estado que cuenta es el que se lee aquí.
+  const pestelRef = adminDb.collection("pestel_projects").doc(projectId);
+  const modduloRef = adminDb.collection("moddulo_projects").doc(modduloProjectId);
+  type ResultadoVinculo =
+    | "ok"
+    | "pestel_no_encontrado"
+    | "moddulo_no_encontrado"
+    | "idempotente"
+    | "pestel_ya_vinculado"
+    | "moddulo_ya_vinculado"
+    | "mapa_ya_importado"
+    | "mismo_analisis";
 
-  // Write back to PESTEL project
-  await adminDb.collection("pestel_projects").doc(projectId).update({
-    modduloProjectId,
-    updatedAt: FieldValue.serverTimestamp(),
+  const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoVinculo> => {
+    const pestelTx = await tx.get(pestelRef);
+    const modduloTx = await tx.get(modduloRef);
+
+    if (!pestelTx.exists || pestelTx.data()?.userId !== session.uid) return "pestel_no_encontrado";
+    if (pestelTx.data()?.modduloProjectId === modduloProjectId) return "idempotente";
+    if (pestelTx.data()?.modduloProjectId) return "pestel_ya_vinculado";
+
+    // getProject filtra la papelera y exige ser colaborador; aquí solo se revalida que siga ahí.
+    if (!modduloTx.exists || modduloTx.data()?.deletedAt) return "moddulo_no_encontrado";
+    const linkedActual = modduloTx.data()?.phases?.exploracion?.linkedSource as
+      | { sourceId?: string; sourceAnalysisId?: string; payload?: unknown }
+      | undefined;
+    if (linkedActual?.sourceId && linkedActual.sourceId !== projectId) return "moddulo_ya_vinculado";
+
+    // If Moddulo already has mapaPESTEL FROM A TRACKED CENTINELA ANALYSIS, check
+    // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
+    // from the express flow — that's the express→Centinela upgrade path this
+    // endpoint must allow, not a conflict to protect against.
+    if (linkedActual?.payload && linkedActual.sourceAnalysisId) {
+      if (linkedActual.sourceAnalysisId === latestAnalysisId) {
+        // Same analysis already imported — idempotent, just ensure PESTEL write-back
+        tx.update(pestelRef, { modduloProjectId, updatedAt: FieldValue.serverTimestamp() });
+        return "mismo_analisis";
+      }
+      return "mapa_ya_importado";
+    }
+
+    tx.update(modduloRef, updatePayload);
+    // Write back to PESTEL project
+    tx.update(pestelRef, { modduloProjectId, updatedAt: FieldValue.serverTimestamp() });
+    return "ok";
   });
 
-  return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 201 });
+  switch (resultado) {
+    case "pestel_no_encontrado":
+      return NextResponse.json({ error: "Proyecto PESTEL no encontrado" }, { status: 404 });
+    case "moddulo_no_encontrado":
+      return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
+    case "idempotente":
+      return NextResponse.json({ modduloProjectId }, { status: 200 });
+    case "pestel_ya_vinculado":
+      return NextResponse.json(
+        { error: "pestel_already_linked", message: "Este proyecto PESTEL ya está vinculado a otro proyecto de Moddulo." },
+        { status: 409 }
+      );
+    case "moddulo_ya_vinculado":
+      return NextResponse.json(
+        {
+          error: "moddulo_already_linked",
+          message: "Este proyecto de Moddulo ya está vinculado a otro análisis PESTEL. Para cambiar la vinculación, contacta soporte.",
+        },
+        { status: 409 }
+      );
+    case "mapa_ya_importado":
+      return NextResponse.json(
+        {
+          error: "moddulo_already_linked",
+          message: "Este proyecto de Moddulo ya tiene un análisis PESTEL importado. Para cambiar la vinculación, contacta soporte.",
+        },
+        { status: 409 }
+      );
+    case "mismo_analisis":
+      return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 200 });
+    case "ok":
+      return NextResponse.json({ modduloProjectId, sourceAnalysisId: latestAnalysisId }, { status: 201 });
+  }
 }
