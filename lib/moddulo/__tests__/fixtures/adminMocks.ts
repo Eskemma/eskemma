@@ -42,13 +42,14 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   let batchCommitFalla = false;
   let rutasQueFallan = new Set<string>();
   let modoAtomico = false;
+  let actualizacionesEstrictas = false;
 
   let autoIdCounter = 0;
 
   interface DocRef {
     id: string;
     path: string;
-    get: () => Promise<{ exists: boolean; data: () => unknown; ref: DocRef }>;
+    get: () => Promise<{ id: string; exists: boolean; data: () => unknown; ref: DocRef }>;
     set: (data: unknown) => Promise<void>;
     update: (data: Record<string, unknown>) => Promise<void>;
     delete: () => Promise<void>;
@@ -87,6 +88,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       id: path.split("/").at(-1) as string,
       path,
       get: vi.fn(async () => ({
+        id: path.split("/").at(-1) as string,
         exists: store.has(path),
         data: () => store.get(path),
         ref,
@@ -96,6 +98,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       }),
       update: vi.fn(async (data: Record<string, unknown>) => {
         if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
+        if (actualizacionesEstrictas && !store.has(path)) throw new Error(`mock: NOT_FOUND al hacer update() de ${path}`);
         updateLog.push({ path, data });
         store.set(path, { ...(store.get(path) as object ?? {}), ...data });
       }),
@@ -228,10 +231,15 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       batchCommitFalla = false;
       rutasQueFallan = new Set();
       modoAtomico = false;
+      actualizacionesEstrictas = false;
     },
     /** Opt-in: las transacciones aplican sus escrituras en búfer, todo o nada (7b-1). */
     atomico(activo = true) {
       modoAtomico = activo;
+    },
+    /** Opt-in: el update() SUELTO de un documento inexistente falla (NOT_FOUND), como en Firestore real. */
+    estricto(activo = true) {
+      actualizacionesEstrictas = activo;
     },
     /** Hace que toda escritura sobre `path` (update/delete directo, batch o transacción) falle. */
     failUpdateOn(path: string) {

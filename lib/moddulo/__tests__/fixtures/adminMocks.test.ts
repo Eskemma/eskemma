@@ -49,4 +49,11 @@ describe("adminMocks — semántica por modo", () => {
     ).rejects.toThrow();
     expect(db.snapshot()).toEqual({ "c/x": { v: 1 } });
   });
+
+  it("estricto() opt-in: el update() suelto de un inexistente falla (NOT_FOUND) y no escribe", async () => {
+    const db = createMockAdminDb();
+    db.estricto(true);
+    await expect(db.collection("c").doc("nuevo").update({ a: 1 })).rejects.toThrow();
+    expect(db.snapshot()).toEqual({});
+  });
 });

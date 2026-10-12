@@ -1,6 +1,8 @@
-// H25 (commit 6c) — acknowledge-bias hace DOS `update` seguidos (la lista de alertas y, si todas
-// están reconocidas, `status: "REVIEWED"`): si el segundo falla tras el primero, el sesgo quedó
-// reconocido y el estado no cambió. El 500 se trata como ambiguo en la pantalla.
+// H25 (commit 6c) — acknowledge-bias hacía DOS `update` seguidos (la lista de alertas y, si todas
+// estaban reconocidas, `status: "REVIEWED"`): si el segundo fallaba tras el primero, el sesgo quedaba
+// reconocido y el estado no cambiaba. El 500 se trata como ambiguo en la pantalla.
+// EDITADO DELIBERADAMENTE EN 7b-3: la prueba «reconoce el único sesgo pendiente» documentaba ese
+// defecto (esperaba DOS escrituras); ahora la ruta usa UNA transacción con UN solo `update`.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,14 +33,15 @@ beforeEach(() => {
 });
 
 describe("POST acknowledge-bias", () => {
-  it("reconoce el único sesgo pendiente: DOS escrituras (alertas y status REVIEWED)", async () => {
-    mockDb.reset(siembra([{ type: "urbano" }]));
+  it("reconoce el único sesgo pendiente: UNA sola escritura (alertas, updatedAt y status REVIEWED)", async () => {
+    mockDb.reset({ ...siembra([{ type: "urbano" }]), "pestel_analyses/a1": { projectId: "p1", status: "PENDING_REVIEW", biasAlerts: [{ type: "urbano" }] } });
     const res = await POST(req("urbano"), ctx);
     expect(res.status).toBe(200);
     const u = mockDb.updates();
-    expect(u).toHaveLength(2);
+    expect(u).toHaveLength(1);
     expect(u[0].data.biasAlerts).toBeDefined();
-    expect(u[1].data).toEqual({ status: "REVIEWED" });
+    expect(u[0].data.status).toBe("REVIEWED");
+    expect(u[0].data.updatedAt).toBe("SERVER_TIMESTAMP");
   });
 
   it("quedan sesgos pendientes: UNA sola escritura (sin REVIEWED)", async () => {
