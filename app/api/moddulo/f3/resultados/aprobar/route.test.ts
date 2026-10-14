@@ -1,12 +1,19 @@
-// H25 (commit 6c) — resultados/aprobar. Esta prueba fija un HECHO de la ruta que decide el texto
-// de la pantalla: escribe `aprobado` en el resultado ANTES de buscar la asignación en el tablero,
-// así que su 404 «Asignación no encontrada en el tablero» llega con la escritura YA hecha
-// (guardadoHonesto lo trata como ambiguo). No se cambia la ruta: se documenta como hallazgo.
+// H25 (6c → 7b-4) — resultados/aprobar. En 6c esta prueba fijaba como HECHO que la ruta escribía
+// `aprobado` ANTES de buscar la asignación (404 con la escritura ya hecha). 7b-4 la corrige: valida
+// primero y solo entonces escribe. EDICIONES DELIBERADAS de este archivo (declaradas):
+//  (1) beforeEach siembra también el documento del proyecto (la ruta ahora lee el tablero crudo
+//      dentro de la transacción en vez de usar solo getProject);
+//  (1b) el mock de project conserva normalizeTareaPIP real (importActual) y solo simula getProject;
+//  (2) la prueba «HECHO … 404 DESPUÉS de haber escrito» se INVIERTE: 404 con CERO escrituras
+//      (negativo real contra la ruta anterior).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
-vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
+vi.mock("@/lib/moddulo/project", async () => ({
+  ...(await vi.importActual<typeof import("@/lib/moddulo/project")>("@/lib/moddulo/project")),
+  getProject: vi.fn(),
+}));
 vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
@@ -32,7 +39,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);
   vi.mocked(getProject).mockResolvedValue({ phases: { investigacion: { f3TareasPIP: tareas } } } as never);
-  mockDb.reset({ [RES]: { aprobado: false } });
+  mockDb.reset({
+    [RES]: { aprobado: false },
+    "moddulo_projects/p1": { phases: { investigacion: { f3TareasPIP: tareas } } },
+  });
 });
 
 describe("POST resultados/aprobar", () => {
@@ -45,13 +55,11 @@ describe("POST resultados/aprobar", () => {
     expect(u[1].data["phases.investigacion.f3TareasPIP"]).toBeDefined();
   });
 
-  it("HECHO: con una asignación que no está en el tablero, responde 404 DESPUÉS de haber escrito `aprobado`", async () => {
+  it("asignación que no está en el tablero: 404 y CERO escrituras (7b-4: se valida antes de escribir)", async () => {
     const res = await POST(body({ asignacionId: "no-existe" }));
     expect(res.status).toBe(404);
     expect((await res.json()).error).toBe("Asignación no encontrada en el tablero");
-    const u = mockDb.updates();
-    expect(u).toHaveLength(1); // el resultado ya quedó aprobado
-    expect(u[0].data).toMatchObject({ aprobado: true });
+    expect(mockDb.updates()).toHaveLength(0);
   });
 
   it("resultado inexistente: 404 «Resultado no encontrado» y cero escrituras; proyecto ajeno: 404", async () => {

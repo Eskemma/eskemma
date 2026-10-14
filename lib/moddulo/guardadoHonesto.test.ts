@@ -1133,14 +1133,18 @@ describe("decidirResultadoGuardado — acciones del commit 6c", () => {
     });
   });
 
-  it("aprobar resultado: el 404 «Asignación no encontrada» es AMBIGUO (la ruta ya escribió `aprobado`)", () => {
+  it("aprobar resultado (7b-4): el 404 «Asignación no encontrada» dice que ESTA solicitud no registró nada", () => {
     const m = msg("aprobar_resultado", conCodigo6c(404, "Asignación no encontrada en el tablero"));
     expect(m).toBe(
-      "No se pudo CONFIRMAR la aprobación del resultado: el servidor pudo marcarlo como aprobado, pero no encontró la asignación en el tablero. Recarga la página para verificar el estado antes de volver a intentarlo."
+      "No se encontró la asignación en el tablero; puede que el tablero haya cambiado. Esta solicitud no registró ningún cambio. Recarga la página para ver el estado real."
     );
+    // No afirma el estado de los datos ni usa el texto ambiguo anterior.
+    expect(m).not.toContain("CONFIRMAR");
     expect(m).not.toContain("sigue sin aprobar");
-    // Los otros 404 de la ruta ocurren ANTES de escribir, pero tampoco afirman nada.
-    expect(msg("aprobar_resultado", conCodigo6c(404, "Resultado no encontrado"))).not.toContain("sigue sin aprobar");
+    // Los otros 404 conservan su texto y no cambian.
+    expect(msg("aprobar_resultado", conCodigo6c(404, "Resultado no encontrado"))).toBe(
+      "No se encontró el resultado o el proyecto; puede que ya no exista. Recarga la página para verificar."
+    );
   });
   it("cambiar asignación y editar/archivar: el texto sigue a la acción", () => {
     expect(msg("cambiar_asignacion", red, { cambio: "la desactivación de la asignación" })).toContain(

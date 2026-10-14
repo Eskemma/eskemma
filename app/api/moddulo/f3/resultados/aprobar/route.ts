@@ -11,10 +11,9 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { getProject } from "@/lib/moddulo/project";
+import { getProject, normalizeTareaPIP } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { TareaPIP } from "@/types/moddulo.types";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -42,42 +41,57 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
 
-  const resultadoRef = adminDb
-    .collection("moddulo_projects")
-    .doc(projectId)
-    .collection("f3Resultados")
-    .doc(resultadoId);
+  const proyectoRef = adminDb.collection("moddulo_projects").doc(projectId);
+  const resultadoRef = proyectoRef.collection("f3Resultados").doc(resultadoId);
 
-  const resultadoSnap = await resultadoRef.get();
-  if (!resultadoSnap.exists) {
-    return NextResponse.json({ error: "Resultado no encontrado" }, { status: 404 });
-  }
+  // 7b-4 (H25): VALIDAR PRIMERO, ESCRIBIR DESPUÉS, todo en una transacción. Antes la ruta escribía
+  // `aprobado` en el resultado y solo después buscaba la asignación en el tablero (un 404 llegaba con
+  // la escritura ya hecha), y el tablero que escribía venía de una lectura anterior (podía pisar uno
+  // más nuevo). Ahora el tablero se relee CRUDO dentro de la transacción y se normaliza con la misma
+  // función que getProject, así lo escrito es idéntico a lo de siempre ({pipItemId, asignaciones}).
+  // El callback puede reintentarse: lee antes de escribir, sin efectos externos; la respuesta se
+  // arma afuera. getProject (arriba) queda solo como acceso.
+  type Resultado = "ok" | "resultado_no_encontrado" | "proyecto_no_encontrado" | "asignacion_no_encontrada";
+  const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+    const resultadoSnap = await tx.get(resultadoRef);
+    const proyectoSnap = aprobado ? await tx.get(proyectoRef) : null;
+    if (!resultadoSnap.exists) return "resultado_no_encontrado";
 
-  await resultadoRef.update({
-    aprobado,
-    ...(notasUsuario !== undefined ? { notasUsuario } : {}),
-  });
-
-  if (aprobado) {
-    const tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
-    const tarea = tareas.find((t) => t.pipItemId === pipItemId);
-    const asignacion = tarea?.asignaciones.find((a) => a.asignacionId === asignacionId);
-    if (!tarea || !asignacion) {
-      return NextResponse.json({ error: "Asignación no encontrada en el tablero" }, { status: 404 });
+    const escrituraResultado = { aprobado, ...(notasUsuario !== undefined ? { notasUsuario } : {}) };
+    if (!aprobado) {
+      tx.update(resultadoRef, escrituraResultado);
+      return "ok";
     }
-    // Payload explícito { pipItemId, asignaciones } — nunca spread (...t)
-    // del objeto de getProject(), que trae `numero` adjunto en memoria.
+
+    if (!proyectoSnap?.exists || proyectoSnap.data()?.deletedAt) return "proyecto_no_encontrado";
+    const crudas = proyectoSnap.data()?.phases?.investigacion?.f3TareasPIP;
+    const tareas = (Array.isArray(crudas) ? crudas : []).map((t: unknown) => normalizeTareaPIP(t as never));
+    const tarea = tareas.find((t) => t.pipItemId === pipItemId);
+    if (!tarea?.asignaciones.some((a) => a.asignacionId === asignacionId)) return "asignacion_no_encontrada";
+
+    // Payload explícito { pipItemId, asignaciones } — nunca spread (...t).
     const tareasActualizadas = tareas.map((t) => ({
       pipItemId: t.pipItemId,
       asignaciones: t.pipItemId !== pipItemId ? t.asignaciones : t.asignaciones.map((a) =>
         a.asignacionId === asignacionId ? { ...a, estado: "recibido" as const, resultadoId } : a
       ),
     }));
-    await adminDb.collection("moddulo_projects").doc(projectId).update({
+    tx.update(resultadoRef, escrituraResultado);
+    tx.update(proyectoRef, {
       "phases.investigacion.f3TareasPIP": tareasActualizadas,
       updatedAt: FieldValue.serverTimestamp(),
     });
-  }
+    return "ok";
+  });
 
+  if (resultado === "resultado_no_encontrado") {
+    return NextResponse.json({ error: "Resultado no encontrado" }, { status: 404 });
+  }
+  if (resultado === "proyecto_no_encontrado") {
+    return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+  }
+  if (resultado === "asignacion_no_encontrada") {
+    return NextResponse.json({ error: "Asignación no encontrada en el tablero" }, { status: 404 });
+  }
   return NextResponse.json({ ok: true }, { status: 200 });
 }

@@ -432,9 +432,11 @@ const TEXTOS_SIMPLES: Record<
     permiso: "No tienes permiso para marcar esta alerta.",
     especifico: () => null,
   },
-  // 6c. `resultados/aprobar` WRITES `aprobado` BEFORE it looks for the assignment in the
-  // board, so its "Asignación no encontrada" 404 can arrive with the write already done:
-  // that 404 is ambiguous, unlike a "Resultado/Proyecto no encontrado" one.
+  // 6c → 7b-4. `resultados/aprobar` used to WRITE `aprobado` before looking for the assignment in
+  // the board (its "Asignación no encontrada" 404 was ambiguous). Since 7b-4 it validates first
+  // inside one transaction, so that 404 means THIS request wrote nothing. The text claims only that
+  // (never the state of the data): after an ambiguous network failure the first attempt may have
+  // approved, which is why it says "recarga para ver el estado real".
   aprobar_resultado: {
     hecho: "aprobado",
     verificar: "recarga la página para verificar el estado.",
@@ -442,7 +444,7 @@ const TEXTOS_SIMPLES: Record<
     permiso: "No tienes permiso para aprobar este resultado.",
     especifico: (r) =>
       r.status === 404 && (r.codigo ?? "").startsWith("Asignación no encontrada")
-        ? "No se pudo CONFIRMAR la aprobación del resultado: el servidor pudo marcarlo como aprobado, pero no encontró la asignación en el tablero. Recarga la página para verificar el estado antes de volver a intentarlo."
+        ? "No se encontró la asignación en el tablero; puede que el tablero haya cambiado. Esta solicitud no registró ningún cambio. Recarga la página para ver el estado real."
         : null,
   },
   cambiar_asignacion: {
