@@ -1,0 +1,685 @@
+# Bitácora de hallazgos candidatos — Documento de Patrones Reutilizables
+
+**Versión:** 8
+**Última actualización:** 2026-10-14
+**Propósito:** Registrar, a medida que avanzamos en la nivelación del sistema contra los 9 Principios Rectores de Eskemma (Grupos 1, 2 y 3) y en las series de correcciones que de ahí se derivan, los hallazgos que podrían convertirse en patrones reutilizables, principios reforzados, o advertencias de diseño para el documento final. Esta bitácora se actualiza al cierre de cada ronda y se versiona (v1, v2, v3, v4, v5, v6, v7, v8...) hasta que se retome la redacción del documento de patrones reutilizables, momento en el que su contenido se integra y esta bitácora se da por cerrada.
+
+**Cómo leer cada entrada:**
+- **Hallazgo:** qué se encontró, en una frase.
+- **Principio(s) o categoría relacionada:** a cuál de los 9 principios rectores, o a cuál categoría técnica del borrador de patrones (Seguridad, Integridad de datos e IA, Arquitectura de datos, Arquitectura entre apps, Ciclo de vida de recursos, Proceso de desarrollo, Diseño visual, Documentación viva), se conecta.
+- **Estado:** Corregido / Pendiente (Grupo 2) / Pendiente (Grupo 3) / Pendiente (decisión de producto) / Documentado solamente.
+- **¿Patrón o caso aislado?:** si ya se ha visto más de una vez en el sistema (patrón candidato a documentar como regla general) o si es un caso único hasta ahora.
+- **Nota para el documento final:** qué regla o principio de diseño se desprende de este hallazgo, en caso de que aplique.
+
+---
+
+## Decisión de criterio registrada — Aprobación implícita vs. explícita (2026-10-03)
+
+Antes de retomar el Grupo 3, Raúl precisó un criterio que reencuadra varios hallazgos de esta bitácora (en particular H02 y H03) y que debe quedar registrado como regla de fondo para el documento final, no solo como nota de una entrada:
+
+**El principio de "Colaborador estratégico" y el de "No determinismo" no exigen que todo resultado generado por el sistema requiera una acción explícita de aprobación del usuario.** Exigen que el sistema nunca trate como definitivo un resultado que el usuario no ha hecho propio — pero "hacerlo propio" puede ocurrir de dos formas distintas, y el sistema debe distinguir cuál aplica en cada caso:
+
+1. **Aprobación implícita** — para resultados de bajo riesgo ("hoja" del árbol de decisiones del sistema, sin efecto vinculante sobre procesos posteriores). El sistema genera una primera versión, el usuario puede editarla o dejarla igual, y si continúa el flujo sin objetarla, eso YA cuenta como su aprobación. No requiere un botón de confirmación explícito ni un lenguaje de interfaz artificialmente tentativo ("Proponer" en vez de "Generar"). Ejemplo dado por Raúl: un primer borrador de análisis FODA.
+
+2. **Aprobación explícita** — para resultados "nodo", que condicionan decisiones o procesos vinculados más adelante en la cadena lógica del sistema (ej. la aprobación M2 de F3 en Moddulo, que ya condiciona la síntesis posterior). Ahí sí se necesita una acción de confirmación clara, registrada con autoría y fecha (conecta directo con H03).
+
+**El criterio para decidir cuál aplica en cada caso no se inventa ad hoc** — debe salir, en primera instancia, de los documentos rectores ya existentes del sistema (FAT 2 v2.0, FODA, MEC, MVP, RAE, y los demás documentos de especificación por fase), que ya definen cuáles son los puntos de control estratégico dentro de cada flujo.
+
+**Matiz importante, planteado explícitamente por Raúl:** este criterio es iterativo y no se limita a lo que los documentos guía ya contemplan. Si la investigación revela un nodo de decisión real (un punto donde el resultado condiciona procesos posteriores) que los documentos guía no identificaron como tal, ese hallazgo debe señalarse igualmente — no se descarta solo porque el documento de referencia no lo mencionó. El mecanismo de aprobación (explícita o implícita) debe poder ajustarse conforme el desarrollo del sistema avanza, no quedar fijado de una sola vez.
+
+**Consecuencia práctica para el Grupo 3:** la revisión de lenguaje determinista ya no es solo una pasada de redacción de botones y prompts. Es, en primer lugar, un ejercicio de **clasificación**: identificar los verdaderos nodos de decisión de cada fase de Moddulo (y de PESTEL/Fontana donde aplique) contra los documentos guía, y solo después decidir, caso por caso, si cada resultado necesita botón de aprobación explícita + campo de autoría, lenguaje de interfaz más cauto, ambos, o ninguno de los dos por ser de aprobación implícita.
+
+---
+
+## Origen: Auditoría de los 9 Principios Rectores (2026-10-02)
+
+### H01 — "Ver razonamiento" no se propagó fuera de 3 chats de Moddulo
+
+- **Hallazgo:** La funcionalidad de trazabilidad ("Ver razonamiento") existe y funciona en los chats de F1, F2 y F3 de Moddulo, pero no existe en ningún otro punto del sistema: ni en el resto de fases de Moddulo (AdvisorPanel, motores de F2, tablero de F3, F4-F9), ni en Fontana (que ya guarda la traza completa de `toolCalls` pero la descarta sin mostrarla), ni en PESTEL, ni en Sefix.
+- **Principio(s):** Principio 2 (Trazabilidad).
+- **Estado:** Pendiente (Grupo 2 — ronda de diseño propia).
+- **¿Patrón o caso aislado?:** Patrón — es el caso fundador que motivó esta bitácora: una capacidad construida en un solo lugar nunca se propagó a sus "caminos hermanos".
+- **Nota para el documento final:** Cuando se construya una funcionalidad de transparencia/trazabilidad para un componente, verificar explícitamente si aplica a los componentes equivalentes del resto del ecosistema antes de darla por completa. Fontana es un caso especial: ya tiene el dato (`toolCalls`) solo falta exponerlo — bajo costo de activación.
+
+### H02 — Lenguaje determinista contradice el principio de "Colaborador estratégico"
+
+- **Hallazgo:** Botones y prompts en las 3 apps con IA (Moddulo, Fontana, PESTEL) usan verbos deterministas ("Generar Reporte", "Ejecutar análisis IA", "Generar veredicto") en vez de lenguaje de propuesta. El propio prompt base de Moddulo se contradice a sí mismo (pide "no ser un ejecutor" y, líneas después, pide un tono de "diagnóstico frío y objetivo").
+- **Principio(s):** Principio 3 (Colaborador estratégico) y Principio 6 (No determinismo).
+- **Estado:** CLASIFICADO Y CERRADO EN LO TEXTUAL (Grupo 3, 2026-10-07). De ~50 casos revisados, solo 5 necesitaron ajuste de texto (M28 prompt base, M25, M8, M9, P4), ya aplicados. El resto se queda como está por ser de aprobación implícita. Lo que de verdad faltaba no era lenguaje sino autoría y fecha en los nodos (ver H03) y confirmación de impacto (ver H15).
+- **¿Patrón o caso aislado?:** Patrón — se repite en las 3 apps con IA, con distinta intensidad (Moddulo ~17 casos, PESTEL ~10, Fontana ~3).
+- **Nota para el documento final:** Checklist de redacción para cualquier texto de interfaz o instrucción de prompt nuevo: ¿el resultado que produce este botón es un nodo de decisión (requiere lenguaje cauto + aprobación explícita) o un resultado de bajo riesgo (aprobación implícita, lenguaje normal es aceptable)? La respuesta sale de los documentos guía (FAT 2, FODA, MEC, MVP) en primera instancia, y se ajusta cuando la investigación revela un nodo real no contemplado en ellos.
+
+### H03 — No existe un campo real de "aprobado por el usuario, con autoría y fecha"
+
+- **Hallazgo:** El campo `aprobado_por_usuario` que describe el principio de Editabilidad no existe en ningún tipo de dato del sistema. Lo que existe son variantes sueltas (`VeredictoHEI.aprobadoPorUsuario`, `ResultadoF3.aprobado`, `approvedBy`/`approvedAt` de PESTEL solo en una ruta) sin un patrón común, y ninguna descarga de documento exige que algo esté realmente aprobado antes de entregarse.
+- **Principio(s):** Principio 4 (Editabilidad universal).
+- **Estado:** Pendiente (Grupo 2 — ronda de diseño propia, "define el tipo común, qué se exige y dónde se firma"). El Grupo 3 identificó los casos concretos que lo necesitan (clase "a"): cerrar F1, F2 y F3 (M2, M10, M24), aprobar motores de F2 (M11), finalizar análisis (M12), aceptar condición RDA (M15), aprobar resultado de F3 (M19), aprobar veredicto (M22), activar/desactivar vía de F3 (M17), más H-P1, H-P3 y H-M7. Solo debe exigirse en esos nodos, no en todo resultado generado. Nota (H20): la serie de guardado honesto hizo que el cierre de fase solo avance si el servidor lo confirmó, pero el registro de autoría y fecha del cierre sigue siendo de esta ronda. Nota (v5): `dvsVersiones` (H28) guarda el uid de quien reemplaza el análisis finalizado, una autoría parcial que el Grupo 2 debe unificar con el tipo común.
+- **¿Patrón o caso aislado?:** Patrón — se repite en Moddulo, PESTEL y Fontana, cada uno con su propia variante parcial.
+- **Nota para el documento final:** Un tipo de dato compartido para "aprobación" (quién, cuándo, con qué firma) debería vivir en un lugar común (posible candidato: `lib/` compartido), no reinventarse por app. Cualquier mecanismo de exportación/descarga debería consultarlo antes de entregar un documento clasificado como "nodo de decisión".
+
+### H04 — Sin alerta de antigüedad de datos en ninguna app
+
+- **Hallazgo:** Ninguna app del ecosistema alerta cuando un dato supera un umbral de antigüedad razonable para su familia (ej. datos censales con más de 10 años). `lib/moddulo/staleness.ts` no existe; el archivo real (`lib/territorio/staleness.ts`) mide cambio de territorio, no antigüedad de dato. Fontana no tiene fecha de corte estructurada (se infiere con regex del texto de la fuente). Sefix es la app más visible en este sentido ("Corte: {fecha}" en títulos de gráficas), pero sin alerta activa de vencimiento.
+- **Principio(s):** Principio 8 (Oportunidad).
+- **Estado:** Pendiente (Grupo 2 — ronda de diseño propia, "umbrales por familia, campo estructurado en Fontana").
+- **¿Patrón o caso aislado?:** Patrón — ausencia total, no parcial, en las 4 apps.
+- **Nota para el documento final:** Definir umbrales de antigüedad por familia de indicador (censal, seguridad, electoral, etc.) como una tabla de configuración central, reutilizable por cualquier app que muestre ese tipo de dato — evita que cada app invente su propio criterio de "qué tan viejo es demasiado viejo".
+
+### H05 — Sin distinción visible entre fuente institucional y fuente generada por IA
+
+- **Hallazgo:** Ningún tipo de dato (`Senal`, `F2Senal`, `CeldaTablaFontana`) tiene un campo que distinga si una afirmación viene de una fuente institucional verificable o fue inferida/generada por la IA. El `nivelConfianza` lo estima la propia IA y se muestra como si fuera un dato objetivo. Los guards de honestidad ya existentes previenen que el sistema invente datos, pero no resuelven la distinción visual de origen que pide el principio.
+- **Principio(s):** Principio 9 (Veracidad).
+- **Estado:** Pendiente (Grupo 2 — ronda de diseño propia, "afecta los tipos de datos y todos los renders de fuente").
+- **¿Patrón o caso aislado?:** Patrón — ausencia total en las apps con IA.
+- **Nota para el documento final:** Diferenciar "el sistema previene la invención de datos" (ya resuelto con los guards de honestidad) de "el sistema declara visiblemente el origen de cada dato" (no resuelto) — son dos capas de Veracidad distintas, y la primera no sustituye a la segunda.
+
+### H06 — Sobrescritura sin versión en Moddulo, Fontana y PESTEL
+
+- **Hallazgo:** Varias rutas de mutación sobrescriben contenido existente sin conservar versión anterior ni historial (`finalize-dvs`, reportes de fase en Moddulo; `reporte/actual` en Fontana se sobrescribe al regenerar, incluidas ediciones del usuario — antes de la corrección de esta misma ronda, lo mismo pasaba con los informes de PESTEL).
+- **Principio(s):** Principio 7 (Persistencia).
+- **Estado:** Parcialmente corregido. PESTEL: ya se resolvió, con la aclaración explícita de que `contenidoEditado` es una solución parcial, no el versionado completo. Moddulo (v5): el análisis finalizado (`phases.exploracion.dvs`) se copia a la subcolección `dvsVersiones` antes de cada reemplazo (ver H28), pero es un mecanismo paralelo a `changelog.ts`, sin tope de retención y sin lectura ni restauración desde la pantalla; el Grupo 2 debe unificarlo con `changelog.ts`. Pendiente (Grupo 2): el resto (reportes de fase de Moddulo, `reporte/actual` de Fontana).
+- **¿Patrón o caso aislado?:** Patrón — se repite en las 3 apps.
+- **Nota para el documento final:** `changelog.ts` (ver H08) es la pieza natural para resolver esto de raíz — diseñado con toda intención para este propósito exacto, nunca conectado. El Grupo 2 debería evaluar si conviene generalizarlo como el mecanismo de versionado único del ecosistema, en vez de resolver cada app por separado.
+
+### H07 — Resolución geográfica inteligente incompleta fuera de Fontana
+
+- **Hallazgo:** Fontana tiene la disciplina completa de declarar el nivel geográfico nativo y advertir cuando se agrega a un nivel superior (cobertura graduada, `MOTIVO_NIVEL_NO_CUBIERTO`). PESTEL y Moddulo F2 no: datos nacionales/estatales (Banxico, BISE) se inyectan sin declarar su nivel, y un proyecto municipal puede recibir población estatal sin ningún aviso.
+- **Principio(s):** Principio 5 (Resolución geográfica inteligente).
+- **Estado:** Pendiente (Grupo 2 — "reutiliza el patrón de Fontana, más campo de nivel en `Senal` e `InsumoSintesis`").
+- **¿Patrón o caso aislado?:** Patrón — mismo tipo de vacío ya resuelto en una app (Fontana) pero no propagado a las otras dos.
+- **Nota para el documento final:** Mismo patrón que H01 — una disciplina ya construida y probada en Fontana (cobertura graduada) debe generalizarse como mecanismo central, no reconstruirse app por app.
+
+### H08 — `changelog.ts`: pieza construida con intención, nunca conectada
+
+- **Hallazgo:** Módulo completo (`logChange`, `logUserChange`, `logAISuggestion`, `logPropagation`, `getChangelog`) con un tipo de dato bien diseñado (`ChangelogEntry`: quién, fase, acción, valor previo/nuevo, motivo, origen usuario/IA/propagación), construido desde la reconstrucción de arquitectura (26-03-14). Ningún commit lo ha llamado jamás.
+- **Principio(s):** Principio 7 (Persistencia) — es la pieza que resolvería H06.
+- **Estado:** Conservado, pendiente de activación en el Grupo 2.
+- **¿Patrón o caso aislado?:** Caso aislado en sí mismo, pero ejemplo de un patrón más amplio: piezas bien diseñadas que se construyen "por si acaso" y nunca se conectan a su punto de uso real.
+- **Nota para el documento final:** Antes de descartar código que parece "muerto", verificar si fue diseñado con intención real (como este caso) antes de asumir que es deuda a eliminar — puede ser la solución correcta esperando su momento.
+
+### H09 — `versionSesion`: residuo real de un diseño abandonado (eliminado)
+
+- **Hallazgo:** Campo pensado para un mecanismo de diff de exportación en Fontana (documentado en `Fontana_T10_Cierre_Paso4.md`) que nunca se terminó de construir (`familiasModificadasDesdeUltimaExportacion` nunca existió en código). El campo solo se escribía con el valor fijo `1`, sin ningún lector.
+- **Principio(s):** N/A — es deuda técnica pura, no un vacío de principio.
+- **Estado:** Corregido (eliminado por completo).
+- **¿Patrón o caso aislado?:** Caso aislado, pero contraste útil con H08 — mismo síntoma superficial ("código sin llamadores"), pero origen distinto (uno es diseño abandonado a eliminar, el otro es diseño pendiente de activar).
+- **Nota para el documento final:** Al encontrar código sin llamadores, siempre investigar el historial de commits y la documentación asociada antes de decidir "eliminar" vs. "conservar y conectar" — el síntoma es idéntico, el tratamiento correcto no lo es.
+
+### H10 — El Redactor: funcionalidad nunca conectada desde su origen (eliminado)
+
+- **Hallazgo:** La pantalla del Redactor (generación de posts) llamaba, desde su primer commit (enero 2026), a una ruta de API que nunca existió — la variable local se llamaba literalmente `mockOutput`. No estaba enlazado desde ninguna navegación real, solo alcanzable por URL directa. Se eliminó por completo (pantalla, tipos, componentes, menciones en modal informativo y plan freemium, el documento de proyecto real sin uso, y la función `canAccessModduloApp` sin otros llamadores) por decisión de producto: no está en la hoja de ruta actual.
+- **Principio(s):** N/A — es deuda técnica / alcance de producto, no un vacío de principio en sí.
+- **Estado:** Corregido (eliminado por completo, incluido el dato real en producción tras confirmación de Raúl).
+- **¿Patrón o caso aislado?:** Caso aislado hasta ahora, pero advertencia general: una pantalla puede existir, verse terminada visualmente, y nunca haber tenido su backend real conectado desde el principio.
+- **Nota para el documento final:** Al auditar cualquier funcionalidad "existente", confirmar que su conexión real al backend existe y fue probada — la sola presencia de una pantalla no es evidencia de que la funcionalidad completa fue construida.
+
+### H11 — Informes de PESTEL: guardado en servidor nunca conectado a la pantalla
+
+- **Hallazgo:** El guardado en Firestore (`persistInforme`) se construyó correctamente (commit `cb008f9`), pero un commit posterior agregó una mejora de experiencia con `localStorage` sin conectar ambas piezas. Las ediciones del usuario nunca viajaban al servidor; un cambio de dispositivo o limpieza de caché perdía el trabajo. Adicionalmente, se encontró que el propio guardado en servidor podía fallar silenciosamente ante un error o desconexión, por el orden del código (`controller.close()` antes de `persistInforme`).
+- **Principio(s):** Principio 7 (Persistencia).
+- **Estado:** Corregido. Verificado en navegador por Raúl.
+- **¿Patrón o caso aislado?:** Patrón — mismo tipo de "mejora de UX que nunca se conectó a la fuente de verdad real" visto en otras piezas de esta sesión (recordar el picker de municipios que descartaba la clave elegida, en la ronda de geografía).
+- **Nota para el documento final:** Cuando se agrega una mejora de experiencia de usuario (caché local, autoguardado) sobre una funcionalidad que ya persiste en servidor, verificar explícitamente que ambas piezas quedan conectadas antes de dar la funcionalidad por completa — una mejora de UX no debe convertirse, por accidente, en la única fuente de verdad.
+- **Límite honesto conocido:** si la migración de una edición desde `localStorage` al servidor falla, se reintenta automáticamente en la siguiente carga de la página, pero sin ningún aviso al usuario de que ese reintento está ocurriendo. No hay pérdida de datos (la copia local se conserva), pero el usuario no tiene visibilidad del proceso. Candidato a mejora menor, no urgente.
+
+### H12 — Mensajes de Fontana: pérdida de turno completo ante desconexión o error
+
+- **Hallazgo:** La pregunta del usuario y la respuesta del asistente se guardaban juntas solo al final del turno. Una desconexión o un error de la API de Claude a mitad del proceso perdía ambos mensajes — hasta 60 segundos de trabajo — mientras que ciertos elementos del Canvas (tarjetas generadas por herramientas) sí persistían de forma independiente, dejando tarjetas huérfanas sin mensaje que las explicara.
+- **Principio(s):** Principio 7 (Persistencia).
+- **Estado:** Corregido (guardado del mensaje de usuario al inicio del turno; guardado continuo tras desconexión del cliente; mensaje de asistente marcado como "interrumpido" ante error de API, enlazado a las tarjetas del Canvas ya generadas).
+- **¿Patrón o caso aislado?:** Patrón relacionado con H11 — ambos son casos de "persistencia diferida hasta el final del proceso", vulnerable a interrupciones.
+- **Nota para el documento final:** Regla general candidata: cualquier proceso largo (generación de informe, turno de chat con herramientas) debería persistir sus piezas atómicas (mensaje de usuario, resultados parciales) tan pronto estén disponibles, no esperar al final del proceso completo para guardar todo junto.
+
+### H13 — Crecimiento sin control de `pestel_analyses.informes[]`
+
+- **Hallazgo:** Cada informe generado o editado se agrega al mismo array dentro del documento del análisis, sin tope. Con los 5 formatos ya construidos, una práctica real de regeneración y edición podría acercar el documento al límite de 1 MB de Firestore en un número de ciclos moderado.
+- **Principio(s):** Principio 7 (Persistencia) — tensión directa con la solución de H11 (conservar `contenidoEditado` sin perder nada aumenta el tamaño).
+- **Estado:** **CERRADO.** Mitigado con alerta en 2 umbrales (60% aviso temprano en consola, 80% prioridad alta) evaluados antes de escribir, aviso visible al usuario cuando el guardado falla (marca de "no guardado" en el propio texto, distinción del error 413 "documento lleno" de cualquier otro error de Firestore), y la solución de fondo (subcolección, mismo patrón que `f3Resultados`) documentada en CLAUDE.md con su disparador concreto: cruzar el 80%, o que el versionado del Grupo 2 guarde una entrada por edición (en cuyo caso la subcolección pasa de opcional a obligatoria y debe diseñarse junto con ese versionado, no aparte).
+- **¿Patrón o caso aislado?:** Patrón candidato — cualquier array que crece con cada edición/regeneración dentro de un documento único corre el mismo riesgo; vale la pena revisar si existe un caso similar en otras apps al llegar al Grupo 2.
+- **Nota para el documento final:** Regla candidata: cuando un documento acumula contenido generado repetidamente (informes, versiones, ediciones), decidir desde el diseño inicial si ese contenido vive en una subcolección (recomendado desde el principio) en vez de un array dentro del documento padre — migrar después es más costoso que diseñarlo bien desde el principio. `f3Resultados` en Moddulo es el precedente correcto a replicar. Nota adicional: cuando un guardado puede fallar de forma irrecuperable para el usuario (límite de tamaño alcanzado), el fallo debe ser visible en la interfaz, nunca solo un registro de consola que nadie revisa en el momento.
+
+---
+
+## Origen: Grupo 3 y H-M5 (2026-10-07)
+
+### H14 — H-M5: el PATCH de proyectos aceptaba casi cualquier campo y pisaba datos de fase
+
+- **Hallazgo:** `PATCH /api/moddulo/projects/[projectId]` hacía `update({...body})` sin lista blanca. Firestore interpreta las claves con punto como rutas, así que un colaborador con rol de edición podía escribir `collaborators`, `userId`, `deletedAt`, `currentPhase`, o rutas como `phases.exploracion.motorAprobaciones.M2`, saltándose los gates. Además, `phaseData` reemplazaba `phases.X.data` completo: cerrar F2 envía `{aprobadoEn}` y borraba el formulario. Medido en datos reales: ocurrió en 10 de 10 proyectos con F2 cerrada (sin pérdida demostrable, porque el chat no había extraído nada en ellos). La rama `started` ponía `in-progress` sin condición, podía revertir una fase completada y no comprobaba rol.
+- **Principio(s):** Seguridad (Regla de Oro #3, ahora también sobre QUÉ se puede escribir, no solo quién) y Principio 7 (Persistencia).
+- **Estado:** Corregido (lista blanca con 400, fusión por clave, `phaseId` validado, `started` con rol y sin revertir, filtrado de rutas de XPCTO en el GET y en el chat). Los 10 proyectos ya afectados no se tocaron.
+- **¿Patrón o caso aislado?:** Patrón — misma clase que `createProject` (identificador del cliente usado sin validar), ahora en forma de "campos del cliente usados sin validar".
+- **Nota para el documento final:** Toda ruta de actualización debe tener lista blanca explícita de campos, validación de valores con topes medidos contra datos reales, y fusión por clave en lugar de reemplazo de objetos. Los errores de validación devuelven el nombre del campo, nunca el contenido enviado.
+- **Lecciones de proceso:** (1) Los topes y tipos se midieron contra los datos reales antes de fijarlos: así apareció que `tiempo.duracionMeses` es `null` en un proyecto real y que el validador debía aceptarlo; de lo contrario el autoguardado de ese proyecto habría recibido 400. (2) Las claves permitidas de una fase se derivan de lo que los clientes escriben hoy, no de memoria. (3) Prueba en negativo contra el código anterior: fallaron 50 de 59 pruebas de comportamiento, y las 9 que pasaron eran los guardados legítimos que no debían cambiar.
+- **Regla vigente para escritores futuros:** cualquier nueva clave de primer nivel en `exploracion.data` debe agregarse a la lista blanca o recibirá 400. `dictamenViabilidad`, `matrizBrechas` y `documentoRector` están fuera porque hoy nadie las escribe.
+- **Límite de verificación declarado:** el emulador de Firestore no arranca (Java 17, se requiere 21 o superior). La semántica de claves con punto se tomó de la documentación y del uso existente del chat. Lo que sí está probado es que la escritura nunca se ejecuta con un cuerpo rechazado.
+
+### H15 — Categoría nueva: "confirmación de impacto" (acciones que descartan o invalidan trabajo aprobado)
+
+- **Hallazgo:** Varias acciones descartan o invalidan algo ya aprobado sin avisar, y no encajan en "aprobar un resultado" ni en "cambiar un texto". Casos: M3 (editar territorio), M4 (editar variables XPCTO), M7 (regenerar análisis descarta aprobaciones de motores), M8 (el botón que antes decía "Regenerar reporte F2" reemplaza el análisis finalizado y rompe `pipItemId` y `actorId` que F3 consume), M17 (activar o desactivar una vía de F3), P2 y H-P4 (un análisis nuevo de PESTEL anula una aprobación sin aviso), H-M3 (regenerar M3, M4 o el tablero no invalida veredicto ni DIE), F3 y H-F1 (la confirmación de entrega a F3 está documentada como obligatoria y no se construyó).
+- **Caso añadido en v4 (camino hermano #8 de H25):** `generate-dvs` en `exploracion/page.tsx:1239`. Es la misma ruta de M8: si la respuesta no es OK, la página sigue a la retropropagación y marca la fase como "completed". Se absorbe en la investigación de M8 en lugar de arreglarse aparte.
+- **Principio(s):** Principios 1 (Transparencia) y 3 (Colaborador estratégico), desde el ángulo de honestidad sobre el impacto real de una acción.
+- **Estado:** En curso (v7). **M8 y H-M3 están corregidos (2026-10-08 y 2026-10-09, ver H28 y H29)**, con el modelo (a) nombrar, (b) confirmar y (c) candado en servidor aplicado de punta a punta. Pendientes de la categoría: M3 (editar territorio), M4 (editar variables XPCTO), M7 (regenerar análisis descarta aprobaciones de motores), M17, P2, H-P4, F3 y H-F1, y la confirmación de «regenerar síntesis o veredicto» cuando exista ese botón (ver H29 y los hallazgos menores del cierre de H25: ese botón necesitará huella y descarte del borrador del veredicto). Los casos de F3 que dependen de reabrir la fase siguen contenidos por un bloqueo PROVISIONAL (ver H30). El camino hermano #8 de H25 quedó absorbido y corregido dentro de M8. Nota de nomenclatura: M3 y M4 de la lista anterior son los de F1 y F2 (territorio, variables XPCTO); «M3 de F3» y «M4 de F3» son la síntesis y el veredicto.
+- **Caso añadido en v7 (`unlink-pestel`):** desvincular un análisis PESTEL desde F2 borra `xpctoSnapshotAtGeneration` y las aprobaciones de motores. La confirmación de la pantalla existe desde 6b (`ConfirmUnlinkPestelModal`), pero no hay candado en el servidor, y falta comprobar si el texto del modal nombra esa pérdida. Si el proyecto ya tiene Reporte F3, el bloqueo PROVISIONAL (H30) no se aplica a esta ruta. Se resuelve en la ronda PESTEL a Moddulo (H16).
+- **¿Patrón o caso aislado?:** Patrón — once casos repartidos en Moddulo, PESTEL y Fontana.
+- **Nota para el documento final:** Toda acción que descarte o invalide trabajo ya aprobado debe (a) nombrarse por lo que hace, (b) pedir confirmación que diga qué se pierde, y (c) tener un candado en el servidor, no solo en la interfaz. El modal de "Regenerar" con ediciones de PESTEL es el modelo a seguir.
+
+### H16 — PESTEL llega a Moddulo sin exigir aprobación y sin los ajustes humanos
+
+- **Hallazgo:** H-P1: importar un análisis PESTEL a F2 no exige que esté aprobado (aunque esté en PENDING_REVIEW o con sesgos sin reconocer), y de ahí cuelgan los motores M2 a M5 y el PIP. H-P2: los ajustes humanos de la matriz no viajan, porque `transformToMapaPESTEL` usa la clasificación original de la IA. H-P3: la spec dice que una confianza global menor a 50 bloquea el avance a la etapa 6, pero el código solo pone la etiqueta PENDING_REVIEW. Además, la spec de PESTEL se contradice a sí misma sobre si `AnalysisStatus` incluye `APPROVED` (H-X).
+- **Principio(s):** Principio 4 (Editabilidad y aprobación), con contradicción explícita contra la spec.
+- **Estado:** Pendiente (ronda propia con diseño, PESTEL a Moddulo). Son los hallazgos de mayor riesgo del Grupo 3.
+- **¿Patrón o caso aislado?:** Patrón dentro de la integración entre apps: el dato viaja, pero su estado de aprobación y sus correcciones humanas no.
+- **Nota para el documento final:** Cuando un resultado cruza de una app a otra, debe viajar con su estado de aprobación y con sus ediciones humanas, y la app receptora debe poder negarse a consumirlo si no cumple el estado exigido por la spec.
+
+### H17 — Guardados optimistas que afirman un éxito que no verificaron
+
+- **Hallazgo:** El autoguardado de F1 y F2 mostraba "guardado" sin revisar `res.ok`; `approve-motor` mostraba la aprobación como hecha aunque el servidor no la registrara; `save-draft` podía perder ediciones del borrador sin aviso. Los dos últimos usaban `.catch(() => {})`.
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia).
+- **Estado:** **Corregido (2026-10-07).** El autoguardado de F1 y F2, `approve-motor` (M2–M4), `finalize-dvs` (M5) y `save-draft` revisan la respuesta del servidor, revierten lo optimista y muestran un error visible. La decisión vive en `lib/moddulo/guardadoHonesto.ts`, con pruebas, y se reutiliza en H20 a H22.
+- **¿Patrón o caso aislado?:** Patrón recurrente — encabeza la familia "la pantalla no afirma lo que el servidor no confirmó" (ver sección siguiente).
+- **Nota para el documento final:** Regla: una acción que el usuario ve como hecha debe estar confirmada por el servidor. Si no lo está, la pantalla revierte y lo dice. Un fallo de red es ambiguo: el servidor puede haber recibido la petición, así que el mensaje dice "no se pudo confirmar", no "no se registró". Se prueba la función pura de decisión, incluidas las respuestas fuera de orden: una respuesta vieja nunca pisa a una más nueva. Verificado: `finalize-dvs` promueve el borrador que envía el cliente, así que un guardado fallido no congela una versión más antigua. Banear `.catch(() => {})` en revisión de código, porque el repo no tiene pruebas de DOM y la decisión debe poder probarse sin él.
+
+### H18 — Los documentos guía no tienen una lista de "puntos de control estratégico"
+
+- **Hallazgo:** Ningún documento de especificación define esa categoría. Los gates están repartidos en tres formas: cláusulas por fase (FAT:806-807, 1174-1177, 1934-1936), criterios de suficiencia "Aprobación del usuario" que son blandos por diseño (el RDA registra la deficiencia sin bloquear), y gates duros puntuales (M2, M4, cerrar F3 solo con veredicto aprobado). Por eso el servidor no bloquea "Cerrar Fase 1, 2 o 3", y eso es coherente con FAT: lo que falta es registro con autoría y fecha, no bloqueo.
+- **Principio(s):** Principio 4 (Editabilidad), Documentación viva.
+- **Estado:** Documentado. Decisión: el criterio de nodo se aplica caso por caso y es iterativo; si la investigación revela un nodo que los documentos no declaran, se señala igual.
+- **¿Patrón o caso aislado?:** Hallazgo de documentación.
+- **Nota para el documento final:** Si el sistema depende de saber qué es un nodo de decisión, esa lista debería existir como parte de la spec de cada fase, en lugar de inferirse del código.
+
+### H19 — Un rótulo debe nombrar lo que la acción hace en realidad
+
+- **Hallazgo:** Tres rótulos describían mal su acción: M8 ("Regenerar reporte F2" reemplazaba el análisis finalizado), P4 ("Ejecutar análisis manual" solo navegaba a otra pantalla) y el modal de M9 (decía que descartaba "los motores generados", cosa que el código no hace). Cada corrección se verificó leyendo el código, no por intuición.
+- **Principio(s):** Principio 1 (Transparencia).
+- **Estado:** Corregido.
+- **¿Patrón o caso aislado?:** Patrón pequeño.
+- **Nota para el documento final:** Al escribir o revisar el texto de un botón o un modal, leer el código que ejecuta y describir su efecto real. El rótulo debe usar la misma palabra que el usuario ve en la interfaz para ese objeto (por ejemplo "Finalizar análisis" y "Reemplazar análisis finalizado", no "aprobado").
+
+### Nota metodológica sobre la verificación de M28 (prompt base)
+
+La reescritura de la línea 30 se verificó con 18 llamadas reales a Claude en F1, F2 y F3, antes y después. El conteo de "te propongo" dio 0 y 0, los guards de honestidad se comportaron igual (0 porcentajes inventados en las 18 respuestas) y las longitudes fueron comparables. Eso demuestra que el cambio no empeora lo medido, no que el modelo enmarque ahora como propuesta lo que debe aprobarse. Esa parte la valida el uso real.
+
+---
+
+## Origen: serie de guardado honesto (2026-10-07 a 2026-10-08)
+
+### Regla común de la serie (agrupa H17, H20, H21, H22 y H24)
+
+**La pantalla no afirma lo que el servidor no confirmó, y una falla de red es ambigua.** Las entradas H17 y H20 a H24 son variantes de una sola familia, y el documento de patrones debe nombrar la regla una vez y listar las variantes:
+
+| Variante | Entrada | Qué no debe afirmar la pantalla |
+|---|---|---|
+| Escritura | H17 | "Guardado" o "aprobado" sin respuesta OK |
+| Cierre | H20 | "Fase cerrada" (navegar) sin confirmación |
+| Lectura | H21 | "No tienes nada" cuando la carga falló |
+| Borrado | H22 | "Eliminado" (cerrar modal, quitar de la lista) sin confirmación |
+| Sesión | H24 | "No hay usuario" cuando solo se cayó la red |
+
+Elementos compartidos de la familia:
+- Decisión en función pura probada sin DOM (`guardadoHonesto.ts`, `decidirSesionTrasError.ts`); el cableado de las pantallas solo ejecuta efectos.
+- Error de red = ambiguo: "no se pudo CONFIRMAR…", con instrucción de verificar. Excepción: para el borrador de F1/F2 el texto dice "vuelve a intentar guardar antes de recargar", porque recargar descarta lo que solo está en pantalla.
+- Pruebas en negativo: una réplica del comportamiento anterior que debe divergir en todas las combinaciones de fallo.
+- Todo estado de lista distingue cargando / vacío / fallido; "vacío" nunca es el valor por defecto de un fallo.
+- Límite declarado de la serie: el cableado de las pantallas no tiene pruebas de DOM; esa parte se valida con guías de navegador en modo Offline.
+
+### H20 — «Cerrar Fase» navegaba o respondía sin verificar que la fase se cerró
+
+- **Hallazgo:** En F1 y F2, «Cerrar Fase» hacía `await fetch(complete-phase)` sin revisar `ok` y navegaba a la fase siguiente aunque el cierre hubiera fallado. En F3 solo apagaba el spinner sin informar. En F2, el PATCH de `aprobadoEn` corría aunque el cierre hubiera fallado. El `catch` de F1 y F2 era silencioso.
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia). El cierre con autoría es H03 (Grupo 2).
+- **Estado:** **Corregido (2026-10-07, commit 2).** Si `complete-phase` falla: no se navega, el modal sigue abierto con el error y el segundo paso no se ejecuta. Si el cierre funciona pero el registro de `aprobadoEn` falla: se navega y se muestra un aviso no bloqueante en F3 (`?aviso=aprobacion_no_registrada`). Límite: el caso del segundo paso queda cubierto solo por pruebas unitarias; no se pudo provocar en navegador, porque el bloqueo de peticiones de Chrome coincide por subcadena y atrapa también `complete-phase`.
+- **¿Patrón o caso aislado?:** Patrón: misma familia que H17, en las tres fases.
+- **Nota para el documento final:** Una acción de cierre que cambia el estado del proyecto no navega ni da por concluido el cierre sin confirmación. Si hay pasos encadenados, el posterior no corre si falla el anterior; si el que falla es uno posterior a un cierre ya efectivo, el fallo se avisa pero no bloquea. Avisos entre pantallas: lista cerrada de códigos con texto fijo, nunca el valor de la URL, y se quitan de la URL tras leerse (`router.replace`).
+
+### H21 — Un hub que mostraba «sin proyectos» cuando la carga falló
+
+- **Hallazgo:** El hub de Moddulo cargaba proyectos y papelera con `.then(r => r.json()).catch(() => {})`. Si fallaba, la pantalla quedaba vacía y se leía como «no tienes proyectos» o «papelera vacía», es decir, como pérdida de datos. El mismo defecto estaba en el hub de PESTEL (fallo = «No tienes proyectos todavía») y en el de Fontana (si fallaba `sesion/mias`, caía al formulario de creación sin avisar).
+- **Principio(s):** Principio 1 (Transparencia); Arquitectura de datos.
+- **Estado:** **Corregido en los 3 hubs** (Moddulo en commit 2; PESTEL y Fontana en commit 3, 2026-10-08). Mensaje y «Reintentar» por lista mediante `decidirEstadoLista` y el componente compartido `ErrorCarga`; en Fontana el formulario «Crear una sesión nueva» queda visible como opción secundaria. Concordancia corregida: «No se pudieron cargar tus proyectos». Pendiente del mismo defecto: ~28 lecturas de Sefix (ver H26).
+- **¿Patrón o caso aislado?:** Patrón de lectura (el de H17 y H20 es de escritura), presente en al menos 4 sitios.
+- **Nota para el documento final:** Toda lista distingue tres estados: cargando, vacía y fallida. «Vacía» nunca es el valor por defecto de un fallo. Un fallo debe dejar una salida (reintentar, o una opción alternativa visible) para que nadie quede atrapado. Sugerencia: un helper común de lectura (la ronda de Sefix lo necesita) con una función pura de clasificación como `decidirEstadoLista`.
+
+### H22 — Escrituras del hub de PESTEL que afirmaban un cambio sin verificarlo (estado, edición, eliminación)
+
+- **Hallazgo:** `handleStatusChange` y `handleSaveEdit` llamaban a `onStatusChanged`/`onUpdated` y cerraban el editor aunque el PATCH fallara. `handleDelete` cerraba el modal siempre, ignoraba un DELETE fallido (`if (r.ok)` sin `else`) y, ante un fallo de red, dejaba un rechazo sin capturar. La importación automática de Moddulo F2 en `datos/page.tsx` tragaba su fallo con `.catch(() => {})`.
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia).
+- **Estado:** **Corregido (commits 3 y 4a, 2026-10-08).** Acciones `actualizar_proyecto`, `eliminar_proyecto` e `importar_adjuntos_moddulo` (no bloqueante, con aviso amarillo). En fallo el editor o el modal quedan abiertos con el mensaje y no se llama a los callbacks.
+- **¿Patrón o caso aislado?:** Patrón: misma familia que H17, en el hub de PESTEL.
+- **Nota para el documento final:** Un 404 en DELETE tras una red ambigua no puede afirmar que el objeto sigue existiendo: el primer intento pudo haberlo borrado y el reintento devuelve 404 aunque el objetivo ya se cumplió. El texto correcto es «No se encontró el proyecto; puede que ya se haya eliminado. Recarga la lista para verificar.»
+
+### H23 — Contraste: `red-eske-20` en oscuro no alcanza AA sobre tintes
+
+- **Hallazgo:** El error de guardado de F2 usaba `text-red-eske` sin variante oscura (2.42:1 en oscuro). Además, 9 líneas usaban `text-red-eske-60 dark:text-red-eske-20`, que mide 4.25:1 sobre `#18324A` y hasta 3.38:1 sobre tintes (mínimo AA para texto: 4.5:1).
+- **Principio(s):** Diseño visual.
+- **Estado:** **Corregido (commits 3 y 4a).** El error de F2 pasa a `red-eske-60 / dark:red-eske-10` (2.42:1 → 5.39:1 en oscuro). Seis usos de texto pasan a `dark:text-red-eske-10` (de 3.90–4.25 a 4.95–5.39). Se excluyeron el V1 legacy (se retira) y el ícono de exploración (4.13:1; un ícono necesita 3:1). El badge «alto» de `PESTLPanel` no llegaba a 4.5:1 con ningún token rojo (máximo 4.40 sobre la tarjeta `#21425E`); se resolvió cambiando el fondo del badge a `#112230` con texto `red-eske-10` y borde `red-eske/40` (4.30:1 → 6.63:1), que conserva el rojo como identidad.
+- **¿Patrón o caso aislado?:** Patrón de diseño: un token puede pasar AA sobre un fondo liso y fallar sobre un tinte.
+- **Nota para el documento final:** El contraste se mide sobre el fondo real (liso o tinte compuesto), en claro y en oscuro, no solo contra el fondo base. Cuando ningún token alcanza el mínimo, se cambia el fondo o el portador del color, no se acepta el valor bajo. Todo token de color con variante oscura debe declararla explícitamente.
+
+### H24 — AuthContext: una caída de red se trataba como sesión inválida
+
+- **Hallazgo:** Ante `auth/network-request-failed`, el `catch` de `AuthContext` solo hacía `console.error` (de ahí el overlay de Next en desarrollo), dejaba `user=null` y `loading=false`, y la app trataba al usuario como invitado aunque Firebase conservara su sesión (p. ej. `/moddulo` redirigía a «/»). No había recuperación al volver Online (ni listener ni reintento). El SDK ya conserva la sesión solo ante `network-request-failed` y cierra sesión ante `user-disabled` y `user-token-expired`; el `catch` nunca cerraba. Hallazgos de la auditoría de idempotencia: el riesgo real era la concurrencia (dos cargas que leen «no existe el perfil» y pisan `createdAt` y los flags de onboarding con un `setDoc` a ciegas) y la reapertura de modales; offline, las escrituras de Firestore no rechazan, quedan en cola y cuelgan el `await`.
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia).
+- **Estado:** **Corregido (2026-10-08, commit 4b).** `decidirSesionTrasError` (cerrar: `user-token-expired`, `user-disabled`, `invalid-user-token`, `user-not-found`; mantener y reintentar: `network-request-failed`, Firestore `unavailable`/`deadline-exceeded`, `too-many-requests`; resto: mantener sin reintento). Reintenta solo la lectura, con backoff de 2/5/10/20/30 s (tope 8; 30/60 s para `too-many-requests`), un solo temporizador, id de carga que invalida cargas viejas, `cancelar()` al cerrar sesión o desmontar y listener `online` con limpieza, sin depender de ese evento. Perfil nuevo con transacción «crear si no existe». Todas las esperas de escritura acotadas (10 s; 15 s la transacción). Expone `sesionSinVerificar` y `reintentarSesion`. Con transitorios: spinner con «Sin conexión. Reintentando…» a los ~10 s y `console.warn`; con errores desconocidos: `loading=false` y `console.error`, como antes. Agotados los reintentos, `/moddulo` y `blog/admin` muestran «Sin conexión» con «Reintentar» en lugar de redirigir. Cambio de orden: `user` se arma antes de las escrituras posteriores, con el rol calculado de datos verificados; la autorización real sigue en la cookie y los claims del servidor.
+- **¿Patrón o caso aislado?:** Patrón (variante «sesión» de la familia).
+- **Nota para el documento final:** Una caída de red no es una sesión inválida: solo los códigos que indican token vencido o usuario deshabilitado cierran sesión. Un estado «pendiente» necesita su propia interfaz; con `loading=true` el proveedor no renderiza nada (`{!loading && children}`), por lo que el spinner pendiente vive en el proveedor. Cualquier espera sobre una escritura de Firestore debe estar acotada. Un reintento repite solo lo idempotente (la lectura); las escrituras corren una vez. Patrón técnico: decisión pura más orquestador con efectos inyectados, probables sin DOM.
+- **Límites declarados:** el cableado de `AuthContext` y de los componentes no tiene pruebas de DOM; el cuelgue real de Firestore sin red y la coincidencia de las reglas desplegadas con `firestore.rules` no se pudieron probar con emulador (Java 17, se requiere 21). Las reglas del bloque `users` permiten la transacción de cliente sobre el propio documento (comprobado por lectura del repo y comparado manualmente por Raúl con la consola de Firebase). Hueco previo que no se empeoró: si `updateDoc` del rol funciona y `callSetUserRole` falla (error tragado), el claim queda desfasado y nadie lo reintenta.
+
+### H25 — Caminos hermanos de escritura con `if (r.ok)` sin `else` o sin `catch`
+
+- **Hallazgo:** Ocho ubicaciones con el mismo defecto que H17 y H22, listadas por la auditoría de caminos hermanos del commit 4:
+
+| # | Ubicación | Método | Tamaño aprox. |
+|---|---|---|---|
+| 1 | `fontana/FontanaSesionesHub.tsx:215-220` `handleEliminar` (sin `try`; `deleting` queda en `true` si lanza) | DELETE | ~12 líneas |
+| 2 | `fontana/FontanaSesionesHub.tsx:328-337` `handleDesvincular` | PATCH | ~12 |
+| 3 | `fontana/FontanaCanvasItemCard.tsx:108-121` eliminar tarjeta (el `finally` cierra el modal) | PATCH | ~12 |
+| 4 | `moddulo/components/RDAHistoryModal.tsx:48-62` aceptar condición RDA | POST | ~12 |
+| 5 | `pestel/[projectId]/monitoreo/page.tsx:144-157` toggle auto-Centinela | PATCH | ~10 |
+| 6 | `moddulo/.../investigacion/page.tsx` :262 generar tareas, :279 sincronizar tablero, :303 revisar territorio, :336 generar síntesis, :349 generar veredicto, :362 **aprobar veredicto (la más seria)** | POST ×6 | 8-10 c/u (~60 con helper) |
+| 7 | `moddulo/.../exploracion/page.tsx:903` unlink-pestel (mudo si `!ok`) | POST | ~10 |
+| 8 | `moddulo/.../exploracion/page.tsx:1239` `generate-dvs`: si `!ok` sigue a la retropropagación y marca «completed» | POST | ~12 |
+
+  Catch vacío por diseño o telemetría (sin acción): `investigacion/page.tsx:237` (chat-visita) y `:247`, `exploracion/page.tsx:1063`, `proposito/page.tsx:289` (todos «Comenzar»/started), `TerritorySelector.tsx:177` (sugerencia de nivel). A retirar: `pestel/analisis/[id]/page.tsx` (V1 legacy, `.catch(() => {})` en la recarga del feed, línea ~138). Cargas opcionales no críticas, solo documentadas: `exploracion/page.tsx:415,427,536,591` (contexto web/Sefix opcional).
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia).
+- **Estado:** **Corregido (v6).** La familia se cerró en los commits 5a, 5b, 6a, 6b y 6c (2026-10-09 a 2026-10-12; ver H32). Los ocho sitios de la tabla quedaron atendidos: #8 dentro de M8; #6 en los commits 4 (generar tareas, sincronizar, síntesis, veredicto), 5a (aprobar veredicto, con su guard en el servidor) y 5b (revisar territorio); #1, #3 y #4 en 5b; #2, #5 y #7 en 6b. Una auditoría ampliada de todo `app/` (111 `fetch` revisados) encontró además 15 sitios nuevos; los de impacto se cerraron en 6b y 6c y el resto quedó fuera por decisión (ver H32). **Pendiente, fuera de la familia:** #3 de la auditoría ampliada (`RegisterModal`/`setUserRole`, auth, ronda propia), 6 de bajo impacto y la telemetría. Los pendientes de servidor asociados (H34 y H35) se corrigieron en los commits 7a y 7b-1 a 7b-4 (v7).
+- **¿Patrón o caso aislado?:** Patrón (mismas variantes que H17 y H22).
+- **Nota para el documento final:** Después de corregir una familia en un sitio, la auditoría de caminos hermanos (búsqueda de `fetch` con DELETE/PATCH/POST cuyo resultado se ignora o se maneja sin `else`/`catch`) es parte de cerrar la ronda, no un extra. La segunda auditoría, repetida sobre todo `app/` al cerrar el commit 5, encontró 15 sitios que la primera no había visto: una auditoría de hermanos se repite sobre el árbol completo, no sobre las carpetas donde ya se encontró el defecto.
+
+### H26 — Sefix: ~28 lecturas con `.then(r => r.json())` sin revisar `ok`
+
+- **Hallazgo:** En 16 archivos, `hooks/useEleccionesFilters.ts` (×5), `useEleccionesLocalesFilters.ts` (×7), `useLneHistorico.ts` (×3), `useResultados.ts` (×2), `useResultadosLocales.ts` (×2), `useLneSemanal.ts`, y las tablas `EleccionesDataTable`, `EleccionesLocalesDataTable`, `HistoricoDataTable`, `HistoricoPartidos`, `HistoricoPartidosLoc`. Es el hallazgo de mayor volumen de la serie.
+- **Principio(s):** Principio 1 (Transparencia); Arquitectura de datos.
+- **Estado:** Pendiente — fuera de la serie por decisión de Raúl; candidato a ronda propia.
+- **¿Patrón o caso aislado?:** Patrón de lectura (variante «lectura» de la familia).
+- **Nota para el documento final:** Se resuelve con un helper común de lectura y una función pura de clasificación (`decidirEstadoLista` o equivalente), no con 28 parches.
+
+### H27 — `profile` y `suscripciones` redirigen cuando `!user` sin mirar `loading`
+
+- **Hallazgo:** `app/profile/page.tsx:38` y `app/suscripciones/page.tsx:28` redirigen a «/» siempre que `!user`, sin consultar `loading` ni `sesionSinVerificar`. El diagnóstico inicial sospechaba que expulsaban a usuarios con sesión válida en una carga normal.
+- **Principio(s):** Principio 7 (Persistencia); Arquitectura entre apps.
+- **Estado:** Sin defecto demostrado. Tras 4b, por lectura, esas páginas no se montan mientras `loading=true` (el proveedor no renderiza hijos), así que solo redirigirían si `user` queda `null` con `loading=false` (por ejemplo, con los reintentos agotados). La comprobación con sesión real en red normal fue solicitada a Raúl en el prompt de 4b; no se registró ninguna expulsión. No se modificaron.
+- **¿Patrón o caso aislado?:** Nota de consumidores: solo 2 de 33 archivos que usan `useAuth` leen `loading`; el resto ve `user=null` durante la verificación y muestra la UI de invitado.
+- **Nota para el documento final:** Un diagnóstico por lectura puede estar equivocado: el de esta entrada se corrigió al descubrir el comportamiento del proveedor. `sesionSinVerificar` queda disponible para que en una ronda posterior los demás consumidores muestren «Sin conexión» en lugar de la UI de invitado.
+
+### Menores de la serie (sin entrada propia)
+
+- El efecto de importación de `pestel/[projectId]/datos/page.tsx` se consideró un riesgo de redisparo si cambiaba la identidad de `loadCoverage`; la lectura demostró que es solo teórico (`loadCoverage` y `loadProject` dependen de `[projectId]`, estable). Solo se repetiría al remontar la página si el servidor no marcó `modduloAttachmentsImported`. Corregida la frase del Historial de CLAUDE.md.
+- El reintento de vinculación a Fontana (`investigacion/page.tsx:162`) es silencioso por diseño (red de seguridad previa al banner `fontanaPendiente`); ahora deja `console.warn` y revisa `ok`.
+- Pendiente de contraste fuera de la serie: badge «Archivado» de PESTEL en oscuro (4.26:1) y kebab gris de Fontana.
+
+---
+
+## Origen: ronda de confirmación de impacto — M8 y H-M3 (2026-10-08 a 2026-10-09)
+
+### Regla de la ronda (aplica H15)
+
+**Toda acción que descarte o invalide trabajo aprobado se nombra por lo que hace, pide confirmación que diga qué se pierde y tiene candado en el servidor.** Contrato común, reutilizado en los cuatro commits:
+
+- El servidor calcula el impacto **antes** de llamar a Claude: sin confirmación responde 409 (costo cero).
+- La confirmación viaja con una **huella** del estado (ids de lo afectado y hash del contenido vigente). Una confirmación vale para una sola huella; si el estado cambia, hay que confirmar de nuevo.
+- La **guardia se revalida dentro de la transacción** de escritura, contra la huella que el usuario confirmó (no contra la del pre-chequeo). Si el estado cambió mientras Claude generaba, 409 y cero escrituras.
+- Bloqueo duro 409 **PROVISIONAL** si existe el Reporte F3 (ver H30). Sin botón de confirmar: solo el motivo.
+- Copia previa de lo que se sobrescribe cuando es trabajo del usuario no regenerable (`dvsVersiones`, ver H28).
+- Funciones puras probadas sin DOM: `impactoReemplazoDVS.ts` (`calcularImpactoReemplazoDVS`, `decidirCandadoReemplazo`, `lineasDeImpacto`, `lineasDeImpactoEdicion`), `diffIdsDVS.ts`, `respuestaCandado.ts`, `escrituraF3Guardada.ts`, y las acciones nuevas de `guardadoHonesto.ts` (`reemplazar_analisis`, `generar_analisis`, `guardar_analisis`, `finalizar_analisis`, `generar_sintesis`, `generar_veredicto`, `generar_tablero`, `sincronizar_tablero`).
+
+| Commit | Fecha | Qué cambió | Pruebas |
+|---|---|---|---|
+| 1 | 2026-10-08 | Núcleo sin cambio de interfaz: `calcularImpactoReemplazoDVS`, serialización estable, copia en `dvsVersiones` dentro de una transacción (si la copia falla, el reemplazo se aborta), cableado en `generate-dvs` final y `finalize-dvs` | +46 (suite en 1189) |
+| 2 | 2026-10-09 | Candado en `generate-dvs` final (409 antes de Claude, guardia en la transacción), modal con rótulos de F3, botón «Reemplazar análisis finalizado…», camino #8, huella con hash del dvs, `maxDuration = 300`, ruta legacy con captura de error | +58 (1247); 12 de las 15 pruebas nuevas de la ruta fallan contra el original |
+| 3 | 2026-10-09 | Candado en `finalize-dvs` por diff real de ids («Guardar cambios» y «Finalizar análisis»), modal con variantes, reversión de la aprobación de M5 al recibir el 409 | +65 (1312); 14 de las 20 pruebas de `finalize-dvs` fallan contra el original |
+| 4 | 2026-10-09 | H-M3: pre-chequeo y escritura condicional en `sintesis/generar` y `veredicto/generar`; bloqueo con Reporte F3 en `tareas/generar` y `tareas/sincronizar`; los handlers de F3 dejan de ignorar `!r.ok` | +77 (1389); 27 de las 41 pruebas fallan contra el original |
+
+### H28 — M8: dos escritores del análisis finalizado, sin candado, rompían los ids que F3 consume
+
+- **Hallazgo:** `phases.exploracion.dvs` tenía dos escritores sin guard: `generate-dvs` con `saveas:"final"` (valor por defecto) y `finalize-dvs` (promueve el borrador y borra `draftDVS` y `motorAprobaciones`). `generate-dvs` nunca lee el dvs anterior y `sanitizeDVS` solo reutiliza ids que vienen en la entrada, así que toda regeneración crea `pipItemId` y `actorId` nuevos. Consumidores que se rompen en silencio o con error: el tablero `f3TareasPIP` (une por `pipItemId`; `detectPipStaleness` lo detecta después y `tareas/sincronizar` retira las tareas con avance), `f3Resultados` y `f3Sintesis` (huérfanos sin señal), `f3Veredicto` y `f3DIE` (nada compara la HEI), `canal1/entregar` (404 «Asignación… no encontrada») y las sesiones de Fontana (apuntan a ids que ya no existen, sin tratamiento). Un segundo llamador de `finalize-dvs`, «Finalizar análisis» tras regenerar el borrador (M7), tenía el mismo daño.
+- **Principio(s):** Principios 1 (Transparencia) y 3 (Colaborador estratégico), vía H15; Principio 7 (Persistencia).
+- **Estado:** **Corregido (commits 1 a 3).** `generate-dvs` final pide confirmación siempre que exista un dvs finalizado (las líneas de impacto sobre F3 aparecen solo si hay impacto real). `finalize-dvs` solo la pide cuando el diff real de ids elimina preguntas o actores que F3 referencia (tarea, resultado asociado o síntesis que cita la pregunta o guarda el FODA del actor); editar textos, reordenar o añadir no la pide. El 409 de «Finalizar análisis» revierte la aprobación de M5 y Cancelar deja la pantalla como antes del clic. Camino #8: ya no se llama a `checkBackPropagation`, no se pasa a «completed» ni se abre el reporte si `generate-dvs` falla; la rama de formulario de `handleSaveEdit` se conserva (casi inalcanzable: «Editar análisis» está deshabilitado sin dvs) y queda registrada como limpieza.
+- **Datos medidos (14 proyectos reales, solo lectura):** 10 con dvs finalizado, 4 con avance real en F3, 1 con resultado aprobado, 1 con síntesis, 0 con veredicto o Reporte F3. El dvs mide entre 24.1 y 30.4 KB (mediana 26.9 KB).
+- **¿Patrón o caso aislado?:** Patrón (H15): primer caso corregido de punta a punta; el modelo se reutilizó en H29.
+- **Nota para el documento final:**
+  - **No existe una clave estable segura para heredar ids** (la pregunta es texto libre, `numero` y `orden` son posicionales y `nombre` es editable). Heredarlos por posición asociaría datos mal en silencio, así que la protección se pone en la escritura, no en la herencia.
+  - El diff de ids exige **normalizar ambos lados igual** (`legacy-N` / `legacy-nombre`); de lo contrario un proyecto legado produce eliminados falsos.
+  - Un fallo de red es ambiguo en `finalize-dvs`: como sin impacto el servidor escribe sin preguntar, ni siquiera sin confirmación previa se puede afirmar que no se guardó. Los textos dicen «No se pudo CONFIRMAR…».
+  - Un texto de error solo afirma «sigue vigente» donde el flujo lo demuestra (error antes de la transacción). El «el anterior se conserva sin cambios» se retiró de `finalize-dvs`.
+  - `dvsVersiones` es un mecanismo **paralelo a `changelog.ts`** (ver H06, H08): el Grupo 2 debe unificarlo. No tiene tope de retención (24–30 KB por versión; ~2.7 MB por 100 ediciones) ni lectura o restauración desde la pantalla. Las reglas de Firestore no tienen comodín bajo `moddulo_projects/{projectId}`, así que las subcolecciones quedan en denegar por defecto para el cliente; el estado desplegado no se pudo verificar.
+- **Límites declarados:** sin pruebas de DOM (el cableado de modal y handlers se valida con guías de navegador); el emulador de Firestore no arranca (Java 17, se requiere 21), así que la atomicidad real no se probó; la secuencia multi-motor de 4 llamadas a Claude solo se prueba hasta el pre-chequeo (la ruta legacy, de una llamada, sí se prueba completa).
+
+### H29 — H-M3: generar M3 (síntesis), M4 (veredicto) o el tablero de F3 encima de lo que ya existe
+
+- **Hallazgo:** `sintesis/generar` sobrescribía el objeto completo y `veredicto/generar` escribía `{...parsed, aprobadoPorUsuario:false}`, ambos sin guard de estado ni transacción. Con un veredicto o un Reporte F3 ya emitidos, regenerar la síntesis dejaba un veredicto contrastado contra otra síntesis: aprobarlo después producía un Reporte incoherente. `tareas/generar` con `confirmar:true` ignoraba síntesis, veredicto y Reporte (contrato distinto al de la serie: boolean sin huella). **La interfaz no ofrece regenerar:** «Generar síntesis (M3)» solo se pinta cuando no hay síntesis y «Generar veredicto (M4)» cuando no hay veredicto. El riesgo real es una pestaña desactualizada (A muestra el botón porque no sabía que B ya generó) o una llamada directa a la API. Además, los handlers de F3 ignoraban `!r.ok` en silencio. Estado imposible por construcción: «veredicto aprobado sin Reporte F3» (aprobar escribe ambos en la misma actualización); solo existiría con datos anómalos.
+- **Principio(s):** Principios 1 y 3, vía H15; Principio 7.
+- **Estado:** **Corregido en servidor y avisos (commit 4).** `sintesis/generar` y `veredicto/generar` hacen un pre-chequeo antes de Claude: 409 `f3_ya_existe` si lo que se iba a generar ya existe («Esta pantalla está desactualizada: la síntesis (o el veredicto) ya existe. No se generó nada; recarga la página.») y 409 `reemplazo_bloqueado` (PROVISIONAL) con Reporte F3 o veredicto aprobado. La escritura va en una transacción condicional (`escrituraF3Guardada.ts`): solo escribe si lo generado sigue sin existir y F3 sigue abierta. `tareas/generar` (incluso con `confirmar:true`) y `tareas/sincronizar` se bloquean con el Reporte F3. Cuatro handlers (síntesis, veredicto, tablero, sincronizar) muestran un aviso rojo con `role="alert"`. **Sin modal ni huella**, porque no existe la función de regenerar. Pendiente: la confirmación con modal cuando se decida el botón «Regenerar síntesis…».
+- **Regresión evitada:** `handleGenerarTareas` trataba cualquier 409 como `progreso_existente`; con el 409 nuevo habría fallado con un resumen indefinido. Ahora discrimina por el campo `error`.
+- **Datos medidos (14 proyectos, solo lectura):** 1 con síntesis, 0 con veredicto, 0 con veredicto aprobado, 0 con Reporte F3, 0 con aprobado sin Reporte.
+- **¿Patrón o caso aislado?:** Patrón (H15) en F3.
+- **Nota para el documento final:**
+  - Antes de construir un modal de confirmación, verificar que existe un camino legítimo que lo alcance. Si solo se llega por una pestaña desactualizada o por API, basta un 409 informativo; la confirmación se construye cuando el botón exista. Eso redujo el commit de ~900 a un tamaño proporcional al riesgo.
+  - **Producto incompleto:** hoy no hay forma de refrescar una síntesis tras aprobar resultados nuevos. Cuando exista «Regenerar síntesis…», su confirmación debe descartar el borrador del veredicto en la misma transacción (un borrador contrastado contra otra síntesis daría un Reporte incoherente).
+  - Al añadir un código de respuesta a una ruta, auditar los llamadores: un 409 nuevo puede romper handlers que asumían un solo significado.
+  - Para el 500 con motor en una primera generación, el texto es «No se guardó nada; la Fase 3 sigue como estaba», porque no hay un anterior que «siga vigente».
+
+### H30 — Bloqueo por Reporte F3 PROVISIONAL y H-M3b
+
+- **Hallazgo:** Mientras no exista un mecanismo para reabrir F3 o marcar lo derivado como desactualizado, cualquier acción que eliminaría ids con impacto, o regeneraría síntesis, veredicto o tablero, se bloquea si existe el Reporte F3. Es una **medida de contención, no de diseño final**. El Reporte F3 es una **foto fija** (`sintesisPorDimension`, `tableroTareasPIP`, `veredictoHEI`): lo que se cambie después lo deja desfasado, y en solo lectura el Tablero muestra lo vivo (`f3Sintesis`, `f3Veredicto`), no lo del Reporte, sin aviso. El texto del bloqueo no dice «DIE» (el usuario no lo ve): usa «M4 · Veredicto HEI» y «Reporte F3», con el verbo de la acción («Guardar estos cambios las dejaría inconsistentes…», «Generar la síntesis de nuevo…»). En el caso anómalo (aprobado sin Reporte) no afirma que exista un Reporte F3.
+- **H-M3b (fuera de la ronda):** una edición manual del dvs que **conserva ids** con Reporte F3 emitido sigue permitida, pero puede cambiar el contenido de la HEI y de los contrastes bajo un Reporte ya construido. Vive en `finalize-dvs`, el cálculo por ids no puede expresarlo, y qué hacer (¿avisar o bloquear?) es una decisión de producto.
+- **Principio(s):** Principios 1 y 4; conecta con H16.
+- **Estado:** Contenido (bloqueo provisional). Pendiente (decisión de producto y diseño en la ronda PESTEL a Moddulo, H16).
+- **Requisito de diseño para H16:** la ronda PESTEL a Moddulo debe diseñar la **actualización controlada de lo derivado en F3**. Con el bloqueo actual, un proyecto con Reporte F3 no puede incorporar un análisis PESTEL o de F2 actualizado. Raúl aceptó este costo por ahora y se observará en el uso real. El banner de desactualización de F3 (`detectPipStaleness`) no aparece en solo lectura (coherente con el bloqueo), y no existe aviso equivalente para síntesis o veredicto desactualizados.
+- **Requisito añadido en v7:** la actualización controlada debe contemplar la **adenda de investigación con Reporte emitido** (ampliar la investigación, por ejemplo con Fontana, reenviarla a F3 y actualizar el Reporte automáticamente), ver H36.
+- **Nota para el documento final:** Una medida de contención debe nombrarse como provisional en el código, en el mensaje y en la bitácora, con la condición que la retira.
+
+### H31 — Generaciones largas: sin `maxDuration` y sin fecha visible para verificar
+
+- **Hallazgo:** `generate-dvs` no declaraba `maxDuration` (la única ruta de F2 que lo declaraba era `generate-m1-express`, con 300). Se añadió `export const maxDuration = 300`. Por lectura (no medido): el caso normal ronda 125–200 s; M2‖M3, M4 y dos intentos de M5 pueden llegar a unos 300 s, y una llamada colgada puede pasar el techo (el SDK tiene timeout de 10 minutos y dos reintentos). Si la función se corta antes de la transacción, no se escribe nada y el análisis anterior queda intacto; si se corta durante el commit, o la respuesta se pierde, el resultado es incierto (una sola llamada a Firestore: aplica completa o no aplica). El usuario recibe el texto ambiguo («No se pudo CONFIRMAR… recarga la página para verificar el estado») y **no tiene contra qué comparar, porque el análisis finalizado no muestra fecha de generación ni de finalización**. Ninguna ruta de F3 declara `maxDuration`; M3 usa `max_tokens: 8000`. Cerrar la pestaña a medio camino: el servidor sigue y escribe si la huella sigue vigente; al volver, el usuario ve el análisis nuevo sin aviso (aceptado: el usuario confirmó y la versión anterior queda guardada).
+- **Principio(s):** Principio 1 (Transparencia); Principio 8 (Oportunidad).
+- **Estado:** Documentado, riesgo conocido. Arreglos posibles, sin construir: mostrar la fecha de finalización (`dvsVersiones` ya guarda `reemplazadoEn`; Grupo 2, junto con H04) o dividir la generación en pasos. **Pendiente de medir:** el tiempo real de una regeneración de M8 con PESTEL vinculado (camino multi-motor).
+- **Nota para el documento final:** Toda ruta que encadena llamadas largas a un modelo declara su techo de duración y su comportamiento ante corte; si el fallo es ambiguo, la pantalla debe ofrecer algún dato contra el cual verificar.
+
+### Verificaciones diferidas hasta que existan los motores M2 en adelante de F3-Investigación
+
+Los motores M2 en adelante de F3 dependen de apps de investigación que aún no están construidas. Raúl aceptó dar los commits por buenos con **reserva**: el núcleo está cubierto por pruebas de función pura y de ruta; las siguientes comprobaciones en navegador se retoman cuando existan esos componentes.
+
+| Verificación pendiente | Qué la activa |
+|---|---|
+| Viñetas del modal de M8 y del modal de edición con resultados recibidos y aprobados reales | M2 de F3 |
+| Impacto sobre una síntesis y un veredicto generados por la app | M3 y M4 de F3 |
+| Bloqueo con un Reporte F3 generado por la app (hoy solo sembrado a mano en un proyecto desechable) | Aprobar veredicto de verdad |
+| Qué muestra «M2 · Resultados recibidos» con un resultado aprobado huérfano tras quitar una pregunta | M2 de F3 |
+| Aviso de desactualización de F3 tras un reemplazo con un tablero que ya tiene resultados | M2 de F3 |
+| Actores eliminados con una síntesis real que tenga su FODA | M3 de F3 |
+| Botones «Generar síntesis (M3)» y «Generar veredicto (M4)» con el 409 de pantalla desactualizada (el botón solo se habilita con un resultado aprobado o un tablero cubierto) | M2 de F3 y tablero cubierto |
+| Escritura condicional de M3 y M4 con dos pestañas y generación real | M3 y M4 de F3 |
+| Cambio de huella durante la generación de M8 en dos pestañas (cuesta una generación completa; cubierto por prueba de ruta) | Decisión de pagar la generación |
+| Tiempo real de una regeneración de M8 con PESTEL vinculado (ver H31) | Una regeneración real en proyecto desechable |
+| Aprobar veredicto de verdad: el 409 `f3_ya_aprobado` con dos pestañas y el Reporte F3 construido por la app (5a) | Aprobar veredicto de verdad |
+| Revisar territorio con éxito (5b) | M2 de F3 |
+| Aprobar un resultado recibido con éxito y sin red, y el caso de la asignación inexistente (6c, `resultados/aprobar`) | M2 de F3 y tablero real |
+| Activar y desactivar una asignación del tablero, con éxito y sin red (6c, `F3TareasPIP`) | Tablero real |
+| Aprobar un resultado con una asignación que ya no está en el tablero (sincronizar en otra pestaña y aprobar desde la vieja): debe salir el texto nuevo de 7b-4 y el resultado seguir sin aprobar | M2 de F3 y tablero real |
+| Aprobar en una pestaña desactualizada con una asignación nueva: el servidor usa el tablero vigente (7b-4) | M2 de F3 y tablero real |
+| Vincular y desvincular una sesión de Fontana con el banner de Fontana pendiente de F3 (7b-1) | Proyecto Moddulo desechable que llegue a F3 |
+
+### Hallazgos menores de la ronda (sin entrada propia)
+
+- **Token `red-eske-70` en oscuro:** `--color-red-eske-70` apunta a `var(--surface-5)`, que no existe, así que `bg-red-eske-70` queda sin color. Afecta a `text-red-eske-70` en `exploracion/page.tsx:2340`. El modal usa `hover:bg-red-eske-60/90`. Pendiente de contraste, sin ronda propia.
+- **«Editar análisis» existe en F2 y en F3 con el mismo rótulo.** El bloqueo de M8 no promete que esté disponible.
+- **Doble clic:** la barrera de M8 era solo `isRegeneratingReport` en el cliente; ahora el servidor también lo impide (la segunda confirmación de la misma huella recibe 409 por el hash del dvs).
+- **Cualquier rol de colaborador puede reemplazar el análisis** (H-M7, sin tocar).
+- **Un actor eliminado que la síntesis usa pide confirmación aunque F3 ya lo muestra con la nota «(ya no está en el Semáforo vigente)».** Se mantiene (criterio vigente: confirmar siempre que F3 use un id eliminado).
+- **Tras un reemplazo con ids nuevos**, `canal1/entregar` falla con 404 explícito y las sesiones de Fontana siguen apuntando a ids que ya no existen. Sin tratamiento.
+- **Después de un reemplazo**, F3 solo se entera por el banner `detectPipStaleness` cuando la persona entra a F3; M8 nunca llamó a `checkBackPropagation`.
+- **Las guías de navegador pueden contradecir al código:** la primera guía de las dos pestañas describía solo la rama #8; se reescribió tras releer el código. Los datos de siembra manual se validan con una prueba que usa las mismas muestras (`siembraF3.ts` y el JSON de la tarea sembrada).
+- **`tareas/generar`** conserva un contrato distinto al de la serie (`confirmar` booleano sin huella); solo se le añadió el bloqueo con Reporte F3.
+- **El dvs ya no se puede consultar ni restaurar desde la pantalla**, aunque exista la copia: el modal lo dice así.
+
+### Lecciones de proceso de la ronda
+
+1. **Plan primero y revisión crítica antes de construir** cambió el diseño en cuatro puntos: la huella lleva el hash del dvs (dos pestañas que confirmaban a la vez regeneraban dos veces), la guardia compara contra la huella confirmada y se revalida dentro de la transacción (no relee antes), el pre-chequeo y la guardia leen el documento crudo y no `getProject()` (huellas coherentes en proyectos legados) y, en H-M3, se simplificó al descubrir que la interfaz no ofrece regenerar.
+2. **Pruebas en negativo contra el código anterior:** fallaron 12 de 15 (commit 2), 14 de 20 (commit 3) y 27 de 41 (commit 4); las que pasaban en ambos eran los comportamientos que no debían cambiar.
+3. **Medir antes de fijar:** los volúmenes de `dvsVersiones` y el estado de los 14 proyectos reales se midieron en solo lectura antes de decidir.
+4. **Contención declarada:** el bloqueo por Reporte F3 se nombró provisional desde el primer commit.
+5. **Verificación diferida con condición de activación**, no omitida: ver la tabla anterior.
+6. **Límite persistente del repo:** sin pruebas de DOM y sin emulador de Firestore; la atomicidad real y el cableado de pantallas se validan con guías de navegador.
+
+---
+
+## Origen: cierre de la familia H25 — commits 5 y 6 (2026-10-09 a 2026-10-12)
+
+### Regla de la serie (sin cambios) y cómo se completó
+
+La regla común sigue siendo la de la serie de guardado honesto: **la pantalla no afirma lo que el servidor no confirmó, y una falla de red es ambigua.** En estos commits se aplicó sin excepciones nuevas. Resumen de su aplicación:
+
+- Red, 500 sin código, 502/503/504, `reemplazo_escritura_incierta` y un 200 inválido son siempre ambiguos («No se pudo CONFIRMAR…»).
+- Solo 401/403 afirman el estado previo, con un texto de permiso propio por acción (campo `permiso`), para no decir «guardar en este proyecto» donde no aplica.
+- Un 404 o un 400 del tipo «no encontrado / no activo / no vinculado» no afirma existencia (lección H22).
+- El modal o la confirmación queda abierto con el error en `role="alert"` (contraste `text-red-eske-60 dark:text-red-eske-10`) y el callback de éxito no se llama si falla.
+
+### H32 — Cierre de la familia H25: auditoría ampliada y commits 5a a 6c
+
+- **Hallazgo:** Al abrir el commit 5, Code repitió la auditoría de caminos hermanos sobre todo `app/` (111 `fetch` revisados). Resultado: **0 destructivos nuevos, 3 que afirman un éxito falso, 12 que solo pierden un aviso y 6 de telemetría por diseño.** Se decidió cerrar la familia completa en un sexto commit y no postergarla.
+- **Principio(s):** Principio 7 (Persistencia) y Principio 1 (Transparencia).
+- **Estado:** **Corregido.** Commits:
+
+| Commit | Qué cambió | Suite |
+|---|---|---|
+| 5a (`5d3b785`) | Guard de `veredicto/aprobar` en el servidor: `decidirAprobacionVeredicto` (Reporte F3 o veredicto aprobado → 409 `f3_ya_aprobado`; sin veredicto o sin síntesis → los 400 de siempre) y escritura condicional que compara veredicto y síntesis (409 `f3_estado_cambio`). El DIE se arma como hoy (persiste `numero`). Aviso en la pantalla | 1426 |
+| 5b (`fc42a60`) | Hermanos que afirmaban éxito falso o eran destructivos: revisar territorio, eliminar exploración, eliminar tarjeta del Canvas y aceptar condición RDA (cuatro acciones simples) | 1463 |
+| Seguimiento de 5b | `setAcceptError(null)` en `RDAHistoryModal.tsx` (error obsoleto al abrir otro ítem) y filas de CLAUDE.md | — |
+| `342c6b6` | Recuento de rutas (148) en CLAUDE.md | — |
+| 6a | Infraestructura de exhaustividad (ver H33) | 1468 |
+| 6b (`69adcd0`) | Cinco acciones simples: eliminar cadena de impacto, eliminar reporte de sesión, desvincular exploración (Fontana), interruptor de monitoreo automático y desvincular PESTEL | 1504 |
+| 6c | Siete acciones simples: agregar cadena de impacto, marcar alerta como leída, aprobar resultado recibido, cambiar asignación en el tablero, reconocer sesgo (interpretación y análisis), editar y archivar exploración (`patchSesion`) | 1550 |
+
+  Evolución del catálogo de acciones: 20 (6a) → 25 (6b) → 32 (6c); las acciones simples pasaron de 4 a 9 y a 16.
+- **Detalle de 6b y 6c que conviene recordar:**
+  - Los dos modales de confirmación (eliminar reporte y desvincular PESTEL) quedan abiertos con el error; «Cancelar» se deshabilita mientras corre la acción; el estado local solo se resetea tras la confirmación.
+  - Las listas se recargan siempre tras un borrado de cadena, porque la ruta borra por índice (ver H34).
+  - El formulario de cadenas conserva lo escrito si falla o es ambiguo.
+  - La alerta solo se marca como leída tras confirmación; el aviso se limpia cuando llegan datos nuevos del sondeo.
+  - En análisis, el reconocimiento de sesgo usa estado de error propio: reutilizar `error` habría disparado el banner «Error en el análisis». En interpretación, usar `setError(null)` habría borrado un error ajeno (por ejemplo, una aprobación rechazada).
+  - `resultados/aprobar` escribe «aprobado» antes de buscar la asignación en el tablero. Su 404 «Asignación no encontrada en el tablero» puede llegar con la escritura ya hecha, así que se trata como ambiguo («el servidor pudo marcarlo como aprobado, pero no encontró la asignación…»). El arreglo de fondo está en H35.
+  - `mensajeDeFalloSimple` ahora evalúa el texto específico antes del 404; es neutral para las acciones previas (solo coinciden con 400 o 409) y tiene prueba.
+  - `patchSesion` devuelve el mensaje honesto; `EditModal` apaga «guardando» siempre.
+- **¿Patrón o caso aislado?:** Patrón (variantes «escritura», «borrado» y «aprobación» de la familia).
+- **Nota para el documento final:**
+  - **Cada commit se acompañó de un repaso de código dedicado al cableado.** Encontró defectos reales que las pruebas de función pura no ven: 3 arreglos en 6b (limpieza del error general en `handleEliminar`, recarga de la lista de cadenas sin captura, aviso de cadenas sin limpiar al agregar) y 4 en 6c (los citados arriba y la limpieza del error por id). Como el repo no tiene pruebas de DOM, ese repaso es hoy el único control del cableado.
+  - **Hallar una observación incorrecta también es resultado:** en 6b Code descartó una observación propia porque la ruta de cadenas responde 403, no 400, y una prueba ya lo cubría.
+  - **Pruebas en negativo:** en 5a, 5b y 6a a 6c son locales (una función que simula el comportamiento viejo), porque no hay DOM ni `@testing-library`; cada fila de CLAUDE.md lo declara. No equivalen a las de los commits 2 a 4, que se midieron contra el código original de las rutas.
+  - Una prueba de 5a esperaba «haya registrado» y el código dice «haya aprobado»; se corrigió la prueba, no el código.
+
+### H33 — Infraestructura de exhaustividad del catálogo de acciones (`GRUPO_ACCION`)
+
+- **Hallazgo:** Con más de veinte acciones de guardado, el riesgo ya no era un texto mal escrito sino una acción sin clasificar. 6a creó un catálogo único `GRUPO_ACCION` (`as const satisfies Record<AccionGuardado, "clasica"|"f3"|"simple">`), con `ACCIONES_F3`, `ACCIONES_SIMPLES` (antes `ACCIONES_5B`), `TEXTOS_SIMPLES` (`Record` sobre las acciones simples, con campo `permiso`) y el helper `esNoBloqueante`. Una acción nueva sin clasificar, o una simple sin sus textos, no compila.
+- **Principio(s):** Proceso de desarrollo; Principio 1 (Transparencia).
+- **Estado:** Corregido (6a). **Límite declarado:** la garantía de compilación es fuerte solo para el grupo `simple`; una acción mal etiquetada como `clasica` cae en la rama genérica sin error de compilación.
+- **Idea registrada, sin construir (test ratchet):** un test que cuente los `fetch` mutantes sin manejo y falle si el número crece. Sería el único guardia mecánico contra regresiones de la familia, pero con `grep` es frágil.
+- **Nota para el documento final:** Cuando una familia de defectos tiene muchas instancias, la corrección debe incluir un mecanismo que haga fallar la compilación al aparecer la siguiente, no solo parchear las conocidas. Declarar la parte de la garantía que no se cumple.
+
+### H34 — `impact-chain` borraba por índice; `ImpactChain` no tenía id
+
+- **Hallazgo:** El DELETE de cadenas de impacto de PESTEL identificaba la cadena por su posición en el arreglo. Con una lista desactualizada (dos pestañas, o un reintento tras una red ambigua) podía eliminar otra cadena del analista. Datos medidos (142 análisis reales, solo lectura): 104 con cadenas, 519 en total, ninguna con id y ninguna del analista (todas vienen de la IA y no traen `source`). Nadie había usado «Agregar cadena» antes de 6c, así que el riesgo no se había materializado. No hizo falta migración.
+- **Principio(s):** Principio 7 (Persistencia); Arquitectura de datos.
+- **Estado:** **Corregido (commit 7a, `97cd737`, 2026-10-12).** `ImpactChain` gana `id?: string`. El POST asigna `crypto.randomUUID()` a cada cadena del analista. El DELETE acepta `{chainId}` y corre dentro de una transacción (el callback devuelve `borrada`, `no_encontrada`, `duplicada`, `no_analista` o `requiere_id`, y la respuesta se arma fuera). Reglas: `chainId` presente pero inválido (número, objeto, null, vacío, solo espacios) es 400 y **no cae al índice**; id inexistente es 404 sin escribir; id duplicado es 409 `cadena_id_duplicado`; si llegan los dos manda el id; una cadena que no es del analista es 403, como antes. **El respaldo por índice solo opera sobre cadenas sin id**: si en esa posición hay una cadena con id responde 409 `requiere_chain_id` y no borra (una pestaña abierta antes del despliegue conserva su JavaScript viejo y podría borrar por índice cadenas nuevas). JSON inválido pasa de 500 a 400. El cliente envía `chainId` (o `index` solo para una cadena sin id), conserva la recarga de la lista de 6b y usa `key={chain.id ?? "idx-" + i}`. Pruebas: +31 en `route.id.test.ts` (23 fallan contra la ruta anterior; las 8 que pasan son validaciones y permisos); las 5 de 6b siguen verdes sin editarse. Suite en 1581. Los textos del catálogo no cambian.
+- **Riesgos residuales y decisiones:**
+  - El POST con id generado en el servidor ya **no se deduplica** ante un reintento ambiguo (antes el objeto idéntico lo hacía `arrayUnion`, porque no llevaba marca de tiempo). El efecto es una tarjeta duplicada, visible y borrable por id. La variante con id generado por el cliente (~25 líneas) se registró y no se construyó.
+  - `requiere_chain_id` y `cadena_id_duplicado` caen en el aviso genérico 4xx. Un texto nuevo en el catálogo no llegaría a una pestaña con el cliente viejo, que es justo quien recibe el primero; se resuelve recargando.
+  - **Criterio de retiro del respaldo por índice:** conteo de solo lectura de cadenas del analista sin id (0 de 519 hoy) y 30 días sin la etiqueta de log `[impact-chain][respaldo-indice]`.
+  - Las cadenas de la IA siguen sin id ni `source`: no se pueden borrar ni referenciar. Si algún día se editan, darles id en `generateFeed.ts` (Cloud Function, copia aparte).
+- **Nota para el documento final:** Toda colección editable por el usuario necesita un identificador estable desde su creación; la posición en un arreglo no es una identidad. Un respaldo de compatibilidad debe ser seguro por construcción (aquí, solo sobre lo que no tiene id) y nombrar la condición que lo retira.
+
+### H35 — Escrituras dobles sin atomicidad y rutas que escribían antes de validar
+
+- **Hallazgo:** Seis rutas hacían varias escrituras que podían dejar un estado a medias si fallaba una de ellas, o escribían antes de validar. La auditoría de datos reales (solo lectura, 14 proyectos Moddulo, 5 PESTEL, 15 sesiones de Fontana, 142 análisis) encontró **cero estados a medias**: 7b fue prevención, no reparación.
+
+| Caso | Commit | Qué cambió |
+|---|---|---|
+| `invalidarReporteSesion` y `repuntarSiCorresponde` (Fontana) | 7b-1 (`98a4e36`) | `WriteBatch`: `invalidarReporteSesion(sesionRef, batch?)` agrega sus operaciones a un batch externo o crea el suyo; el repunte suma su update y queda en 4 operaciones atómicas |
+| Desvincular de Fontana | 7b-1 | `runTransaction` que relee la sesión, revalida y escribe marcador `fontanaPendiente` y sesión juntos |
+| `vincular-moddulo` (hermano) | 7b-1 | `runTransaction` (el reverso exacto del anterior) |
+| `unlink-pestel` | 7b-2 | `runTransaction` que revalida `linkedSource` dentro (dos desvinculaciones simultáneas dejan a la 2.ª en `not_linked`) y escribe ambos documentos |
+| `link-moddulo` (hermano) | 7b-2 | Toda decisión que depende del estado vigente (idempotente, `pestel_already_linked`, `moddulo_already_linked`, rama C7b) se toma dentro de la transacción. Cierra una **carrera real**: dos vinculaciones simultáneas del mismo PESTEL a dos Moddulo (o de dos PESTEL al mismo Moddulo) pasaban ambas comprobaciones |
+| `acknowledge-bias` | 7b-3 | Un solo `tx.update`; `status` pasa a `REVIEWED` solo si todas quedan reconocidas y el estado actual es `PENDING_REVIEW` (**nunca baja un `APPROVED`**); cuerpo inválido da 400; también corrige dos reconocimientos simultáneos que se pisaban |
+| `approve` (PESTEL) | 7b-3 | Propiedad por proyecto con `getAnalisisPropio` (404 para ajeno, inexistente o proyecto inexistente, sin escribir; antes escribía `APPROVED` y luego lanzaba); 422 evaluado con la lectura transaccional; ambos updates en una transacción |
+| `resultados/aprobar` (F3) | 7b-4 (`820fcfc`) | Valida primero (resultado, proyecto, asignación en el tablero releído **dentro** de la transacción) y escribe después; lo escrito es idéntico al de siempre (`normalizeTareaPIP`, con ids actuales y `legacy-N`). Único texto de pantalla que cambia en 7b: el 404 «Asignación no encontrada» pasa de «el servidor pudo marcarlo como aprobado…» a «Esta solicitud no registró ningún cambio…» |
+
+- **Pruebas (todas con caracterización escrita primero, verde contra el código anterior y sin editar después, salvo cambios declarados):**
+
+| Commit | Suite | Caracterización | Atomicidad: fallan contra la ruta anterior |
+|---|---|---|---|
+| 7b-1 | 1616 | 21 | 12 de 14 (9 negativos reales de rutas, 3 de API nueva) |
+| 7b-2 | 1651 | 21 | 8 de 10 |
+| 7b-3 | 1682 | 11 | 8 de 12 (más 7 de equivalencia de propiedad, sobre siembra, que no cuentan como negativos) |
+| 7b-4 | 1695 | 4 | 6 de 9 |
+
+  Las que pasan en ambos son locales al mock («falla la primera escritura»: ahí no hay nada a medias) y se declaran así. Un conteo mal reportado en 7b-1 (13 en vez de 14) se detectó en la revisión y se corrigió en CLAUDE.md.
+- **Ediciones deliberadas de pruebas existentes (declaradas):** la de 6c «DOS escrituras» de `acknowledge-bias` pasó a una; `approve` con proyecto inexistente pasó de «escribe y lanza» a «404 sin escribir»; la de «ajeno» siembra otro dueño del proyecto; la de `resultados/aprobar` «404 después de haber escrito» pasó a «404 con cero escrituras»; y la siembra del documento del proyecto con `importActual` para conservar `normalizeTareaPIP` real.
+- **Mock `adminMocks.ts` (solo aditivo):** `delete`, `batch()`, `failUpdateOn`, `failNextBatchCommit`, `estricto(true)` y búfer de `runTransaction` **opt-in** (`mockDb.atomico(true)`). El comportamiento por defecto no cambió, porque lo usan informes, impact-chain, `dvsVersiones` y `escribirF3Condicional`. Un artefacto del mock (devolvía el mismo arreglo y la ruta lo mutaba en sitio) hacía «fallar» una prueba contra la ruta anterior por una razón equivocada; se reescribió.
+- **Principio(s):** Principio 7 (Persistencia); Arquitectura de datos.
+- **Estado:** **Corregido** (7b-1 a 7b-4). Mismos códigos y cuerpos hacia la pantalla en todos los casos, salvo el texto de `resultados/aprobar`. Pendientes de la misma clase en H37.
+- **Límites declarados (en CLAUDE.md de cada commit):** sin emulador de Firestore (Java 17, se requiere 21): la atomicidad real, el aislamiento, los reintentos y la contención no se prueban; el mock modela el «todo o nada» y no lo demuestra; las carreras se simulan escribiendo en el hueco entre la lectura previa y la transacción; un 500 sigue siendo ambiguo para el cliente (el commit pudo aplicarse y perderse la respuesta), así que los textos de 6a a 6c no cambian.
+- **Nota para el documento final:** Si una acción toca varios documentos, se escribe en una transacción o en un batch, y toda ruta valida antes de escribir. Dentro de una transacción el callback no tiene efectos externos (puede reintentarse), lee todo antes de escribir, devuelve un resultado y la respuesta se arma fuera. Una **carrera de doble vínculo** se cierra leyendo dentro de la transacción, no con un guard previo. Tocar el criterio de propiedad de una ruta (aquí, `approve`: de `data.userId` a la propiedad por proyecto) se justifica con una medición de que ambos criterios coinciden en los datos reales (142 de 142) y se declara.
+
+### Hallazgos menores del cierre de H25 (sin entrada propia)
+
+- **Decisiones de producto aceptadas (no se afirma estado desde un 400 o un 404):** un reintento que recibe `not_linked`, `sesion_no_vinculada` o un 404 en un borrado deja el aviso «recarga» en lugar de un éxito idempotente.
+- **Interruptor de monitoreo automático:** tras un fallo ambiguo conserva el estado anterior sin releerlo.
+- **Tras un fallo ambiguo de «Aprobar» (resultado) o del select de asignación**, la pantalla no se refresca sola; el aviso pide recargar.
+- **`ConfirmUnlinkPestelModal`** no tiene Escape ni trampa de foco (preexistente).
+- **Clics en «borrar cadena» durante un borrado** se ignoran sin indicador visual.
+- **El patrón «error por id y control deshabilitado mientras corre»** está duplicado en `F3ResultadosRecibidos` y `F3TareasPIP`; candidato a extraer cuando se toque de nuevo.
+- **#15 de la auditoría ampliada:** `proposito` muestra «guardado» aunque el reporte no se regenere. Fuera de la familia; registrado.
+- **#3 de la auditoría ampliada (`RegisterModal`/`setUserRole`):** auth; ronda propia, sin tocar. Conecta con el hueco previo de H24 (`updateDoc` del rol funciona y `callSetUserRole` falla con el error tragado).
+- **ESLint de la raíz no corre** (no hay `eslint.config.*`). Hallazgo de entorno, sin ronda propia.
+- **Guías de navegador:** las guías de 5a, 5b y 6c se registraron como verificaciones diferidas (ver la tabla); las de 6b no dependen de F3 y se pueden correr con Fontana, PESTEL y Moddulo F2 operativas.
+- **«Regenerar veredicto…» y «Regenerar síntesis…» (ver H29):** cuando existan, su confirmación debe llevar huella y descartar el borrador del veredicto en la misma transacción. En 5a se decidió no construir la protección contra aprobar con una pantalla desactualizada, porque el veredicto no puede cambiar una vez que existe; esa condición deja de valer cuando exista el botón.
+
+### Lecciones de proceso (cierre de H25)
+
+1. **Sesión nueva de Code tras cada commit o cada par de commits.** El contexto de Code se llenó dos veces («Prompt is too long»). El prompt de arranque debe ser autosuficiente: pedir `git status` y `git log` antes de nada, lectura acotada de CLAUDE.md y de la bitácora, y el plan pegado debajo.
+2. **Partir un commit grande reduce el riesgo de revisión.** El commit 5 se partió en 5a y 5b, y el 6 en 6a (infraestructura), 6b y 6c, con una detención y una verificación entre cada uno.
+3. **La verificación del árbol de trabajo importa:** Code confirmó que el árbol contenía solo 5b, sin mezcla con 5a.
+4. **Aprobar bajo reserva sigue vigente** para lo que depende de F3: las guías quedan registradas con su condición de activación.
+
+---
+
+## Origen: auditoría del Reporte F3 y prevención de vínculos a medias (2026-10-14)
+
+### H36 — Rutas de escritura de F3 sin guard del Reporte F3
+
+- **Hallazgo:** Auditoría de solo lectura de las 16 rutas de `app/api/moddulo/f3/` y de las externas que tocan datos de F3. El bloqueo por Reporte F3 (H30, PROVISIONAL) existe en cinco rutas; las demás dependen solo de que la interfaz oculte la acción en solo lectura. El Reporte (DIE) es una foto fija y el Tablero en solo lectura muestra lo **vivo**: cualquier escritura posterior los desfasa.
+
+| Clasificación | Rutas |
+|---|---|
+| Ya protegidas (5) | `sintesis/generar`, `veredicto/generar`, `veredicto/aprobar`, `tareas/generar`, `tareas/sincronizar` |
+| No protegidas, la interfaz las oculta (5) | `resultados/aprobar`, `tareas/aprobar` (activar/desactivar y canal de una asignación), `confirm` (carga manual), `canal3/vincular`, `canal3/revisar-territorio` (solo metadatos del resultado). Solo se llega con una pestaña abierta antes del Reporte o por la API |
+| No protegida, la interfaz **no** la oculta (1) | `canal1/entregar`: el botón vive en Fontana (`FontanaCanal1Button`), que no conoce el estado de F3 (solo lo gatea `reporteListo`, el reporte de la SESIÓN de Fontana). En reentrega invalida la aprobación y limpia `resultadoId` de la asignación en el tablero vivo |
+| Fuera de alcance | `chat-visita` (telemetría), `request-upload` (URL firmada), `complete-phase` (es el paso que sigue al Reporte), `rda/accept` (decisión del usuario, no dato derivado; pregunta de producto) y las rutas de solo lectura |
+
+- **Principio(s):** Principios 1 y 4; conecta con H30 y H16.
+- **Estado:** **Diferido a la ronda PESTEL a Moddulo (H16), por decisión de Raúl (2026-10-14).** No se construye el commit 7b-5 (ni 7b-5a ni 7b-5b).
+- **Decisión de producto (Raúl, 2026-10-14):** no bloquear `canal1/entregar`. La intención de producto es que, aunque el Reporte F3 ya exista, el usuario pueda **ampliar su investigación** (por ejemplo, con Fontana), volver a enviarla a F3-Investigación y que el Reporte de F3 se **actualice automáticamente**. Un 409 `reemplazo_bloqueado` en esa ruta impediría justo esa adenda, así que contradice la dirección del producto. Por la misma razón se retira la propuesta de guard para `resultados/aprobar`, `tareas/aprobar`, `confirm` y `canal3/vincular`: hoy solo igualarían al servidor con una interfaz que cierra F3 tras el Reporte, y esa interfaz va a cambiar. `revisar-territorio` y `rda/accept` quedan como estaban.
+- **Lo que sí queda como requisito de diseño (ronda H16 y H30):** definir la **adenda de investigación con Reporte emitido**. Debe resolver, como mínimo: (a) qué estado tiene F3 cuando se amplía la investigación (¿reabierta? ¿con adenda?) y qué escrituras permite en cada estado; (b) cómo se **actualiza el Reporte** de forma controlada (el Reporte es una foto fija; hoy cualquier escritura posterior lo desfasa sin aviso, y el Tablero en solo lectura muestra lo vivo); (c) qué se descarta o invalida al actualizar (veredicto aprobado, DIE, `numero`) y con qué confirmación de impacto (H15); (d) un aviso visible de «Reporte desactualizado» mientras la actualización no se aplique; (e) que `canal1/entregar` en reentrega ya invalida la aprobación del resultado y limpia `resultadoId` de la asignación, lo que debe integrarse con esa actualización. Cuando exista ese mecanismo, los bloqueos PROVISIONALES de H29/H30 (generación de síntesis, veredicto, tablero) se sustituyen por él.
+- **Riesgo aceptado mientras tanto:** una entrega desde Fontana con el Reporte emitido deja el Reporte desfasado respecto del tablero vivo, sin aviso. Hoy no puede ocurrir en producción (no existe ningún Reporte F3 real: los motores M2 en adelante no están construidos).
+- **Nota para el documento final:** Un modo de solo lectura que existe únicamente en la interfaz no es un candado; pero antes de poner un candado en el servidor hay que comprobar que la acción bloqueada no es una que el producto quiere permitir de forma controlada. Aquí la respuesta fue que sí (ampliar la investigación tras el Reporte), así que lo correcto no es bloquear sino diseñar la actualización controlada del Reporte. Un candado provisional debe poder retirarse sin rehacer el resto (H30).
+
+### H37 — `createProject` y el repair de `find-linked-pestel`: la misma invariante que 7b-2 cerró en `link-moddulo`
+
+- **Hallazgo:** (1) `createProject` (`lib/moddulo/project.ts`) comprueba el guard de doble vínculo con una lectura **fuera de una transacción**, hace `add` y después un `update` de `pestel_projects.modduloProjectId` cuyo fallo se traga con `console.error`. Ese `try/catch` es del commit `58c6bc3` (2026-07-14, Fase C de la integración Moddulo↔PESTEL); su motivo **nunca estuvo documentado** (ni en CLAUDE.md, ni en el código, ni en el mensaje del commit, que solo marca como «non-fatal» el write-back de `deleteProject`) y ningún flujo depende de él. La atribución «26-09-23» que se había escrito antes era incorrecta: esa fecha es la del guard de propiedad. Dos creaciones simultáneas desde el mismo análisis pasan ambas (el back-link queda con el último en escribir), y si el write-back falla el cliente recibe 201 con un vínculo asimétrico que el guard posterior no detecta. (2) El «repair» de `find-linked-pestel` (modo `moddulo_project_id`) es un **GET que escribe**: puede resucitar un vínculo que `unlink-pestel` acaba de quitar, pisar en silencio un `linkedSource.sourceId` de otro análisis y bumpear `updatedAt` en cada llamada.
+- **Datos medidos (solo lectura):** 1 Moddulo vinculado, consistente en ambos sentidos con su PESTEL; 0 vínculos colgantes, 0 hacia papelera, 0 asimétricos, 0 dos PESTEL hacia el mismo Moddulo. Es prevención, no reparación.
+- **Principio(s):** Principio 7 (Persistencia); Arquitectura entre apps.
+- **Estado:** **Corregido (commits 7b-6a `c3dffdb` y 7b-6b, 2026-10-14).** 7b-6a: `createProject` crea el Moddulo y el back-link en una sola transacción (id generado de antemano; sin `pestelProjectId` el camino no cambia; mismos códigos y cuerpos; si el back-link falla, falla la creación completa y no queda nada). Pruebas: 5 de caracterización (verdes antes y después, sin editar) y 8 de atomicidad (6 fallan contra el código anterior, 2 locales); suite en 1708. 7b-6b: el repair de `find-linked-pestel` revalida en una transacción (ver abajo); suite en 1728. Plan ejecutado, en dos commits:
+  - **7b-6a (`createProject`):** id generado de antemano (`doc()`), y una `runTransaction` que relee el PESTEL (propiedad y `modduloProjectId`) y el Moddulo vinculado, y crea el Moddulo y el back-link juntos; sin `pestelProjectId` no cambia. Mismos códigos y cuerpos. **Cambio de modo de fallo, aceptado:** si el back-link falla, la creación completa falla (500) y no queda nada, en lugar del 201 con vínculo asimétrico. Con `add` y `update` independientes tenía sentido no fallar por el back-link; con una transacción, fallar sin dejar nada es coherente. Verificado al construir: los dos llamadores muestran el error (`proyecto/nuevo/page.tsx` muestra `data.error` del cuerpo, es decir, el 409, el 404 y el «Error al crear proyecto» del 500, y «Error de conexión. Intenta de nuevo.» si el fetch lanza; `OrphanRecoveryView` muestra `err.error` en `createError`).
+  - **7b-6b (repair):** opción B, transacción de revalidación: escribe solo si el Moddulo existe sin `deletedAt`, el PESTEL sigue apuntando a él y `linkedSource.sourceId` está ausente (nunca sobrescribe uno distinto; si ya está bien, no escribe). La opción A (eliminar el repair) es válida pero se descarta por ahora: es una decisión de comportamiento. Una vez que 7b-6a esté en uso, el único origen real del estado «PESTEL apunta, Moddulo no» desaparece, y el repair podrá retirarse con el mismo tipo de criterio que el respaldo por índice de H34.
+- **Riesgo declarado:** tras un 500 ambiguo en `createProject`, un reintento puede dar 409 «Este proyecto de PESTEL ya está vinculado a otro proyecto de Moddulo» aunque el primero sí creó el proyecto. Verificado: el cuerpo del 409 **solo trae `error`**, sin el id del Moddulo vinculado, y ninguna pantalla usa un id; la pantalla no puede decir a cuál. No se construye; mejora posible: incluir el id en el 409 y ofrecer «Abrir el proyecto vinculado».
+- **Resultado de 7b-6b (repair):** una `runTransaction` lee el Moddulo y el PESTEL y **escribe solo si** el Moddulo existe, no está en la papelera y el usuario colabora; el PESTEL es del usuario y todavía apunta a ese Moddulo; y `linkedSource` está **ausente, o de kind vacío o T22 sin `sourceId`**. Regla de `kind` (la más conservadora; no existía en el código anterior, que convertía un vínculo express en T22): cualquier `sourceId` presente, igual o distinto y de cualquier kind, o un kind distinto de T22, da cero escrituras. Cambios de comportamiento declarados: si ya está correcto, cero escrituras (antes escribía y bumpeaba `updatedAt` en cada llamada); un `sourceId` distinto ya no se sobrescribe; un vínculo express no se convierte; no resucita un vínculo quitado por `unlink-pestel`. Sigue siendo un GET con efecto de escritura y el fallo sigue siendo no fatal (un solo write: no hay medio estado), ahora con `console.warn('[find-linked-pestel][repair] …')`. Misma respuesta `{found, sourceId, currentStage}`. Pruebas: 6 de caracterización (4 existentes más la forma exacta de lo que escribe el repair, verdes sin editar) y 14 de atomicidad y carrera (11 fallan contra la ruta anterior: **9 conductuales** y **2 estructurales**, «una sola transacción» y «warn con la etiqueta», que fallan por construcción; 3 locales).
+- **Criterio para retirar el repair:** ningún proyecto con PESTEL apuntando y sin `linkedSource`, y la etiqueta `[find-linked-pestel][repair]` ausente de los logs durante más que la vida de una sesión. Con 7b-6a en uso, el único origen real de ese estado desaparece.
+- **Hallazgo de 7b-6a:** `OrphanRecoveryView` navega a F2 con `?pest_analysis_id=` y de ahí el flujo importa el análisis; si esa importación falla, no deshace la creación. Es no atómico por diseño.
+- **Nota para el documento final:** Una invariante de unicidad entre dos documentos se cierra en una transacción que lee ambos, y en **todos** los caminos que la pueden violar: cerrar uno (`link-moddulo`) y dejar abierto otro (`createProject`) deja la invariante rota. Una escritura que "no debe fallar la operación" se traga el error y deja un estado a medias sin que nadie se entere.
+
+### Cierre de la serie de guardado honesto (commits 5a a 7b-6b)
+
+La serie comenzó con los commits 2 a 4b de H17 y H20 a H24, siguió con la ronda de confirmación de impacto (M8 y H-M3, commits 1 a 4) y se cerró con los commits siguientes. La suite se midió en cada commit con un worktree temporal por commit. Los guards del Reporte F3 (7b-5a y 7b-5b) quedan **diferidos a la ronda PESTEL a Moddulo** (H16), por decisión de producto (ver H36).
+
+| Commit | Hash | Suite | Tema |
+|---|---|---|---|
+| 5a | `5d3b785` | 1426 | Guard de `veredicto/aprobar` (H25) |
+| 5b | `fc42a60` | 1463 | Hermanos destructivos o con éxito falso (H25) |
+| 6a | `9a4df70` | 1468 | Catálogo `GRUPO_ACCION` (H33) |
+| 6b | `69adcd0` | 1504 | Cinco acciones simples (H25) |
+| 6c | `686c1d4` | 1550 | Siete acciones simples; cierra H25 |
+| 7a | `97cd737` | 1581 | Id de las cadenas de impacto (H34) |
+| 7b-1 | `98a4e36` | 1616 | Fontana atómica (H35) |
+| 7b-2 | `96f8879` | 1651 | Vínculos Moddulo↔PESTEL atómicos (H35) |
+| 7b-3 | `6dba399` | 1682 | `acknowledge-bias` y `approve` de PESTEL (H35) |
+| 7b-4 | `820fcfc` | 1695 | `resultados/aprobar` valida antes de escribir (H35) |
+| 7b-6a | `c3dffdb` | 1708 | `createProject` atómico (H37) |
+| 7b-6b | pendiente de commit al cierre de esta versión | 1728 | Repair de `find-linked-pestel` (H37) |
+
+Evolución de la suite a lo largo de la serie de endurecimiento: de 1189 (primer commit de M8) a 1728, es decir, +539 pruebas. El catálogo de acciones de guardado llegó a 32.
+
+### Hallazgos menores de 7a y 7b (sin entrada propia)
+
+- **Detector de frescura (`check-docs-freshness`):** compara el timestamp del último commit que tocó la línea ancla de CLAUDE.md con el del último que tocó cada ruta del manifiesto, y lee commits, no el árbol de trabajo. Por eso marcó 1 tras 7b-1 y 7b-2 en vez de 0, y mi expectativa de que "se resuelve al commitear" fue incorrecta dos veces. **Regla práctica (en CLAUDE.md):** todo commit que toque `app/api` debe editar la línea 1109 (conteo de rutas, 148) en ese mismo commit; todo commit que toque una de las cuatro rutas de `app/api/moddulo/f2/` debe revisar la fila de la integración con Moddulo F2 releyendo el código real. El detector marca por directorio, lo que obliga a releer secciones cercanas a un cambio menor.
+- **Job de reporte en vuelo:** un job de generación (`after()`) puede escribir `reporte/actual` y el puntero **después** de una invalidación. Es otra carrera, no cerrada.
+- **`vincular-moddulo`** valida el proyecto con `getProject` fuera de la transacción: un proyecto enviado a la papelera en medio no se detecta; si se purga en medio, el update del marcador hace fallar la transacción con 500 ambiguo.
+- **`link-moddulo`:** `getProject` y las comprobaciones de tipo y territorio siguen fuera de la transacción (ventana mínima).
+- **Criterios de propiedad en PESTEL:** `approve` ahora verifica por proyecto, como `impact-chain`, `acknowledge-bias`, informes y `getAnalisisPropio`, pero las rutas devuelven códigos distintos (404 en `approve`, 403 «Sin permisos» en sus hermanas, que revela que el id existe). Unificarlos es decisión de producto. PESTEL no tiene modelo de colaboradores (ni en el tipo ni en los datos): la diferencia de criterio aparecería si se crea.
+- **Re-aprobar o re-reconocer sobrescribe fecha y autor originales** (`approve`, `resultados/aprobar` con `notasUsuario`): trazabilidad, H03 en el Grupo 2.
+- **`variables` baja `currentStage` a 4 aun con un análisis aprobado**, así que «`APPROVED` con el proyecto en etapa menor que 7» es legítimo hoy y dificulta detectar escrituras a medias de `approve`.
+- **Un análisis PESTEL huérfano** (sin proyecto) sigue en los datos; ahora es inaprobable por la ruta. No se tocó ningún dato.
+- **`resultados/aprobar`:** `aprobado:false` sobre un resultado ya aprobado no revierte el estado «recibido» de la asignación (desfase preexistente); una asignación con `activada:false` se puede aprobar si el cliente la envía (conecta con H-M2); la normalización pasa por `recalcularEstadoApp`, así que otras asignaciones del tablero pueden cambiar su estado derivado en esa escritura (preexistente).
+- **`find-linked-pestel` es un GET con efecto de escritura** (ver H37).
+- **El Reporte F3 (DIE) solo copia síntesis, tablero y veredicto.** No copia `compatibilidad` ni `proyectoTerritorioSnapshotAtVinculacion`, que son lo que escribe `revisar-territorio`; por eso esa ruta no necesita guardia por el Reporte.
+- **`rda/accept` no considera el estado de F3** (pregunta de producto, ver H36).
+- **Repair de `find-linked-pestel`:** un `linkedSource` T22 sin `sourceId` se completa, pero uno express sin `sourceId` no (regla conservadora). Con PESTEL duplicados apuntando al mismo Moddulo, el repair toma el más reciente y solo si el `linkedSource` está vacío. La lectura del PESTEL se repite (consulta y transacción): inocuo.
+- **Negativos estructurales:** en 7b-6b, 2 de los 11 negativos «reales» fallan por construcción (una sola transacción; la etiqueta del `warn`). Conviene reportarlos aparte de los conductuales, como en 7b-1.
+
+### Lecciones de proceso (7a y 7b)
+
+1. **Caracterización primero:** en rutas sin pruebas, escribir antes de refactorizar pruebas que pasen contra el código actual y que sigan verdes sin editar después. Es la demostración de equivalencia; los cambios de comportamiento se declaran uno por uno.
+2. **Distinguir negativos reales de locales en una tabla exacta por archivo** (cuántas pruebas, cuántas fallan contra la ruta anterior, cuántas pasan en ambos y por qué). Una cifra que no cuadra (13 contra 14) se detecta pidiendo la tabla.
+3. **Medir antes de construir:** los datos reales mostraron cero estados a medias, lo que fijó el tono de 7b (prevención) y evitó presentarlo como reparación.
+4. **Una revisión que cuestiona una premisa del plan cambia el diseño:** el respaldo por índice de 7a se corrigió porque "el bundle se recarga en cada despliegue" era falso para una pestaña abierta.
+5. **Un hallazgo inesperado vale más que el alcance:** la carrera de doble vínculo en `link-moddulo` no estaba en el plan; apareció al preguntar por la invariante.
+6. **Una nota de documentación por trámite falla dos veces:** la regla del detector de frescura se descubrió al diagnosticar por qué persistía el aviso, no al escribirla.
+7. **Diferir un candado cuando choca con la dirección del producto:** el guard del Reporte F3 para `canal1/entregar` habría impedido ampliar la investigación tras el Reporte (H36). La decisión de producto de Raúl lo evitó y convirtió el trabajo en un requisito de diseño de la ronda H16.
+8. **Lo que no se puede verificar hoy se registra con su condición de activación:** ningún Reporte F3 real puede existir hasta que los motores M2 en adelante estén construidos; las guías de F3 se retoman entonces.
+
+---
+
+## Grupo 3 — CERRADO en lo textual (2026-10-07)
+
+Clasificación de ~50 casos entregada y aprobada. Con el criterio de aprobación implícita vs. explícita, el trabajo de lenguaje resultó mínimo (5 ajustes). El peso real quedó en tres rondas futuras: Grupo 2 (autoría y fecha en los nodos, ver H03), confirmación de impacto (H15) y PESTEL a Moddulo (H16). H-M5 se atendió antes que todo lo demás por ser un defecto de integridad.
+
+Pendientes menores sin ronda propia (correcciones chicas): H-M2 (activar/desactivar vía de F3 sin confirmación), H-M4 (criterio `aprobacion-usuario` siempre falso y modal de cierre con `risks` vacío), H-M6 (`f3Seed` y `phases.investigacion.pip` sin escritor), P7 (etiqueta de 100 caracteres con `maxLength` de 300 y recorte silencioso en el servidor). Las dos claves de XPCTO que el chat descarta (`tiempo.fechaInicio`, `tiempo.hitos`) no se tocan hasta que exista un campo real para ellas. (`approve-motor` y `save-draft` salieron de esta lista en v4: corregidos, ver H17.) Se añade en v5, sin ronda propia: el token `red-eske-70` en oscuro (ver «Hallazgos menores de la ronda de confirmación de impacto»).
+
+---
+
+## Grupo 1 — CERRADO (2026-10-03)
+
+Los 4 puntos de corrección inmediata derivados de la auditoría de los 9 principios (informes de PESTEL, mensajes de Fontana, eliminación del Redactor, código huérfano) quedaron corregidos, verificados (tsc, suite completa, next build, code-review-and-quality, check-docs-freshness) y confirmados en navegador por Raúl. Commit ejecutado.
+
+---
+
+## Pendientes de investigación (no verificados aún, mencionados en la auditoría original)
+
+Estos quedaron señalados por Code como "no verificado" durante la auditoría de los 9 principios — se listan aquí para no perderlos de vista cuando se retomen las rondas de los Grupos 2 y 3:
+
+- Código sin leer: `FontanaReportePanel`, `F4Panel`, la matriz E6 de PESTEL, las gráficas electorales de Sefix.
+- Moddulo F4 a F9: no tienen código propio todavía (son stubs).
+- Ningún hallazgo de lenguaje determinista (H02) fue verificado línea por línea — los conteos salieron de expresiones regulares.
+- Rutas de agregación de Sefix: no se abrieron durante la auditoría.
+- Registry de Fontana: no se confirmó el total real de 86 indicadores documentado.
+
+---
+
+## Agenda de rondas (orden acordado a 2026-10-14, ajustado el mismo día)
+
+1. ~~Commit 5 y commit 6: cierre de la familia H25.~~ **Hecho (5a, 5b, 6a, 6b, 6c; ver H32).**
+2. ~~Commit 7a: id de las cadenas de impacto (H34).~~ **Hecho (`97cd737`).**
+3. ~~Commits 7b-1 a 7b-4: atomicidad y validar antes de escribir (H35).~~ **Hechos.**
+4. ~~Commit 7b-6a: `createProject` atómico (H37).~~ **Hecho (`c3dffdb`).**
+5. ~~Commit 7b-6b: repair de `find-linked-pestel` con revalidación transaccional (H37).~~ **Hecho (2026-10-14).**
+6. ~~Commits 7b-5a y 7b-5b (guard del Reporte F3 en las rutas de escritura de F3).~~ **Diferidos a la ronda PESTEL a Moddulo (H16), por decisión de Raúl (2026-10-14):** el producto debe permitir ampliar la investigación tras el Reporte y actualizarlo; no se bloquea (ver H36).
+7. ~~Cierre de la serie de guardado honesto.~~ **Cerrada con 7b-6b** (ver el cuadro de cierre antes del Grupo 3).
+8. **Ronda 7b-7 (propia):** atomicidad de `canal1/entregar` y `canal3/vincular` (2 o 3 escrituras no atómicas).
+9. ~~Ronda de confirmación de impacto (H15), empezando por M8.~~ **Hecha para M8 y H-M3 (commits 1 a 4, 2026-10-08 y 2026-10-09).** Quedan los demás casos de H15 (M3 y M4 de F1/F2, M7, M17, P2, H-P4, `unlink-pestel`, F3 y H-F1) y la confirmación de «regenerar síntesis o veredicto» cuando exista el botón.
+10. PESTEL a Moddulo (H16, H-P1, H-P2, H-P3), con el requisito de diseño de la **actualización controlada de lo derivado en F3** (ver H30), que incluye la **adenda de investigación con Reporte emitido** (ver H36), la decisión sobre H-M3b y el retiro de los bloqueos provisionales.
+11. Grupo 2: trazabilidad (H01), aprobación con autoría y fecha (H03, incluida la sobrescritura de fecha y autor al re-aprobar), antigüedad (H04), distinción IA/institucional (H05), versionado con `changelog.ts` (H06, H08, y la unificación de `dvsVersiones`), resolución geográfica (H07). Una ronda por principio. La fecha de finalización visible del análisis (H31) va junto con H04.
+12. Sefix (H26), ronda propia con helper común de lectura.
+13. Ronda de auth: `RegisterModal`/`setUserRole` (#3 de la auditoría ampliada de H25).
+14. Documento de patrones reutilizables, con esta bitácora como insumo.
+
+Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-eske-70` en oscuro, la insignia «Archivado» en oscuro, el kebab de Fontana, `ConfirmUnlinkPestelModal` sin Escape ni trampa de foco, la configuración de ESLint de la raíz, la idea del test ratchet, el job de reporte en vuelo y la unificación 403/404 de las rutas de PESTEL.
+
+---
+
+## Historial de versiones de esta bitácora
+
+- **v1 (2026-10-02):** Creación inicial, con los hallazgos H01-H13 surgidos del cierre del Grupo 1 y la lista de pendientes de verificación.
+- **v2 (2026-10-03):** Cierre formal del Grupo 1 (H09, H10, H11, H12, H13 confirmados como corregidos/mitigados, con el límite honesto de H11 documentado). Se incorpora la decisión de criterio sobre aprobación implícita vs. explícita, que reencuadra el alcance del Grupo 3 (H02) y precisa el alcance de H03 — el campo de aprobación con autoría solo aplica a los casos clasificados como "nodo de decisión", no a todo resultado generado por el sistema.
+- **v3 (2026-10-07):** Cierre del Grupo 3 en lo textual y de H-M5. Nuevas entradas H14 a H19 (integridad del PATCH, categoría de confirmación de impacto, PESTEL a Moddulo sin aprobación, guardados optimistas, ausencia de lista de nodos en los documentos guía, rótulos que describen mal su acción) y nota metodológica sobre M28. H02 y H03 actualizados con el resultado de la clasificación.
+- **v4 (2026-10-08):** Cierre de la serie de guardado honesto (commits 2, 3, 4a y 4b). H17 pasa a Corregido; H15 gana el caso `generate-dvs`; H03 anota que el cierre con autoría sigue en Grupo 2. Nuevas entradas H20 a H27 (cierre de fase, listas fallidas en los 3 hubs, escrituras del hub de PESTEL, contraste en oscuro, AuthContext, caminos hermanos, Sefix, `profile`/`suscripciones`) y sección de la regla común «la pantalla no afirma lo que el servidor no confirmó». Se limpia la lista de pendientes menores del Grupo 3 y se añade la agenda de rondas.
+- **v5 (2026-10-09):** Cierre de la ronda de confirmación de impacto para M8 y H-M3 (commits 1 a 4). H15 pasa a «En curso» con M8 y H-M3 corregidos; H06 y H03 anotan `dvsVersiones` como mecanismo parcial y paralelo a `changelog.ts`; H25 anota el #8 corregido y los cuatro handlers de F3 corregidos, y deja el commit 5 por decidir. Nuevas entradas H28 a H31 (M8 y el candado de ids, H-M3, bloqueo provisional por Reporte F3 con H-M3b, generaciones largas sin fecha visible), la regla de la ronda, la tabla de verificaciones diferidas hasta M2+, hallazgos menores y lecciones de proceso. Se actualiza la agenda de rondas.
+- **v6 (2026-10-12):** Cierre de la familia H25 (commits 5a, 5b, 6a, 6b y 6c; H25 pasa a Corregido). Nuevas entradas H32 a H35 (auditoría ampliada y commits de cierre, infraestructura de exhaustividad `GRUPO_ACCION`, `impact-chain` por índice con el commit 7a en curso, escrituras dobles sin atomicidad y rutas que escriben antes de validar con el commit 7b pendiente), hallazgos menores y lecciones de proceso del cierre. H15 anota que «Regenerar veredicto…» y «Regenerar síntesis…» necesitarán huella y descarte del borrador. La tabla de verificaciones diferidas suma las guías de 5a, 5b y 6c. Se reordena la agenda de rondas.
+- **v7 (2026-10-14):** Cierre de los commits 7a y 7b-1 a 7b-4. H34 (id de las cadenas de impacto) y H35 (escrituras dobles y validar antes de escribir) pasan a Corregido, con tablas de commits, pruebas y límites. Nuevas entradas H36 (auditoría del Reporte F3 en las rutas de escritura de F3, con la decisión de producto sobre la entrega de Fontana) y H37 (`createProject` y el repair de `find-linked-pestel`, plan 7b-6a/6b), hallazgos menores, regla práctica del detector de frescura y lecciones de proceso. H15 suma el caso `unlink-pestel`. Se añaden tres verificaciones diferidas y se reordena la agenda: 7b-6 (alcanzable hoy) cierra la serie; el guard del Reporte F3 (7b-5) se difiere a la ronda H16 por decisión de Raúl, porque el producto debe permitir ampliar la investigación tras el Reporte (adenda) y actualizarlo.
+- **v8 (2026-10-14):** Cierre de la serie de guardado honesto con los commits 7b-6a y 7b-6b. H37 pasa a Corregido (`createProject` atómico y repair de `find-linked-pestel` con revalidación transaccional y regla de `kind`). Se corrige la atribución del `try/catch` del write-back de `createProject` (`58c6bc3`, 2026-07-14; su motivo nunca estuvo documentado). Cuadro de cierre con los hashes y el tamaño de la suite en cada commit de 5a a 7b-6b. H36 queda diferida a la ronda PESTEL a Moddulo por decisión de producto (adenda de investigación con Reporte emitido). Nuevos hallazgos menores y una lección de proceso.

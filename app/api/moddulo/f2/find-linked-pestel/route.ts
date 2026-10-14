@@ -54,30 +54,50 @@ export async function GET(request: NextRequest) {
       return bTime - aTime;
     })[0];
 
-    // Repair: write sourceId (+ kind/componente, ausentes precisamente
-    // porque este es el caso de "el lado Moddulo nunca los tuvo") de vuelta
-    // a Moddulo si faltaban.
-    // Hueco cerrado (26-09-28): esta rama escribía sobre moddulo_projects sin
-    // verificar que el proyecto exista, sea del usuario, o no esté en papelera —
-    // getProject ya hace las 3 cosas (y ahora también excluye deletedAt). Si no pasa,
-    // se omite el repair pero se sigue devolviendo el lado PESTEL encontrado.
+    // Repair (7b-6b, H25). Sigue siendo un GET con efecto de escritura y el fallo sigue siendo no
+    // fatal (un solo write: no hay medio estado), pero ahora REVALIDA en una transacción antes de
+    // escribir. Antes, un `update` suelto con la lectura de la consulta: (a) resucitaba un vínculo que
+    // `unlink-pestel` acababa de quitar (la consulta veía el back-link, el unlink borraba ambos lados
+    // y el repair escribía después); (b) pisaba un sourceId distinto o convertía un vínculo `express`
+    // en T22; (c) escribía y bumpeaba updatedAt aunque ya estuviera bien.
+    // Regla (la más conservadora): se escribe SOLO si el Moddulo existe, no está en papelera y el
+    // usuario colabora; el PESTEL sigue siendo suyo y sigue apuntando a ESTE Moddulo; y el
+    // linkedSource está ausente, o es de kind vacío/T22 SIN sourceId. Cualquier sourceId presente
+    // (igual o distinto, de cualquier kind) o un kind distinto de T22 → cero escrituras.
+    // getProject queda solo como acceso (404 del proyecto = sin repair, como antes).
     const modduloProject = await getProject(modduloProjectId, session.uid);
     if (modduloProject) {
+      const modduloRef = adminDb.collection("moddulo_projects").doc(modduloProjectId);
+      const pestelRef = adminDb.collection("pestel_projects").doc(doc.id);
       try {
-        await adminDb
-          .collection("moddulo_projects")
-          .doc(modduloProjectId)
-          .update({
+        await adminDb.runTransaction(async (tx): Promise<void> => {
+          const modSnap = await tx.get(modduloRef);
+          const pesSnap = await tx.get(pestelRef);
+          if (!modSnap.exists || !pesSnap.exists) return;
+          const mod = modSnap.data() as {
+            deletedAt?: unknown;
+            collaborators?: Array<{ uid?: string }>;
+            phases?: { exploracion?: { linkedSource?: { sourceId?: string; kind?: string } } };
+          };
+          const pes = pesSnap.data() as { userId?: string; modduloProjectId?: string };
+          if (mod.deletedAt || !mod.collaborators?.some((c) => c.uid === session.uid)) return;
+          if (pes.userId !== session.uid || pes.modduloProjectId !== modduloProjectId) return;
+          const ls = mod.phases?.exploracion?.linkedSource;
+          if (ls?.sourceId) return;
+          if (ls?.kind && ls.kind !== "T22") return;
+          tx.update(modduloRef, {
             "phases.exploracion.linkedSource.sourceId": doc.id,
             "phases.exploracion.linkedSource.kind": "T22",
             "phases.exploracion.linkedSource.componente": "centinela",
             updatedAt: FieldValue.serverTimestamp(),
           });
-      } catch {
-        // Non-fatal: still return the found project to the client
+        });
+      } catch (err) {
+        // Non-fatal: still return the found project to the client. Etiqueta fija para medir en los
+        // logs cuándo se puede retirar el repair (como el respaldo por índice de 7a).
+        console.warn("[find-linked-pestel][repair] no se pudo completar el vínculo:", err);
       }
     }
-
     return NextResponse.json({
       found: true,
       sourceId: doc.id,
