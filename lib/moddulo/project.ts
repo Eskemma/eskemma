@@ -288,24 +288,37 @@ export async function createProject(
     };
   }
 
-  const ref = await adminDb.collection(COLLECTION).add(data);
-
-  if (input.pestelProjectId) {
-    try {
-      await adminDb
-        .collection("pestel_projects")
-        .doc(input.pestelProjectId)
-        .update({
-          modduloProjectId: ref.id,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-    } catch (err) {
-      console.error(
-        `[createProject] write-back a pestel_projects/${input.pestelProjectId} falló:`,
-        err
-      );
-    }
+  // Sin PESTEL no hay nada que vincular: el camino no cambia.
+  if (!input.pestelProjectId) {
+    const ref = await adminDb.collection(COLLECTION).add(data);
+    const snap = await ref.get();
+    return { id: ref.id, ...snap.data() } as ModduloProject;
   }
+
+  // 7b-6a (H25): el Moddulo y el back-link del PESTEL se escriben en UNA transacción (antes, `add` y
+  // luego un `update` cuyo fallo se tragaba: un fallo dejaba un Moddulo vinculado a un PESTEL sin
+  // back-link, y dos creaciones simultáneas pasaban ambas el guard). El id se genera de antemano
+  // (`doc()`, local) para que un reintento de la transacción sea idempotente. Las lecturas previas
+  // de arriba solo ordenan las respuestas; la propiedad y el doble vínculo se REVALIDAN aquí con el
+  // estado vigente. El callback puede reintentarse: lee antes de escribir, sin efectos externos.
+  const pestelRef = adminDb.collection("pestel_projects").doc(input.pestelProjectId);
+  const ref = adminDb.collection(COLLECTION).doc();
+  type Resultado = "ok" | "no_propio" | "ya_vinculado";
+  const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+    const pestelSnap = await tx.get(pestelRef);
+    if (!pestelSnap.exists || pestelSnap.data()?.userId !== userId) return "no_propio";
+    const vinculado = pestelSnap.data()?.modduloProjectId;
+    if (typeof vinculado === "string" && vinculado) {
+      // Con o sin deletedAt: la papelera no libera el vínculo (solo la purga lo hace).
+      const existente = await tx.get(adminDb.collection(COLLECTION).doc(vinculado));
+      if (existente.exists) return "ya_vinculado";
+    }
+    tx.set(ref, data);
+    tx.update(pestelRef, { modduloProjectId: ref.id, updatedAt: now });
+    return "ok";
+  });
+  if (resultado === "no_propio") throw new PestelProjectNoPropioError();
+  if (resultado === "ya_vinculado") throw new PestelYaVinculadoError();
 
   const snap = await ref.get();
   return { id: ref.id, ...snap.data() } as ModduloProject;
