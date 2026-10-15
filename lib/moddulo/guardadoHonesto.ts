@@ -44,7 +44,13 @@ export type AccionGuardado =
   | "cambiar_asignacion"
   | "reconocer_sesgo"
   | "editar_exploracion"
-  | "archivar_exploracion";
+  | "archivar_exploracion"
+  // M1 de F2 (commit 3a): review and approval of the Análisis PESTEL.
+  | "guardar_edicion_m1"
+  | "aprobar_m1"
+  | "generar_motores"
+  | "reabrir_m1"
+  | "generar_m1";
 
 /**
  * Single catalog of every action and the group that decides how its failure is worded
@@ -93,6 +99,16 @@ export const GRUPO_ACCION = {
   reconocer_sesgo: "simple",
   editar_exploracion: "simple",
   archivar_exploracion: "simple",
+  // M1 de F2 (3a). Simple: one write whose failure is worded from the table below (it has its own
+  // 409s). Clásicas: reabrir_m1 and generar_m1 follow the reemplazar_analisis family — the server
+  // answers the 3 H15 409s (requires confirmation / fingerprint expired / blocked) that open a
+  // modal and retry with the fingerprint, and their failure wording depends on whether the
+  // request carried the user's confirmation (a request without it never writes).
+  guardar_edicion_m1: "simple",
+  aprobar_m1: "simple",
+  generar_motores: "simple",
+  reabrir_m1: "clasica",
+  generar_m1: "clasica",
 } as const satisfies Record<AccionGuardado, GrupoAccion>;
 
 const accionesDelGrupo = (g: GrupoAccion): readonly AccionGuardado[] =>
@@ -134,10 +150,18 @@ export interface ContextoGuardado {
   aprobadoPrevio?: boolean;
   /** For actualizar_proyecto: what changed ("el cambio de estado del proyecto"). */
   cambio?: string;
-  /** For reemplazar_analisis: whether the request carried the user's confirmation. */
+  /**
+   * For the confirmation family (reemplazar_analisis, reabrir_m1, generar_m1): whether the request
+   * carried the user's confirmation. Pass `false` ONLY when the project had something to replace
+   * and the request carried no confirmation (the server then never writes); leave it undefined
+   * when no confirmation is required (e.g. the very first analysis), where a lost response is
+   * ambiguous.
+   */
   confirmado?: boolean;
   /** For aceptar_condicion_rda: the name of the RDA item, shown in the message. */
   nombre?: string;
+  /** For guardar_edicion_m1: label of the dimension being edited ("Político"). */
+  dimension?: string;
 }
 
 export interface DecisionGuardado {
@@ -225,6 +249,16 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "el guardado de los cambios de la exploración";
     case "archivar_exploracion":
       return ctx.cambio ?? "el archivado de la exploración";
+    case "guardar_edicion_m1":
+      return ctx.dimension ? `tu edición de «${ctx.dimension}»` : "tu edición de la categoría";
+    case "aprobar_m1":
+      return "la aprobación del análisis";
+    case "generar_motores":
+      return "la generación de los motores M2–M5";
+    case "reabrir_m1":
+      return "la reapertura del análisis";
+    case "generar_m1":
+      return "la generación del análisis nuevo";
   }
 }
 
@@ -290,6 +324,16 @@ function consecuencia(accion: AccionGuardado): string {
       return "Se conservan los datos anteriores; tus cambios siguen en el formulario. Inténtalo de nuevo.";
     case "archivar_exploracion":
       return "La exploración queda como estaba; inténtalo de nuevo.";
+    case "guardar_edicion_m1":
+      return "Tu texto sigue en pantalla, sin guardar; inténtalo de nuevo.";
+    case "aprobar_m1":
+      return "El análisis sigue sin aprobar; inténtalo de nuevo.";
+    case "generar_motores":
+      return "Tu análisis sigue aprobado; M2–M5 no se generaron. Reintentar generación.";
+    case "reabrir_m1":
+      return "El análisis sigue aprobado; inténtalo de nuevo.";
+    case "generar_m1":
+      return "Tu análisis actual se conserva; inténtalo de nuevo.";
   }
 }
 
@@ -332,6 +376,11 @@ const TEXTOS_SIMPLES: Record<
     permiso?: string;
     /** Specific 4xx with their own text (checked before the generic one). */
     especifico: (resp: Extract<RespuestaGuardado, { tipo: "respuesta" }>) => string | null;
+    /**
+     * A failure the server CERTIFIES happened before any write (e.g. a 500 that names the Claude
+     * motor that failed). Checked BEFORE the ambiguity rule for 5xx; null when it does not apply.
+     */
+    certero?: (resp: Extract<RespuestaGuardado, { tipo: "respuesta" }>) => string | null;
   }
 > = {
   revisar_territorio_fuente: {
@@ -476,6 +525,58 @@ const TEXTOS_SIMPLES: Record<
     permiso: "No tienes permiso para cambiar esta exploración.",
     especifico: () => null,
   },
+  // M1 de F2 (3a). The screen says "Guardado" only for a 200 with a usable body (the caller reads
+  // `ok` and the new fingerprint). Codes are the real ones of m1-edit / m1-approve / generate-dvs.
+  guardar_edicion_m1: {
+    hecho: "guardado",
+    verificar: "tu texto sigue en pantalla, pero recarga la página para verificar el estado antes de volver a editar.",
+    noEncontrado: "No se encontró el análisis o la categoría; puede que haya cambiado. Recarga la página; tu texto sigue en pantalla, sin guardar.",
+    permiso: "No tienes permiso para editar este análisis.",
+    especifico: (r) => {
+      if (r.status === 409) {
+        if (r.codigo === "m1_aprobado") return "El análisis ya está aprobado y bloqueado; no se guardó tu edición. Para modificarlo usa «Editar narrativas». Tu texto sigue en pantalla.";
+        if (r.codigo === "m1_cambio") return "Esta categoría cambió en otra pestaña o sesión; no se guardó tu edición. Recarga la página para ver la versión vigente (copia tu texto antes si quieres conservarlo).";
+        if (r.codigo === "m1_no_editable_centinela") return "Este análisis viene de Centinela y no se edita desde aquí; no se guardó nada.";
+        if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada y el análisis es de solo lectura; no se guardó nada.";
+      }
+      if (r.status === 400) {
+        if (r.codigo === "texto_invalido") return "El texto no es válido: no puede estar vacío ni pasar de 10 000 caracteres. No se guardó nada.";
+        if (r.codigo === "clasificacion_invalida") return "La clasificación elegida no es válida; no se guardó nada.";
+      }
+      return null;
+    },
+  },
+  aprobar_m1: {
+    hecho: "aprobado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "No se encontró el análisis; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
+    permiso: "No tienes permiso para aprobar este análisis.",
+    especifico: (r) => {
+      if (r.status !== 409) return null;
+      if (r.codigo === "m1_cambio") return "El análisis cambió desde que lo revisaste (puede que se haya editado en otra pestaña); no se aprobó nada. Recarga la página, revísalo y apruébalo de nuevo.";
+      if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada; no se aprobó nada.";
+      return null;
+    },
+  },
+  // Generating M2–M5 is a step of its own after approving. It NEVER claims they were generated
+  // unless the body carried the analysis. A 500 that names a motor failed before the write.
+  generar_motores: {
+    hecho: "generado",
+    verificar: "recarga la página para verificar el estado; tu análisis sigue aprobado.",
+    noEncontrado: "No se encontró el análisis; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
+    permiso: "No tienes permiso para generar los motores de este proyecto.",
+    especifico: (r) => {
+      if (r.status !== 409) return null;
+      if (r.codigo === "m1_no_aprobado") return "El análisis ya no está aprobado; no se generaron los motores. Apruébalo de nuevo para generar M2–M5.";
+      if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada; no se generaron los motores.";
+      return null;
+    },
+    certero: (r) => {
+      if (r.status < 500 || !r.motor) return null;
+      const nombre = r.motor === "M2/M3" ? "M2 o M3" : /^M[2-5]$/.test(r.motor) ? r.motor : "los motores";
+      return `No se pudo generar ${nombre}. Tu análisis sigue aprobado; M2–M5 no se generaron. Reintentar generación.`;
+    },
+  },
 };
 
 function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
@@ -484,6 +585,8 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   if (resp.tipo === "error_red") {
     return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
   }
+  const certero = !resp.ok ? t.certero?.(resp) : null;
+  if (certero) return certero;
   if (resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta") {
     return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${t.hecho}; ${t.verificar}`;
   }
@@ -494,6 +597,42 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   if (resp.status === 404) return t.noEncontrado;
   const porQue = t.permiso && (resp.status === 401 || resp.status === 403) ? t.permiso : motivo(resp);
   return `No se pudo registrar ${que}. ${porQue} ${consecuencia(accion)}`;
+}
+
+// ── M1 de F2: the two actions of the confirmation family (3a) ─────────────────
+// reabrir_m1 ("Editar narrativas") and generar_m1 ("Nuevo análisis"). Without the user's
+// confirmation the server never writes (it answers one of the H15 409s), so for a request that
+// carried none "nothing was changed" is true by construction; with it, a lost response is ambiguous.
+function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGuardado, ctx: ContextoGuardado): string {
+  const que = sujeto(accion, ctx);
+  const sinConfirmar = ctx.confirmado === false;
+  const hecho = accion === "reabrir_m1" ? "reabierto" : "reemplazado";
+  const ni = accion === "reabrir_m1" ? "No se reabrió nada" : "No se reemplazó nada";
+  const impacto = accion === "reabrir_m1" ? "reabrir el análisis" : "generar un análisis nuevo";
+  if (resp.tipo === "error_red") {
+    if (sinConfirmar) return `No se pudo verificar el impacto de ${impacto}: sin conexión con el servidor. ${ni}, porque aún no habías confirmado.`;
+    return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${hecho}; recarga la página para verificar el estado.`;
+  }
+  const incierto = resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta";
+  if (accion === "generar_m1" && resp.status >= 500 && (resp.codigo ?? "").startsWith("Error al parsear")) {
+    // The route parses Claude's answer BEFORE it writes anything.
+    return "No se pudo generar el análisis nuevo: la respuesta del análisis no fue válida. Tu análisis actual se conserva; inténtalo de nuevo.";
+  }
+  if (incierto) {
+    if (sinConfirmar) return `No se pudo verificar el impacto de ${impacto}: el servidor no pudo completar la operación. ${ni}, porque aún no habías confirmado.`;
+    return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${hecho}; recarga la página para verificar el estado.`;
+  }
+  if (resp.status === 409) {
+    if (resp.codigo === "fase_cerrada") return `La Fase 2 ya está cerrada; ${accion === "reabrir_m1" ? "no se puede reabrir el análisis" : "no se generó un análisis nuevo"}.`;
+    if (accion === "reabrir_m1" && resp.codigo === "m1_no_aprobado") {
+      return "El análisis ya no está aprobado (puede que ya se haya reabierto); no se reabrió nada. Recarga la página para ver el estado.";
+    }
+    if (accion === "generar_m1" && resp.codigo === "pestel_linked") {
+      return "Este proyecto tiene un análisis de Centinela vinculado; desvincúlalo antes de generar uno nuevo con Moddulo. No se generó nada.";
+    }
+  }
+  if (resp.status === 404) return "No se encontró el análisis; puede que ya no exista o no tengas acceso. Recarga la página para verificar.";
+  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
 }
 
 /**
@@ -508,6 +647,7 @@ function mensajeDeFallo(
   ctx: ContextoGuardado
 ): string {
   if (esAccionSimple(accion)) return mensajeDeFalloSimple(accion, resp, ctx);
+  if (accion === "reabrir_m1" || accion === "generar_m1") return mensajeDeFalloM1(accion, resp, ctx);
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
     if (accion === "guardar_borrador") {
@@ -760,7 +900,13 @@ interface ReversionAprobacion {
   valorRestaurado?: boolean;
 }
 
-export type AccionConConfirmacion = "reemplazar_analisis" | "guardar_analisis" | "finalizar_analisis";
+export type AccionConConfirmacion =
+  | "reemplazar_analisis"
+  | "guardar_analisis"
+  | "finalizar_analisis"
+  // M1 de F2 (3a): same three H15 409s, same modal + retry with the fingerprint.
+  | "reabrir_m1"
+  | "generar_m1";
 
 export function decidirReemplazoAnalisis(
   resp: RespuestaGuardado,

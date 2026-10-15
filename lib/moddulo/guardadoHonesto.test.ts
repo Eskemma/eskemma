@@ -863,7 +863,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "aprobar_veredicto",
     ]);
   });
-  it("ACCIONES_SIMPLES: las 4 de 5b y las 5 de 6b en el mismo orden, seguidas de las 7 de 6c", () => {
+  it("ACCIONES_SIMPLES: las 4 de 5b y las 5 de 6b en el mismo orden, seguidas de las 7 de 6c y las 3 de M1 (3a)", () => {
     expect([...ACCIONES_SIMPLES]).toEqual([
       "revisar_territorio_fuente",
       "eliminar_sesion",
@@ -883,13 +883,17 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "reconocer_sesgo",
       "editar_exploracion",
       "archivar_exploracion",
+      // M1 de F2 (3a)
+      "guardar_edicion_m1",
+      "aprobar_m1",
+      "generar_motores",
     ]);
   });
   it("ACCIONES_NO_BLOQUEANTES es exactamente la lista anterior", () => {
     expect([...ACCIONES_NO_BLOQUEANTES]).toEqual(["registrar_aprobacion", "importar_adjuntos_moddulo"]);
   });
 
-  it("el catálogo clasifica TODAS las acciones (32), sin duplicar grupos ni dejar ninguna fuera", () => {
+  it("el catálogo clasifica TODAS las acciones (37), sin duplicar grupos ni dejar ninguna fuera", () => {
     const todas = Object.keys(GRUPO_ACCION).sort();
     expect(todas).toEqual(
       [
@@ -902,6 +906,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
         "cambiar_monitoreo_automatico", "desvincular_pestel",
         "agregar_cadena_impacto", "marcar_alerta_leida", "aprobar_resultado", "cambiar_asignacion",
         "reconocer_sesgo", "editar_exploracion", "archivar_exploracion",
+        "guardar_edicion_m1", "aprobar_m1", "generar_motores", "reabrir_m1", "generar_m1",
       ].sort()
     );
     const clasicas = todas.filter((a) => GRUPO_ACCION[a as keyof typeof GRUPO_ACCION] === "clasica");
