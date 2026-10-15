@@ -270,6 +270,8 @@ export interface PhaseState {
   // "T22") o flujo express (kind "express"). payload es el MapaPESTEL
   // transformado (señales tripartitas por dimensión).
   linkedSource?: LinkedSourceRef<MapaPESTEL>;
+  // Edición y aprobación del usuario sobre el M1 (ausente en proyectos anteriores).
+  m1?: M1Datos;
   // Estado semántico de la fase (F2: "lista" cuando DVS generado)
   estado?: string;
   // Fecha de aprobación/cierre de la fase
@@ -577,6 +579,54 @@ export interface F2DimensionPESTEL {
 }
 
 export type MapaPESTEL = Partial<Record<string, F2DimensionPESTEL>>;
+
+// ----- M1 (Análisis PESTEL) — edición y aprobación del usuario -----
+// Vive en phases.exploracion.m1 (opcional: los proyectos anteriores no lo tienen).
+// linkedSource.payload sigue siendo el M1 "de trabajo"; la copia congelada de lo aprobado
+// vive en m1.aprobacion.mapa. Ver lib/moddulo/m1Aprobacion.ts.
+
+/** Campos editables de una dimensión del M1. */
+export type CampoEditableM1 = "narrativa" | "clasificacion";
+
+/** Clave por ruta de una edición: "P.narrativa", "P.clasificacion", … */
+export type RutaEdicionM1 = `${string}.${CampoEditableM1}`;
+
+export interface M1Edicion {
+  /** Texto/valor de la IA, guardado la primera vez que se edita. */
+  original: string;
+  editado: string;
+  por: string;
+  /** Marca de tiempo del servidor (Timestamp de Firestore al leer). */
+  en: unknown;
+}
+
+export interface M1Aprobacion {
+  por: string;
+  en: unknown;
+  /** sha-256 del mapa aprobado (solo se calcula en servidor). */
+  huella: string;
+  /** Dimensiones con edición vigente al aprobar. */
+  categoriasEditadas: number;
+  /** Dimensiones del mapa aprobado. */
+  total: number;
+  /** Copia CONGELADA de lo aprobado (editado o tal como lo produjo el sistema). */
+  mapa: MapaPESTEL;
+}
+
+export interface M1Generacion {
+  /** Huella del M1 aprobado desde el cual se generó el borrador vigente. */
+  huella: string;
+  en: unknown;
+}
+
+export interface M1Datos {
+  ediciones?: Partial<Record<RutaEdicionM1, M1Edicion>>;
+  aprobacion?: M1Aprobacion;
+  generacion?: M1Generacion;
+  /** Marca de que el usuario reabrió un M1 aprobado y aún no lo vuelve a aprobar. */
+  reabiertoEn?: unknown;
+  reabiertoPor?: string;
+}
 
 // ==========================================
 // FASE 2 — EXPLORACIÓN: formulario

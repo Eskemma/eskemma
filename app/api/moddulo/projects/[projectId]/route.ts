@@ -18,6 +18,7 @@ import {
   validarReportDraft,
 } from "@/lib/moddulo/projectPatch";
 import type { UpdateProjectInput, ModduloProject } from "@/types/moddulo.types";
+import { resumenM1ParaCliente } from "@/lib/moddulo/m1Servidor";
 
 // GET: Obtener proyecto individual
 export async function GET(
@@ -74,7 +75,9 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ project });
+    // M1 review state with the fingerprint already computed (the screen cannot: node:crypto). Additive:
+    // a sibling of `project`, so every reader of `data.project` is unaffected.
+    return NextResponse.json({ project, m1: resumenM1ParaCliente(project.phases?.exploracion) });
   } catch (error) {
     console.error("Error al obtener proyecto:", error);
     return NextResponse.json({ error: "Error al obtener proyecto" }, { status: 500 });
