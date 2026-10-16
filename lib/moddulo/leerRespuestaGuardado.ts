@@ -33,6 +33,8 @@ export async function leerRespuestaGuardado(
       codigo: typeof datos.codigo === "string" ? datos.codigo : typeof datos.error === "string" ? datos.error : undefined,
       motor: typeof datos.motor === "string" ? datos.motor : undefined,
       mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
+      // A short list like "T, Ec y L"; anything else is ignored (it is shown to the user).
+      ...(typeof datos.dimensiones === "string" && /^[A-Za-z, ]{1,30}$/.test(datos.dimensiones) ? { dimensiones: datos.dimensiones } : {}),
     },
     datos,
   };

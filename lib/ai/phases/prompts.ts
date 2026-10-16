@@ -636,9 +636,12 @@ const DIMENSION_ORDER_PESTEL: DimensionCode[] = ["P", "E", "S", "T", "Ec", "L"];
 // M1 ("Pesos del escaneo por tipo de proyecto"). Mismo texto/criterio que
 // functions/src/pestel/classifier/claudePESTL.ts — ver lib/moddulo/dimensionPriority.ts
 // para la tabla y la nota de sincronización obligatoria.
-function buildDimensionDepthInstructions(projectType: string): string {
+function buildDimensionDepthInstructions(
+  projectType: string,
+  dimensiones: readonly DimensionCode[] = DIMENSION_ORDER_PESTEL
+): string {
   const config = DIMENSION_PRIORITY_BY_TYPE[projectType as ProjectType] ?? DIMENSION_PRIORITY_BY_TYPE.ciudadano;
-  return DIMENSION_ORDER_PESTEL.map((code) => {
+  return DIMENSION_ORDER_PESTEL.filter((code) => dimensiones.includes(code)).map((code) => {
     const label = DIMENSION_LABEL_ES[code];
     if (config.prioritarias.includes(code)) {
       return `- ${code} (${label}) — PRIORITARIA para este tipo de proyecto: 3–4 señales por categoría, narrativa de 3–4 oraciones, mayor profundidad analítica.`;
@@ -660,8 +663,16 @@ export function getMapaPESTELExpressPrompt(
   projectType: string,
   xpcto: Record<string, unknown>,
   archivos?: { nombre: string; textoExtraido: string }[],
-  context?: ExpressContext
+  context?: ExpressContext,
+  // Paso 2 (26-10-16): the route asks for the 6 dimensions as two parallel calls of 3, so one
+  // answer never exceeds max_tokens. Omitted (or all 6, not compact) the text is byte-identical
+  // to the former single-call prompt (lib/ai/phases/__fixtures__/express-prompt-antes-paso2.json).
+  opciones?: { dimensiones?: readonly DimensionCode[]; compacto?: boolean }
 ): { system: string; user: string } {
+  const dimsPedidas = DIMENSION_ORDER_PESTEL.filter((c) => (opciones?.dimensiones ?? DIMENSION_ORDER_PESTEL).includes(c));
+  const dimsOtra = DIMENSION_ORDER_PESTEL.filter((c) => !dimsPedidas.includes(c));
+  const esSubconjunto = dimsOtra.length > 0;
+  const compacto = opciones?.compacto === true;
   const x = xpcto as {
     hito?: string; sujeto?: string; justificacion?: string;
     capacidades?: { financiero?: string; humano?: string; logistico?: string };
@@ -675,7 +686,7 @@ export function getMapaPESTELExpressPrompt(
   const system = `Eres un analista político experto en metodología PEST-L aplicada a consultoría política.
 Tu tarea es generar un MapaPESTEL tripartito completo para un proyecto de tipo "${projectType}".
 Este MapaPESTEL es la lectura inicial del entorno que realiza Moddulo cuando el consultor no utiliza la app PESTEL.
-Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques de código.`;
+Respondes SOLO con JSON válido, sin markdown, sin texto adicional, sin bloques de código${compacto ? ", en una sola línea, sin saltos de línea ni sangrías" : ""}.`;
 
   const archivosSection =
     archivos && archivos.length > 0
@@ -701,6 +712,47 @@ REGLA ABSOLUTA SOBRE FUENTES:
   const confidenceValue = hasRealData ? 65 : 50;
   const currentYearMonth = new Date().toISOString().slice(0, 7);
 
+  // Per-dimension JSON examples (same text as the former single template; joined with ",\n").
+  const ejemploJson: Record<DimensionCode, string> = {
+    P: `  "P": { "code": "P", "label": "Político", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción política específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [{ "descripcion": "señal política favorable específica al hito del proyecto", "fuente": "Fuente: INE/SEFIX, 2024", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesAdversas": [{ "descripcion": "señal política adversa específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesInciertas": [] }`,
+    E: `  "E": { "code": "E", "label": "Económico", "clasificacion": "AMENAZA", "narrativa": "Descripción económica específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal económica adversa específica al hito del proyecto", "fuente": "Fuente: INEGI, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesInciertas": [{ "descripcion": "señal económica incierta para el proyecto", "fuente": "Fuente: Banxico, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] }`,
+    S: `  "S": { "code": "S", "label": "Social", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción social específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [{ "descripcion": "señal social favorable específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesAdversas": [],
+    "senalesInciertas": [] }`,
+    T: `  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción tecnológica específica al proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesInciertas": [] }`,
+    Ec: `  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": ${confidenceValue},
+    "escaladaPorRelevanciaLocal": false,
+    "senalesFavorables": [],
+    "senalesAdversas": [],
+    "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] }`,
+    L: `  "L": { "code": "L", "label": "Legal", "clasificacion": "AMENAZA", "narrativa": "Descripción legal específica al tipo de proyecto...", "confidence": ${confidenceValue},
+    "senalesFavorables": [],
+    "senalesAdversas": [{ "descripcion": "señal legal adversa al hito o sujeto del proyecto", "fuente": "Fuente: DOF, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
+    "senalesInciertas": [] }`,
+  };
+
+  // Same shared context and sources for both halves; only the dimensions to write change, plus one line
+  // naming what the other call covers so the same signal is not repeated in both.
+  const avisoOtraMitad = esSubconjunto
+    ? `Este análisis se genera en dos partes en paralelo y tú escribes solo ${dimsPedidas.join(", ")}. Otra parte cubre ${dimsOtra.join(", ")}: no escribas esas dimensiones y evita repetir una misma señal (misma fuente y hecho) que corresponda con más claridad a ellas.\n`
+    : "";
+  const encabezadoJson = esSubconjunto
+    ? `Responde con este JSON exacto (las ${dimsPedidas.length} claves en el nivel raíz: ${dimsPedidas.join(", ")}):`
+    : "Responde con este JSON exacto (las 6 claves en el nivel raíz):";
+  const cuerpoJson = compacto
+    ? dimsPedidas.map((c) => ejemploJson[c].replace(/\s*\n\s*/g, " ")).join(", ")
+    : dimsPedidas.map((c) => ejemploJson[c]).join(",\n");
+
   const user = `Genera el MapaPESTEL para este proyecto. El análisis debe ser específico al hito, el sujeto y el contexto político-territorial.${archivosSection}${sourcesSection}
 == XPCTO DEL PROYECTO ==
 X — Hito: ${x.hito ?? ""}
@@ -712,11 +764,11 @@ T — Fecha límite: ${t.fechaLimite ?? ""} (${t.duracionMeses ?? "?"} meses)
 O — Justificación: ${x.justificacion ?? ""}
 ${antiFabricacionRule}
 == PROFUNDIDAD POR DIMENSIÓN (pesos del escaneo PESTEL por tipo de proyecto) ==
-Las 6 dimensiones SIEMPRE se generan — la diferencia es de profundidad, no de inclusión:
-${buildDimensionDepthInstructions(projectType)}
+${esSubconjunto ? `Las ${dimsPedidas.length} dimensiones que te corresponden SIEMPRE se generan — la diferencia es de profundidad, no de inclusión:` : "Las 6 dimensiones SIEMPRE se generan — la diferencia es de profundidad, no de inclusión:"}
+${buildDimensionDepthInstructions(projectType, dimsPedidas)}
 
 == INSTRUCCIONES ==
-Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
+${avisoOtraMitad}Para cada una de las ${dimsPedidas.length} dimensiones ${esSubconjunto ? "que te corresponden " : ""}(${dimsPedidas.join(", ")}):
 - clasificacion: "OPORTUNIDAD" si favorece el hito, "AMENAZA" si lo obstaculiza, "NEUTRAL" si es ambiguo.
 - narrativa: la extensión indicada arriba según si la dimensión es prioritaria o de seguimiento, de síntesis vinculada al hito, sujeto y fuentes disponibles.
   Cuando afirmes un hecho específico proveniente de una fuente consultada, cita entre paréntesis
@@ -738,33 +790,9 @@ Para cada una de las 6 dimensiones (P, E, S, T, Ec, L):
   en el objeto de esa dimensión. Omite el campo (o usa false) en cualquier otro caso — incluidas las dimensiones
   ya prioritarias, donde el campo no aplica.
 
-Responde con este JSON exacto (las 6 claves en el nivel raíz):
+${encabezadoJson}
 {
-  "P": { "code": "P", "label": "Político", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción política específica al proyecto...", "confidence": ${confidenceValue},
-    "senalesFavorables": [{ "descripcion": "señal política favorable específica al hito del proyecto", "fuente": "Fuente: INE/SEFIX, 2024", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesAdversas": [{ "descripcion": "señal política adversa específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesInciertas": [] },
-  "E": { "code": "E", "label": "Económico", "clasificacion": "AMENAZA", "narrativa": "Descripción económica específica al proyecto...", "confidence": ${confidenceValue},
-    "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal económica adversa específica al hito del proyecto", "fuente": "Fuente: INEGI, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesInciertas": [{ "descripcion": "señal económica incierta para el proyecto", "fuente": "Fuente: Banxico, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] },
-  "S": { "code": "S", "label": "Social", "clasificacion": "OPORTUNIDAD", "narrativa": "Descripción social específica al proyecto...", "confidence": ${confidenceValue},
-    "senalesFavorables": [{ "descripcion": "señal social favorable específica al sujeto del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesAdversas": [],
-    "senalesInciertas": [] },
-  "T": { "code": "T", "label": "Tecnológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción tecnológica específica al proyecto...", "confidence": ${confidenceValue},
-    "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal tecnológica adversa para la operación del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesInciertas": [] },
-  "Ec": { "code": "Ec", "label": "Ecológico", "clasificacion": "NEUTRAL", "narrativa": "Descripción ecológica específica al territorio...", "confidence": ${confidenceValue},
-    "escaladaPorRelevanciaLocal": false,
-    "senalesFavorables": [],
-    "senalesAdversas": [],
-    "senalesInciertas": [{ "descripcion": "señal ecológica incierta que puede afectar el territorio del proyecto", "fuente": "Fuente: Google News, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }] },
-  "L": { "code": "L", "label": "Legal", "clasificacion": "AMENAZA", "narrativa": "Descripción legal específica al tipo de proyecto...", "confidence": ${confidenceValue},
-    "senalesFavorables": [],
-    "senalesAdversas": [{ "descripcion": "señal legal adversa al hito o sujeto del proyecto", "fuente": "Fuente: DOF, ${currentYearMonth}", "fechaCorte": "${currentYearMonth}", "nivelConfianza": "medio", "origenInternacional": false }],
-    "senalesInciertas": [] }
+${cuerpoJson}
 }
 RECUERDA: señales reales y específicas al XPCTO. Cada dimensión necesita al menos 1 señal O narrativa explicando la ausencia de datos.`;
 

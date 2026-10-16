@@ -1,4 +1,4 @@
-// generate-m1-express: códigos de error propios (`codigo`) y registro de diagnóstico.
+// generate-m1-express: códigos de error propios (`codigo`) y registro de diagnóstico, ahora por mitad.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,18 +38,11 @@ import { getProject } from "@/lib/moddulo/project";
 import { anthropic } from "@/lib/ai/claude";
 import { adminDb } from "@/lib/firebase-admin";
 import { POST } from "./route";
+import { respuestaValida, respuestaModelo, responderPorMitad } from "@/lib/moddulo/__tests__/fixtures/modeloPorMitad";
 
 type Db = { reset(): void; updates(): Array<{ path: string; data: Record<string, unknown> }>; failUpdateOn(p: string): void; seed?: unknown };
 const db = adminDb as unknown as Db;
 
-const MAPA_VALIDO = Object.fromEntries(
-  ["P", "E", "S", "T", "Ec", "L"].map((k) => [k, { code: k, label: k, clasificacion: "NEUTRAL", narrativa: "x", confidence: 65, senalesFavorables: [], senalesAdversas: [], senalesInciertas: [] }])
-);
-const respuestaModelo = (text: string, stop_reason = "end_turn") => ({
-  content: [{ type: "text", text }],
-  stop_reason,
-  usage: { input_tokens: 1200, output_tokens: 3400 },
-});
 
 const llamar = async () => {
   const r = await POST(new Request("http://local/x", { method: "POST", body: JSON.stringify({ projectId: "p1" }) }) as never);
@@ -71,34 +64,44 @@ const espiar = () => ({
 });
 const todo = (s: ReturnType<typeof espiar>) =>
   [...s.log.mock.calls, ...s.warn.mock.calls, ...s.err.mock.calls].map((c) => c.map(String).join(" ")).join("\n");
+const create = () => vi.mocked(anthropic.messages.create);
 
 describe("generate-m1-express — códigos de error propios", () => {
-  it("stop_reason max_tokens + JSON cortado → 500 codigo respuesta_truncada, sin escribir", async () => {
+  it("una mitad con stop_reason max_tokens → 500 respuesta_truncada, nombra T, Ec y L, sin reintento y sin escribir", async () => {
     espiar();
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo('{"P":{"code":"P","narra', "max_tokens") as never);
+    const intentos = responderPorMitad(create(), (m) =>
+      m === "TEcL" ? respuestaModelo('{"T":{"code":"T","narra', "max_tokens") : respuestaValida(m)
+    );
     const r = await llamar();
     expect(r.status).toBe(500);
     expect(r.cuerpo.codigo).toBe("respuesta_truncada");
+    expect(r.cuerpo.dimensiones).toBe("T, Ec y L");
+    expect(intentos).toEqual({ PES: 1, TEcL: 1 });
     expect(db.updates()).toEqual([]);
   });
 
-  it("JSON inválido con otro stop_reason → 500 codigo respuesta_invalida", async () => {
+  it("JSON inválido con otro stop_reason → respuesta_invalida (se reintenta una vez la mitad) y nombra P, E y S", async () => {
     espiar();
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo("Aquí está tu análisis: no es JSON") as never);
+    const intentos = responderPorMitad(create(), (m) => (m === "PES" ? respuestaModelo("Aquí está tu análisis: no es JSON") : respuestaValida(m)));
     const r = await llamar();
     expect(r.status).toBe(500);
     expect(r.cuerpo.codigo).toBe("respuesta_invalida");
+    expect(r.cuerpo.dimensiones).toBe("P, E y S");
+    expect(intentos).toEqual({ PES: 2, TEcL: 1 });
     expect(db.updates()).toEqual([]);
   });
 
-  it("excepción del SDK → 500 codigo fallo_modelo y console.error con nombre y status, sin el mensaje", async () => {
+  it("excepción del SDK en ambas mitades → 500 fallo_modelo, sin reintento, console.error con nombre y status, sin el mensaje", async () => {
     const s = espiar();
     const e = Object.assign(new Error("secreto: clave sk-XYZ"), { name: "APIError", status: 529 });
-    vi.mocked(anthropic.messages.create).mockRejectedValue(e);
+    const intentos = responderPorMitad(create(), () => {
+      throw e;
+    });
     const r = await llamar();
     expect(r.status).toBe(500);
     expect(r.cuerpo.codigo).toBe("fallo_modelo");
-    expect(s.err).toHaveBeenCalled();
+    expect(r.cuerpo.dimensiones).toBe("P, E, S, T, Ec y L");
+    expect(intentos).toEqual({ PES: 1, TEcL: 1 });
     const texto = todo(s);
     expect(texto).toContain("APIError");
     expect(texto).toContain("529");
@@ -106,9 +109,9 @@ describe("generate-m1-express — códigos de error propios", () => {
     expect(db.updates()).toEqual([]);
   });
 
-  it("falla el update de Firestore → 500 codigo fallo_guardado y console.error", async () => {
+  it("falla el update de Firestore → 500 fallo_guardado y console.error", async () => {
     const s = espiar();
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo(JSON.stringify(MAPA_VALIDO)) as never);
+    responderPorMitad(create(), (m) => respuestaValida(m));
     db.failUpdateOn("moddulo_projects/p1");
     const r = await llamar();
     expect(r.status).toBe(500);
@@ -118,30 +121,33 @@ describe("generate-m1-express — códigos de error propios", () => {
 
   it("el éxito no trae `codigo`", async () => {
     espiar();
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo(JSON.stringify(MAPA_VALIDO)) as never);
+    responderPorMitad(create(), (m) => respuestaValida(m));
     const r = await llamar();
     expect(r.status).toBe(200);
     expect(r.cuerpo.codigo).toBeUndefined();
   });
 });
 
-describe("generate-m1-express — registro de diagnóstico", () => {
-  it("tras la llamada registra stop_reason, tokens de entrada y salida, duración y tamaño del prompt", async () => {
+describe("generate-m1-express — registro de diagnóstico por mitad", () => {
+  it("registra por mitad el prompt, stop_reason, tokens, duración y tiempo desde el inicio; y un total", async () => {
     const s = espiar();
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo(JSON.stringify(MAPA_VALIDO), "end_turn") as never);
+    responderPorMitad(create(), (m) => respuestaValida(m));
     await llamar();
     const t = todo(s);
-    expect(t).toMatch(/\[generate-m1-express\] prompt: system=\d+ user=\d+ caracteres/);
-    expect(t).toMatch(/stop_reason=end_turn input_tokens=1200 output_tokens=3400 duracion_ms=\d+/);
+    for (const mitad of ["PES", "TEcL"]) {
+      expect(t).toMatch(new RegExp(`\\[generate-m1-express\\] mitad=${mitad} prompt: system=\\d+ user=\\d+ caracteres`));
+      expect(t).toMatch(new RegExp(`mitad=${mitad} intento=1 stop_reason=end_turn input_tokens=1200 output_tokens=3400 duracion_ms=\\d+ desde_inicio_ms=\\d+`));
+    }
+    expect(t).toMatch(/\[generate-m1-express\] total duracion_ms=\d+ mitades=2 input_tokens=2400 output_tokens=6800/);
   });
 
-  it("en la rama de parseo registra stop_reason, longitud, primeros 200 y últimos 100 caracteres", async () => {
+  it("en la rama de parseo registra la mitad, stop_reason, longitud, primeros 200 y últimos 100 caracteres", async () => {
     const s = espiar();
     const texto = "A".repeat(250) + "M".repeat(300) + "Z".repeat(100);
-    vi.mocked(anthropic.messages.create).mockResolvedValue(respuestaModelo(texto, "max_tokens") as never);
+    responderPorMitad(create(), (m) => (m === "TEcL" ? respuestaModelo(texto, "max_tokens") : respuestaValida(m)));
     await llamar();
     const t = todo(s);
-    expect(t).toContain("parseo fallido stop_reason=max_tokens longitud=650");
+    expect(t).toContain("mitad=TEcL intento=1 parseo fallido stop_reason=max_tokens longitud=650");
     expect(t).toContain("A".repeat(200));
     expect(t).not.toContain("A".repeat(201));
     expect(t).toContain("Z".repeat(100));

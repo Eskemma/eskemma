@@ -138,6 +138,8 @@ export type RespuestaGuardado =
       motor?: string;
       /** `mensaje` field of the JSON body (e.g. the block reason), when present. */
       mensaje?: string;
+      /** `dimensiones` of the JSON body (generate-m1-express: the dimensions of the half that failed). */
+      dimensiones?: string;
     }
   | { tipo: "error_red" };
 
@@ -617,13 +619,15 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
   if (accion === "generar_m1" && resp.status >= 500) {
     // The route's own codes (generate-m1-express). The first three happen BEFORE it writes anything.
     // The cause is never deduced from the message text: only from the code.
+    // When the server names the dimensions of the half that failed, so do we ("No se pudo generar T, Ec y L").
+    const que = resp.dimensiones ? `No se pudo generar ${resp.dimensiones}` : "No se pudo generar el análisis nuevo";
     switch (resp.codigo) {
       case "respuesta_truncada":
-        return "No se pudo generar el análisis nuevo: la respuesta del modelo se cortó por exceder su límite de longitud. No se guardó nada; inténtalo de nuevo.";
+        return `${que}: la respuesta del modelo se cortó por exceder su límite de longitud. No se guardó nada; inténtalo de nuevo.`;
       case "respuesta_invalida":
-        return "No se pudo generar el análisis nuevo: la respuesta del análisis no fue válida. No se guardó nada; inténtalo de nuevo.";
+        return `${que}: la respuesta del análisis no fue válida. No se guardó nada; inténtalo de nuevo.`;
       case "fallo_modelo":
-        return "No se pudo generar el análisis nuevo: el servicio de análisis no respondió. No se guardó nada; inténtalo de nuevo.";
+        return `${que}: el servicio de análisis no respondió. No se guardó nada; inténtalo de nuevo.`;
       case "fallo_guardado":
         return "El análisis se generó, pero no se pudo CONFIRMAR que se guardó. Recarga la página para verificar el estado antes de volver a generarlo.";
     }

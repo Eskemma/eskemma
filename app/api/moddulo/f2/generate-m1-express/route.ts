@@ -56,7 +56,133 @@ function getNewsTerritory(territorio: Territorio | undefined): string {
   return territorio.estado ?? territorio.nombre ?? "";
 }
 
+// ── Two parallel halves of three dimensions (paso 2, 26-10-16) ─────────────────
+type CodigoMitad = "respuesta_truncada" | "respuesta_invalida" | "fallo_modelo";
+type Dim = "P" | "E" | "S" | "T" | "Ec" | "L";
+const DIMENSIONES_ORDEN: readonly Dim[] = ["P", "E", "S", "T", "Ec", "L"];
+const MITADES: readonly { id: "PES" | "TEcL"; dims: readonly Dim[] }[] = [
+  { id: "PES", dims: ["P", "E", "S"] },
+  { id: "TEcL", dims: ["T", "Ec", "L"] },
+];
+// Per half. Measured worst half over the 7 real express M1: ≈ 4.5k tokens (56 % of this cap).
+const MAX_TOKENS_MITAD = 8000;
+// Vercel Hobby with Fluid compute: 300 s, not extendable. A half is retried once only if less than
+// 150 s have passed and the retry is expected to end before 240 s; each call also has its own timeout
+// so a hung call cannot eat the whole budget (the SDK's own retries are off: this route owns the retry).
+const UMBRAL_REINTENTO_MS = 150_000;
+const PRESUPUESTO_REINTENTO_MS = 240_000;
+const TIMEOUT_LLAMADA_MS = 170_000;
+const LIMITE_RUTA_MS = 285_000;
+const CODIGOS_REINTENTABLES: readonly CodigoMitad[] = ["fallo_modelo", "respuesta_invalida"];
+
+interface ResultadoMitadOk {
+  ok: true;
+  mitad: string;
+  dims: readonly Dim[];
+  mapa: Record<string, unknown>;
+  duracionMs: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+interface ResultadoMitadFallida {
+  ok: false;
+  mitad: string;
+  dims: readonly Dim[];
+  codigo: CodigoMitad;
+  raw?: string;
+  duracionMs: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+function listaDimensiones(dims: readonly string[]): string {
+  return dims.length <= 1 ? dims.join("") : `${dims.slice(0, -1).join(", ")} y ${dims[dims.length - 1]}`;
+}
+
+/** One call to the model for one half, with its own log line, stop_reason and error code. */
+async function intentarMitad(
+  mitad: (typeof MITADES)[number],
+  prompt: { system: string; user: string },
+  intento: number,
+  inicioRuta: number
+): Promise<ResultadoMitadOk | ResultadoMitadFallida> {
+  const etiqueta = `[generate-m1-express] mitad=${mitad.id} intento=${intento}`;
+  const base = { mitad: mitad.id, dims: mitad.dims } as const;
+  const inicio = Date.now();
+  const timeout = Math.max(10_000, Math.min(TIMEOUT_LLAMADA_MS, LIMITE_RUTA_MS - (inicio - inicioRuta)));
+  let response: { content: Array<{ type: string; text?: string }>; stop_reason?: string | null; usage?: { input_tokens?: number; output_tokens?: number } };
+  try {
+    response = (await anthropic.messages.create(
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: MAX_TOKENS_MITAD,
+        system: prompt.system,
+        messages: [{ role: "user", content: prompt.user }],
+      },
+      { timeout, maxRetries: 0 }
+    )) as typeof response;
+  } catch (e) {
+    // Name and status only: the SDK message can echo request details.
+    const err = e as { name?: string; status?: number };
+    console.error(
+      `${etiqueta} fallo_modelo name=${err?.name ?? "desconocido"} status=${err?.status ?? "n/a"} ` +
+        `duracion_ms=${Date.now() - inicio} desde_inicio_ms=${Date.now() - inicioRuta}`
+    );
+    return { ...base, ok: false, codigo: "fallo_modelo", duracionMs: Date.now() - inicio, inputTokens: 0, outputTokens: 0 };
+  }
+  const duracionMs = Date.now() - inicio;
+  const stopReason = response.stop_reason ?? "desconocido";
+  const inputTokens = response.usage?.input_tokens ?? 0;
+  const outputTokens = response.usage?.output_tokens ?? 0;
+  console.log(
+    `${etiqueta} stop_reason=${stopReason} input_tokens=${response.usage?.input_tokens ?? "n/a"} ` +
+      `output_tokens=${response.usage?.output_tokens ?? "n/a"} duracion_ms=${duracionMs} ` +
+      `desde_inicio_ms=${Date.now() - inicioRuta}`
+  );
+  const tokens = { duracionMs, inputTokens, outputTokens };
+
+  const rawText = response.content
+    .filter((b) => b.type === "text")
+    .map((b) => b.text ?? "")
+    .join("");
+
+  let parsed: unknown;
+  try {
+    let jsonToParse = rawText.trim();
+    const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+    if (fenceMatch) jsonToParse = fenceMatch[1].trim();
+    parsed = JSON.parse(jsonToParse);
+  } catch {
+    console.error(
+      `${etiqueta} parseo fallido stop_reason=${stopReason} longitud=${rawText.length} ` +
+        `inicio=${JSON.stringify(rawText.slice(0, 200))} final=${JSON.stringify(rawText.slice(-100))}`
+    );
+    // Truncated (hit max_tokens) vs. otherwise invalid: the client words each case differently.
+    return {
+      ...base,
+      ok: false,
+      codigo: stopReason === "max_tokens" ? "respuesta_truncada" : "respuesta_invalida",
+      raw: rawText.slice(0, 500),
+      ...tokens,
+    };
+  }
+
+  // Exactly the three keys of this half, each an object.
+  const obj = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  const claves = obj ? Object.keys(obj) : [];
+  const valida =
+    obj !== null &&
+    claves.length === mitad.dims.length &&
+    mitad.dims.every((d) => d in obj && obj[d] !== null && typeof obj[d] === "object" && !Array.isArray(obj[d]));
+  if (!valida) {
+    console.error(`${etiqueta} claves_invalidas esperadas=${mitad.dims.join(",")} recibidas=${claves.join(",")}`);
+    return { ...base, ok: false, codigo: "respuesta_invalida", raw: rawText.slice(0, 500), ...tokens };
+  }
+  return { ...base, ok: true, mapa: obj, ...tokens };
+}
+
 export async function POST(request: NextRequest) {
+  const inicioRuta = Date.now();
   const session = await getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -266,75 +392,77 @@ export async function POST(request: NextRequest) {
       `webLegal=${webContext?.legal?.disponible ?? false}`
   );
 
-  // ── Build prompt and call Claude ──────────────────────────────
-  const { system, user } = getMapaPESTELExpressPrompt(
-    tipoProyecto,
-    xpcto as Record<string, unknown>,
-    archivos.length > 0 ? archivos : undefined,
-    { news, dof, inegi, banxico, sefix, bise, webContext, fontana }
-  );
+  // ── Build prompts and call Claude: two parallel halves of three dimensions ──
+  // One call for the six dimensions needed ≈ 8.9k tokens and was cut at max_tokens (8000) on a real
+  // project. Each half gets the whole project context and all sources; only the dimensions it writes,
+  // their depth instructions and a line naming what the other half covers change.
+  const contextoFuentes = { news, dof, inegi, banxico, sefix, bise, webContext, fontana };
+  const xpctoPrompt = xpcto as Record<string, unknown>;
+  const archivosPrompt = archivos.length > 0 ? archivos : undefined;
+  const promptsMitad = MITADES.map((m) => {
+    const prompt = getMapaPESTELExpressPrompt(tipoProyecto, xpctoPrompt, archivosPrompt, contextoFuentes, {
+      dimensiones: m.dims,
+      compacto: true,
+    });
+    console.log(
+      `[generate-m1-express] mitad=${m.id} prompt: system=${prompt.system.length} user=${prompt.user.length} caracteres`
+    );
+    return prompt;
+  });
 
-  // Diagnostic log (no user data): prompt size, then stop_reason / tokens / duration of the call.
-  console.log(`[generate-m1-express] prompt: system=${system.length} user=${user.length} caracteres`);
-  const inicioModelo = Date.now();
-  let response: Awaited<ReturnType<typeof anthropic.messages.create>> & {
-    content: Array<{ type: string; text?: string }>;
-  };
-  try {
-    response = (await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 8000,
-      system,
-      messages: [{ role: "user", content: user }],
-    })) as typeof response;
-  } catch (e) {
-    // Name and status only: the SDK message can echo request details.
-    const err = e as { name?: string; status?: number };
-    console.error(
-      `[generate-m1-express] fallo_modelo name=${err?.name ?? "desconocido"} status=${err?.status ?? "n/a"} ` +
-        `duracion_ms=${Date.now() - inicioModelo}`
-    );
-    return NextResponse.json(
-      { error: "El modelo no pudo completar la solicitud", codigo: "fallo_modelo" },
-      { status: 500 }
-    );
+  let tokensIntentosPerdidos = { input: 0, output: 0 };
+  let resultados = await Promise.all(MITADES.map((m, i) => intentarMitad(m, promptsMitad[i], 1, inicioRuta)));
+  const fallidas = resultados.filter((r) => !r.ok);
+  // One retry, only of the failed half, only for transient failures, only if the route has time left.
+  // Nothing is retried when both halves failed or when a half was truncated (it would truncate again).
+  if (fallidas.length === 1 && fallidas[0].ok === false && CODIGOS_REINTENTABLES.includes(fallidas[0].codigo)) {
+    const falla = fallidas[0];
+    const hermana = resultados.find((r) => r.ok);
+    const desdeInicio = Date.now() - inicioRuta;
+    const estimado = Math.max(falla.duracionMs, hermana?.duracionMs ?? 0, 60_000);
+    if (desdeInicio < UMBRAL_REINTENTO_MS && desdeInicio + estimado < PRESUPUESTO_REINTENTO_MS) {
+      const i = MITADES.findIndex((m) => m.id === falla.mitad);
+      const reintento = await intentarMitad(MITADES[i], promptsMitad[i], 2, inicioRuta);
+      tokensIntentosPerdidos = { input: falla.inputTokens, output: falla.outputTokens };
+      resultados = resultados.map((r, j) => (j === i ? reintento : r));
+    } else {
+      console.warn(
+        `[generate-m1-express] mitad=${falla.mitad} sin reintento por tiempo: desde_inicio_ms=${desdeInicio} ` +
+          `estimado_ms=${estimado}`
+      );
+    }
   }
-  const stopReason = (response as { stop_reason?: string | null }).stop_reason ?? "desconocido";
-  const usage = (response as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+
+  // Total over EVERY attempt, including the one that was retried.
+  const salidaTokens = resultados.reduce((a, r) => a + r.outputTokens, tokensIntentosPerdidos.output);
+  const entradaTokens = resultados.reduce((a, r) => a + r.inputTokens, tokensIntentosPerdidos.input);
   console.log(
-    `[generate-m1-express] stop_reason=${stopReason} input_tokens=${usage?.input_tokens ?? "n/a"} ` +
-      `output_tokens=${usage?.output_tokens ?? "n/a"} duracion_ms=${Date.now() - inicioModelo}`
+    `[generate-m1-express] total duracion_ms=${Date.now() - inicioRuta} mitades=${resultados.length} ` +
+      `input_tokens=${entradaTokens} output_tokens=${salidaTokens}`
   );
 
-  const rawText = response.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as { type: "text"; text: string }).text)
-    .join("");
-
-  let mapaPESTEL: MapaPESTEL;
-  try {
-    let jsonToParse = rawText.trim();
-    const fenceMatch = jsonToParse.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-    if (fenceMatch) jsonToParse = fenceMatch[1].trim();
-    mapaPESTEL = JSON.parse(jsonToParse) as MapaPESTEL;
-  } catch {
-    console.error(
-      `[generate-m1-express] parseo fallido stop_reason=${stopReason} longitud=${rawText.length} ` +
-        `inicio=${JSON.stringify(rawText.slice(0, 200))} final=${JSON.stringify(rawText.slice(-100))}`
-    );
-    // Truncated (hit max_tokens) vs. otherwise invalid: the client words each case differently.
-    const codigo = stopReason === "max_tokens" ? "respuesta_truncada" : "respuesta_invalida";
+  const fallo = resultados.filter((r): r is ResultadoMitadFallida => !r.ok);
+  if (fallo.length > 0) {
+    // Any failed half discards everything: a partial M1 would be read, edited and approved as if whole.
+    const dims = DIMENSIONES_ORDEN.filter((c) => fallo.some((f) => f.dims.includes(c)));
+    const codigo = (["respuesta_truncada", "respuesta_invalida", "fallo_modelo"] as const).find((c) =>
+      fallo.some((f) => f.codigo === c)
+    )!;
     return NextResponse.json(
-      { error: "Error al parsear respuesta de Claude", codigo, raw: rawText.slice(0, 500) },
+      {
+        error: "No se pudo generar el análisis completo",
+        codigo,
+        dimensiones: listaDimensiones(dims),
+        ...(codigo === "respuesta_invalida" ? { raw: fallo.find((f) => f.codigo === codigo)?.raw } : {}),
+      },
       { status: 500 }
     );
   }
-
-  // Verify all 6 PEST-L keys are present
-  const EXPECTED_KEYS = ["P", "E", "S", "T", "Ec", "L"];
-  const missingKeys = EXPECTED_KEYS.filter((k) => !(k in mapaPESTEL));
-  if (missingKeys.length > 0) {
-    console.warn(`[generate-m1-express] Faltan dimensiones en la respuesta: ${missingKeys.join(", ")}`);
+  const mapasMitad = resultados as ResultadoMitadOk[];
+  const mapaPESTEL = {} as MapaPESTEL;
+  for (const c of DIMENSIONES_ORDEN) {
+    const fuente = mapasMitad.find((r) => c in r.mapa);
+    if (fuente) (mapaPESTEL as Record<string, unknown>)[c] = fuente.mapa[c];
   }
 
   // Ensure origenInternacional: boolean on all signals
