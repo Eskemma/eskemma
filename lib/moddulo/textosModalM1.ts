@@ -115,3 +115,15 @@ export function estadoImpactoDesdePantalla(d: DatosPantallaM1): EstadoParaImpact
     hayDvs: d.hayDvs,
   };
 }
+
+/**
+ * The 409 that the Centinela-side link (ModduloButton → link-moddulo) returns when the Moddulo
+ * project has edits or an approval: the screen shows THIS text (not the server's wording). The
+ * server emits it from commit 4; until then the branch never fires.
+ */
+export function mensajeRechazoVincularCentinela(resp: { status: number; codigo?: string }): string | null {
+  if (resp.status !== 409) return null;
+  return resp.codigo === "reemplazo_requiere_confirmacion" || resp.codigo === "reemplazo_huella_vencida"
+    ? MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES
+    : null;
+}

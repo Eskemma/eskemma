@@ -137,3 +137,13 @@ describe("líneas del servidor y palabras internas", () => {
     );
   });
 });
+
+describe("mensajeRechazoVincularCentinela", () => {
+  it("con los 409 de confirmación muestra el texto acordado; con otros códigos o estados, null", async () => {
+    const { mensajeRechazoVincularCentinela } = await import("./textosModalM1");
+    expect(mensajeRechazoVincularCentinela({ status: 409, codigo: "reemplazo_requiere_confirmacion" })).toBe(MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES);
+    expect(mensajeRechazoVincularCentinela({ status: 409, codigo: "reemplazo_huella_vencida" })).toBe(MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES);
+    expect(mensajeRechazoVincularCentinela({ status: 409, codigo: "pestel_already_linked" })).toBeNull();
+    expect(mensajeRechazoVincularCentinela({ status: 500, codigo: "reemplazo_requiere_confirmacion" })).toBeNull();
+  });
+});

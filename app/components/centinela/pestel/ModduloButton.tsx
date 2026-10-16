@@ -5,6 +5,7 @@
 // "Iniciar proyecto en Moddulo" (primary) + "Vincular a proyecto existente" (picker).
 // When already linked, shows "Regresar a Moddulo F2 con resultados".
 
+import { mensajeRechazoVincularCentinela } from "@/lib/moddulo/textosModalM1";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PESTELProject } from "@/types/pestel.types";
@@ -106,7 +107,13 @@ function PickerModal({
       }
 
       const err = (await res.json()) as { error?: string; message?: string };
-      if (res.status === 409) {
+      // The Moddulo project has edits or an approval on its M1: the server refuses (409 asking for a
+      // confirmation) and this screen has no confirmation step — the message sends the user to
+      // Moddulo. The server emits that 409 from commit 4 of the M1 review; until then it never fires.
+      const rechazoM1 = mensajeRechazoVincularCentinela({ status: res.status, codigo: err.error });
+      if (rechazoM1) {
+        setLinkError(rechazoM1);
+      } else if (res.status === 409) {
         setLinkError(
           err.message ??
             "Este proyecto de Moddulo ya está vinculado a otro análisis PESTEL. Para cambiar la vinculación, contacta soporte."

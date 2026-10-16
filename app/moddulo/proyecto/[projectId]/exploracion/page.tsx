@@ -11,6 +11,19 @@ import {
   type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
+import { dimensionEditada, aFecha } from "@/lib/moddulo/m1Aprobacion";
+import { requiereConfirmacionM1, type EstadoParaImpactoM1 } from "@/lib/moddulo/impactoM1";
+import { estadoImpactoDesdePantalla, textoModalM1 } from "@/lib/moddulo/textosModalM1";
+import {
+  ROTULO_CONFIANZA_IA,
+  mensajeAreaMotores,
+  mostrarAvisoSinGenerar,
+  opcionesKebabM1,
+  pieM1,
+  puedeEditarMotores,
+  tooltipEditado,
+  MAX_TEXTO_EDICION,
+} from "@/lib/moddulo/pantallaM1";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +31,11 @@ import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
 import MotoresSequentialView from "./components/MotoresSequentialView";
+import M1Pie from "./components/M1Pie";
+import ModalM1 from "./components/ModalM1";
+import { useM1Revision, type M1Revision } from "./useM1Revision";
+import { useFocusTrap } from "@/app/hooks/useFocusTrap";
+import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import OrphanRecoveryView from "./components/OrphanRecoveryView";
 import ReemplazarAnalisisModal, {
   type EliminadosModal,
@@ -214,7 +232,6 @@ export default function ExploracionPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [propagationWarning, setPropagationWarning] = useState<PhaseId[]>([]);
-  const [showConfirmReanalisis, setShowConfirmReanalisis] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "form">("chat");
   const [sefixData, setSefixData] = useState<SefixData | null>(null);
   const [webElectoralData, setWebElectoralData] = useState<WebContextResult | null>(null);
@@ -232,10 +249,6 @@ export default function ExploracionPage() {
   // generarDraftDVS sin agregarlo a sus deps (se mantiene estable).
   const mapaPESTELRef = useRef<MapaPESTEL | null>(null);
   useEffect(() => { mapaPESTELRef.current = mapaPESTEL; }, [mapaPESTEL]);
-  // Serializado del mapaPESTEL que corresponde al draftDVS actualmente
-  // válido — el auto-generate effect solo regenera si el contenido de
-  // mapaPESTEL difiere de este marcador, no solo su referencia de objeto.
-  const lastGeneratedMapaRef = useRef<string | null>(null);
   const [showReporte, setShowReporte] = useState(false);
   // Nuevo flujo de motores secuenciales (Iter 2+)
   const [draftDVS, setDraftDVS] = useState<DVSF2 | null>(null);
@@ -376,13 +389,8 @@ export default function ExploracionPage() {
         if (savedDraftDVS && draftM5Valid) {
           setDraftDVS(savedDraftDVS as unknown as DVSF2);
         }
-        // Baseline del auto-generate effect: marca que savedMapa ya generó
-        // un DVS — sin importar si el proyecto sigue en borrador (draftDVS)
-        // o ya finalizó (dvs, con draftDVS borrado por finalize-dvs). Antes
-        // esto solo se primaba dentro del `if` de arriba, así que cualquier
-        // proyecto F2 ya cerrado (sin draftDVS en Firestore) perdía el
-        // baseline y disparaba una regeneración completa en cada carga.
-        if (savedMapa) lastGeneratedMapaRef.current = JSON.stringify(savedMapa);
+        // M1 review state (edits, approval, fingerprint): computed by the server.
+        m1.aplicarGet(data);
         const savedMotorAprobaciones = p.phases?.exploracion?.motorAprobaciones;
         if (savedMotorAprobaciones) setMotorAprobaciones(
           savedMotorAprobaciones as { M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean }
@@ -491,14 +499,14 @@ export default function ExploracionPage() {
         setPestAnalysisId(pestAnalysisId);
         // M1 pudo haberse refrescado (análisis renovado, restaurado, o
         // reemplazando un express) — M2-M5 aprobados contra el M1 anterior
-        // quedarían obsoletos, se fuerza re-aprobación. draftDVS NO se limpia
-        // aquí: el auto-generate effect dispara la regeneración y solo lo
-        // sobreescribe si tiene éxito.
+        // quedarían obsoletos. Since 3b nothing regenerates the motors here: the imported M1 is a
+        // draft until the user approves it (the state comes back from the server).
         setRegenKind("full");
         setMotorAprobaciones({});
         setXpctoStaleChanges([]);
         setTerritorioStaleChanges([]);
         setLastUnlinkedPestAnalysisId(null);
+        void refrescarM1Ref.current();
 
         // Limpia el query param — evita que el efecto C7 vuelva a disparar
         // este mismo import (aunque sea idempotente) en visitas futuras.
@@ -562,6 +570,7 @@ export default function ExploracionPage() {
           const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
           if (linkedSource?.sourceId) setPestProjectId(linkedSource.sourceId);
           if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
+          void refrescarM1Ref.current();
         })
         .catch((err) => console.error("[C7b] import-pestel falló para pestAnalysisId:", pestAnalysisId, err));
     }
@@ -690,27 +699,9 @@ export default function ExploracionPage() {
     return () => clearInterval(id);
   }, [isExpressAnalyzing, expressStartTime]);
 
-  // Auto-generate draftDVS cuando mapaPESTEL cambia de CONTENIDO (no de
-  // referencia) durante la sesión — cubre primer análisis, re-sync tras
-  // regenerar en Centinela, restauración de vínculo, o upgrade
-  // express→Centinela. No exige draftDVS === null: si ya había un draft
-  // previo (de un M1 anterior), se deja intacto mientras se regenera —
-  // generarDraftDVS solo lo sobreescribe si la llamada tiene éxito, así que
-  // un fallo no deja al usuario sin nada que ver.
-  //
-  // La comparación es por contenido serializado (lastGeneratedMapaRef), no
-  // por igualdad de referencia: un re-import idempotente (mismo análisis, ya
-  // sincronizado) deserializa un objeto NUEVO con el mismo contenido, y
-  // comparar por referencia disparaba una regeneración real de sobra en cada
-  // visita — ver bug reportado 2026-07-17.
-  useEffect(() => {
-    if (mapaPESTEL === null || !isLoaded) return;
-    const serialized = JSON.stringify(mapaPESTEL);
-    if (serialized === lastGeneratedMapaRef.current) return;
-    generarDraftDVS();
-  // generarDraftDVS es estable (useCallback con dep projectId que no cambia en runtime)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapaPESTEL, isLoaded]);
+  // NOTE (M1 review, commit 3b): the automatic generation of M2–M5 when the map changes was
+  // removed. M2–M5 are generated ONLY after the user approves M1 (useM1Revision.aprobar) or on
+  // "Reintentar generación"; an imported or regenerated M1 stays a draft until it is approved.
 
   // Datos planos del formulario para el chat
   const currentFormData: Record<string, unknown> = {
@@ -816,82 +807,167 @@ export default function ExploracionPage() {
   // Ref para prevenir doble llamada concurrente (evita stale closure en useCallback)
   const generatingRef = useRef(false);
 
-  // Genera draftDVS a partir del mapaPESTEL actual (PESTEL app path o express path)
+  // Generates the motors draft (M2–M5). Called ONLY (a) right after approving M1, (b) from
+  // "Reintentar generación", (c) from the XPCTO "actualizar contraste" banner. It reads what the
+  // server holds; the screen says nothing is generated unless the response carried the analysis.
   const generarDraftDVS = useCallback(async () => {
     if (generatingRef.current) return;
     generatingRef.current = true;
     setIsGeneratingMotors(true);
     setMotorGenerationError(null);
     try {
-      const r = await fetch("/api/moddulo/f2/generate-dvs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId, saveas: "draft" }),
-      });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        const motor = (err as { motor?: string }).motor;
-        setMotorGenerationError(
-          motor
-            ? `Error al generar ${motor}. Intenta de nuevo.`
-            : "No se pudo generar el análisis. Intenta de nuevo."
-        );
+      const { resp, datos } = await leerRespuestaGuardado(
+        () =>
+          fetch("/api/moddulo/f2/generate-dvs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ projectId, saveas: "draft" }),
+          }),
+        (d) => Boolean(d.dvs)
+      );
+      const decision = decidirResultadoGuardado("generar_motores", resp);
+      if (!decision.exito) {
+        setMotorGenerationError(decision.mensajeError);
         return;
       }
-      const data = await r.json();
-      if (data.dvs) {
-        setDraftDVS(data.dvs as DVSF2);
-        // Marca el mapaPESTEL vigente como el que generó este draft — el
-        // auto-generate effect no vuelve a disparar hasta que cambie de verdad.
-        lastGeneratedMapaRef.current = JSON.stringify(mapaPESTELRef.current);
-      }
-    } catch {
-      setMotorGenerationError("Error de red. Verifica tu conexión e intenta de nuevo.");
+      setDraftDVS(datos.dvs as DVSF2);
     } finally {
       generatingRef.current = false;
       setIsGeneratingMotors(false);
     }
   }, [projectId]);
 
-  // Express path: generate mapaPESTEL with Claude.
-  // On success, setMapaPESTEL triggers the auto-generate useEffect → generarDraftDVS.
-  // Identical handoff pattern as the Centinela import-pestel path.
-  const handleGenerarDVS = useCallback(async () => {
-    setIsExpressAnalyzing(true);
-    setExpressStartTime(new Date());
-    setExpressError(null);
-    try {
-      const mR = await fetch("/api/moddulo/f2/generate-m1-express", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ projectId }),
-      });
-      if (!mR.ok) {
-        setExpressError("El análisis express no pudo completarse. Intenta de nuevo.");
-        return;
+  // ── M1 review (edit / approve / reopen): effects in useM1Revision, decisions in lib/moddulo ──
+  const alReabrirRef = useRef<() => void>(() => {});
+  const m1 = useM1Revision({
+    projectId,
+    mapaPESTEL,
+    setMapaPESTEL,
+    motoresGenerados: draftDVS !== null || dvs !== null,
+    limpiarMotoresLocales: () => {
+      setDraftDVS(null);
+      setMotorAprobaciones({});
+    },
+    generarMotores: generarDraftDVS,
+    alReabrir: () => alReabrirRef.current(),
+  });
+  const refrescarM1Ref = useRef<() => Promise<unknown>>(async () => null);
+  useEffect(() => { refrescarM1Ref.current = m1.refrescar; });
+
+  // After reopening M1 the page leaves the motors-editing view and the report: the motors are
+  // paused until M1 is approved again.
+  useEffect(() => {
+    alReabrirRef.current = () => {
+      if (mode === "editing") {
+        setDraftDVS(null);
+        setMotorAprobaciones({});
       }
-      const mData = await mR.json();
-      if (mData.mapaPESTEL) {
-        setMapaPESTEL(mData.mapaPESTEL as MapaPESTEL);
-      } else {
-        setExpressError("El análisis no devolvió datos válidos. Intenta de nuevo.");
+      setMode(dvs ? "completed" : "active");
+      setShowReporte(false);
+    };
+  });
+
+  // Unsaved edits of the narratives: warn before leaving the page.
+  const hayCambiosM1 = m1.cambiosSinGuardar.length > 0;
+  useEffect(() => {
+    if (!hayCambiosM1) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [hayCambiosM1]);
+
+  // State the confirmation modals are worded from (same lines as the server, impactoM1.ts).
+  const impactoPantalla: EstadoParaImpactoM1 = (() => {
+    const base = estadoImpactoDesdePantalla({
+      estado: m1.estado ?? (mapaPESTEL !== null ? "borrador" : "sin_m1"),
+      aprobacionValida: m1.resumen?.aprobacionValida ?? false,
+      dimensionesEditadas: m1.resumen?.dimensionesEditadas ?? [],
+      totalDimensiones: Object.keys(mapaPESTEL ?? {}).length,
+      motoresAprobados: (["M2", "M3", "M4", "M5"] as const).filter((k) => motorAprobaciones[k]),
+      hayBorrador: draftDVS !== null,
+      hayDvs: dvs !== null,
+    });
+    return { ...base, hayPayload: base.hayPayload || mapaPESTEL !== null };
+  })();
+  const impactoRef = useRef(impactoPantalla);
+  useEffect(() => { impactoRef.current = impactoPantalla; });
+
+  // "Nuevo análisis": the modal (lines from the real state; the server's own lines replace them
+  // when it answers a 409) and the call. A clean project generates without asking.
+  const [nuevoModal, setNuevoModal] = useState<{ lineasServidor?: string[]; huella: string | null; aviso: string | null } | null>(null);
+
+  const handleGenerarDVS = useCallback(
+    async (confirm?: { huella: string | null }) => {
+      // The analyzing view is behind `mode === "editing"` and the report in the render chain: leave
+      // them so the user sees the progress (bug 26-09-13, "Relanzar análisis" showed nothing).
+      setMode((m) => (m === "editing" ? (dvs ? "completed" : "active") : m));
+      setShowReporte(false);
+      setIsExpressAnalyzing(true);
+      setExpressStartTime(new Date());
+      setExpressError(null);
+      try {
+        const { resp, datos } = await leerRespuestaGuardado(
+          () =>
+            fetch("/api/moddulo/f2/generate-m1-express", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              // The server asks for confirmar/huella from commit 4 on; today it ignores them.
+              body: JSON.stringify({ projectId, ...(confirm ? { confirmar: true, ...(confirm.huella ? { huella: confirm.huella } : {}) } : {}) }),
+            }),
+          (d) => Boolean(d.mapaPESTEL)
+        );
+        const d = decidirReemplazoAnalisis(resp, { confirmado: confirm ? true : undefined }, "generar_m1");
+        switch (d.tipo) {
+          case "exito":
+            setMapaPESTEL(datos.mapaPESTEL as MapaPESTEL);
+            // The new M1 starts as a draft: the previous motors no longer belong to it.
+            setDraftDVS(null);
+            setMotorAprobaciones({});
+            setXpctoStaleChanges([]);
+            setTerritorioStaleChanges([]);
+            void refrescarM1Ref.current();
+            break;
+          case "requiere_confirmacion":
+          case "huella_vencida":
+            setNuevoModal({
+              lineasServidor: Array.isArray(datos.lineas) ? (datos.lineas as string[]) : undefined,
+              huella: typeof datos.huella === "string" ? datos.huella : null,
+              aviso: d.tipo === "huella_vencida" ? "El estado del análisis cambió. No se reemplazó nada: revisa lo que se perderá y confirma de nuevo." : null,
+            });
+            break;
+          case "bloqueado":
+          case "error":
+            setExpressError(d.tipo === "error" ? d.mensajeError : "No se pudo generar el análisis nuevo.");
+            break;
+        }
+      } finally {
+        setIsExpressAnalyzing(false);
+        setExpressStartTime(null);
       }
-    } catch {
-      setExpressError("Error de red. Verifica tu conexión e intenta de nuevo.");
-    } finally {
-      setIsExpressAnalyzing(false);
-      setExpressStartTime(null);
-    }
-  }, [projectId]);
+    },
+    [projectId, dvs]
+  );
+
+  // Every entry point that REPLACES the analysis (kebab, regenerate banners, chat action) goes here.
+  const solicitarNuevoAnalisis = useCallback(() => {
+    if (requiereConfirmacionM1(impactoRef.current, "nuevo_analisis")) setNuevoModal({ huella: null, aviso: null });
+    else void handleGenerarDVS();
+  }, [handleGenerarDVS]);
+  const solicitarNuevoAnalisisRef = useRef<() => void>(() => {});
+  useEffect(() => { solicitarNuevoAnalisisRef.current = solicitarNuevoAnalisis; }, [solicitarNuevoAnalisis]);
 
   // Keep the ref in sync so handleDataExtracted can call it without stale closure
-  useEffect(() => { handleGenerarDVSRef.current = handleGenerarDVS; }, [handleGenerarDVS]);
+  useEffect(() => { handleGenerarDVSRef.current = solicitarNuevoAnalisis; }, [solicitarNuevoAnalisis]);
 
   const [isUnlinkingPestel, setIsUnlinkingPestel] = useState(false);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState(false);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  const [unlinkServidor, setUnlinkServidor] = useState<{ lineas: string[]; huella: string | null; aviso: string | null } | null>(null);
   const [isRelinkingPestel, setIsRelinkingPestel] = useState(false);
   const [showLinkExistingPicker, setShowLinkExistingPicker] = useState(false);
 
@@ -899,27 +975,37 @@ export default function ExploracionPage() {
   // pestAnalysisId/pestProjectId/mapaPESTEL en el servidor (que además
   // conserva el pestAnalysisId anterior para poder deshacer) y resetea el
   // estado local para que el usuario pueda regenerar vía express de inmediato.
-  // H25 (6b): the confirmation used to close BEFORE the request and a failure was silent
-  // (and a thrown fetch left `isUnlinkingPestel` on). Now it stays open with the error and
-  // the local state only resets once the server confirmed.
+  // H25 (6b): the confirmation stays open with the error and the local state only resets once the
+  // server confirmed. M1 review (3b): the notice lists what is lost from the real state, the request
+  // carries `confirmar` (the server demands it from commit 4: a 409 reopens the notice with ITS
+  // lines and fingerprint), and the motors draft and approvals are discarded together with M1.
   const handleUnlinkPestel = useCallback(async () => {
     setIsUnlinkingPestel(true);
     setUnlinkError(null);
     try {
-      const { resp } = await leerRespuestaGuardado(() =>
+      const { resp, datos } = await leerRespuestaGuardado(() =>
         fetch("/api/moddulo/f2/unlink-pestel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ projectId }),
+          body: JSON.stringify({ projectId, confirmar: true, ...(unlinkServidor?.huella ? { huella: unlinkServidor.huella } : {}) }),
         })
       );
+      if (resp.tipo === "respuesta" && resp.status === 409 && (resp.codigo === "reemplazo_requiere_confirmacion" || resp.codigo === "reemplazo_huella_vencida")) {
+        setUnlinkServidor({
+          lineas: Array.isArray(datos.lineas) ? (datos.lineas as string[]) : [],
+          huella: typeof datos.huella === "string" ? datos.huella : null,
+          aviso: resp.codigo === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se desvinculó nada: revisa lo que se perderá y confirma de nuevo." : null,
+        });
+        return;
+      }
       const decision = decidirResultadoGuardado("desvincular_pestel", resp);
       if (!decision.exito) {
         setUnlinkError(decision.mensajeError);
         return;
       }
       setShowConfirmUnlink(false);
+      setUnlinkServidor(null);
       setLastUnlinkedPestAnalysisId(pestAnalysisId);
       setPestlVia(null);
       setPestProjectId(null);
@@ -927,14 +1013,14 @@ export default function ExploracionPage() {
       setMapaPESTEL(null);
       setXpctoStaleChanges([]);
       setTerritorioStaleChanges([]);
+      // The motors came from the M1 that no longer exists: draft and approvals go with it.
       setMotorAprobaciones({});
-      // draftDVS NO se limpia: si el usuario restaura el vínculo o
-      // regenera vía express, sigue teniendo su último estado válido
-      // visible mientras la regeneración corre.
+      setDraftDVS(null);
+      void refrescarM1Ref.current();
     } finally {
       setIsUnlinkingPestel(false);
     }
-  }, [projectId, pestAnalysisId]);
+  }, [projectId, pestAnalysisId, unlinkServidor]);
 
   // Deshace una desvinculación: re-vincula con el MISMO análisis de
   // Centinela del que se desvinculó (no uno nuevo). Si el usuario generó un
@@ -1552,7 +1638,12 @@ export default function ExploracionPage() {
                     {isSaving || generandoDVS ? "Guardando..." : "Guardar cambios"}
                   </button>
                 ) : (
-                  <button onClick={handleStartEdit} disabled={headerState === "en_progreso"} className={btnBase}>
+                  <button
+                    onClick={handleStartEdit}
+                    disabled={headerState === "en_progreso" || !puedeEditarMotores(m1.estado, draftDVS !== null || dvs !== null)}
+                    title={!puedeEditarMotores(m1.estado, draftDVS !== null || dvs !== null) ? "Aprueba el análisis (M1) para editar los motores." : undefined}
+                    className={btnBase}
+                  >
                     Editar análisis
                   </button>
                 )}
@@ -1718,13 +1809,19 @@ export default function ExploracionPage() {
           /* Estado B — mapaPESTEL disponible (con o sin DVS previo) */
           ) : mapaPESTEL !== null && mode !== "editing" ? (
             <div className="flex-1 flex flex-col overflow-hidden">
+              {expressError !== null && (
+                <div role="alert" className="shrink-0 mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-eske/30 bg-red-eske/10 px-3 py-2 text-xs text-red-eske-60 dark:text-red-eske-10">
+                  <span className="min-w-0">{expressError}</span>
+                  <button type="button" onClick={() => setExpressError(null)} aria-label="Cerrar aviso" className="shrink-0 font-semibold hover:underline">Cerrar</button>
+                </div>
+              )}
               <div className="shrink-0 mb-3 flex items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-black-eske dark:text-white">
                     Análisis por motores
                   </p>
                   <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE]">
-                    Revisa y aprueba cada sección antes de generar el Reporte F2.
+                    {mensajeAreaMotores(m1.estado) ? "Primero revisa y aprueba el análisis PESTEL (panel derecho)." : "Revisa y aprueba cada sección antes de generar el Reporte F2."}
                   </p>
                 </div>
                 {pestlVia === "pestel" && pestProjectId && (
@@ -1795,21 +1892,22 @@ export default function ExploracionPage() {
                             router.push(`/centinela/pestel/${pestProjectId}/datos`);
                             return;
                           }
-                          setXpctoStaleChanges([]);
-                          setMotorAprobaciones({});
-                          // draftDVS NO se limpia aquí — se conserva mientras
-                          // corre la regeneración; solo se sobreescribe si
-                          // generarDraftDVS/generate-m1-express tienen éxito.
                           if (regenType === "full") {
+                            // Replaces M1: same notice (and server confirmation) as "Nuevo análisis".
                             setRegenKind("full");
-                            setMapaPESTEL(null);
-                            handleGenerarDVSRef.current();
+                            solicitarNuevoAnalisis();
                           } else {
+                            // Only the contrast against the XPCTO is refreshed; M1 (already
+                            // approved) does not change, so its approval is kept.
+                            setXpctoStaleChanges([]);
+                            setMotorAprobaciones({});
                             setRegenKind("partial");
-                            generarDraftDVS();
+                            void generarDraftDVS();
                           }
                         }}
-                        className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
+                        disabled={!viaCentinela && regenType !== "full" && (m1.estado === "borrador" || m1.estado === "reabierto")}
+                        title={!viaCentinela && regenType !== "full" && (m1.estado === "borrador" || m1.estado === "reabierto") ? "Aprueba el análisis (M1) para actualizar el contraste." : undefined}
+                        className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                       >
                         {viaCentinela
                           ? "Ir a Centinela PESTEL →"
@@ -1849,11 +1947,8 @@ export default function ExploracionPage() {
                     </div>
                     <button
                       onClick={() => {
-                        setTerritorioStaleChanges([]);
-                        setMotorAprobaciones({});
                         setRegenKind("full");
-                        setMapaPESTEL(null);
-                        handleGenerarDVSRef.current();
+                        solicitarNuevoAnalisis();
                       }}
                       className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap"
                     >
@@ -1882,6 +1977,28 @@ export default function ExploracionPage() {
                       Generar Reporte F2
                     </button>
                   </div>
+                ) : mensajeAreaMotores(m1.estado) ? (
+                  <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center">
+                    <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">Motores M2–M5</p>
+                    <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">{mensajeAreaMotores(m1.estado)}</p>
+                  </div>
+                ) : mostrarAvisoSinGenerar({
+                    estado: m1.estado,
+                    motoresSinGenerarServidor: m1.resumen?.motoresSinGenerar ?? false,
+                    motoresGenerados: draftDVS !== null || dvs !== null,
+                    generando: isGeneratingMotors,
+                    hayErrorGeneracion: motorGenerationError !== null,
+                  }) ? (
+                  <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center space-y-3">
+                    <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">M1 aprobado, motores sin generar</p>
+                    <button
+                      type="button"
+                      onClick={() => void generarDraftDVS()}
+                      className="px-4 py-2 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                    >
+                      Reintentar generación
+                    </button>
+                  </div>
                 ) : (
                   <MotoresSequentialView
                     projectId={projectId}
@@ -1890,7 +2007,7 @@ export default function ExploracionPage() {
                     isGenerating={isGeneratingMotors}
                     generationError={motorGenerationError}
                     onRetry={generarDraftDVS}
-                    retryLabel={regenKind === "partial" ? "Reintentar actualización" : "Reintentar análisis"}
+                    retryLabel={regenKind === "partial" ? "Reintentar actualización" : "Reintentar generación"}
                     onApprove={handleApproveMotor}
                     onDraftChange={setDraftDVS}
                     onSaveEdit={handleSaveMotorEdit}
@@ -1913,7 +2030,7 @@ export default function ExploracionPage() {
                   <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE] mt-1">{expressError}</p>
                 </div>
                 <button
-                  onClick={() => { setExpressError(null); handleGenerarDVS(); }}
+                  onClick={() => { setExpressError(null); solicitarNuevoAnalisis(); }}
                   className="px-4 py-2 bg-bluegreen-eske text-white-eske rounded-lg text-sm font-medium hover:bg-bluegreen-eske/90 transition-colors"
                 >
                   Reintentar análisis express
@@ -1978,7 +2095,12 @@ export default function ExploracionPage() {
             mapaPESTEL={mapaPESTEL}
             isAnalyzing={isExpressAnalyzing}
             pestProjectId={pestProjectId}
-            onNuevoAnalisis={pestProjectId === null ? () => setShowConfirmReanalisis(true) : undefined}
+            onNuevoAnalisis={pestProjectId === null ? solicitarNuevoAnalisis : undefined}
+            onEditarNarrativas={() => void m1.pedirReabrir()}
+            m1={m1}
+            motoresGenerados={draftDVS !== null || dvs !== null}
+            generandoMotores={isGeneratingMotors}
+            onReintentarGeneracion={() => void generarDraftDVS()}
             lastUnlinkedPestAnalysisId={lastUnlinkedPestAnalysisId}
             onRelinkPestel={handleRelinkPestel}
             isRelinkingPestel={isRelinkingPestel}
@@ -1992,46 +2114,42 @@ export default function ExploracionPage() {
         </>)}
       </div>
 
-      {/* Modal confirmación nuevo análisis */}
-      {showConfirmReanalisis && (
-        <ConfirmReanalisisModal
-          onCancel={() => setShowConfirmReanalisis(false)}
-          onConfirm={() => {
-            setShowConfirmReanalisis(false);
+      {/* Nuevo análisis: lines from the real state (or the server's, when it answered a 409) */}
+      {nuevoModal && (
+        <ModalM1
+          texto={textoModalM1("nuevo_analisis", impactoPantalla, { lineasServidor: nuevoModal.lineasServidor })}
+          aviso={nuevoModal.aviso}
+          onCancelar={() => setNuevoModal(null)}
+          onConfirmar={() => {
+            const huella = nuevoModal.huella;
+            setNuevoModal(null);
             setRegenKind("full");
-            setMapaPESTEL(null);
-            setExpressError(null);
-            setMotorAprobaciones({});
-            // Causa raíz confirmada (26-09-13, bug reportado por Raúl —
-            // "Relanzar análisis" no hacía nada visible): la cadena de
-            // renderizado revisa `mode === "editing" && dvs !== null`
-            // ANTES que `isExpressAnalyzing` — si el usuario confirmaba
-            // el relanzamiento estando en modo edición (como en el caso
-            // real reportado), la vista de edición de motores se quedaba
-            // fija en pantalla durante TODO el proceso (con o sin éxito
-            // del lado del servidor, verificado en logs), sin mostrar el
-            // spinner "Analizando con IA…" ni el resultado nuevo al
-            // terminar. Salir de "editing" y de la vista de reporte aquí
-            // dispara la rama de `isExpressAnalyzing` mientras la
-            // petición está en curso — sin afectar la preservación de
-            // `draftDVS` (no se toca, sigue disponible si el usuario
-            // necesita retomar la edición tras un fallo).
-            setMode(dvs ? "completed" : "active");
-            setShowReporte(false);
-            // draftDVS NO se limpia — se conserva mientras corre la
-            // regeneración; solo se sobreescribe si express tiene éxito.
-            handleGenerarDVSRef.current();
+            void handleGenerarDVS({ huella });
           }}
         />
       )}
 
-      {/* Modal confirmación desvincular de Centinela PESTEL */}
+      {/* Editar narrativas (reabrir M1): the lines and the fingerprint come from the server (H15) */}
+      {m1.reabrirModal && (
+        <ModalM1
+          texto={textoModalM1("reabrir", impactoPantalla, { lineasServidor: m1.reabrirModal.lineas })}
+          aviso={m1.reabrirModal.aviso}
+          error={m1.reabrirModal.error}
+          ocupado={m1.reabrirModal.ocupado}
+          onCancelar={() => m1.setReabrirModal(null)}
+          onConfirmar={() => void m1.confirmarReabrir()}
+        />
+      )}
+
+      {/* Desvincular de Centinela PESTEL: se descartan M1, el borrador de motores y sus aprobaciones */}
       {showConfirmUnlink && (
-        <ConfirmUnlinkPestelModal
-          isConfirming={isUnlinkingPestel}
-          errorMessage={unlinkError}
-          onCancel={() => { setShowConfirmUnlink(false); setUnlinkError(null); }}
-          onConfirm={handleUnlinkPestel}
+        <ModalM1
+          texto={textoModalM1("desvincular", impactoPantalla, { lineasServidor: unlinkServidor?.lineas })}
+          aviso={unlinkServidor?.aviso ?? null}
+          error={unlinkError}
+          ocupado={isUnlinkingPestel}
+          onCancelar={() => { setShowConfirmUnlink(false); setUnlinkError(null); setUnlinkServidor(null); }}
+          onConfirmar={handleUnlinkPestel}
         />
       )}
 
@@ -2051,6 +2169,7 @@ export default function ExploracionPage() {
           projectId={projectId}
           projectType={projectType}
           projectTerritory={projectTerritory}
+          impacto={impactoPantalla}
           onClose={() => setShowLinkExistingPicker(false)}
         />
       )}
@@ -2122,6 +2241,7 @@ function ExplorationFormPanel({
   isAnalyzing = false, onNuevoAnalisis, pestProjectId,
   lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL,
   esMexico, webElectoralData, webElectoralLoading,
+  onEditarNarrativas, m1, motoresGenerados, generandoMotores, onReintentarGeneracion,
 }: {
   form: ExplorationForm;
   onChange: (f: ExplorationForm) => void;
@@ -2142,6 +2262,12 @@ function ExplorationFormPanel({
   esMexico: boolean;
   webElectoralData: WebContextResult | null;
   webElectoralLoading: boolean;
+  /** M1 review (edit / approve / reopen), see useM1Revision. */
+  m1: M1Revision;
+  onEditarNarrativas?: () => void;
+  motoresGenerados: boolean;
+  generandoMotores: boolean;
+  onReintentarGeneracion: () => void;
 }) {
   const fieldClass =
     "w-full px-3 py-2 text-sm font-normal rounded-lg border border-gray-eske-20 dark:border-white/10 " +
@@ -2165,13 +2291,63 @@ function ExplorationFormPanel({
     return () => document.removeEventListener("mousedown", onOutsideClick);
   }, [kebabOpen]);
 
+  // M1 review: pencil refs (focus goes back to the pencil after saving / cancelling), the footer
+  // and the per-dimension editor props. Decisions come from lib/moddulo/pantallaM1.
+  const lapizRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const { dimParaFoco, consumirFoco } = m1;
+  useEffect(() => {
+    if (!dimParaFoco) return;
+    lapizRefs.current[dimParaFoco]?.focus();
+    consumirFoco();
+  }, [dimParaFoco, consumirFoco]);
+  const kebabM1 = opcionesKebabM1({ kind: m1.kind, estado: m1.estado, f2Cerrada: m1.f2Cerrada });
+  const pie = pieM1({
+    estado: m1.estado,
+    f2Cerrada: m1.f2Cerrada,
+    kind: m1.kind,
+    aprobadoEn: m1.datos?.aprobacion?.en,
+    motoresSinGenerarServidor: m1.resumen?.motoresSinGenerar ?? false,
+    motoresGenerados,
+    dimensionesConCambios: m1.cambiosSinGuardar,
+    aprobando: m1.aprobando,
+    generando: generandoMotores,
+  });
+  const renderM1 = (code: string) => {
+    const dim = mapaPESTEL![code]!;
+    const entradas = Object.entries(m1.datos?.ediciones ?? {}).filter(([ruta]) => ruta.startsWith(`${code}.`));
+    const ultima = entradas.map(([, e]) => aFecha(e?.en)?.getTime() ?? 0).reduce((a, b) => Math.max(a, b), 0);
+    return (
+      <TripartiteSignalsPanel
+        dim={dim}
+        edicion={{
+          puede: m1.permiso.puede,
+          editando: !!m1.borradores[code],
+          borrador: m1.borradores[code] ?? null,
+          guardando: m1.guardando === code,
+          error: m1.errorDim[code] ?? null,
+          editado: dimensionEditada(m1.datos?.ediciones, mapaPESTEL ?? undefined, code),
+          tooltipEditado: tooltipEditado(ultima ? new Date(ultima) : null),
+          confirmarRestaurar: m1.confirmarRestaurar === code,
+          onEditar: () => m1.iniciarEdicion(code),
+          onCambiar: (patch) => m1.cambiarBorrador(code, patch),
+          onGuardar: () => void m1.guardarEdicion(code),
+          onCancelar: () => m1.cancelarEdicion(code),
+          onPedirRestaurar: () => m1.setConfirmarRestaurar(code),
+          onCancelarRestaurar: () => m1.setConfirmarRestaurar(null),
+          onRestaurar: () => void m1.restaurar(code),
+          lapizRef: (el) => { lapizRefs.current[code] = el; },
+        }}
+      />
+    );
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
         <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
         {readOnly ? (
-          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
+          m1.permiso.puede ? null : <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
         ) : pestProjectId ? (
           <Link
             href={`/centinela/pestel/${pestProjectId}/analisis`}
@@ -2244,6 +2420,15 @@ function ExplorationFormPanel({
                     Vincular con análisis independiente
                   </button>
                 )}
+                {kebabM1.editarNarrativas && onEditarNarrativas && (
+                  <button
+                    type="button"
+                    onClick={() => { setKebabOpen(false); onEditarNarrativas(); }}
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Editar narrativas
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2268,6 +2453,8 @@ function ExplorationFormPanel({
               <span className="sm:hidden">{sec.short}</span>
               {isAnalyzing
                 ? <span className="w-1.5 h-1.5 rounded-full bg-gray-eske-30 dark:bg-white/20 animate-pulse shrink-0" />
+                : sec.dimCode && m1.cambiosSinGuardar.includes(sec.dimCode)
+                ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-eske shrink-0" title="Cambios sin guardar" aria-label="Cambios sin guardar" />
                 : hasSignals
                   ? <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Señales PESTEL importadas" />
                   : filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />
@@ -2283,7 +2470,7 @@ function ExplorationFormPanel({
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["P"] ? (
             <div className="space-y-4">
-              <TripartiteSignalsPanel dim={mapaPESTEL["P"]} />
+              {renderM1("P")}
               {(projectType === "electoral" || projectType === "gubernamental") && (
                 <div className="border-t border-gray-eske-20 dark:border-white/10 pt-3">
                   <p className="text-xs font-semibold text-black-eske-40 dark:text-[#9AAEBE] uppercase tracking-wider mb-2">
@@ -2303,7 +2490,7 @@ function ExplorationFormPanel({
         {activeSection === "economico" && (
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["E"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["E"]} />
+            renderM1("E")
           ) : (
             <SimpleDimSection
               title="Entorno Económico"
@@ -2321,7 +2508,7 @@ function ExplorationFormPanel({
         {activeSection === "social" && (
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["S"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["S"]} />
+            renderM1("S")
           ) : (
             <SimpleDimSection
               title="Entorno Social"
@@ -2341,7 +2528,7 @@ function ExplorationFormPanel({
         {activeSection === "tecnologico" && (
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["T"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["T"]} />
+            renderM1("T")
           ) : (
             <SimpleDimSection
               title="Entorno Tecnológico"
@@ -2357,7 +2544,7 @@ function ExplorationFormPanel({
         {activeSection === "ecologico" && (
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["Ec"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["Ec"]} />
+            renderM1("Ec")
           ) : (
             <SimpleDimSection
               title="Entorno Ecológico"
@@ -2373,7 +2560,7 @@ function ExplorationFormPanel({
         {activeSection === "legal" && (
           isAnalyzing ? <SkeletonDimension /> :
           mapaPESTEL?.["L"] ? (
-            <TripartiteSignalsPanel dim={mapaPESTEL["L"]} />
+            renderM1("L")
           ) : (
             <SimpleDimSection
               title="Entorno Legal"
@@ -2389,6 +2576,20 @@ function ExplorationFormPanel({
           )
         )}
       </div>
+
+      {/* Pie fijo del M1: estado + Aprobar / Reintentar generación / Reabrir (Centinela) */}
+      {!isAnalyzing && (
+      <M1Pie
+        pie={pie}
+        errorAprobar={m1.errorAprobar}
+        aviso={m1.avisoAprobar}
+        errorReabrir={m1.errorReabrir}
+        reabriendo={m1.verificandoReabrir}
+        onAprobar={() => void m1.aprobar()}
+        onReintentarGeneracion={onReintentarGeneracion}
+        onReabrir={() => void m1.pedirReabrir()}
+      />
+      )}
     </div>
   );
 }
@@ -2416,32 +2617,150 @@ function InlineMarkdown({ text }: { text: string }) {
 // SEÑALES TRIPARTITAS (C4)
 // ==========================================
 
-function TripartiteSignalsPanel({ dim }: { dim: F2DimensionPESTEL }) {
+/** What the M1 panel needs to edit ONE dimension (see useM1Revision / lib/moddulo/pantallaM1). */
+interface EdicionDimensionM1 {
+  puede: boolean;
+  editando: boolean;
+  borrador: { narrativa: string; clasificacion: string } | null;
+  guardando: boolean;
+  error: string | null;
+  editado: boolean;
+  tooltipEditado: string;
+  confirmarRestaurar: boolean;
+  onEditar: () => void;
+  onCambiar: (patch: Partial<{ narrativa: string; clasificacion: string }>) => void;
+  onGuardar: () => void;
+  onCancelar: () => void;
+  onPedirRestaurar: () => void;
+  onCancelarRestaurar: () => void;
+  onRestaurar: () => void;
+  lapizRef: (el: HTMLButtonElement | null) => void;
+}
+
+function TripartiteSignalsPanel({ dim, edicion }: { dim: F2DimensionPESTEL; edicion?: EdicionDimensionM1 }) {
   const CLASIF_COLORS: Record<string, string> = {
     OPORTUNIDAD: "bg-green-eske-20 text-green-eske-80 dark:bg-green-eske/20 dark:text-[#7BC47C]",
     NEUTRAL: "bg-[#FFF2CC] text-[#816000] dark:bg-yellow-eske/20 dark:text-yellow-eske",
     AMENAZA: "bg-red-eske-20 text-red-eske-80 dark:bg-orange-eske/20 dark:text-orange-eske",
   };
+  const editando = !!edicion?.editando && !!edicion.borrador;
+  const idNarrativa = `m1-narrativa-${dim.code}`;
+  const idClasificacion = `m1-clasificacion-${dim.code}`;
+  const btn = "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2";
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-black-eske dark:text-white">{dim.label}</span>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CLASIF_COLORS[dim.clasificacion] ?? CLASIF_COLORS.NEUTRAL}`}>
           {dim.clasificacion}
         </span>
-        {dim.confidence !== undefined && (
-          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">
-            {dim.confidence}% conf.
+        {edicion?.editado && (
+          <span
+            title={edicion.tooltipEditado}
+            className="text-[11px] font-medium px-1.5 py-0.5 rounded border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20"
+          >
+            Editado
           </span>
         )}
+        {dim.confidence !== undefined && (
+          <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]" title="Confianza del análisis generado por la IA; no se edita.">
+            {ROTULO_CONFIANZA_IA}: {dim.confidence}%
+          </span>
+        )}
+        {edicion?.puede && !editando && (
+          <button
+            type="button"
+            ref={edicion.lapizRef}
+            onClick={edicion.onEditar}
+            aria-label={`Editar narrativa de ${dim.label}`}
+            title="Editar narrativa y clasificación"
+            className="ml-auto flex items-center justify-center w-6 h-6 rounded-md text-black-eske-20 dark:text-[#9AAEBE] hover:bg-gray-eske-10 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </button>
+        )}
       </div>
-      {dim.narrativa && (
-        <div className="text-xs text-black-eske-40 dark:text-[#C5D8E8] space-y-2">
-          {dim.narrativa.split("\n\n").filter(Boolean).map((para, i) => (
-            <p key={i}>{para.trim()}</p>
-          ))}
+
+      {editando && edicion && edicion.borrador ? (
+        <div
+          className="space-y-2 rounded-lg border border-bluegreen-eske-60/40 dark:border-blue-eske-20/30 p-2.5"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !edicion.guardando) {
+              e.stopPropagation();
+              edicion.onCancelar();
+            }
+          }}
+        >
+          <div>
+            <label htmlFor={idClasificacion} className="block text-xs font-semibold text-black-eske-20 dark:text-[#C7D6E0] mb-1">Clasificación</label>
+            <select
+              id={idClasificacion}
+              value={edicion.borrador.clasificacion}
+              disabled={edicion.guardando}
+              onChange={(e) => edicion.onCambiar({ clasificacion: e.target.value })}
+              className="w-full px-2 py-1.5 text-xs rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] focus-visible:outline focus-visible:outline-2"
+            >
+              <option value="OPORTUNIDAD">OPORTUNIDAD</option>
+              <option value="NEUTRAL">NEUTRAL</option>
+              <option value="AMENAZA">AMENAZA</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor={idNarrativa} className="block text-xs font-semibold text-black-eske-20 dark:text-[#C7D6E0] mb-1">Narrativa</label>
+            <AutoResizeTextarea
+              id={idNarrativa}
+              value={edicion.borrador.narrativa}
+              onChange={(v) => edicion.onCambiar({ narrativa: v })}
+              disabled={edicion.guardando}
+              autoFocus
+              minRows={6}
+              maxRows={16}
+              maxLength={MAX_TEXTO_EDICION}
+              className="w-full px-2 py-1.5 text-xs rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#112230] text-black-eske dark:text-[#EAF2F8] focus-visible:outline focus-visible:outline-2"
+            />
+            <p className="text-[11px] text-black-eske-20 dark:text-[#9AAEBE] mt-0.5">Separa los párrafos con una línea en blanco.</p>
+          </div>
+          {edicion.error && (
+            <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 leading-relaxed">{edicion.error}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={edicion.onGuardar} disabled={edicion.guardando} className={`${btn} bg-bluegreen-eske-60 text-white-eske hover:bg-bluegreen-eske-70`}>
+              {edicion.guardando ? "Guardando…" : "Guardar"}
+            </button>
+            <button type="button" onClick={edicion.onCancelar} disabled={edicion.guardando} className={`${btn} border border-gray-eske-30 dark:border-white/20 text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5`}>
+              Cancelar
+            </button>
+            {edicion.editado && !edicion.confirmarRestaurar && (
+              <button type="button" onClick={edicion.onPedirRestaurar} disabled={edicion.guardando} className="text-xs text-bluegreen-eske-60 dark:text-blue-eske-20 underline-offset-2 hover:underline disabled:opacity-50 focus-visible:outline focus-visible:outline-2">
+                Restaurar texto original
+              </button>
+            )}
+          </div>
+          {edicion.confirmarRestaurar && (
+            <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 px-2.5 py-2 text-xs text-brown-eske-60 dark:text-yellow-eske">
+              <span>¿Restaurar el texto original? Se perderá tu edición.</span>
+              <button type="button" onClick={edicion.onRestaurar} disabled={edicion.guardando} className={`${btn} bg-orange-eske-60 text-white-eske hover:bg-orange-eske-70`}>Restaurar</button>
+              <button type="button" onClick={edicion.onCancelarRestaurar} className={`${btn} border border-gray-eske-30 dark:border-white/20 text-black-eske-20 dark:text-[#C7D6E0]`}>Cancelar</button>
+            </div>
+          )}
         </div>
+      ) : (
+        <>
+          {dim.narrativa && (
+            <div className="text-xs text-black-eske-40 dark:text-[#C5D8E8] space-y-2">
+              {dim.narrativa.split("\n\n").filter(Boolean).map((para, i) => (
+                <p key={i}>{para.trim()}</p>
+              ))}
+            </div>
+          )}
+          {edicion?.error && (
+            <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 leading-relaxed">{edicion.error}</p>
+          )}
+        </>
       )}
 
       <SignalGroup
@@ -2605,9 +2924,10 @@ function SectionField({ label, hint, required, children }: {
   );
 }
 
-function AutoResizeTextarea({ value, onChange, disabled, placeholder, minRows = 2, maxRows = 10, className = "" }: {
+function AutoResizeTextarea({ value, onChange, disabled, placeholder, minRows = 2, maxRows = 10, className = "", id, autoFocus, maxLength }: {
   value: string; onChange: (v: string) => void; disabled?: boolean;
   placeholder?: string; minRows?: number; maxRows?: number; className?: string;
+  id?: string; autoFocus?: boolean; maxLength?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -2619,7 +2939,7 @@ function AutoResizeTextarea({ value, onChange, disabled, placeholder, minRows = 
   }, [value, minRows, maxRows]);
 
   return (
-    <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)}
+    <textarea ref={ref} id={id} autoFocus={autoFocus} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)}
       disabled={disabled} placeholder={placeholder} rows={minRows}
       className={`resize-none overflow-y-auto ${className}`} />
   );
@@ -2628,97 +2948,6 @@ function AutoResizeTextarea({ value, onChange, disabled, placeholder, minRows = 
 // ==========================================
 // MODAL BACK-PROPAGATION
 // ==========================================
-
-function ConfirmReanalisisModal({ onCancel, onConfirm }: {
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
-      <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="font-bold text-black-eske dark:text-[#EAF2F8]">¿Relanzar el análisis PESTEL?</h2>
-            <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-1">
-              Se descartarán el mapa de dimensiones y las aprobaciones de los motores, y los motores en borrador se reemplazarán cuando termine el nuevo análisis. El análisis finalizado no cambia hasta que lo vuelvas a finalizar.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors"
-          >
-            Relanzar análisis
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmUnlinkPestelModal({ isConfirming, errorMessage, onCancel, onConfirm }: {
-  isConfirming: boolean;
-  /** Failure of the last attempt; the confirmation stays open while it is shown. */
-  errorMessage?: string | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-eske/50">
-      <div className="bg-white-eske dark:bg-[#18324A] rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-orange-eske/20 dark:bg-orange-eske/30 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-orange-eske-60 dark:text-orange-eske-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="font-bold text-black-eske dark:text-[#EAF2F8]">¿Desvincular del análisis de Centinela PESTEL?</h2>
-            <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-1">
-              Se borrará el escaneo PESTEL actual (M1) y las secciones M2-M5 ya aprobadas. El análisis
-              de Centinela seguirá intacto — podrás regenerar vía el flujo express de Moddulo, o
-              restaurar este mismo vínculo después.
-            </p>
-          </div>
-        </div>
-        {errorMessage && (
-          <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10 mb-4 leading-relaxed">
-            {errorMessage}
-          </p>
-        )}
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            disabled={isConfirming}
-            className="flex-1 py-2.5 bg-gray-eske-20 dark:bg-white/10 text-black-eske dark:text-[#EAF2F8] rounded-lg text-sm font-medium hover:bg-gray-eske-30 dark:hover:bg-white/15 transition-colors disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isConfirming}
-            className="flex-1 py-2.5 bg-orange-eske text-white-eske rounded-lg text-sm font-medium hover:bg-orange-eske/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isConfirming && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            Desvincular
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ==========================================
 // PICKER: VINCULAR A ANÁLISIS PESTEL EXISTENTE (upgrade express→Centinela)
@@ -2747,13 +2976,23 @@ type PestelPickerProject = {
   status?: string;
 };
 
-function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onClose }: {
+function LinkExistingPestelModal({ projectId, projectType, projectTerritory, impacto, onClose }: {
   projectId: string;
   projectType: ProjectType;
   projectTerritory: Territorio | null;
+  /** Real M1 state: decides whether a confirmation step (what is lost) is needed. */
+  impacto: EstadoParaImpactoM1;
   onClose: () => void;
 }) {
   const router = useRouter();
+  const dialogRef = useFocusTrap(true) as React.RefObject<HTMLDivElement>;
+  useEscapeKey(true, onClose);
+  // H15 step: lists what the link replaces (same lines as the server). The server asks for the
+  // confirmation from commit 4; a 409 brings ITS lines and fingerprint and the step is shown again.
+  const necesitaM1 = requiereConfirmacionM1(impacto, "vincular");
+  const [m1Target, setM1Target] = useState<PestelPickerProject | null>(null);
+  const [m1Server, setM1Server] = useState<{ lineas?: string[]; huella: string | null; aviso: string | null } | null>(null);
+  const [forzarTerritorio, setForzarTerritorio] = useState(false);
   const [projects, setProjects] = useState<(PestelPickerProject & { tipoOk: boolean; territoryMatch: TerritoryMatchKind })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -2788,7 +3027,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
     })();
   }, [projectType, projectTerritory]);
 
-  async function doLink(target: PestelPickerProject, force: boolean) {
+  async function doLink(target: PestelPickerProject, force: boolean, confirmar?: { huella: string | null }) {
     setLinking(true);
     setLinkError(null);
     try {
@@ -2796,7 +3035,11 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ modduloProjectId: projectId, forceLink: force }),
+        body: JSON.stringify({
+          modduloProjectId: projectId,
+          forceLink: force,
+          ...(confirmar ? { confirmar: true, ...(confirmar.huella ? { huella: confirmar.huella } : {}) } : {}),
+        }),
       });
       if (res.ok) {
         const data = (await res.json()) as { sourceAnalysisId?: string };
@@ -2807,7 +3050,17 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
         router.refresh();
         return;
       }
-      const err = (await res.json()) as { message?: string };
+      const err = (await res.json()) as { error?: string; message?: string; lineas?: string[]; huella?: string };
+      if (res.status === 409 && (err.error === "reemplazo_requiere_confirmacion" || err.error === "reemplazo_huella_vencida")) {
+        setForzarTerritorio(force);
+        setM1Server({
+          lineas: Array.isArray(err.lineas) ? err.lineas : undefined,
+          huella: typeof err.huella === "string" ? err.huella : null,
+          aviso: err.error === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se vinculó nada: revisa lo que se perderá y confirma de nuevo." : null,
+        });
+        setM1Target(target);
+        return;
+      }
       setLinkError(err.message ?? "No se pudo vincular. Intenta de nuevo.");
     } catch {
       setLinkError("Error de conexión. Intenta de nuevo.");
@@ -2820,10 +3073,14 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
   function handleSelect(target: PestelPickerProject & { tipoOk: boolean; territoryMatch: TerritoryMatchKind }) {
     if (!target.tipoOk) return;
     setLinkError(null);
-    if (target.territoryMatch === "exact") {
-      doLink(target, false);
-    } else {
+    if (target.territoryMatch !== "exact") {
       setConfirmTarget(target);
+    } else if (necesitaM1) {
+      setForzarTerritorio(false);
+      setM1Server(null);
+      setM1Target(target);
+    } else {
+      doLink(target, false);
     }
   }
 
@@ -2832,7 +3089,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Vincular con análisis independiente" className="bg-white-eske dark:bg-[#18324A] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between p-5 border-b border-gray-eske-20 dark:border-white/10 shrink-0">
           <h3 className="font-semibold text-black-eske-20 dark:text-[#C7D6E0] text-base">
             Vincular con análisis independiente
@@ -2848,6 +3105,45 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
             </svg>
           </button>
         </div>
+
+        {m1Target && (() => {
+          const t = textoModalM1("vincular", impacto, { nombre: m1Target.nombre, lineasServidor: m1Server?.lineas });
+          return (
+            <div className="p-5 flex flex-col gap-3">
+              <p className="font-semibold text-sm text-black-eske dark:text-[#EAF2F8]">{t.titulo}</p>
+              {m1Server?.aviso && (
+                <p role="status" className="text-sm rounded-lg px-3 py-2 bg-yellow-eske/10 border border-yellow-eske/30 text-brown-eske-60 dark:text-yellow-eske">{m1Server.aviso}</p>
+              )}
+              {t.intro.map((x, i) => <p key={i} className="text-sm text-black-eske-10 dark:text-[#C7D6E0]">{x}</p>)}
+              {t.lineas.length > 0 && (
+                <ul className="list-disc pl-5 space-y-1 text-sm text-black-eske-10 dark:text-[#C7D6E0]">
+                  {t.lineas.map((l, i) => <li key={i}>{l}</li>)}
+                </ul>
+              )}
+              {t.cierre && <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0]">{t.cierre}</p>}
+              {linkError && <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10">{linkError}</p>}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setM1Target(null); setM1Server(null); setLinkError(null); }}
+                  disabled={linking}
+                  className="px-4 py-2 text-sm font-medium text-black-eske-20 dark:text-[#C7D6E0] hover:underline disabled:opacity-50"
+                >
+                  {t.cancelar}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => doLink(m1Target, forzarTerritorio, { huella: m1Server?.huella ?? null })}
+                  disabled={linking}
+                  className="px-4 py-2 text-sm font-medium bg-orange-eske-60 text-white-eske rounded-lg hover:bg-orange-eske-70 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {linking && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden />}
+                  {t.confirmar}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {confirmTarget && (
           <div className="p-5 flex flex-col gap-4">
@@ -2873,7 +3169,16 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
               </button>
               <button
                 type="button"
-                onClick={() => doLink(confirmTarget, true)}
+                onClick={() => {
+                  if (necesitaM1) {
+                    setForzarTerritorio(true);
+                    setM1Server(null);
+                    setM1Target(confirmTarget);
+                    setConfirmTarget(null);
+                  } else {
+                    doLink(confirmTarget, true);
+                  }
+                }}
                 disabled={linking}
                 className="px-4 py-2 text-sm font-medium bg-orange-eske text-white rounded-lg hover:bg-orange-eske-60 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
@@ -2884,7 +3189,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, onC
           </div>
         )}
 
-        {!confirmTarget && (
+        {!confirmTarget && !m1Target && (
           <div className="overflow-y-auto flex-1 p-2">
             {loading && (
               <div className="flex justify-center py-8">

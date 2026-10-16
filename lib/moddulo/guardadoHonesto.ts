@@ -614,9 +614,23 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
     return `No se pudo CONFIRMAR ${que}: sin conexión con el servidor. Puede que sí se haya ${hecho}; recarga la página para verificar el estado.`;
   }
   const incierto = resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta";
-  if (accion === "generar_m1" && resp.status >= 500 && (resp.codigo ?? "").startsWith("Error al parsear")) {
-    // The route parses Claude's answer BEFORE it writes anything.
-    return "No se pudo generar el análisis nuevo: la respuesta del análisis no fue válida. Tu análisis actual se conserva; inténtalo de nuevo.";
+  if (accion === "generar_m1" && resp.status >= 500) {
+    // The route's own codes (generate-m1-express). The first three happen BEFORE it writes anything.
+    // The cause is never deduced from the message text: only from the code.
+    switch (resp.codigo) {
+      case "respuesta_truncada":
+        return "No se pudo generar el análisis nuevo: la respuesta del modelo se cortó por exceder su límite de longitud. No se guardó nada; inténtalo de nuevo.";
+      case "respuesta_invalida":
+        return "No se pudo generar el análisis nuevo: la respuesta del análisis no fue válida. No se guardó nada; inténtalo de nuevo.";
+      case "fallo_modelo":
+        return "No se pudo generar el análisis nuevo: el servicio de análisis no respondió. No se guardó nada; inténtalo de nuevo.";
+      case "fallo_guardado":
+        return "El análisis se generó, pero no se pudo CONFIRMAR que se guardó. Recarga la página para verificar el estado antes de volver a generarlo.";
+    }
+    if (!sinConfirmar && resp.codigo !== "reemplazo_escritura_incierta" && resp.status === 500) {
+      // A 500 with no known code: no cause is attributed.
+      return "El servidor no pudo completar el análisis. Recarga la página para verificar el estado antes de volver a intentarlo.";
+    }
   }
   if (incierto) {
     if (sinConfirmar) return `No se pudo verificar el impacto de ${impacto}: el servidor no pudo completar la operación. ${ni}, porque aún no habías confirmado.`;

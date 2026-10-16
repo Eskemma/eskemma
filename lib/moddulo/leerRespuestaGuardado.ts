@@ -29,7 +29,8 @@ export async function leerRespuestaGuardado(
       ok: r.ok,
       status: r.status,
       ...(cuerpoEsValido ? { cuerpoValido: r.ok ? cuerpoEsValido(datos) : undefined } : {}),
-      codigo: typeof datos.error === "string" ? datos.error : undefined,
+      // A route may send its own `codigo` next to a readable `error`; the older routes use `error` as the code.
+      codigo: typeof datos.codigo === "string" ? datos.codigo : typeof datos.error === "string" ? datos.error : undefined,
       motor: typeof datos.motor === "string" ? datos.motor : undefined,
       mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
     },

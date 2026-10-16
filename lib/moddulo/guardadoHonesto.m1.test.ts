@@ -163,7 +163,10 @@ describe("reabrir_m1 y generar_m1 — familia de la confirmación (decidirReempl
       });
       it("con confirmación (o donde no se pide), la red y los 5xx son ambiguos: «No se pudo CONFIRMAR…»", () => {
         for (const ctx of [{ confirmado: true }, {}]) {
-          for (const c of [red, r(500), r(502), r(504), r(500, "reemplazo_escritura_incierta"), ok200Invalido]) {
+          // EDITADA a propósito (diagnóstico de generate-m1-express): un 500 SIN código ya no dice
+          // «Puede que sí se haya reemplazado» para generar_m1; ese caso lo cubre guardadoHonesto.m1Codigos.test.ts.
+          const bare500 = accion === "generar_m1" ? [] : [r(500)];
+          for (const c of [red, ...bare500, r(502), r(504), r(500, "reemplazo_escritura_incierta"), ok200Invalido]) {
             const d = decidirReemplazoAnalisis(c, ctx, accion) as { tipo: string; mensajeError: string };
             expect(d.tipo).toBe("error");
             expect(d.mensajeError).toContain("No se pudo CONFIRMAR");
@@ -194,11 +197,13 @@ describe("reabrir_m1 y generar_m1 — familia de la confirmación (decidirReempl
     expect(d.mensajeError).toContain("ya no está aprobado (puede que ya se haya reabierto); no se reabrió nada");
   });
   it("generar_m1: pestel_linked y el error de parseo de Claude (fallo ANTES de escribir)", () => {
+    // EDITADA a propósito: el tipo de falla ya no se deduce del prefijo «Error al parsear» sino del
+    // `codigo` propio (ver guardadoHonesto.m1Codigos.test.ts); con solo ese texto el cliente no atribuye causa.
     const l = decidirReemplazoAnalisis(r(409, "pestel_linked"), {}, "generar_m1") as { mensajeError: string };
     expect(l.mensajeError).toContain("Centinela vinculado; desvincúlalo antes de generar uno nuevo con Moddulo. No se generó nada");
     const p = decidirReemplazoAnalisis(r(500, "Error al parsear respuesta de Claude"), { confirmado: true }, "generar_m1") as { mensajeError: string };
-    expect(p.mensajeError).toContain("Tu análisis actual se conserva");
-    expect(p.mensajeError).not.toContain("CONFIRMAR");
+    expect(p.mensajeError).toContain("El servidor no pudo completar el análisis");
+    expect(p.mensajeError).not.toContain("no fue válida");
   });
   it("no revierte ninguna aprobación optimista (estas acciones no tienen)", () => {
     const d = decidirReemplazoAnalisis(r(500), { confirmado: true }, "reabrir_m1") as unknown as Record<string, unknown>;

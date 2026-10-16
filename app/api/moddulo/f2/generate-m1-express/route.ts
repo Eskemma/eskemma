@@ -274,12 +274,37 @@ export async function POST(request: NextRequest) {
     { news, dof, inegi, banxico, sefix, bise, webContext, fontana }
   );
 
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 8000,
-    system,
-    messages: [{ role: "user", content: user }],
-  });
+  // Diagnostic log (no user data): prompt size, then stop_reason / tokens / duration of the call.
+  console.log(`[generate-m1-express] prompt: system=${system.length} user=${user.length} caracteres`);
+  const inicioModelo = Date.now();
+  let response: Awaited<ReturnType<typeof anthropic.messages.create>> & {
+    content: Array<{ type: string; text?: string }>;
+  };
+  try {
+    response = (await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 8000,
+      system,
+      messages: [{ role: "user", content: user }],
+    })) as typeof response;
+  } catch (e) {
+    // Name and status only: the SDK message can echo request details.
+    const err = e as { name?: string; status?: number };
+    console.error(
+      `[generate-m1-express] fallo_modelo name=${err?.name ?? "desconocido"} status=${err?.status ?? "n/a"} ` +
+        `duracion_ms=${Date.now() - inicioModelo}`
+    );
+    return NextResponse.json(
+      { error: "El modelo no pudo completar la solicitud", codigo: "fallo_modelo" },
+      { status: 500 }
+    );
+  }
+  const stopReason = (response as { stop_reason?: string | null }).stop_reason ?? "desconocido";
+  const usage = (response as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+  console.log(
+    `[generate-m1-express] stop_reason=${stopReason} input_tokens=${usage?.input_tokens ?? "n/a"} ` +
+      `output_tokens=${usage?.output_tokens ?? "n/a"} duracion_ms=${Date.now() - inicioModelo}`
+  );
 
   const rawText = response.content
     .filter((b) => b.type === "text")
@@ -293,8 +318,14 @@ export async function POST(request: NextRequest) {
     if (fenceMatch) jsonToParse = fenceMatch[1].trim();
     mapaPESTEL = JSON.parse(jsonToParse) as MapaPESTEL;
   } catch {
+    console.error(
+      `[generate-m1-express] parseo fallido stop_reason=${stopReason} longitud=${rawText.length} ` +
+        `inicio=${JSON.stringify(rawText.slice(0, 200))} final=${JSON.stringify(rawText.slice(-100))}`
+    );
+    // Truncated (hit max_tokens) vs. otherwise invalid: the client words each case differently.
+    const codigo = stopReason === "max_tokens" ? "respuesta_truncada" : "respuesta_invalida";
     return NextResponse.json(
-      { error: "Error al parsear respuesta de Claude", raw: rawText.slice(0, 500) },
+      { error: "Error al parsear respuesta de Claude", codigo, raw: rawText.slice(0, 500) },
       { status: 500 }
     );
   }
@@ -331,16 +362,25 @@ export async function POST(request: NextRequest) {
     payload: mapaPESTEL,
   };
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.linkedSource": linkedSource,
-    "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
-    "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
-    // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
-    "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
-      extraerTerritorioEscalar(project.territorio as Territorio)
-    ),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  try {
+    await adminDb.collection("moddulo_projects").doc(projectId).update({
+      "phases.exploracion.linkedSource": linkedSource,
+      "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
+      "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+      // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
+      "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
+        extraerTerritorioEscalar(project.territorio as Territorio)
+      ),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    const err = e as { name?: string; code?: unknown };
+    console.error(`[generate-m1-express] fallo_guardado name=${err?.name ?? "desconocido"} code=${String(err?.code ?? "n/a")}`);
+    return NextResponse.json(
+      { error: "No se pudo guardar el análisis generado", codigo: "fallo_guardado" },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ mapaPESTEL, fuentesConsultadas }, { status: 200 });
 }
