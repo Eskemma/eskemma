@@ -28,6 +28,7 @@ export default function M1Pie({ pie, errorAprobar, aviso, errorReabrir, reabrien
   return (
     <div className="shrink-0 border-t border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] px-3 py-2.5 space-y-1.5" data-m1-pie={pie.tipo}>
       {pie.texto && <p className="text-xs font-medium text-black-eske-20 dark:text-[#C7D6E0]">{pie.texto}</p>}
+      {pie.sello && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">{pie.sello}</p>}
       {pie.lineaGeneracion && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]" role="status">{pie.lineaGeneracion}</p>}
 
       {pie.aprobar.visible && (

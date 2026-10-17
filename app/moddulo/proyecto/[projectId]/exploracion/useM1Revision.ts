@@ -22,6 +22,7 @@ import {
   errorDeBorrador,
   permisoEdicionM1,
   type Borradores,
+  debeGenerarTrasAprobar,
 } from "@/lib/moddulo/pantallaM1";
 import type { ResumenM1Cliente } from "@/lib/moddulo/m1Servidor";
 
@@ -242,8 +243,11 @@ export function useM1Revision(p: Params) {
         setAvisoAprobar("El análisis quedó aprobado, pero no se pudo actualizar la pantalla. Recarga la página para continuar.");
         return;
       }
-      const hayMotores = respDatos.motoresDescartados === true ? false : ref.current.motoresGenerados;
-      if (nuevo.motoresSinGenerar && !hayMotores) await p.generarMotores();
+      if (debeGenerarTrasAprobar({
+        motoresSinGenerarServidor: nuevo.motoresSinGenerar,
+        hayBorradorLocal: ref.current.motoresGenerados,
+        motoresDescartados: respDatos.motoresDescartados === true,
+      })) await p.generarMotores();
     } finally {
       setAprobando(false);
     }

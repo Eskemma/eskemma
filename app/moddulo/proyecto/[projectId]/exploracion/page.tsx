@@ -9,18 +9,30 @@ import {
   esRespuestaVigente,
   urlTrasCierre,
   type RespuestaGuardado,
+  MENSAJE_FASE_CERRADA_REEMPLAZO,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { dimensionEditada, aFecha } from "@/lib/moddulo/m1Aprobacion";
 import { requiereConfirmacionM1, type EstadoParaImpactoM1 } from "@/lib/moddulo/impactoM1";
-import { estadoImpactoDesdePantalla, textoModalM1 } from "@/lib/moddulo/textosModalM1";
+import { LIMITE_ABORTAR_S, MENSAJE_ESPERA_EXCEDIDA } from "@/lib/moddulo/esperaMotores";
+import { estadoImpactoDesdePantalla, mensajeRechazoVincularCentinela, textoModalM1 } from "@/lib/moddulo/textosModalM1";
 import {
   ROTULO_CONFIANZA_IA,
   mensajeAreaMotores,
   mostrarAvisoSinGenerar,
+  motoresGeneradosParaPantalla,
+  zonaCentroMotores,
   opcionesKebabM1,
   pieM1,
   puedeEditarMotores,
+  avisoExitoNuevoAnalisisVisible,
+  motivoCerrarF2SinAprobar,
+  motivoSinEditarMotores,
+  puedeAprobarM1,
+  reporteDelAnalisisAnterior,
+  subtituloAreaMotores,
+  textoExitoNuevoAnalisis,
+  textoReporteAnterior,
   tooltipEditado,
   MAX_TEXTO_EDICION,
 } from "@/lib/moddulo/pantallaM1";
@@ -30,6 +42,7 @@ import Link from "next/link";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
+import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
@@ -244,6 +257,8 @@ export default function ExploracionPage() {
   const [expressStartTime, setExpressStartTime] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [expressError, setExpressError] = useState<string | null>(null);
+  // Success notice of «Nuevo análisis»: stays until the user closes it or approves the new M1.
+  const [avisoNuevoAnalisis, setAvisoNuevoAnalisis] = useState<string | null>(null);
   const [mapaPESTEL, setMapaPESTEL] = useState<MapaPESTEL | null>(null);
   // Mirror de mapaPESTEL en ref — permite leer el valor vigente dentro de
   // generarDraftDVS sin agregarlo a sus deps (se mantiene estable).
@@ -256,6 +271,7 @@ export default function ExploracionPage() {
     M2?: boolean; M3?: boolean; M4?: boolean; M5?: boolean;
   }>({});
   const [isGeneratingMotors, setIsGeneratingMotors] = useState(false);
+  const [generandoMotoresDesde, setGenerandoMotoresDesde] = useState<number | null>(null);
   const [motorGenerationError, setMotorGenerationError] = useState<string | null>(null);
   // Distingue si la generación de M2-M5 en curso acompaña un M1 nuevo/reemplazado
   // ("full") o es solo una actualización de contraste sobre el mismo M1 ("partial")
@@ -486,7 +502,15 @@ export default function ExploracionPage() {
           credentials: "include",
           body: JSON.stringify({ projectId, pestAnalysisId, confirmReplace }),
         });
-        if (r.status === 409) return { ok: false, conflict: true };
+        if (r.status === 409) {
+          // F2 closed is not a source conflict: it must not offer «confirm replace».
+          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string };
+          if (cuerpo.error === "fase_cerrada") {
+            setExpressError(MENSAJE_FASE_CERRADA_REEMPLAZO);
+            return { ok: false, conflict: false };
+          }
+          return { ok: false, conflict: true };
+        }
         if (!r.ok) return { ok: false, conflict: false };
 
         const data = await r.json();
@@ -814,7 +838,12 @@ export default function ExploracionPage() {
     if (generatingRef.current) return;
     generatingRef.current = true;
     setIsGeneratingMotors(true);
+    setGenerandoMotoresDesde(Date.now());
     setMotorGenerationError(null);
+    // The wait is bounded: past LIMITE_ABORTAR_S the client gives up its OWN wait (the server may still
+    // finish and save: the message says it could not be confirmed, never that nothing was saved).
+    const controlador = new AbortController();
+    const temporizador = setTimeout(() => controlador.abort(), LIMITE_ABORTAR_S * 1000);
     try {
       const { resp, datos } = await leerRespuestaGuardado(
         () =>
@@ -823,18 +852,48 @@ export default function ExploracionPage() {
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({ projectId, saveas: "draft" }),
+            signal: controlador.signal,
           }),
         (d) => Boolean(d.dvs)
       );
+      if (controlador.signal.aborted) {
+        setMotorGenerationError(MENSAJE_ESPERA_EXCEDIDA);
+        return;
+      }
       const decision = decidirResultadoGuardado("generar_motores", resp);
       if (!decision.exito) {
         setMotorGenerationError(decision.mensajeError);
         return;
       }
       setDraftDVS(datos.dvs as DVSF2);
+      // The server wrote m1.generacion with the draft: re-read so «sin generar» goes away.
+      void refrescarM1Ref.current();
     } finally {
+      clearTimeout(temporizador);
       generatingRef.current = false;
       setIsGeneratingMotors(false);
+      setGenerandoMotoresDesde(null);
+    }
+  }, [projectId]);
+
+  // «Revisar estado»: after a wait that could not be confirmed, ask the server whether the draft exists.
+  const revisarEstadoMotores = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/moddulo/projects/${projectId}`, { credentials: "include" });
+      if (!r.ok) {
+        setMotorGenerationError("No se pudo revisar el estado: el servidor no respondió como se esperaba. Inténtalo de nuevo.");
+        return;
+      }
+      const data = (await r.json()) as { project?: { phases?: { exploracion?: { draftDVS?: DVSF2 } } } };
+      const draft = data.project?.phases?.exploracion?.draftDVS;
+      if (draft) {
+        setDraftDVS(draft);
+        setMotorGenerationError(null);
+      }
+      void refrescarM1Ref.current();
+      if (!draft) setMotorGenerationError("Revisado: el servidor aún no tiene los motores generados. Puedes reintentar la generación.");
+    } catch {
+      setMotorGenerationError("No se pudo revisar el estado: sin conexión con el servidor. Inténtalo de nuevo.");
     }
   }, [projectId]);
 
@@ -844,7 +903,8 @@ export default function ExploracionPage() {
     projectId,
     mapaPESTEL,
     setMapaPESTEL,
-    motoresGenerados: draftDVS !== null || dvs !== null,
+    // Only a draft of the CURRENT M1 counts here (a finalized dvs may belong to a previous M1).
+    motoresGenerados: draftDVS !== null,
     limpiarMotoresLocales: () => {
       setDraftDVS(null);
       setMotorAprobaciones({});
@@ -854,6 +914,14 @@ export default function ExploracionPage() {
   });
   const refrescarM1Ref = useRef<() => Promise<unknown>>(async () => null);
   useEffect(() => { refrescarM1Ref.current = m1.refrescar; });
+  // Are the motors on screen those of the current M1? (the server's m1.generacion tells a dvs of THIS M1 from a
+  // dvs of a previous one; without an M1 record the former local rule applies)
+  const motoresGeneradosM1 = motoresGeneradosParaPantalla({
+    estado: m1.estado,
+    motoresSinGenerarServidor: m1.resumen?.motoresSinGenerar ?? false,
+    hayBorrador: draftDVS !== null,
+    hayDvs: dvs !== null,
+  });
 
   // After reopening M1 the page leaves the motors-editing view and the report: the motors are
   // paused until M1 is approved again.
@@ -900,8 +968,41 @@ export default function ExploracionPage() {
   // when it answers a 409) and the call. A clean project generates without asking.
   const [nuevoModal, setNuevoModal] = useState<{ lineasServidor?: string[]; huella: string | null; aviso: string | null } | null>(null);
 
+  // Is there something that survives a failed generation (an M1 or a finalized report)? Read when the
+  // request starts, before the success handler replaces the state.
+  const hayAnalisisPrevioRef = useRef(false);
+  useEffect(() => { hayAnalisisPrevioRef.current = mapaPESTEL !== null || dvs !== null; });
+  // A finalized Reporte F2 belongs to the PREVIOUS analysis while the M1 on screen is new and unapproved.
+  const reporteAnterior = reporteDelAnalisisAnterior(m1.estado, dvs !== null);
+  // What the centre of the motors area shows (pure decision in lib/moddulo/pantallaM1).
+  const zonaCentro = zonaCentroMotores({
+    faseCompletada: mode === "completed",
+    hayDvs: dvs !== null,
+    hayBorrador: draftDVS !== null,
+    generando: isGeneratingMotors,
+    hayErrorGeneracion: motorGenerationError !== null,
+    showReporte,
+    reporteAnterior,
+    motoresGeneradosDelM1: motoresGeneradosM1,
+    hayMensajeArea: mensajeAreaMotores(m1.estado, m1.f2Cerrada) !== null,
+    avisoSinGenerar: mostrarAvisoSinGenerar({
+      estado: m1.estado,
+      motoresSinGenerarServidor: m1.resumen?.motoresSinGenerar ?? false,
+      motoresGenerados: motoresGeneradosM1,
+      generando: isGeneratingMotors,
+      hayErrorGeneracion: motorGenerationError !== null,
+    }),
+  });
+  // Every text that invites to «aprobar» depends on this ONE condition (the «Aprobar análisis» button).
+  const puedeAprobar = puedeAprobarM1(m1.estado, m1.f2Cerrada);
+  // The success notice of «Nuevo análisis» goes away once the new M1 is approved.
+  useEffect(() => { if (m1.estado === "aprobado") setAvisoNuevoAnalisis(null); }, [m1.estado]);
+
   const handleGenerarDVS = useCallback(
     async (confirm?: { huella: string | null }) => {
+      const hayAnalisisPrevio = hayAnalisisPrevioRef.current;
+      const habiaReporte = dvs !== null;
+      setAvisoNuevoAnalisis(null);
       // The analyzing view is behind `mode === "editing"` and the report in the render chain: leave
       // them so the user sees the progress (bug 26-09-13, "Relanzar análisis" showed nothing).
       setMode((m) => (m === "editing" ? (dvs ? "completed" : "active") : m));
@@ -921,7 +1022,7 @@ export default function ExploracionPage() {
             }),
           (d) => Boolean(d.mapaPESTEL)
         );
-        const d = decidirReemplazoAnalisis(resp, { confirmado: confirm ? true : undefined }, "generar_m1");
+        const d = decidirReemplazoAnalisis(resp, { confirmado: confirm ? true : undefined, hayAnalisisPrevio }, "generar_m1");
         switch (d.tipo) {
           case "exito":
             setMapaPESTEL(datos.mapaPESTEL as MapaPESTEL);
@@ -930,6 +1031,7 @@ export default function ExploracionPage() {
             setMotorAprobaciones({});
             setXpctoStaleChanges([]);
             setTerritorioStaleChanges([]);
+            setAvisoNuevoAnalisis(textoExitoNuevoAnalisis(new Date(), habiaReporte));
             void refrescarM1Ref.current();
             break;
           case "requiere_confirmacion":
@@ -1192,6 +1294,7 @@ export default function ExploracionPage() {
 
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
+    if (reporteAnterior) return;
     if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs, mapaPESTEL ?? undefined, projectType));
     setShowReview(true);
   };
@@ -1640,8 +1743,8 @@ export default function ExploracionPage() {
                 ) : (
                   <button
                     onClick={handleStartEdit}
-                    disabled={headerState === "en_progreso" || !puedeEditarMotores(m1.estado, draftDVS !== null || dvs !== null)}
-                    title={!puedeEditarMotores(m1.estado, draftDVS !== null || dvs !== null) ? "Aprueba el análisis (M1) para editar los motores." : undefined}
+                    disabled={headerState === "en_progreso" || !puedeEditarMotores(m1.estado, motoresGeneradosM1)}
+                    title={!puedeEditarMotores(m1.estado, motoresGeneradosM1) ? motivoSinEditarMotores(m1.estado, m1.f2Cerrada) ?? undefined : undefined}
                     className={btnBase}
                   >
                     Editar análisis
@@ -1651,8 +1754,9 @@ export default function ExploracionPage() {
                 {/* Chip 3: Cerrar Fase 2 */}
                 <button
                   onClick={handleOpenReview}
-                  disabled={headerState !== "lista"}
-                  className={headerState === "lista" ? btnClose : btnBase}
+                  disabled={headerState !== "lista" || reporteAnterior}
+                  title={reporteAnterior ? motivoCerrarF2SinAprobar(puedeAprobar) : undefined}
+                  className={headerState === "lista" && !reporteAnterior ? btnClose : btnBase}
                 >
                   Cerrar Fase 2
                 </button>
@@ -1735,6 +1839,8 @@ export default function ExploracionPage() {
                   <div className="flex items-center gap-2">
                     {isRegeneratingReport ? (
                       <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Regenerando...</span>
+                    ) : reporteAnterior ? (
+                      <span className="text-xs text-brown-eske-60 dark:text-yellow-eske font-medium">Reporte del análisis anterior</span>
                     ) : (
                       <span className="text-xs text-green-eske-60 dark:text-green-eske-30 font-medium">Reporte generado</span>
                     )}
@@ -1748,6 +1854,9 @@ export default function ExploracionPage() {
                     </button>
                   </div>
                 </div>
+                {reporteAnterior && (
+                  <p role="status" className="rounded-lg border border-yellow-eske/40 bg-yellow-eske/10 px-3 py-2 text-xs text-brown-eske-60 dark:text-yellow-eske">{textoReporteAnterior(puedeAprobar)}</p>
+                )}
                 {reportRegenError && (
                   <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 text-right">{reportRegenError}</p>
                 )}
@@ -1809,6 +1918,12 @@ export default function ExploracionPage() {
           /* Estado B — mapaPESTEL disponible (con o sin DVS previo) */
           ) : mapaPESTEL !== null && mode !== "editing" ? (
             <div className="flex-1 flex flex-col overflow-hidden">
+              {expressError === null && avisoExitoNuevoAnalisisVisible({ aviso: avisoNuevoAnalisis, estado: m1.estado, f2Cerrada: m1.f2Cerrada }) && (
+                <div role="status" className="shrink-0 mb-3 flex items-start justify-between gap-3 rounded-lg border border-green-eske/30 bg-green-eske/10 px-3 py-2 text-xs text-green-eske-80 dark:text-green-eske-30">
+                  <span className="min-w-0">{avisoNuevoAnalisis}</span>
+                  <button type="button" onClick={() => setAvisoNuevoAnalisis(null)} aria-label="Cerrar aviso" className="shrink-0 font-semibold hover:underline">Cerrar</button>
+                </div>
+              )}
               {expressError !== null && (
                 <div role="alert" className="shrink-0 mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-eske/30 bg-red-eske/10 px-3 py-2 text-xs text-red-eske-60 dark:text-red-eske-10">
                   <span className="min-w-0">{expressError}</span>
@@ -1821,7 +1936,7 @@ export default function ExploracionPage() {
                     Análisis por motores
                   </p>
                   <p className="text-xs text-black-eske-40 dark:text-[#9AAEBE]">
-                    {mensajeAreaMotores(m1.estado) ? "Primero revisa y aprueba el análisis PESTEL (panel derecho)." : "Revisa y aprueba cada sección antes de generar el Reporte F2."}
+                    {subtituloAreaMotores(m1.estado, m1.f2Cerrada)}
                   </p>
                 </div>
                 {pestlVia === "pestel" && pestProjectId && (
@@ -1958,7 +2073,7 @@ export default function ExploracionPage() {
                 </div>
               )}
               <div className="flex-1 overflow-y-auto">
-                {mode === "completed" && dvs !== null && !showReporte ? (
+                {zonaCentro === "completo" ? (
                   <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">
                     <p className="text-xs font-bold uppercase tracking-wider text-bluegreen-eske-70 dark:text-blue-eske-20 mb-2">
                       Análisis de exploración completo
@@ -1977,18 +2092,12 @@ export default function ExploracionPage() {
                       Generar Reporte F2
                     </button>
                   </div>
-                ) : mensajeAreaMotores(m1.estado) ? (
+                ) : zonaCentro === "mensaje" ? (
                   <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center">
                     <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8] mb-1">Motores M2–M5</p>
-                    <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">{mensajeAreaMotores(m1.estado)}</p>
+                    <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">{mensajeAreaMotores(m1.estado, m1.f2Cerrada)}</p>
                   </div>
-                ) : mostrarAvisoSinGenerar({
-                    estado: m1.estado,
-                    motoresSinGenerarServidor: m1.resumen?.motoresSinGenerar ?? false,
-                    motoresGenerados: draftDVS !== null || dvs !== null,
-                    generando: isGeneratingMotors,
-                    hayErrorGeneracion: motorGenerationError !== null,
-                  }) ? (
+                ) : zonaCentro === "sin_generar" ? (
                   <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center space-y-3">
                     <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">M1 aprobado, motores sin generar</p>
                     <button
@@ -2007,6 +2116,8 @@ export default function ExploracionPage() {
                     isGenerating={isGeneratingMotors}
                     generationError={motorGenerationError}
                     onRetry={generarDraftDVS}
+                    generandoDesde={generandoMotoresDesde}
+                    onRevisarEstado={revisarEstadoMotores}
                     retryLabel={regenKind === "partial" ? "Reintentar actualización" : "Reintentar generación"}
                     onApprove={handleApproveMotor}
                     onDraftChange={setDraftDVS}
@@ -2098,7 +2209,7 @@ export default function ExploracionPage() {
             onNuevoAnalisis={pestProjectId === null ? solicitarNuevoAnalisis : undefined}
             onEditarNarrativas={() => void m1.pedirReabrir()}
             m1={m1}
-            motoresGenerados={draftDVS !== null || dvs !== null}
+            motoresGenerados={motoresGeneradosM1}
             generandoMotores={isGeneratingMotors}
             onReintentarGeneracion={() => void generarDraftDVS()}
             lastUnlinkedPestAnalysisId={lastUnlinkedPestAnalysisId}
@@ -2301,6 +2412,8 @@ function ExplorationFormPanel({
     consumirFoco();
   }, [dimParaFoco, consumirFoco]);
   const kebabM1 = opcionesKebabM1({ kind: m1.kind, estado: m1.estado, f2Cerrada: m1.f2Cerrada });
+  // Closed F2 with nothing to offer in the menu: the menu is not drawn (a plain label instead).
+  const f2CerradaPanel = m1.f2Cerrada && !kebabM1.hayOpciones;
   const pie = pieM1({
     estado: m1.estado,
     f2Cerrada: m1.f2Cerrada,
@@ -2311,6 +2424,7 @@ function ExplorationFormPanel({
     dimensionesConCambios: m1.cambiosSinGuardar,
     aprobando: m1.aprobando,
     generando: generandoMotores,
+    creadoEn: m1.datos?.creadoEn,
   });
   const renderM1 = (code: string) => {
     const dim = mapaPESTEL![code]!;
@@ -2355,7 +2469,7 @@ function ExplorationFormPanel({
           >
             Ver en Centinela →
           </Link>
-        ) : lastUnlinkedPestAnalysisId && onRelinkPestel ? (
+        ) : lastUnlinkedPestAnalysisId && onRelinkPestel && kebabM1.vincularDeNuevo ? (
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -2365,7 +2479,7 @@ function ExplorationFormPanel({
             >
               {isRelinkingPestel ? "Vinculando…" : "Vincular de nuevo ↺"}
             </button>
-            {onNuevoAnalisis && (
+            {onNuevoAnalisis && kebabM1.nuevoAnalisis && (
               <button
                 type="button"
                 onClick={onNuevoAnalisis}
@@ -2375,7 +2489,9 @@ function ExplorationFormPanel({
               </button>
             )}
           </div>
-        ) : onNuevoAnalisis ? (
+        ) : f2CerradaPanel ? (
+          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
+        ) : onNuevoAnalisis && kebabM1.hayOpciones ? (
           <div className="relative shrink-0" ref={kebabRef}>
             <button
               type="button"
@@ -2395,7 +2511,7 @@ function ExplorationFormPanel({
                 className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-1.5rem)] bg-white-eske dark:bg-[#1E3A52]
                   rounded-lg shadow-lg border border-gray-eske-20 dark:border-white/10 py-1 z-20"
               >
-                {onAnalizarConPESTEL && (
+                {onAnalizarConPESTEL && kebabM1.analizarConPestel && (
                   <button
                     type="button"
                     onClick={() => { setKebabOpen(false); onAnalizarConPESTEL(); }}
@@ -2404,14 +2520,16 @@ function ExplorationFormPanel({
                     Analizar con PESTEL
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => { setKebabOpen(false); onNuevoAnalisis(); }}
-                  className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
-                >
-                  Nuevo análisis ↺
-                </button>
-                {onLinkExisting && (
+                {kebabM1.nuevoAnalisis && (
+                  <button
+                    type="button"
+                    onClick={() => { setKebabOpen(false); onNuevoAnalisis(); }}
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Nuevo análisis ↺
+                  </button>
+                )}
+                {onLinkExisting && kebabM1.vincularIndependiente && (
                   <button
                     type="button"
                     onClick={() => { setKebabOpen(false); onLinkExisting(); }}
@@ -2456,7 +2574,7 @@ function ExplorationFormPanel({
                 : sec.dimCode && m1.cambiosSinGuardar.includes(sec.dimCode)
                 ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-eske shrink-0" title="Cambios sin guardar" aria-label="Cambios sin guardar" />
                 : hasSignals
-                  ? <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Señales PESTEL importadas" />
+                  ? <span className="w-1.5 h-1.5 rounded-full bg-orange-eske shrink-0" title="Esta dimensión tiene análisis" />
                   : filled && <span className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske shrink-0" />
               }
             </button>
@@ -2591,25 +2709,6 @@ function ExplorationFormPanel({
       />
       )}
     </div>
-  );
-}
-
-// ==========================================
-// MARKDOWN INLINE RENDERER
-// ==========================================
-
-function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("**") && part.endsWith("**"))
-          return <strong key={i}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith("*") && part.endsWith("*"))
-          return <em key={i}>{part.slice(1, -1)}</em>;
-        return <span key={i}>{part}</span>;
-      })}
-    </>
   );
 }
 
@@ -2763,66 +2862,25 @@ function TripartiteSignalsPanel({ dim, edicion }: { dim: F2DimensionPESTEL; edic
         </>
       )}
 
-      <SignalGroup
+      <SenalesGrupo
         title="Señales favorables"
         signals={dim.senalesFavorables}
         colorClass="text-green-eske-70 dark:text-[#7BC47C]"
         summaryClass="border border-green-eske-30 dark:border-green-eske/20"
       />
-      <SignalGroup
+      <SenalesGrupo
         title="Señales adversas"
         signals={dim.senalesAdversas}
         colorClass="text-red-eske-70 dark:text-orange-eske"
         summaryClass="border border-red-eske-20 dark:border-orange-eske/30"
       />
-      <SignalGroup
+      <SenalesGrupo
         title="Señales inciertas"
         signals={dim.senalesInciertas}
         colorClass="text-brown-eske-60 dark:text-yellow-eske"
         summaryClass="border border-yellow-eske/40 dark:border-yellow-eske/20"
       />
     </div>
-  );
-}
-
-function SignalGroup({
-  title, signals, colorClass, summaryClass,
-}: {
-  title: string;
-  signals: F2DimensionPESTEL["senalesFavorables"];
-  colorClass: string;
-  summaryClass: string;
-}) {
-  if (signals.length === 0) return null;
-  return (
-    <details className={`rounded-lg overflow-hidden ${summaryClass}`}>
-      <summary className={`px-3 py-2 text-xs font-semibold cursor-pointer list-none flex items-center justify-between ${colorClass}`}>
-        {title} <span className="text-black-eske-20">({signals.length})</span>
-      </summary>
-      <ul className="divide-y divide-gray-eske-20 dark:divide-white/5">
-        {signals.map((s, i) => (
-          <li key={i} className="px-3 py-2 space-y-0.5">
-            <p className="text-xs text-black-eske dark:text-[#EAF2F8]"><InlineMarkdown text={s.descripcion} /></p>
-            <div className="flex items-center gap-2 text-xs text-black-eske-20 dark:text-[#9AAEBE]">
-              <span>{s.fuente}</span>
-              {s.fechaCorte && <span>· {s.fechaCorte}</span>}
-              {s.origenInternacional && (
-                <span className="px-1.5 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-70 rounded text-xs dark:bg-bluegreen-eske/20 dark:text-blue-eske-20">
-                  Intl.
-                </span>
-              )}
-              <span className={`ml-auto px-1.5 py-0.5 rounded text-xs ${
-                s.nivelConfianza === "alto" ? "bg-green-eske-10 text-green-eske-70" :
-                s.nivelConfianza === "bajo" ? "bg-red-eske-10 text-red-eske-70" :
-                "bg-gray-eske-10 text-gray-eske-60"
-              }`}>
-                {s.nivelConfianza}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 
@@ -3061,7 +3119,7 @@ function LinkExistingPestelModal({ projectId, projectType, projectTerritory, imp
         setM1Target(target);
         return;
       }
-      setLinkError(err.message ?? "No se pudo vincular. Intenta de nuevo.");
+      setLinkError(mensajeRechazoVincularCentinela({ status: res.status, codigo: err.error }) ?? err.message ?? "No se pudo vincular. Intenta de nuevo.");
     } catch {
       setLinkError("Error de conexión. Intenta de nuevo.");
     } finally {

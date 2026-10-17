@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { estadoEsperaMotores, TEXTO_ESPERA_LENTA, TEXTO_PROCESANDO_MOTORES } from "@/lib/moddulo/esperaMotores";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import type {
   DVSF2,
@@ -37,6 +38,10 @@ export interface MotoresSequentialViewProps {
   onSaveEdit?: (motor: MotorId) => void;
   /** Cuando true, todos los motores arrancan expandidos y editables sin aprobación previa */
   editMode?: boolean;
+  /** Date.now() cuando empezó la generación en curso (para avisar si tarda más de lo esperado). */
+  generandoDesde?: number | null;
+  /** Vuelve a leer el estado del servidor (por si la generación terminó aunque la espera se abortó). */
+  onRevisarEstado?: () => void;
 }
 
 // ── Motor metadata ─────────────────────────────────────────────────────────────
@@ -695,7 +700,16 @@ function M5Panel({ hei, pip, editable, onHEIChange, onPIPChange }: {
 
 const MOTOR_LABELS = ["M2 — Contraste XPCTO", "M3 — Semáforo de Veto", "M4 — Incertidumbres", "M5 — Hipótesis + PIP"];
 
-function GeneratingSkeleton() {
+function GeneratingSkeleton({ desde }: { desde?: number | null }) {
+  // The wait is never open-ended: past the expected time the screen says so (the page aborts its own wait
+  // a little after the platform limit and shows the persistent notice).
+  const [segundos, setSegundos] = useState(0);
+  useEffect(() => {
+    if (!desde) return;
+    const t = setInterval(() => setSegundos((Date.now() - desde) / 1000), 5000);
+    return () => clearInterval(t);
+  }, [desde]);
+  const lenta = estadoEsperaMotores(segundos) !== "normal";
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-4 px-1">
@@ -704,7 +718,11 @@ function GeneratingSkeleton() {
             <span key={i} className="w-1.5 h-1.5 rounded-full bg-bluegreen-eske animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
           ))}
         </div>
-        <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE]">Generando análisis por motores con Claude…</p>
+        {/* System process text: red-eske-60 / dark red-eske-10, role=status (alert is for errors). */}
+        <p role="status" className="text-xs text-red-eske-60 dark:text-red-eske-10">
+          {TEXTO_PROCESANDO_MOTORES}
+          {lenta && <span className="block mt-0.5">{TEXTO_ESPERA_LENTA}</span>}
+        </p>
       </div>
       {MOTOR_LABELS.map((label, i) => (
         <div key={i} className="rounded-xl border border-gray-eske-20 dark:border-white/10 p-4 animate-pulse">
@@ -739,6 +757,8 @@ export default function MotoresSequentialView({
   onDraftChange,
   onSaveEdit,
   editMode = false,
+  generandoDesde = null,
+  onRevisarEstado,
 }: MotoresSequentialViewProps) {
   // Accordion: in editMode all start expanded; otherwise M2 only
   const [expanded, setExpanded] = useState<Record<MotorId, boolean>>(
@@ -775,7 +795,7 @@ export default function MotoresSequentialView({
   // Sin draft previo (primer análisis): pantalla completa de carga/error —
   // no hay nada que mostrar mientras tanto.
   if (!draftDVS) {
-    if (isGenerating) return <GeneratingSkeleton />;
+    if (isGenerating) return <GeneratingSkeleton desde={generandoDesde} />;
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
         {generationError ? (
@@ -789,13 +809,30 @@ export default function MotoresSequentialView({
               <p className="text-sm font-semibold text-black-eske dark:text-white mb-1">Error al generar los motores</p>
               <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] max-w-xs">{generationError}</p>
             </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {onRetry && (
+                <button type="button" onClick={onRetry} className="px-4 py-2 bg-bluegreen-eske text-white rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors">
+                  {retryLabel}
+                </button>
+              )}
+              {onRevisarEstado && (
+                <button type="button" onClick={onRevisarEstado} className="px-4 py-2 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/5 transition-colors">
+                  Revisar estado
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          // Not generating and nothing to show: say so (never a loading skeleton without a request behind it).
+          <>
+            <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">Motores M2–M5 sin generar</p>
             {onRetry && (
-              <button type="button" onClick={onRetry} className="px-4 py-2 bg-bluegreen-eske text-white rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors">
+              <button type="button" onClick={onRetry} className="px-4 py-2 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/5 transition-colors">
                 {retryLabel}
               </button>
             )}
           </>
-        ) : <GeneratingSkeleton />}
+        )}
       </div>
     );
   }
