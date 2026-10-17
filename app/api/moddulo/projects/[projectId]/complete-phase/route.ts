@@ -7,6 +7,8 @@ import { getProject } from "@/lib/moddulo/project";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import type { PhaseId } from "@/types/moddulo.types";
 import { planRDAUpdate } from "@/lib/moddulo/rda";
+import { analizarM1, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
+import { reporteDelAnalisisAnterior } from "@/lib/moddulo/pantallaM1";
 
 interface CompletePhaseBody {
   phaseId: PhaseId;
@@ -35,6 +37,15 @@ export async function POST(
     const collaborator = project.collaborators.find((c) => c.uid === session.uid);
     if (!collaborator || collaborator.role === "analyst" || collaborator.role === "client") {
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
+    }
+
+    // F2 cannot close with the Reporte F2 of a PREVIOUS analysis while the M1 on screen is a new one that
+    // nobody approved (draft or reopened). A project «anterior» (no record about M1) is not this case.
+    if (phaseId === "exploracion") {
+      const exploracion = project.phases?.exploracion as ExploracionParaM1 | undefined;
+      if (reporteDelAnalisisAnterior(analizarM1(exploracion).estado.estado, !!exploracion?.dvs)) {
+        return NextResponse.json({ error: "m1_no_aprobado" }, { status: 409 });
+      }
     }
 
     const phaseIndex = PHASE_ORDER.indexOf(phaseId);

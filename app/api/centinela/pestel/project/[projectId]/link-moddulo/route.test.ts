@@ -139,6 +139,15 @@ describe("POST link-moddulo — escritura", () => {
     expect(u.find((x) => x.path === "pestel_projects/pest1")!.data).toEqual({ modduloProjectId: "m1", updatedAt: "TS" });
   });
 
+  it("con análisis: deja un M1 nuevo en borrador (m1 con creadoEn) y descarta el borrador de motores, sin tocar el Reporte F2", async () => {
+    const r = await POST(req({ modduloProjectId: "m1" }), ctx);
+    expect(r.status).toBe(201);
+    const m = mockDb.updates().find((x) => x.path === "moddulo_projects/m1")!.data;
+    expect(m["phases.exploracion.m1"]).toEqual({ creadoEn: "TS" });
+    expect(m["phases.exploracion.draftDVS"]).toBe("__DELETE__");
+    expect(m).not.toHaveProperty("phases.exploracion.dvs");
+  });
+
   it("sin análisis: 201 con sourceAnalysisId null y solo el vínculo (sin mapa ni aprobaciones)", async () => {
     sembrar({ "pestel_projects/pest1": pestel(), "moddulo_projects/m1": moddulo() });
     const r = await POST(req({ modduloProjectId: "m1" }), ctx);
@@ -147,6 +156,8 @@ describe("POST link-moddulo — escritura", () => {
     const m = mockDb.updates().find((x) => x.path === "moddulo_projects/m1")!.data;
     expect(m["phases.exploracion.linkedSource"]).toEqual({ kind: "T22", componente: "centinela", sourceId: "pest1" });
     expect(m["phases.exploracion.motorAprobaciones"]).toBeUndefined();
+    expect(m).not.toHaveProperty("phases.exploracion.m1");
+    expect(m).not.toHaveProperty("phases.exploracion.draftDVS");
   });
 
   it("rama C7b: mismo análisis ya importado → 200 y SOLO se reafirma el back-link de PESTEL", async () => {

@@ -6,9 +6,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
+import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 
 export async function POST(request: NextRequest) {
@@ -37,6 +39,9 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // F2 closed = read-only: nothing is read or written.
+  if (exploracionCerrada(project.phases?.exploracion)) return respuestaFaseCerrada();
 
   // Load PESTEL analysis
   const analysisSnap = await adminDb
@@ -108,16 +113,15 @@ export async function POST(request: NextRequest) {
     payload: mapaPESTEL,
   };
 
-  // Save to Moddulo project. On re-sync (M1 refreshed from a renewed
-  // Centinela analysis), M2-M5 fueron aprobados contra el M1 anterior —
-  // se limpia motorAprobaciones para forzar re-aprobación, pero NO se borra
-  // draftDVS: el cliente regenera automáticamente al detectar el cambio de
-  // mapaPESTEL, y si esa regeneración falla, el usuario debe seguir viendo
-  // el último draftDVS válido en vez de una pantalla en blanco sin salida.
+  // Save to Moddulo project. The imported M1 is a NEW M1 in draft (m1Escritura.ts): the user reviews and
+  // approves it, M2–M5 are generated from that approval. The motors draft and the motor approvals made
+  // against the previous M1 are discarded (since 3b nothing regenerates them automatically, so keeping
+  // the old draft only left motors that no longer belong to the M1 on screen). The finalized Reporte F2
+  // (`dvs`) is not touched.
   await adminDb.collection("moddulo_projects").doc(projectId).update({
     "phases.exploracion.linkedSource": linkedSource,
     "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
-    "phases.exploracion.motorAprobaciones": {},
+    ...camposNuevoM1(FieldValue),
     // Ya no hace falta el puntero de "deshacer desvinculación" — este
     // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
     "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),

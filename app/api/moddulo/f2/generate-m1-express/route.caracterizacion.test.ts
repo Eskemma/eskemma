@@ -69,6 +69,28 @@ describe("generate-m1-express — caracterización", () => {
     expect((w?.data["phases.exploracion.linkedSource"] as { kind: string }).kind).toBe("express");
   });
 
+  // EDITADA a propósito (paso 3 de 3b): antes escribía SOLO el vínculo, las fuentes y los dos snapshots
+  // (no descartaba nada); ahora deja un M1 nuevo en borrador y descarta lo hecho contra el anterior.
+  it("escribe el vínculo, las fuentes, los dos snapshots y un M1 nuevo en borrador; descarta el borrador de motores y las aprobaciones; no toca dvs", async () => {
+    responderPorMitad(vi.mocked(anthropic.messages.create), (m) => respuestaValida(m));
+    await llamar();
+    const d = db.updates().find((u) => u.path === "moddulo_projects/p1")!.data;
+    expect(Object.keys(d).sort()).toEqual([
+      "phases.exploracion.draftDVS",
+      "phases.exploracion.fuentesConsultadas",
+      "phases.exploracion.linkedSource",
+      "phases.exploracion.m1",
+      "phases.exploracion.motorAprobaciones",
+      "phases.exploracion.territorioSnapshotAtGeneration",
+      "phases.exploracion.xpctoSnapshotAtGeneration",
+      "updatedAt",
+    ]);
+    expect(d["phases.exploracion.m1"]).toEqual({ creadoEn: "TS" });
+    expect(d["phases.exploracion.draftDVS"]).toBe("__DELETE__");
+    expect(d["phases.exploracion.motorAprobaciones"]).toEqual({});
+    expect(d).not.toHaveProperty("phases.exploracion.dvs");
+  });
+
   it("acepta el JSON dentro de una valla ```json", async () => {
     responderPorMitad(vi.mocked(anthropic.messages.create), (m) => respuestaModelo("```json\n" + JSON.stringify(mapaMitad(m as Mitad)) + "\n```"));
     expect((await llamar()).status).toBe(200);

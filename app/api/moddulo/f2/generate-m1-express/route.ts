@@ -6,11 +6,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getMapaPESTELExpressPrompt } from "@/lib/ai/phases/prompts";
 import type { XPCTO, MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
+import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import {
   fetchGoogleNewsRSS,
   getNewsTopicsForProject,
@@ -204,6 +206,9 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // F2 closed = read-only: refuse BEFORE reading sources or calling the model (no time, no tokens).
+  if (exploracionCerrada(project.phases?.exploracion)) return respuestaFaseCerrada();
 
   // Guard: si el M1 proviene de un análisis de Centinela PESTEL vinculado,
   // el flujo express no debe sobrescribirlo — rompería el vínculo sin avisar
@@ -499,6 +504,8 @@ export async function POST(request: NextRequest) {
       "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
         extraerTerritorioEscalar(project.territorio as Territorio)
       ),
+      // New M1 in draft: no stale approval/edits, no motors draft from the previous one (m1Escritura.ts).
+      ...camposNuevoM1(FieldValue),
       updatedAt: FieldValue.serverTimestamp(),
     });
   } catch (e) {

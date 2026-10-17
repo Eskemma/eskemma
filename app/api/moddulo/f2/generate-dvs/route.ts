@@ -41,6 +41,7 @@ import {
   estadoParaImpactoDesdeProyecto,
   leerEstadoParaImpacto,
 } from "@/lib/moddulo/impactoReemplazoServidor";
+import { codigoDeParseo, medirLlamada, registrarTotal, type MetaLlamada } from "@/lib/moddulo/registroModelo";
 
 // A full generation is 4+ sequential Claude calls (M2||M3 → M4 → M5, with one
 // retry for M5): same ceiling as generate-m1-express. The route used to declare
@@ -106,13 +107,15 @@ function parseJSON<T>(raw: string, motorName: string): T {
   throw new Error(`${motorName}: JSON inválido`);
 }
 
-async function callClaude(system: string, user: string, maxTokens: number): Promise<Anthropic.Message> {
-  return anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: user }],
-  }) as Promise<Anthropic.Message>;
+async function callClaude(system: string, user: string, maxTokens: number, meta: MetaLlamada): Promise<Anthropic.Message> {
+  return medirLlamada("generate-dvs", meta, () =>
+    anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+    }) as Promise<Anthropic.Message>
+  );
 }
 
 // ── route ─────────────────────────────────────────────────────────────────────
@@ -164,15 +167,19 @@ export async function POST(request: NextRequest) {
   // ── Try new path: mapaPESTEL en phases.exploracion ───────────────────────
   const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
 
+  // Fingerprint of the approved M1 this draft is generated from (m1.generacion). Only when the project has
+  // an M1 with an approval: projects without m1 are written exactly as before.
+  const huellaM1 = project.phases?.exploracion?.m1?.aprobacion?.huella ?? null;
+
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
       projectId, project.type, xpcto, mapaPESTEL, saveas,
-      JSON.stringify(project.xpcto ?? {}), session.uid, huellaConfirmada
+      JSON.stringify(project.xpcto ?? {}), session.uid, huellaConfirmada, huellaM1
     );
   }
 
   // ── Fallback: legacy single-call (pestel_analyses o form data) ────────────
-  return runLegacyPath(projectId, project, xpcto, saveas, session.uid, huellaConfirmada);
+  return runLegacyPath(projectId, project, xpcto, saveas, session.uid, huellaConfirmada, huellaM1);
 }
 
 // ── Multi-motor path ──────────────────────────────────────────────────────────
@@ -185,8 +192,33 @@ async function runMultiMotorPath(
   saveas: "draft" | "final",
   xpctoSnapshot: string,
   uid: string,
-  huellaConfirmada: string | null
+  huellaConfirmada: string | null,
+  huellaM1: string | null
 ): Promise<NextResponse> {
+  const t0 = Date.now();
+  let resultado = "error";
+  try {
+    const r = await runMultiMotorInterno(projectId, projectType, xpcto, mapaPESTEL, saveas, xpctoSnapshot, uid, huellaConfirmada, huellaM1, t0);
+    resultado = r.status === 200 ? "ok" : `http_${r.status}`;
+    return r;
+  } finally {
+    registrarTotal("generate-dvs", resultado, t0);
+  }
+}
+
+async function runMultiMotorInterno(
+  projectId: string,
+  projectType: string,
+  xpcto: Partial<XPCTO>,
+  mapaPESTEL: Record<string, unknown>,
+  saveas: "draft" | "final",
+  xpctoSnapshot: string,
+  uid: string,
+  huellaConfirmada: string | null,
+  huellaM1: string | null,
+  t0: number
+): Promise<NextResponse> {
+  const stops: Record<string, string | null | undefined> = {};
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
 
@@ -202,22 +234,24 @@ async function runMultiMotorPath(
     const pM2 = getDVSM2Prompt(projectType, xpctoRaw, mapaSerialized);
     const pM3 = getDVSM3Prompt(projectType, xpctoRaw, mapaSerialized);
     const [resM2, resM3] = await Promise.all([
-      callClaude(pM2.system, pM2.user, 3000),
-      callClaude(pM3.system, pM3.user, 3000),
+      callClaude(pM2.system, pM2.user, 3000, { motor: "M2", intento: 1, t0 }),
+      callClaude(pM3.system, pM3.user, 3000, { motor: "M3", intento: 1, t0 }),
     ]);
+    stops.M2 = resM2.stop_reason;
+    stops.M3 = resM3.stop_reason;
     m2Raw = extractText(resM2);
     m3Raw = extractText(resM3);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logAnthropicError("generate-dvs M2/M3", err);
-    return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3" }, { status: 500 });
+    return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3", codigo: "fallo_modelo" }, { status: 500 });
   }
 
   let m2: ContrasteXPCTO[];
   try {
     m2 = parseJSON<ContrasteXPCTO[]>(m2Raw, "M2");
   } catch {
-    return NextResponse.json({ error: `M2: no se pudo parsear la respuesta`, motor: "M2", raw: m2Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M2: no se pudo parsear la respuesta`, motor: "M2", codigo: codigoDeParseo(stops.M2), raw: m2Raw.slice(0, 400) }, { status: 500 });
   }
 
   let m3: ActorVetoF2[];
@@ -227,7 +261,7 @@ async function runMultiMotorPath(
     // Claude (mismo criterio que PIPItem.pipItemId).
     m3 = m3Parsed.map((a) => ({ ...a, actorId: crypto.randomUUID() }));
   } catch {
-    return NextResponse.json({ error: `M3: no se pudo parsear la respuesta`, motor: "M3", raw: m3Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M3: no se pudo parsear la respuesta`, motor: "M3", codigo: codigoDeParseo(stops.M3), raw: m3Raw.slice(0, 400) }, { status: 500 });
   }
 
   // M4 después de M2
@@ -240,19 +274,20 @@ async function runMultiMotorPath(
   let m4Raw: string;
   try {
     const { system, user } = getDVSM4Prompt(mapaSerialized, m2Veredictos);
-    const resM4 = await callClaude(system, user, 2000);
+    const resM4 = await callClaude(system, user, 2000, { motor: "M4", intento: 1, t0 });
+    stops.M4 = resM4.stop_reason;
     m4Raw = extractText(resM4);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logAnthropicError("generate-dvs M4", err);
-    return NextResponse.json({ error: `Error en M4: ${msg}`, motor: "M4" }, { status: 500 });
+    return NextResponse.json({ error: `Error en M4: ${msg}`, motor: "M4", codigo: "fallo_modelo" }, { status: 500 });
   }
 
   let m4: IncertidumbreF2[];
   try {
     m4 = parseJSON<IncertidumbreF2[]>(m4Raw, "M4");
   } catch {
-    return NextResponse.json({ error: `M4: no se pudo parsear la respuesta`, motor: "M4", raw: m4Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M4: no se pudo parsear la respuesta`, motor: "M4", codigo: codigoDeParseo(stops.M4), raw: m4Raw.slice(0, 400) }, { status: 500 });
   }
 
   // M5 después de M3 + M4
@@ -276,14 +311,15 @@ async function runMultiMotorPath(
     let m5Raw: string;
     try {
       const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres);
-      const resM5 = await callClaude(system, user, 5000);
+      const resM5 = await callClaude(system, user, 5000, { motor: "M5", intento: attempt, t0 });
+      stops.M5 = resM5.stop_reason;
       m5Raw = extractText(resM5);
       console.log(`[generate-dvs] M5 attempt ${attempt} raw (200 chars):`, m5Raw.slice(0, 200));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logAnthropicError(`generate-dvs M5 attempt ${attempt}`, err);
       if (attempt === 2) {
-        return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5" }, { status: 500 });
+        return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5", codigo: "fallo_modelo" }, { status: 500 });
       }
       continue;
     }
@@ -293,7 +329,7 @@ async function runMultiMotorPath(
       if (isM5Empty(parsed)) {
         console.error(`[generate-dvs] M5 attempt ${attempt} returned empty content`);
         if (attempt === 2) {
-          return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5" }, { status: 500 });
+          return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5", codigo: "respuesta_invalida" }, { status: 500 });
         }
         continue;
       }
@@ -302,13 +338,13 @@ async function runMultiMotorPath(
     } catch {
       console.error(`[generate-dvs] M5 attempt ${attempt} parse failure. Raw:`, m5Raw.slice(0, 300));
       if (attempt === 2) {
-        return NextResponse.json({ error: "M5: no se pudo parsear la respuesta de Claude.", motor: "M5" }, { status: 500 });
+        return NextResponse.json({ error: "M5: no se pudo parsear la respuesta del modelo.", motor: "M5", codigo: codigoDeParseo(stops.M5) }, { status: 500 });
       }
     }
   }
 
   if (!m5) {
-    return NextResponse.json({ error: "M5: falló después de 2 intentos.", motor: "M5" }, { status: 500 });
+    return NextResponse.json({ error: "M5: falló después de 2 intentos.", motor: "M5", codigo: "respuesta_invalida" }, { status: 500 });
   }
 
   const dvs: DVSF2 = {
@@ -319,7 +355,7 @@ async function runMultiMotorPath(
     pip: m5.pip,
   };
 
-  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada, xpctoSnapshot);
+  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada, xpctoSnapshot, huellaM1);
 }
 
 // ── Legacy single-call path ───────────────────────────────────────────────────
@@ -330,7 +366,8 @@ async function runLegacyPath(
   xpcto: Partial<XPCTO>,
   saveas: "draft" | "final",
   uid: string,
-  huellaConfirmada: string | null
+  huellaConfirmada: string | null,
+  huellaM1: string | null
 ): Promise<NextResponse> {
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
@@ -372,17 +409,20 @@ async function runLegacyPath(
   // Claude may fail here, before any write: answer a JSON 500 (like the
   // multi-motor path) so the client can say the previous analysis is untouched.
   let response: Anthropic.Message;
+  const t0 = Date.now();
   try {
-    response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: user }],
-    });
+    response = await medirLlamada("generate-dvs", { motor: "legacy", intento: 1, t0 }, () =>
+      anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: user }],
+      })
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logAnthropicError("generate-dvs legacy", err);
-    return NextResponse.json({ error: `Error al generar el análisis: ${msg}`, motor: "legacy" }, { status: 500 });
+    return NextResponse.json({ error: `Error al generar el análisis: ${msg}`, motor: "legacy", codigo: "fallo_modelo" }, { status: 500 });
   }
 
   const rawText = extractText(response);
@@ -391,12 +431,12 @@ async function runLegacyPath(
     dvs = parseJSON<DVSF2>(rawText, "DVS");
   } catch {
     return NextResponse.json(
-      { error: "Error al parsear respuesta de Claude", raw: rawText.slice(0, 500) },
+      { error: "Error al parsear la respuesta del modelo", codigo: codigoDeParseo(response.stop_reason), raw: rawText.slice(0, 500) },
       { status: 500 }
     );
   }
 
-  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada);
+  return persistAndReturn(projectId, dvs, saveas, uid, huellaConfirmada, undefined, huellaM1);
 }
 
 // ── sanitize ──────────────────────────────────────────────────────────────────
@@ -463,20 +503,24 @@ async function persistAndReturn(
   saveas: "draft" | "final",
   uid: string,
   huellaConfirmada: string | null,
-  xpctoSnapshot?: string
+  xpctoSnapshot?: string,
+  huellaM1?: string | null
 ): Promise<NextResponse> {
   const dvs = sanitizeDVS(rawDvs);
 
   const hasM5Content = dvs.hei?.tensionCentral || dvs.hei?.contexto || (dvs.pip?.length ?? 0) > 0;
   if (!hasM5Content) {
     console.error("[generate-dvs] M5 empty after sanitization — aborting save", { rawHei: rawDvs.hei });
-    return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5" }, { status: 500 });
+    return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5", codigo: "respuesta_invalida" }, { status: 500 });
   }
 
   if (saveas === "draft") {
     await adminDb.collection("moddulo_projects").doc(projectId).update({
       "phases.exploracion.draftDVS": dvs,
       "phases.exploracion.motorAprobaciones": {},
+      // Which approved M1 this draft comes from (the discriminator the screen uses to tell a dvs of THIS M1
+      // from a dvs of a previous one). Only for projects with an approved M1; others are written as before.
+      ...(huellaM1 && { "phases.exploracion.m1.generacion": { huella: huellaM1, en: FieldValue.serverTimestamp() } }),
       ...(xpctoSnapshot !== undefined && {
         "phases.exploracion.xpctoSnapshotAtGeneration": xpctoSnapshot,
       }),

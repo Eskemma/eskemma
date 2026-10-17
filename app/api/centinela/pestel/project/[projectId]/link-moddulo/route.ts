@@ -6,8 +6,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
+import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
+import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
@@ -62,6 +64,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!modduloProject) {
     return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
   }
+
+  // F2 closed = read-only (same 409 fase_cerrada as the m1-* routes); re-checked inside the transaction.
+  if (exploracionCerrada(modduloProject.phases?.exploracion)) return respuestaFaseCerrada();
 
   // Conflict: Moddulo project's exploracion phase already has a different pestProjectId
   const explorarPhase = modduloProject.phases?.["exploracion"];
@@ -156,12 +161,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     linkedSource.sourceAnalysisId = latestAnalysisId;
     linkedSource.payload = mapaPESTEL;
     updatePayload["phases.exploracion.xpctoSnapshotAtGeneration"] = JSON.stringify(modduloProject.xpcto ?? {});
-    // M1 puede estar reemplazando uno de origen express (upgrade) — M2-M5
-    // aprobados contra el M1 anterior quedarían obsoletos, se fuerza
-    // re-aprobación. draftDVS NO se borra: si la regeneración automática
-    // falla, el usuario conserva su último estado válido en vez de pantalla
-    // en blanco.
-    updatePayload["phases.exploracion.motorAprobaciones"] = {};
+    // M1 puede estar reemplazando uno de origen express (upgrade): el M1 vinculado es un M1 NUEVO en
+    // borrador (m1Escritura.ts) y el borrador de motores y las aprobaciones hechos contra el anterior
+    // se descartan; el Reporte F2 finalizado (`dvs`) no se toca.
+    Object.assign(updatePayload, camposNuevoM1(FieldValue));
   }
   updatePayload["phases.exploracion.linkedSource"] = linkedSource;
 
@@ -183,7 +186,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     | "pestel_ya_vinculado"
     | "moddulo_ya_vinculado"
     | "mapa_ya_importado"
-    | "mismo_analisis";
+    | "mismo_analisis"
+    | "fase_cerrada";
 
   const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoVinculo> => {
     const pestelTx = await tx.get(pestelRef);
@@ -195,6 +199,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // getProject filtra la papelera y exige ser colaborador; aquí solo se revalida que siga ahí.
     if (!modduloTx.exists || modduloTx.data()?.deletedAt) return "moddulo_no_encontrado";
+    if (exploracionCerrada(modduloTx.data()?.phases?.exploracion)) return "fase_cerrada";
     const linkedActual = modduloTx.data()?.phases?.exploracion?.linkedSource as
       | { sourceId?: string; sourceAnalysisId?: string; payload?: unknown }
       | undefined;
@@ -226,6 +231,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
     case "idempotente":
       return NextResponse.json({ modduloProjectId }, { status: 200 });
+    case "fase_cerrada":
+      return respuestaFaseCerrada();
     case "pestel_ya_vinculado":
       return NextResponse.json(
         { error: "pestel_already_linked", message: "Este proyecto PESTEL ya está vinculado a otro proyecto de Moddulo." },

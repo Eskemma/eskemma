@@ -12,6 +12,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import { serializeMapaPESTEL, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
+import { codigoDeParseo, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
 import type { XPCTO, HEIF2, PIPItem } from "@/types/moddulo.types";
 
 function extractText(response: Anthropic.Message): string {
@@ -83,6 +84,7 @@ function sanitizeM5(raw: { hei?: Partial<HEIF2>; pip?: unknown[] }): { hei: HEIF
 }
 
 export async function POST(request: NextRequest) {
+  const t0 = Date.now();
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
   const mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
 
   let m5Raw: string;
+  let stopReason: string | null | undefined;
   try {
     const { system, user } = getDVSM5Prompt(
       project.type ?? "electoral",
@@ -136,16 +139,20 @@ export async function POST(request: NextRequest) {
     );
     const knowledgeContext = await buildPhaseContext({ phaseId: "exploracion", projectType: project.type });
     const systemPrompt = knowledgeContext ? `${knowledgeContext}\n\n${system}` : system;
-    const res = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: user }],
-    }) as Anthropic.Message;
+    const res = await medirLlamada("regenerate-m5", { motor: "M5", intento: 1, t0 }, () =>
+      anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: user }],
+      }) as Promise<Anthropic.Message>
+    );
+    stopReason = res.stop_reason;
     m5Raw = extractText(res);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Error llamando a Claude: ${msg}` }, { status: 500 });
+    registrarTotal("regenerate-m5", "fallo_modelo", t0);
+    return NextResponse.json({ error: `Error llamando al modelo: ${msg}`, codigo: "fallo_modelo" }, { status: 500 });
   }
 
   let m5: { hei: HEIF2; pip: PIPItem[] };
@@ -153,12 +160,14 @@ export async function POST(request: NextRequest) {
     const parsed = parseM5JSON(m5Raw);
     m5 = sanitizeM5(parsed);
   } catch {
-    return NextResponse.json({ error: "M5: no se pudo parsear la respuesta de Claude", raw: m5Raw.slice(0, 400) }, { status: 500 });
+    registrarTotal("regenerate-m5", codigoDeParseo(stopReason), t0);
+    return NextResponse.json({ error: "M5: no se pudo parsear la respuesta del modelo", codigo: codigoDeParseo(stopReason), raw: m5Raw.slice(0, 400) }, { status: 500 });
   }
 
   if (!m5.hei.tensionCentral && !m5.hei.contexto && m5.pip.length === 0) {
     console.error("[regenerate-m5] M5 returned empty after sanitization", { raw: m5Raw.slice(0, 400) });
-    return NextResponse.json({ error: "Claude devolvió M5 vacío. Intenta de nuevo." }, { status: 500 });
+    registrarTotal("regenerate-m5", "respuesta_invalida", t0);
+    return NextResponse.json({ error: "El modelo devolvió M5 vacío. Intenta de nuevo.", codigo: "respuesta_invalida" }, { status: 500 });
   }
 
   // Merge: preserva M2, M3, M4 — solo sobreescribe hei y pip
@@ -169,5 +178,6 @@ export async function POST(request: NextRequest) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
+  registrarTotal("regenerate-m5", "ok", t0);
   return NextResponse.json({ hei: m5.hei, pip: m5.pip });
 }
