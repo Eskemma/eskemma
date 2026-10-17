@@ -620,6 +620,8 @@ export interface M1Generacion {
 }
 
 export interface M1Datos {
+  /** Cuándo se generó o importó este M1 (lo escriben los tres escritores de M1; el sello de la pantalla). */
+  creadoEn?: unknown;
   ediciones?: Partial<Record<RutaEdicionM1, M1Edicion>>;
   aprobacion?: M1Aprobacion;
   generacion?: M1Generacion;

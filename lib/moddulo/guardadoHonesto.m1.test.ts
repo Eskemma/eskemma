@@ -181,7 +181,8 @@ describe("reabrir_m1 y generar_m1 — familia de la confirmación (decidirReempl
       });
       it("fase_cerrada; 404 no afirma existencia; 401/403 afirman el estado previo", () => {
         const f = decidirReemplazoAnalisis(r(409, "fase_cerrada"), { confirmado: true }, accion) as { mensajeError: string };
-        expect(f.mensajeError).toContain("Fase 2 ya está cerrada");
+        // EDITADA a propósito (opción A): generar_m1 usa el texto nuevo de «cerrada = solo lectura»; reabrir_m1 conserva el suyo.
+        expect(f.mensajeError).toContain(accion === "reabrir_m1" ? "Fase 2 ya está cerrada" : "La Fase 2 está cerrada: no se puede reemplazar el análisis. No se guardó nada.");
         const n = decidirReemplazoAnalisis(r(404, "m1_no_encontrado"), {}, accion) as { mensajeError: string };
         expect(n.mensajeError).toContain("puede que ya no exista o no tengas acceso");
         expect(n.mensajeError).not.toMatch(/se conserva|sigue aprobado/);
@@ -201,7 +202,7 @@ describe("reabrir_m1 y generar_m1 — familia de la confirmación (decidirReempl
     // `codigo` propio (ver guardadoHonesto.m1Codigos.test.ts); con solo ese texto el cliente no atribuye causa.
     const l = decidirReemplazoAnalisis(r(409, "pestel_linked"), {}, "generar_m1") as { mensajeError: string };
     expect(l.mensajeError).toContain("Centinela vinculado; desvincúlalo antes de generar uno nuevo con Moddulo. No se generó nada");
-    const p = decidirReemplazoAnalisis(r(500, "Error al parsear respuesta de Claude"), { confirmado: true }, "generar_m1") as { mensajeError: string };
+    const p = decidirReemplazoAnalisis(r(500, "Error al parsear la respuesta del modelo"), { confirmado: true }, "generar_m1") as { mensajeError: string };
     expect(p.mensajeError).toContain("El servidor no pudo completar el análisis");
     expect(p.mensajeError).not.toContain("no fue válida");
   });

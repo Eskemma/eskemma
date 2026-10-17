@@ -9,6 +9,9 @@
 
 import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
 
+/** F2 closed = read-only: generate-m1-express, import-pestel and link-moddulo answer 409 `fase_cerrada`. */
+export const MENSAJE_FASE_CERRADA_REEMPLAZO = "La Fase 2 está cerrada: no se puede reemplazar el análisis. No se guardó nada.";
+
 export type AccionGuardado =
   | "aprobar_motor"
   | "guardar_borrador"
@@ -160,6 +163,12 @@ export interface ContextoGuardado {
    * ambiguous.
    */
   confirmado?: boolean;
+  /**
+   * For generar_m1: there is an analysis (M1 or finalized report) that survives a failure. Only then
+   * does the message say «Tu análisis actual se conserva»; with `false` it claims nothing is kept.
+   * Undefined keeps the former wording.
+   */
+  hayAnalisisPrevio?: boolean;
   /** For aceptar_condicion_rda: the name of the RDA item, shown in the message. */
   nombre?: string;
   /** For guardar_edicion_m1: label of the dimension being edited ("Político"). */
@@ -641,7 +650,8 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
     return `No se pudo CONFIRMAR ${que}: el servidor no respondió como se esperaba. Puede que sí se haya ${hecho}; recarga la página para verificar el estado.`;
   }
   if (resp.status === 409) {
-    if (resp.codigo === "fase_cerrada") return `La Fase 2 ya está cerrada; ${accion === "reabrir_m1" ? "no se puede reabrir el análisis" : "no se generó un análisis nuevo"}.`;
+    // A code of the server itself, so it does state what happened (it never fires for a 5xx without a code).
+    if (resp.codigo === "fase_cerrada") return accion === "reabrir_m1" ? "La Fase 2 ya está cerrada; no se puede reabrir el análisis." : MENSAJE_FASE_CERRADA_REEMPLAZO;
     if (accion === "reabrir_m1" && resp.codigo === "m1_no_aprobado") {
       return "El análisis ya no está aprobado (puede que ya se haya reabierto); no se reabrió nada. Recarga la página para ver el estado.";
     }
@@ -650,7 +660,8 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
     }
   }
   if (resp.status === 404) return "No se encontró el análisis; puede que ya no exista o no tengas acceso. Recarga la página para verificar.";
-  return `No se pudo registrar ${que}. ${motivo(resp)} ${consecuencia(accion)}`;
+  const cierre = accion === "generar_m1" && ctx.hayAnalisisPrevio === false ? "Inténtalo de nuevo." : consecuencia(accion);
+  return `No se pudo registrar ${que}. ${motivo(resp)} ${cierre}`;
 }
 
 /**
@@ -666,6 +677,10 @@ function mensajeDeFallo(
 ): string {
   if (esAccionSimple(accion)) return mensajeDeFalloSimple(accion, resp, ctx);
   if (accion === "reabrir_m1" || accion === "generar_m1") return mensajeDeFalloM1(accion, resp, ctx);
+  if (accion === "cerrar_fase" && resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_no_aprobado") {
+    // complete-phase: a finalized Reporte F2 exists but the M1 on screen is new and not approved.
+    return "No se pudo cerrar la Fase 2: el análisis nuevo (M1) aún no está aprobado y el Reporte F2 es el del análisis anterior. Apruébalo y vuelve a finalizar el Reporte F2. La fase sigue abierta.";
+  }
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
     if (accion === "guardar_borrador") {

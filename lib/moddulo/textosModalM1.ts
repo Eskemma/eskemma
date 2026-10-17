@@ -12,6 +12,7 @@ import {
   type EstadoParaImpactoM1,
 } from "./impactoM1";
 import type { EstadoM1 } from "./m1Aprobacion";
+import { MENSAJE_FASE_CERRADA_REEMPLAZO } from "./guardadoHonesto";
 
 export interface TextoModalM1 {
   titulo: string;
@@ -123,6 +124,7 @@ export function estadoImpactoDesdePantalla(d: DatosPantallaM1): EstadoParaImpact
  */
 export function mensajeRechazoVincularCentinela(resp: { status: number; codigo?: string }): string | null {
   if (resp.status !== 409) return null;
+  if (resp.codigo === "fase_cerrada") return MENSAJE_FASE_CERRADA_REEMPLAZO;
   return resp.codigo === "reemplazo_requiere_confirmacion" || resp.codigo === "reemplazo_huella_vencida"
     ? MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES
     : null;
