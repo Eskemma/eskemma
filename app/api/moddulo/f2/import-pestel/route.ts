@@ -11,6 +11,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
+import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string; pestAnalysisId?: string; confirmReplace?: boolean };
+  let body: { projectId?: string; pestAnalysisId?: string; confirmReplace?: boolean; confirmar?: unknown; huella?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -82,17 +83,27 @@ export async function POST(request: NextRequest) {
   const existingMapa = existingLinkedSource?.payload;
   const incomingPestProjectId = analysis.projectId as string;
 
+  // ONE confirmation (paso 4): a different source and the H15 lock are asked together. The 409 `conflict`
+  // keeps its code and message but now carries the real `lineas` and the `huella` to confirm against; a
+  // request with `confirmar` + `huella` is the explicit confirmation (it also satisfies `confirmReplace`).
+  const confirmaConHuella = body.confirmar === true && typeof body.huella === "string";
   if (existingMapa) {
     const sameLinkedProject = existingPestProjectId && existingPestProjectId === incomingPestProjectId;
 
     if (!sameLinkedProject) {
-      if (!confirmReplace) {
+      if (!confirmReplace && !confirmaConHuella) {
+        const d = decidirCandadoM1Servidor(project.phases?.exploracion, "vincular", { confirmar: false, huella: null });
         return NextResponse.json(
-          { error: "conflict", message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte." },
+          {
+            error: "conflict",
+            message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte.",
+            lineas: d.accion === "continuar" ? [] : d.lineas,
+            huella: d.accion === "continuar" ? null : d.huella,
+          },
           { status: 409 }
         );
       }
-      // Usuario confirmó el reemplazo explícitamente — continúa abajo y sobrescribe.
+      // Usuario confirmó el reemplazo explícitamente — la confirmación con huella se valida abajo.
     } else if (existingAnalysisId === pestAnalysisId) {
       // Same analysis already imported — return existing data idempotently.
       return NextResponse.json({ linkedSource: existingLinkedSource }, { status: 200 });
@@ -118,15 +129,32 @@ export async function POST(request: NextRequest) {
   // against the previous M1 are discarded (since 3b nothing regenerates them automatically, so keeping
   // the old draft only left motors that no longer belong to the M1 on screen). The finalized Reporte F2
   // (`dvs`) is not touched.
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.linkedSource": linkedSource,
-    "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
-    ...camposNuevoM1(FieldValue),
-    // Ya no hace falta el puntero de "deshacer desvinculación" — este
-    // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
-    "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  // H15 lock (paso 4) INSIDE the transaction that writes, against the state read there: replacing an M1
+  // that has an approval, edits or motors needs the confirmation tied to the fingerprint the user saw.
+  const ref = adminDb.collection("moddulo_projects").doc(projectId);
+  const resultado = await adminDb.runTransaction(
+    async (tx): Promise<"ok" | "no_encontrado" | "fase_cerrada" | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> }> => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
+      const exp = snap.data()?.phases?.exploracion;
+      if (exploracionCerrada(exp)) return "fase_cerrada";
+      const d = decidirCandadoM1Servidor(exp, "vincular", { confirmar: body.confirmar, huella: body.huella });
+      if (d.accion !== "continuar") return { candado: d };
+      tx.update(ref, {
+        "phases.exploracion.linkedSource": linkedSource,
+        "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+        ...camposNuevoM1(FieldValue),
+        // Ya no hace falta el puntero de "deshacer desvinculación" — este
+        // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
+        "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return "ok";
+    }
+  );
+  if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+  if (resultado === "fase_cerrada") return respuestaFaseCerrada();
+  if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
 
   return NextResponse.json({ linkedSource }, { status: 200 });
 }

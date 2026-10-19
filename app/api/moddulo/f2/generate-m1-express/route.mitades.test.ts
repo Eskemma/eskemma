@@ -41,7 +41,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { POST } from "./route";
 import { respuestaValida, respuestaModelo, responderPorMitad, mapaMitad, dimension } from "@/lib/moddulo/__tests__/fixtures/modeloPorMitad";
 
-type Db = { reset(): void; updates(): Array<{ path: string; data: Record<string, unknown> }>; failUpdateOn(p: string): void; seed?: unknown };
+type Db = { reset(d?: Record<string, unknown>): void; updates(): Array<{ path: string; data: Record<string, unknown> }>; failUpdateOn(p: string): void; seed?: unknown };
 const db = adminDb as unknown as Db;
 
 
@@ -52,7 +52,7 @@ const llamar = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.reset();
+  db.reset({ "moddulo_projects/p1": { phases: { exploracion: {} } } }); // paso 4: the write is a transaction that re-reads the document
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);
   vi.mocked(getProject).mockResolvedValue({ id: "p1", type: "ciudadano", xpcto: { hito: "h" }, territorio: { nivel: "estatal", nombre: "Yucatán", estado: "Yucatán" }, phases: {} } as never);
 });

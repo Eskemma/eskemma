@@ -1,5 +1,8 @@
 // app/api/centinela/pestel/project/[projectId]/link-moddulo/route.ts
-// POST { modduloProjectId, forceLink? }
+// POST { modduloProjectId, forceLink?, confirmar?, huella? }
+// H15 (paso 4): linking REPLACES the M1 of the Moddulo project. When something would be lost (the M1, its
+// edits or approval, the motors draft or approvals) it answers 409 reemplazo_requiere_confirmacion with the
+// real lines and the fingerprint to confirm against; the territory warning (forceLink) is a separate step.
 // Bidirectionally links a PESTEL project to an existing Moddulo project.
 // Validates compatibility, guards against conflicts, and imports MapaPESTEL if analysis exists.
 
@@ -10,6 +13,7 @@ import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
+import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const { projectId } = await context.params;
 
-  let body: { modduloProjectId?: string; forceLink?: boolean };
+  let body: { modduloProjectId?: string; forceLink?: boolean; confirmar?: unknown; huella?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -187,7 +191,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     | "moddulo_ya_vinculado"
     | "mapa_ya_importado"
     | "mismo_analisis"
-    | "fase_cerrada";
+    | "fase_cerrada"
+    | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
 
   const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoVinculo> => {
     const pestelTx = await tx.get(pestelRef);
@@ -218,12 +223,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return "mapa_ya_importado";
     }
 
+    // The lock again, against the state read here and the fingerprint the user confirmed.
+    const candado = decidirCandadoM1Servidor(modduloTx.data()?.phases?.exploracion, "vincular", {
+      confirmar: body.confirmar,
+      huella: body.huella,
+    });
+    if (candado.accion !== "continuar") return { candado };
+
     tx.update(modduloRef, updatePayload);
     // Write back to PESTEL project
     tx.update(pestelRef, { modduloProjectId, updatedAt: FieldValue.serverTimestamp() });
     return "ok";
   });
 
+  if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
   switch (resultado) {
     case "pestel_no_encontrado":
       return NextResponse.json({ error: "Proyecto PESTEL no encontrado" }, { status: 404 });

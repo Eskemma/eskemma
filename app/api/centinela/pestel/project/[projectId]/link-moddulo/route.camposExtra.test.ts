@@ -1,5 +1,5 @@
-// M1 de F2 (3b): la pantalla ya envía `confirmar` y `huella` al vincular (el servidor los exige desde el
-// commit 4). Mientras tanto la ruta debe responder IGUAL con o sin esos campos.
+// M1 de F2 (3b): la pantalla envía `confirmar` y `huella` al vincular. Paso 4: el servidor los EXIGE solo cuando
+// algo se perdería (ver route.candado.test.ts); con un proyecto limpio la ruta responde IGUAL con o sin esos campos.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

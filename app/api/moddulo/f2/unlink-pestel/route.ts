@@ -1,5 +1,8 @@
 // app/api/moddulo/f2/unlink-pestel/route.ts
-// POST { projectId }
+// POST { projectId, confirmar?, huella? }
+// H15 (paso 4): the confirmation is ALWAYS required (409 reemplazo_requiere_confirmacion with the real lines
+// and the fingerprint to confirm against); 409 fase_cerrada when F2 is closed. On success it discards the
+// motors draft, the motor approvals and the M1 record together with the link.
 // Desvincula explícitamente un proyecto Moddulo de su análisis de Centinela
 // PESTEL. Limpia los punteros y el M1 asociado, dejando F2 listo para
 // regenerar vía el flujo express. Contraparte deliberada del guard 409 en
@@ -11,6 +14,8 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
+import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -18,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string };
+  let body: { projectId?: string; confirmar?: unknown; huella?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -42,15 +47,32 @@ export async function POST(request: NextRequest) {
   // vínculo dentro (la lectura previa de `getProject` es solo de acceso): dos desvinculaciones
   // simultáneas dejan a la segunda en `not_linked`.
   const proyectoRef = adminDb.collection("moddulo_projects").doc(projectId);
-  type ResultadoDesvinculo = "ok" | "no_encontrado" | "no_vinculado";
+  type ResultadoDesvinculo =
+    | "ok"
+    | "no_encontrado"
+    | "no_vinculado"
+    | "fase_cerrada"
+    | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
   const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoDesvinculo> => {
     const snap = await tx.get(proyectoRef);
-    if (!snap.exists) return "no_encontrado";
-    const linkedSource = snap.data()?.phases?.exploracion?.linkedSource;
+    if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
+    const exploracion = snap.data()?.phases?.exploracion;
+    // F2 closed = read-only (same 409 as the other M1 writers).
+    if (exploracionCerrada(exploracion)) return "fase_cerrada";
+    const linkedSource = exploracion?.linkedSource;
     // kind !== "T22" cubre tanto "sin vínculo" como "vínculo express" — el
     // express no tiene fuente de Centinela que desvincular (su sourceId es
     // el propio ID del proyecto Moddulo, no un pestel_projects real).
     if (!linkedSource || linkedSource.kind !== "T22") return "no_vinculado";
+
+    // H15 lock (paso 4), ALWAYS asked: unlinking removes the M1 and breaks the link on both sides. The
+    // lines list what exists; the confirmation is tied to the fingerprint of what the user saw.
+    const candado = decidirCandadoM1Servidor(exploracion, "desvincular", {
+      confirmar: body.confirmar,
+      huella: body.huella,
+      siempre: true,
+    });
+    if (candado.accion !== "continuar") return { candado };
 
     // Write-back: clear the reverse reference on the PESTEL project if it
     // still points to this Moddulo project (symmetry with link-moddulo).
@@ -66,11 +88,12 @@ export async function POST(request: NextRequest) {
       // Conserva el vínculo anterior completo para permitir deshacer
       // ("Vincular de nuevo") sin pasar por el picker.
       "phases.exploracion.lastUnlinkedLinkedSource": linkedSource,
-      // M1 desaparece — M2-M5 aprobados contra él quedan obsoletos, se fuerza
-      // re-aprobación. draftDVS NO se borra: si el usuario restaura el vínculo
-      // o regenera vía express y la regeneración falla, sigue teniendo su
-      // último estado válido visible en vez de pantalla en blanco.
+      // The M1 goes away and so does everything made against it: the motors draft, the motor approvals and
+      // the M1 record itself (approval, edits, generation mark). The finalized Reporte F2 (`dvs`) stays.
+      // NOTE for the reopening round: the record of the approval is lost with the M1.
       "phases.exploracion.motorAprobaciones": {},
+      "phases.exploracion.draftDVS": FieldValue.delete(),
+      "phases.exploracion.m1": FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (pestelRef && pestelApuntaAqui) {
@@ -82,6 +105,8 @@ export async function POST(request: NextRequest) {
     return "ok";
   });
 
+  if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
+  if (resultado === "fase_cerrada") return respuestaFaseCerrada();
   if (resultado === "no_encontrado") {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }

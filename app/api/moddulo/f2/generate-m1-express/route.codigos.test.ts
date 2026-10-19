@@ -40,7 +40,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { POST } from "./route";
 import { respuestaValida, respuestaModelo, responderPorMitad } from "@/lib/moddulo/__tests__/fixtures/modeloPorMitad";
 
-type Db = { reset(): void; updates(): Array<{ path: string; data: Record<string, unknown> }>; failUpdateOn(p: string): void; seed?: unknown };
+type Db = { reset(d?: Record<string, unknown>): void; updates(): Array<{ path: string; data: Record<string, unknown> }>; failUpdateOn(p: string): void; atomico(a?: boolean): void; seed?: unknown };
 const db = adminDb as unknown as Db;
 
 
@@ -51,7 +51,7 @@ const llamar = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.reset();
+  db.reset({ "moddulo_projects/p1": { phases: { exploracion: {} } } }); // paso 4: the write is a transaction that re-reads the document
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);
   vi.mocked(getProject).mockResolvedValue({ id: "p1", type: "ciudadano", xpcto: { hito: "h" }, territorio: { nivel: "estatal", nombre: "Yucatán", estado: "Yucatán" }, phases: {} } as never);
 });
@@ -112,6 +112,7 @@ describe("generate-m1-express — códigos de error propios", () => {
   it("falla el update de Firestore → 500 fallo_guardado y console.error", async () => {
     const s = espiar();
     responderPorMitad(create(), (m) => respuestaValida(m));
+    db.atomico(true); // the write is a transaction now: the failure is raised when the buffered writes are applied
     db.failUpdateOn("moddulo_projects/p1");
     const r = await llamar();
     expect(r.status).toBe(500);

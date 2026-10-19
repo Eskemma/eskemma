@@ -63,7 +63,7 @@ describe("guardar_edicion_m1 — guardar la edición de una dimensión", () => {
   });
   it("409 con cada código real de m1-edit", () => {
     expect(msg("guardar_edicion_m1", r(409, "m1_aprobado"))).toContain("ya está aprobado y bloqueado; no se guardó tu edición. Para modificarlo usa «Editar narrativas»");
-    expect(msg("guardar_edicion_m1", r(409, "m1_cambio"))).toContain("cambió en otra pestaña o sesión; no se guardó tu edición");
+    expect(msg("guardar_edicion_m1", r(409, "m1_cambio"))).toContain("cambió en otra pestaña o sesión; no se guardó la edición");
     expect(msg("guardar_edicion_m1", r(409, "m1_no_editable_centinela"))).toContain("viene de Centinela y no se edita desde aquí");
     expect(msg("guardar_edicion_m1", r(409, "fase_cerrada"))).toContain("Fase 2 ya está cerrada");
   });

@@ -194,7 +194,12 @@ describe("POST link-moddulo — escritura", () => {
       "moddulo_projects/m1": moddulo({ phases: { exploracion: { linkedSource: { kind: "express", sourceId: "pest1", payload: { P: {} } } } } }),
       "pestel_analyses/a1": ANALISIS,
     });
-    const r = await POST(req({ modduloProjectId: "m1" }), ctx);
+    // Paso 4: replacing an existing M1 asks once (409 with the lines and the fingerprint); confirmed, it links.
+    const pide = await POST(req({ modduloProjectId: "m1" }), ctx);
+    expect(pide.status).toBe(409);
+    const { huella } = await pide.json();
+    expect(mockDb.updates()).toHaveLength(0);
+    const r = await POST(req({ modduloProjectId: "m1", confirmar: true, huella }), ctx);
     expect(r.status).toBe(201);
   });
 });

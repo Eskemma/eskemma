@@ -11,6 +11,7 @@ import type { M1Datos, MapaPESTEL } from "@/types/moddulo.types";
 import {
   decidirReemplazoAnalisis,
   decidirResultadoGuardado,
+  mensajeTrasRefresco,
   type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
@@ -169,9 +170,14 @@ export function useM1Revision(p: Params) {
         );
         const decision = decidirResultadoGuardado("guardar_edicion_m1", resp, { dimension: ETIQUETA_DIMENSION[dim] ?? dim });
         if (!decision.exito) {
-          // The user's text stays on screen; a 409 means the screen is stale: refetch.
-          setErrorDim((e) => ({ ...e, [dim]: decision.mensajeError ?? "" }));
-          if (debeRefrescarTras409(resp)) void refrescar();
+          // The user's text stays on screen; a 409 means the screen is stale: refetch, and word the message
+          // by whether the refetch worked (m1_cambio says «la pantalla se actualizó» only if it did).
+          let mensaje = decision.mensajeError;
+          if (debeRefrescarTras409(resp)) {
+            const nuevo = await refrescar();
+            mensaje = mensajeTrasRefresco("guardar_edicion_m1", resp, mensaje, nuevo !== null);
+          }
+          setErrorDim((e) => ({ ...e, [dim]: mensaje ?? "" }));
           return;
         }
         aplicarResultadoLocal(dim, respDatos, tras);
@@ -232,8 +238,12 @@ export function useM1Revision(p: Params) {
       );
       const decision = decidirResultadoGuardado("aprobar_m1", resp);
       if (!decision.exito) {
-        setErrorAprobar(decision.mensajeError);
-        if (debeRefrescarTras409(resp)) void refrescar();
+        let mensaje = decision.mensajeError;
+        if (debeRefrescarTras409(resp)) {
+          const nuevo = await refrescar();
+          mensaje = mensajeTrasRefresco("aprobar_m1", resp, mensaje, nuevo !== null);
+        }
+        setErrorAprobar(mensaje);
         return;
       }
       if (respDatos.motoresDescartados === true) p.limpiarMotoresLocales();

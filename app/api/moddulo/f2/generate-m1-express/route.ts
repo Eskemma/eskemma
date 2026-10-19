@@ -14,6 +14,7 @@ import { getMapaPESTELExpressPrompt } from "@/lib/ai/phases/prompts";
 import type { XPCTO, MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { descripcionError, descripcionEstructural } from "@/lib/moddulo/registroModelo";
+import { decidirCandadoM1Servidor, respuestaCandadoM1 } from "@/lib/moddulo/candadoM1Servidor";
 import {
   fetchGoogleNewsRSS,
   getNewsTopicsForProject,
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string };
+  let body: { projectId?: string; confirmar?: unknown; huella?: unknown; verificar?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -222,6 +223,21 @@ export async function POST(request: NextRequest) {
       { status: 409 }
     );
   }
+
+  // H15 lock (paso 4): a new analysis REPLACES the M1 on screen. If something would be lost (the M1 itself,
+  // its edits or approval, the motors draft or their approvals) the server demands an explicit
+  // confirmation tied to the fingerprint of what the user saw: 409 requiere_confirmacion / huella_vencida,
+  // before reading sources or calling the model (the 409 costs nothing). It reads the RAW document, the
+  // same shape the transaction below checks.
+  const docCrudo = await adminDb.collection("moddulo_projects").doc(projectId).get();
+  const decisionPrevia = decidirCandadoM1Servidor(docCrudo.data()?.phases?.exploracion, "nuevo_analisis", {
+    confirmar: body.confirmar,
+    huella: body.huella,
+  });
+  if (decisionPrevia.accion !== "continuar") return respuestaCandadoM1(decisionPrevia);
+  // Only asking «what would be lost?»: the screen verifies before opening the modal (or going ahead).
+  if (body.verificar === true) return NextResponse.json({ verificado: true }, { status: 200 });
+  const huellaConfirmada = body.confirmar === true && typeof body.huella === "string" ? body.huella : null;
 
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
@@ -492,18 +508,38 @@ export async function POST(request: NextRequest) {
     payload: mapaPESTEL,
   };
 
+  // The write is a transaction that re-reads the document: while the model was generating (up to minutes)
+  // the project may have been closed, approved or edited from another tab. F2 closed → 409 fase_cerrada;
+  // the lock is checked again against the fingerprint the user confirmed (a state that now needs a
+  // confirmation nobody gave → 409, the generated M1 is discarded and nothing is written).
+  const ref = adminDb.collection("moddulo_projects").doc(projectId);
+  type ResultadoEscritura =
+    | { t: "ok" }
+    | { t: "no_encontrado" }
+    | { t: "fase_cerrada" }
+    | { t: "candado"; d: Exclude<ReturnType<typeof decidirCandadoM1Servidor>, { accion: "continuar" }> };
+  let escritura: ResultadoEscritura;
   try {
-    await adminDb.collection("moddulo_projects").doc(projectId).update({
-      "phases.exploracion.linkedSource": linkedSource,
-      "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
-      "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
-      // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
-      "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
-        extraerTerritorioEscalar(project.territorio as Territorio)
-      ),
-      // New M1 in draft: no stale approval/edits, no motors draft from the previous one (m1Escritura.ts).
-      ...camposNuevoM1(FieldValue),
-      updatedAt: FieldValue.serverTimestamp(),
+    escritura = await adminDb.runTransaction(async (tx): Promise<ResultadoEscritura> => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.deletedAt) return { t: "no_encontrado" };
+      const exp = snap.data()?.phases?.exploracion;
+      if (exploracionCerrada(exp)) return { t: "fase_cerrada" };
+      const d = decidirCandadoM1Servidor(exp, "nuevo_analisis", { confirmar: huellaConfirmada !== null, huella: huellaConfirmada });
+      if (d.accion !== "continuar") return { t: "candado", d };
+      tx.update(ref, {
+        "phases.exploracion.linkedSource": linkedSource,
+        "phases.exploracion.fuentesConsultadas": fuentesConsultadas,
+        "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+        // Ronda 13 (26-08-18) — propagación de cambios de territorio, Capa 2.
+        "phases.exploracion.territorioSnapshotAtGeneration": JSON.stringify(
+          extraerTerritorioEscalar(project.territorio as Territorio)
+        ),
+        // New M1 in draft: no stale approval/edits, no motors draft from the previous one (m1Escritura.ts).
+        ...camposNuevoM1(FieldValue),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return { t: "ok" };
     });
   } catch (e) {
     const err = e as { name?: string; code?: unknown };
@@ -513,6 +549,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  if (escritura.t === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+  if (escritura.t === "fase_cerrada") return respuestaFaseCerrada();
+  if (escritura.t === "candado") return respuestaCandadoM1(escritura.d);
 
   return NextResponse.json({ mapaPESTEL, fuentesConsultadas }, { status: 200 });
 }

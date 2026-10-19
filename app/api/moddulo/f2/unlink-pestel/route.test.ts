@@ -1,5 +1,6 @@
 // H25 (7b-2) — caracterización de POST unlink-pestel. Escrita ANTES del refactor a transacción y verde
-// contra el código anterior: fija códigos, cuerpos y el conjunto de escrituras. Debe seguir verde sin editarse.
+// contra el código anterior: fija códigos, cuerpos y el conjunto de escrituras. Paso 4: los casos de éxito pasan por
+// la confirmación obligatoria (sonda + confirmar) y el conjunto de escrituras ganó draftDVS y m1 (borrados).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +20,15 @@ import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMo
 
 const mockDb = adminDb as unknown as ReturnType<typeof createMockAdminDb>;
 const req = (cuerpo: unknown) => new Request("http://local/x", { method: "POST", body: JSON.stringify(cuerpo) }) as never;
+// Paso 4: unlinking ALWAYS asks first. This helper makes the probe (409, nothing written) and then repeats
+// the request confirming with the fingerprint the server returned.
+async function POSTconfirmando(cuerpo: Record<string, unknown>) {
+  const sondeo = await POST(req(cuerpo));
+  expect(sondeo.status).toBe(409);
+  const { huella } = await sondeo.json();
+  expect(mockDb.updates()).toHaveLength(0);
+  return POST(req({ ...cuerpo, confirmar: true, huella }));
+}
 const T22 = { kind: "T22", componente: "centinela", sourceId: "pest1", sourceAnalysisId: "a1", payload: { P: {} } };
 const moddulo = (linkedSource?: unknown) => ({ name: "M", phases: { exploracion: linkedSource ? { linkedSource } : {} } });
 
@@ -72,7 +82,7 @@ describe("POST unlink-pestel — respuestas", () => {
 
 describe("POST unlink-pestel — éxito", () => {
   it("limpia el vínculo del Moddulo (guarda el anterior y vacía las aprobaciones) y el back-link de PESTEL", async () => {
-    const r = await POST(req({ projectId: "m1" }));
+    const r = await POSTconfirmando({ projectId: "m1" });
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ ok: true });
     const u = mockDb.updates();
@@ -83,6 +93,8 @@ describe("POST unlink-pestel — éxito", () => {
       "phases.exploracion.xpctoSnapshotAtGeneration": "__DELETE__",
       "phases.exploracion.lastUnlinkedLinkedSource": T22,
       "phases.exploracion.motorAprobaciones": {},
+      "phases.exploracion.draftDVS": "__DELETE__", // paso 4: ya no se conserva el borrador de motores
+      "phases.exploracion.m1": "__DELETE__", // paso 4: el registro del M1 se va con el vínculo
       updatedAt: "TS",
     });
     expect(u.find((x) => x.path === "pestel_projects/pest1")!.data).toEqual({ modduloProjectId: "__DELETE__", updatedAt: "TS" });
@@ -90,21 +102,21 @@ describe("POST unlink-pestel — éxito", () => {
 
   it("si PESTEL apunta a OTRO Moddulo, no se toca; el Moddulo sí se desvincula", async () => {
     sembrar({ "moddulo_projects/m1": moddulo(T22), "pestel_projects/pest1": { userId: "u1", modduloProjectId: "otro" } });
-    const r = await POST(req({ projectId: "m1" }));
+    const r = await POSTconfirmando({ projectId: "m1" });
     expect(r.status).toBe(200);
     expect(mockDb.updates().map((x) => x.path)).toEqual(["moddulo_projects/m1"]);
   });
 
   it("si el proyecto PESTEL ya no existe, el Moddulo se desvincula igual", async () => {
     sembrar({ "moddulo_projects/m1": moddulo(T22) });
-    const r = await POST(req({ projectId: "m1" }));
+    const r = await POSTconfirmando({ projectId: "m1" });
     expect(r.status).toBe(200);
     expect(mockDb.updates().map((x) => x.path)).toEqual(["moddulo_projects/m1"]);
   });
 
   it("sin sourceId en el vínculo solo se escribe el Moddulo", async () => {
     sembrar({ "moddulo_projects/m1": moddulo({ kind: "T22", componente: "centinela" }) });
-    const r = await POST(req({ projectId: "m1" }));
+    const r = await POSTconfirmando({ projectId: "m1" });
     expect(r.status).toBe(200);
     expect(mockDb.updates().map((x) => x.path)).toEqual(["moddulo_projects/m1"]);
   });

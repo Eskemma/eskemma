@@ -46,6 +46,7 @@ import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
+import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
@@ -56,7 +57,6 @@ import ReemplazarAnalisisModal, {
   type VarianteReemplazo,
 } from "./components/ReemplazarAnalisisModal";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
-import ConfirmReplacePestelModal from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
 import { formatF2Report, formatPestelAnalysis } from "@/lib/moddulo/reportFormatters";
 import type {
@@ -315,8 +315,9 @@ export default function ExploracionPage() {
   // Conflicto detectado por import-pestel (409): mapaPESTEL existente viene
   // de una fuente distinta. Se resuelve con confirmación explícita del
   // usuario antes de reintentar con confirmReplace: true.
-  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync" } | null>(null);
+  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null } | null>(null);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
+  const [errorReplace, setErrorReplace] = useState<string | null>(null);
 
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
@@ -494,24 +495,45 @@ export default function ExploracionPage() {
   // backend rechazó con 409 porque mapaPESTEL viene de otra fuente; el
   // llamador decide si ofrece confirmación (confirmReplace: true) o no.
   const importPestel = useCallback(
-    async (pestAnalysisId: string, confirmReplace = false): Promise<{ ok: boolean; conflict: boolean }> => {
+    async (pestAnalysisId: string, confirmacion: { huella: string | null } | null = null): Promise<{ ok: boolean; conflict: boolean; confirmar?: { lineas?: string[]; huella: string | null; aviso: string | null }; fallo?: { resp: RespuestaGuardado; datos: Record<string, unknown> } }> => {
       try {
         const r = await fetch("/api/moddulo/f2/import-pestel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ projectId, pestAnalysisId, confirmReplace }),
+          // ONE confirmation (paso 4): the same request that confirms the replacement of another source also
+          // carries the fingerprint of what the user saw (`confirmReplace` stays for the server's own check).
+          body: JSON.stringify({
+            projectId, pestAnalysisId,
+            ...(confirmacion ? { confirmReplace: true, confirmar: true, ...(confirmacion.huella ? { huella: confirmacion.huella } : {}) } : {}),
+          }),
         });
         if (r.status === 409) {
           // F2 closed is not a source conflict: it must not offer «confirm replace».
-          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string };
+          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown };
           if (cuerpo.error === "fase_cerrada") {
             setExpressError(MENSAJE_FASE_CERRADA_REEMPLAZO);
-            return { ok: false, conflict: false };
+            return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: 409, codigo: "fase_cerrada" }, datos: cuerpo as Record<string, unknown> } };
           }
-          return { ok: false, conflict: true };
+          // `conflict` (another source), `reemplazo_requiere_confirmacion` and `reemplazo_huella_vencida` are
+          // all «ask the user once, with the server's lines and fingerprint».
+          if (cuerpo.error === "conflict" || cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida") {
+            return {
+              ok: false,
+              conflict: true,
+              confirmar: {
+                lineas: Array.isArray(cuerpo.lineas) && cuerpo.lineas.every((x) => typeof x === "string") ? (cuerpo.lineas as string[]) : undefined,
+                huella: typeof cuerpo.huella === "string" ? cuerpo.huella : null,
+                aviso: cuerpo.error === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se importó nada: revisa lo que se perderá y confirma de nuevo." : null,
+              },
+            };
+          }
+          return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: 409, codigo: cuerpo.error }, datos: cuerpo as Record<string, unknown> } };
         }
-        if (!r.ok) return { ok: false, conflict: false };
+        if (!r.ok) {
+          const cuerpo = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+          return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: r.status, codigo: typeof cuerpo.error === "string" ? cuerpo.error : undefined }, datos: cuerpo } };
+        }
 
         const data = await r.json();
         const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
@@ -541,7 +563,8 @@ export default function ExploracionPage() {
         }
         return { ok: true, conflict: false };
       } catch {
-        return { ok: false, conflict: false };
+        // A lost response or an unreadable body: whether the server imported is unknown.
+        return { ok: false, conflict: false, fallo: { resp: { tipo: "error_red" }, datos: {} } };
       }
     },
     [projectId, router]
@@ -563,7 +586,7 @@ export default function ExploracionPage() {
 
     importPestel(pestId).then((result) => {
       if (!result.ok && result.conflict) {
-        setPendingReplaceConfirm({ pestAnalysisId: pestId, source: "sync" });
+        setPendingReplaceConfirm({ pestAnalysisId: pestId, source: "sync", huella: null, aviso: null, ...result.confirmar });
       }
     });
   }, [isLoaded, projectId, mapaPESTEL, pestAnalysisId, importPestel]);
@@ -589,6 +612,19 @@ export default function ExploracionPage() {
         body: JSON.stringify({ projectId, pestAnalysisId }),
       })
         .then(async (r) => {
+          if (r.status === 409) {
+            // The H15 lock: something exists that this import would replace. Ask once (same modal as C7).
+            const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown };
+            if (cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida" || cuerpo.error === "conflict") {
+              setPendingReplaceConfirm({
+                pestAnalysisId, source: "sync",
+                lineas: Array.isArray(cuerpo.lineas) && cuerpo.lineas.every((x) => typeof x === "string") ? (cuerpo.lineas as string[]) : undefined,
+                huella: typeof cuerpo.huella === "string" ? cuerpo.huella : null,
+                aviso: null,
+              });
+            }
+            return;
+          }
           if (!r.ok) return;
           const data = await r.json();
           const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
@@ -961,8 +997,6 @@ export default function ExploracionPage() {
     });
     return { ...base, hayPayload: base.hayPayload || mapaPESTEL !== null };
   })();
-  const impactoRef = useRef(impactoPantalla);
-  useEffect(() => { impactoRef.current = impactoPantalla; });
 
   // "Nuevo análisis": the modal (lines from the real state; the server's own lines replace them
   // when it answers a 409) and the call. A clean project generates without asking.
@@ -1056,10 +1090,47 @@ export default function ExploracionPage() {
   );
 
   // Every entry point that REPLACES the analysis (kebab, regenerate banners, chat action) goes here.
-  const solicitarNuevoAnalisis = useCallback(() => {
-    if (requiereConfirmacionM1(impactoRef.current, "nuevo_analisis")) setNuevoModal({ huella: null, aviso: null });
-    else void handleGenerarDVS();
-  }, [handleGenerarDVS]);
+  //
+  // Paso 4: the SERVER decides whether something would be lost. The first click asks it without generating
+  // (`verificar`): a clean project goes ahead with no modal; otherwise the 409 brings the real lines and the
+  // fingerprint, and the modal opens ONCE with them (confirming sends that fingerprint). On a network/5xx
+  // failure no modal opens: it says «No se pudo CONFIRMAR…» with a retry.
+  const [verificandoAccion, setVerificandoAccion] = useState<AccionSondeo | null>(null);
+  const verificandoRef = useRef<AccionSondeo | null>(null);
+  const [errorSondeo, setErrorSondeo] = useState<{ accion: AccionSondeo; mensaje: string; reintentable: boolean } | null>(null);
+  const sondearCandado = useCallback(
+    async (accion: AccionSondeo) => {
+      if (verificandoRef.current) return null;
+      verificandoRef.current = accion;
+      setVerificandoAccion(accion);
+      setErrorSondeo(null);
+      try {
+        const { resp, datos } = await leerRespuestaGuardado(
+          () =>
+            fetch(accion === "nuevo_analisis" ? "/api/moddulo/f2/generate-m1-express" : "/api/moddulo/f2/unlink-pestel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(accion === "nuevo_analisis" ? { projectId, verificar: true } : { projectId }),
+            }),
+          (d) => d.verificado === true
+        );
+        const d = decidirSondeo(accion, resp, datos);
+        if (d.tipo === "error") setErrorSondeo({ accion, mensaje: d.mensaje, reintentable: d.reintentable });
+        return d;
+      } finally {
+        verificandoRef.current = null;
+        setVerificandoAccion(null);
+      }
+    },
+    [projectId]
+  );
+  const solicitarNuevoAnalisis = useCallback(async () => {
+    const d = await sondearCandado("nuevo_analisis");
+    if (!d) return;
+    if (d.tipo === "continuar") void handleGenerarDVS();
+    else if (d.tipo === "confirmar") setNuevoModal({ lineasServidor: d.lineas, huella: d.huella, aviso: d.aviso });
+  }, [handleGenerarDVS, sondearCandado]);
   const solicitarNuevoAnalisisRef = useRef<() => void>(() => {});
   useEffect(() => { solicitarNuevoAnalisisRef.current = solicitarNuevoAnalisis; }, [solicitarNuevoAnalisis]);
 
@@ -1081,6 +1152,16 @@ export default function ExploracionPage() {
   // server confirmed. M1 review (3b): the notice lists what is lost from the real state, the request
   // carries `confirmar` (the server demands it from commit 4: a 409 reopens the notice with ITS
   // lines and fingerprint), and the motors draft and approvals are discarded together with M1.
+  // Unlinking ALWAYS asks: the first click probes the server (it answers 409 with the real lines and the
+  // fingerprint) and only then opens the modal, so the user confirms once, against what they were shown.
+  const pedirDesvincular = useCallback(async () => {
+    const d = await sondearCandado("desvincular");
+    if (!d || d.tipo !== "confirmar") return;
+    setUnlinkError(null);
+    setUnlinkServidor({ lineas: d.lineas ?? [], huella: d.huella, aviso: d.aviso });
+    setShowConfirmUnlink(true);
+  }, [sondearCandado]);
+
   const handleUnlinkPestel = useCallback(async () => {
     setIsUnlinkingPestel(true);
     setUnlinkError(null);
@@ -1135,7 +1216,7 @@ export default function ExploracionPage() {
     try {
       const result = await importPestel(lastUnlinkedPestAnalysisId);
       if (!result.ok && result.conflict) {
-        setPendingReplaceConfirm({ pestAnalysisId: lastUnlinkedPestAnalysisId, source: "relink" });
+        setPendingReplaceConfirm({ pestAnalysisId: lastUnlinkedPestAnalysisId, source: "relink", huella: null, aviso: null, ...result.confirmar });
       }
     } finally {
       setIsRelinkingPestel(false);
@@ -1147,12 +1228,28 @@ export default function ExploracionPage() {
   const handleConfirmReplace = useCallback(async () => {
     if (!pendingReplaceConfirm) return;
     setIsConfirmingReplace(true);
+    setErrorReplace(null);
     try {
-      await importPestel(pendingReplaceConfirm.pestAnalysisId, true);
+      const r = await importPestel(pendingReplaceConfirm.pestAnalysisId, { huella: pendingReplaceConfirm.huella });
+      // The state changed since the user looked (huella_vencida): keep asking, with the fresh lines.
+      if (!r.ok && r.conflict && r.confirmar) {
+        setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, ...r.confirmar });
+        return;
+      }
+      // Any other failure: the modal stays open with the message (never a silent close).
+      if (!r.ok && r.fallo) {
+        const d = decidirConfirmacionImport(r.fallo.resp, r.fallo.datos);
+        if (d.tipo === "reconfirmar") {
+          setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso });
+        } else {
+          setErrorReplace(d.mensaje);
+        }
+        return;
+      }
     } finally {
       setIsConfirmingReplace(false);
-      setPendingReplaceConfirm(null);
     }
+    setPendingReplaceConfirm(null);
   }, [pendingReplaceConfirm, importPestel]);
 
   const [isRegeneratingReport, setIsRegeneratingReport] = useState(false);
@@ -1949,11 +2046,11 @@ export default function ExploracionPage() {
                     </button>
                     <span className="flex items-center gap-0.5">
                       <button
-                        onClick={() => setShowConfirmUnlink(true)}
-                        disabled={isUnlinkingPestel}
+                        onClick={() => void pedirDesvincular()}
+                        disabled={isUnlinkingPestel || verificandoAccion !== null}
                         className="px-3 py-1.5 text-black-eske/50 dark:text-[#9AAEBE] text-xs font-medium hover:underline disabled:opacity-50"
                       >
-                        {isUnlinkingPestel ? "Desvinculando…" : "Desvincular"}
+                        {isUnlinkingPestel ? "Desvinculando…" : verificandoAccion === "desvincular" ? "Verificando…" : "Desvincular"}
                       </button>
                       <InfoTooltip
                         content="Rompe el vínculo de este proyecto con el análisis de Centinela PESTEL. El escaneo PESTEL actual (M1) y las secciones M2-M5 ya aprobadas se borran. Podrás regenerar vía el flujo express de Moddulo, o restaurar este mismo vínculo después."
@@ -2207,6 +2304,7 @@ export default function ExploracionPage() {
             isAnalyzing={isExpressAnalyzing}
             pestProjectId={pestProjectId}
             onNuevoAnalisis={pestProjectId === null ? solicitarNuevoAnalisis : undefined}
+            verificando={verificandoAccion !== null}
             onEditarNarrativas={() => void m1.pedirReabrir()}
             m1={m1}
             motoresGenerados={motoresGeneradosM1}
@@ -2224,6 +2322,26 @@ export default function ExploracionPage() {
         </div>
         </>)}
       </div>
+
+      {/* Server check in progress / failed (Nuevo análisis, Desvincular). Process text uses red-eske-60 / dark red-eske-10 with role=status. */}
+      {verificandoAccion !== null && (
+        <p role="status" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] px-4 py-2 text-sm text-red-eske-60 dark:text-red-eske-10 shadow-lg">
+          Verificando lo que se perdería…
+        </p>
+      )}
+      {errorSondeo !== null && (
+        <div role="alert" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-red-eske/30 bg-white-eske dark:bg-[#18324A] px-4 py-3 text-sm text-red-eske-60 dark:text-red-eske-10 shadow-lg sm:max-w-md">
+          <span className="min-w-0">{errorSondeo.mensaje}</span>
+          <span className="shrink-0 flex flex-col gap-1">
+            {errorSondeo.reintentable && (
+              <button type="button" onClick={() => (errorSondeo.accion === "nuevo_analisis" ? void solicitarNuevoAnalisis() : void pedirDesvincular())} className="font-semibold hover:underline">
+                Reintentar
+              </button>
+            )}
+            <button type="button" onClick={() => setErrorSondeo(null)} className="font-semibold hover:underline">Cerrar</button>
+          </span>
+        </div>
+      )}
 
       {/* Nuevo análisis: lines from the real state (or the server's, when it answered a 409) */}
       {nuevoModal && (
@@ -2266,11 +2384,19 @@ export default function ExploracionPage() {
 
       {/* Modal confirmación reemplazo — mapaPESTEL existente viene de otra fuente */}
       {pendingReplaceConfirm && (
-        <ConfirmReplacePestelModal
-          source={pendingReplaceConfirm.source}
-          isConfirming={isConfirmingReplace}
-          onCancel={() => setPendingReplaceConfirm(null)}
-          onConfirm={handleConfirmReplace}
+        <ModalM1
+          texto={textoModalM1("vincular", impactoPantalla, { lineasServidor: pendingReplaceConfirm.lineas })}
+          aviso={pendingReplaceConfirm.aviso}
+          error={errorReplace}
+          ocupado={isConfirmingReplace}
+          onCancelar={() => {
+            setErrorReplace(null);
+            // Cancelling the AUTOMATIC import removes the parameter from the URL, or F5 would ask again.
+            const limpia = urlAlCancelarImport(pendingReplaceConfirm.source, window.location.href);
+            if (limpia) router.replace(limpia, { scroll: false });
+            setPendingReplaceConfirm(null);
+          }}
+          onConfirmar={handleConfirmReplace}
         />
       )}
 
@@ -2349,7 +2475,7 @@ function SkeletonDimension() {
 
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
-  isAnalyzing = false, onNuevoAnalisis, pestProjectId,
+  isAnalyzing = false, onNuevoAnalisis, verificando = false, pestProjectId,
   lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL,
   esMexico, webElectoralData, webElectoralLoading,
   onEditarNarrativas, m1, motoresGenerados, generandoMotores, onReintentarGeneracion,
@@ -2364,6 +2490,8 @@ function ExplorationFormPanel({
   mapaPESTEL: MapaPESTEL | null;
   isAnalyzing?: boolean;
   onNuevoAnalisis?: () => void;
+  /** A server check («what would be lost?») is running: the actions that start one are off. */
+  verificando?: boolean;
   pestProjectId?: string | null;
   lastUnlinkedPestAnalysisId?: string | null;
   onRelinkPestel?: () => void;
@@ -2483,7 +2611,8 @@ function ExplorationFormPanel({
               <button
                 type="button"
                 onClick={onNuevoAnalisis}
-                className="text-xs text-black-eske-20 dark:text-[#9AAEBE] hover:underline"
+                disabled={verificando}
+                className="text-xs text-black-eske-20 dark:text-[#9AAEBE] hover:underline disabled:opacity-50"
               >
                 Nuevo análisis
               </button>
@@ -2524,7 +2653,8 @@ function ExplorationFormPanel({
                   <button
                     type="button"
                     onClick={() => { setKebabOpen(false); onNuevoAnalisis(); }}
-                    className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors"
+                    disabled={verificando}
+                    className="w-full text-left px-3 py-2 text-sm text-black-eske-20 dark:text-[#C7D6E0] hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                   >
                     Nuevo análisis ↺
                   </button>

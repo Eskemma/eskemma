@@ -546,7 +546,7 @@ const TEXTOS_SIMPLES: Record<
     especifico: (r) => {
       if (r.status === 409) {
         if (r.codigo === "m1_aprobado") return "El análisis ya está aprobado y bloqueado; no se guardó tu edición. Para modificarlo usa «Editar narrativas». Tu texto sigue en pantalla.";
-        if (r.codigo === "m1_cambio") return "Esta categoría cambió en otra pestaña o sesión; no se guardó tu edición. Recarga la página para ver la versión vigente (copia tu texto antes si quieres conservarlo).";
+        if (r.codigo === "m1_cambio") return TEXTO_M1_CAMBIO.guardar_edicion_m1.sinRefresco;
         if (r.codigo === "m1_no_editable_centinela") return "Este análisis viene de Centinela y no se edita desde aquí; no se guardó nada.";
         if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada y el análisis es de solo lectura; no se guardó nada.";
       }
@@ -564,7 +564,7 @@ const TEXTOS_SIMPLES: Record<
     permiso: "No tienes permiso para aprobar este análisis.",
     especifico: (r) => {
       if (r.status !== 409) return null;
-      if (r.codigo === "m1_cambio") return "El análisis cambió desde que lo revisaste (puede que se haya editado en otra pestaña); no se aprobó nada. Recarga la página, revísalo y apruébalo de nuevo.";
+      if (r.codigo === "m1_cambio") return TEXTO_M1_CAMBIO.aprobar_m1.sinRefresco;
       if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada; no se aprobó nada.";
       return null;
     },
@@ -608,6 +608,37 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   if (resp.status === 404) return t.noEncontrado;
   const porQue = t.permiso && (resp.status === 401 || resp.status === 403) ? t.permiso : motivo(resp);
   return `No se pudo registrar ${que}. ${porQue} ${consecuencia(accion)}`;
+}
+
+// ── m1_cambio (paso 4): the screen is stale ────────────────────────────────────
+// The server refused because the content is no longer the one the user saw; it wrote nothing. The screen
+// refetches by itself after any 409, so «Recarga la página» is only true when that refetch FAILED: when it
+// worked the message says the screen is up to date; when it did not, it asks to reload.
+export const TEXTO_M1_CAMBIO = {
+  guardar_edicion_m1: {
+    sinRefresco: "Esta categoría cambió en otra pestaña o sesión; no se guardó la edición. Recarga la página para ver la versión vigente (copia tu texto antes si quieres conservarlo).",
+    conRefresco: "Esta categoría cambió en otra pestaña o sesión; no se guardó la edición. La pantalla se actualizó con la versión vigente; tu texto sigue en el editor para que lo compares (cópialo si quieres conservarlo).",
+  },
+  aprobar_m1: {
+    sinRefresco: "El análisis cambió desde que lo revisaste (puede que se haya editado en otra pestaña); no se aprobó nada. Recarga la página, revísalo y apruébalo de nuevo.",
+    conRefresco: "El análisis cambió desde que lo revisaste (puede que se haya editado en otra pestaña); no se aprobó nada. La pantalla se actualizó con la versión vigente: revísala y apruébala de nuevo.",
+  },
+} as const;
+
+/**
+ * The message to show after a refused save/approve, given whether the follow-up refetch worked. Only a
+ * 409 `m1_cambio` changes; anything else keeps the base message untouched.
+ */
+export function mensajeTrasRefresco(
+  accion: "guardar_edicion_m1" | "aprobar_m1",
+  resp: RespuestaGuardado,
+  mensajeBase: string | null,
+  refrescado: boolean
+): string | null {
+  if (resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_cambio" && refrescado) {
+    return TEXTO_M1_CAMBIO[accion].conRefresco;
+  }
+  return mensajeBase;
 }
 
 // ── M1 de F2: the two actions of the confirmation family (3a) ─────────────────

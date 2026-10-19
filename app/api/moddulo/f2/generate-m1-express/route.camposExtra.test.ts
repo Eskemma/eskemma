@@ -1,5 +1,5 @@
-// M1 de F2 (3b): la pantalla ya envía `confirmar` y `huella` a generate-m1-express (el servidor los exige
-// desde el commit 4). Hoy la ruta solo lee `projectId`: con esos campos debe llegar a la misma
+// M1 de F2 (3b): la pantalla envía `confirmar` y `huella` a generate-m1-express. Paso 4: el servidor los exige
+// solo cuando algo se perdería (ver route.candado.test.ts); con esos campos la ruta llega a la misma
 // comprobación que sin ellos (aquí, el 404 de un proyecto inaccesible), no a un 400.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

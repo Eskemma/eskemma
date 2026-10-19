@@ -25,6 +25,17 @@ const llamar = async (cuerpo: Record<string, unknown>) => {
 };
 const proyecto = (exploracion: Record<string, unknown> = {}) => ({ id: "p1", xpcto: { hito: "h" }, phases: { exploracion } });
 
+// Paso 4: the write is a transaction that re-reads the project document, so the stored document and
+// getProject describe the same state.
+const sembrar = (exploracion: Record<string, unknown> = {}) => {
+  vi.mocked(getProject).mockResolvedValue(proyecto(exploracion) as never);
+  db.reset({
+    "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
+    "pestel_projects/pest1": { userId: "u1" },
+    "moddulo_projects/p1": { phases: { exploracion } },
+  });
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   db.reset({
@@ -36,7 +47,7 @@ beforeEach(() => {
 
 describe("import-pestel — lo que escribe", () => {
   it("EDITADA — proyecto sin M1: escribe el vínculo T22, el snapshot de XPCTO, un M1 nuevo en borrador (m1 con creadoEn), vacía las aprobaciones y el borrador de motores, y borra el puntero de deshacer", async () => {
-    vi.mocked(getProject).mockResolvedValue(proyecto() as never);
+    sembrar();
     const r = await llamar({ projectId: "p1", pestAnalysisId: "a1" });
     expect(r.status).toBe(200);
     const w = db.updates().filter((u) => u.path === "moddulo_projects/p1");
@@ -57,9 +68,13 @@ describe("import-pestel — lo que escribe", () => {
     expect(d["phases.exploracion.draftDVS"]).toBe("__DELETE__");
   });
 
-  it("EDITADA — en un proyecto «anterior» (con borrador y Reporte F2) deja un M1 nuevo en borrador y descarta el borrador de motores, pero NO toca el Reporte F2 (dvs)", async () => {
-    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: { x: 1 }, draftDVS: { y: 1 }, linkedSource: { kind: "express", sourceId: "p1", payload: { P: {} } } }) as never);
-    await llamar({ projectId: "p1", pestAnalysisId: "a1", confirmReplace: true });
+  it("EDITADA (paso 4) — en un proyecto «anterior» (con borrador y Reporte F2) pide UNA confirmación; confirmada, deja un M1 nuevo en borrador y descarta el borrador de motores, pero NO toca el Reporte F2 (dvs)", async () => {
+    sembrar({ dvs: { x: 1 }, draftDVS: { y: 1 }, linkedSource: { kind: "express", sourceId: "p1", payload: { P: {} } } });
+    const pide = await llamar({ projectId: "p1", pestAnalysisId: "a1" });
+    expect(pide.status).toBe(409);
+    expect(pide.cuerpo.error).toBe("conflict");
+    expect(db.updates()).toEqual([]);
+    await llamar({ projectId: "p1", pestAnalysisId: "a1", confirmar: true, huella: pide.cuerpo.huella });
     const d = db.updates().find((u) => u.path === "moddulo_projects/p1")!.data;
     expect(d).not.toHaveProperty("phases.exploracion.dvs");
     expect(d["phases.exploracion.m1"]).toEqual({ creadoEn: "TS" });
@@ -68,7 +83,7 @@ describe("import-pestel — lo que escribe", () => {
   });
 
   it("el mismo análisis ya importado responde 200 sin escribir", async () => {
-    vi.mocked(getProject).mockResolvedValue(proyecto({ linkedSource: { kind: "T22", sourceId: "pest1", sourceAnalysisId: "a1", payload: { P: {} } } }) as never);
+    sembrar({ linkedSource: { kind: "T22", sourceId: "pest1", sourceAnalysisId: "a1", payload: { P: {} } } });
     const r = await llamar({ projectId: "p1", pestAnalysisId: "a1" });
     expect(r.status).toBe(200);
     expect(db.updates().filter((u) => u.path === "moddulo_projects/p1")).toHaveLength(0);

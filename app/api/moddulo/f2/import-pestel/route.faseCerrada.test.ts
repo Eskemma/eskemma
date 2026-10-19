@@ -23,6 +23,17 @@ const llamar = async () => {
 };
 const proyecto = (exploracion: Record<string, unknown>) => ({ id: "p1", xpcto: {}, phases: { exploracion } });
 
+// Paso 4: the write is a transaction that re-reads the project document, so the stored document and
+// getProject describe the same state.
+const sembrar = (exploracion: Record<string, unknown> = {}) => {
+  vi.mocked(getProject).mockResolvedValue(proyecto(exploracion) as never);
+  db.reset({
+    "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
+    "pestel_projects/pest1": { userId: "u1" },
+    "moddulo_projects/p1": { phases: { exploracion } },
+  });
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   db.reset({ "pestel_analyses/a1": { projectId: "pest1", dimensions: [] }, "pestel_projects/pest1": { userId: "u1" } });
@@ -31,14 +42,14 @@ beforeEach(() => {
 
 describe("import-pestel — F2 cerrada", () => {
   it("409 fase_cerrada y no escribe nada", async () => {
-    vi.mocked(getProject).mockResolvedValue(proyecto({ status: "completed", dvs: { x: 1 } }) as never);
+    sembrar({ status: "completed", dvs: { x: 1 } });
     const r = await llamar();
     expect(r).toEqual({ status: 409, cuerpo: { error: "fase_cerrada" } });
     expect(db.updates()).toHaveLength(0);
   });
   it("va antes de leer el análisis: con un análisis inexistente sigue siendo fase_cerrada", async () => {
     db.reset({});
-    vi.mocked(getProject).mockResolvedValue(proyecto({ status: "completed" }) as never);
+    sembrar({ status: "completed" });
     expect((await llamar()).cuerpo).toEqual({ error: "fase_cerrada" });
   });
   it("401 y 404 van antes", async () => {
@@ -49,7 +60,7 @@ describe("import-pestel — F2 cerrada", () => {
     expect((await llamar()).status).toBe(404);
   });
   it("con la fase abierta importa (200)", async () => {
-    vi.mocked(getProject).mockResolvedValue(proyecto({ status: "in-progress" }) as never);
+    sembrar({ status: "in-progress" });
     expect((await llamar()).status).toBe(200);
     expect(db.updates()).toHaveLength(1);
   });
