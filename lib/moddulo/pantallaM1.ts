@@ -37,6 +37,33 @@ export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: bool
   return hayDvs && (estado === "borrador" || estado === "reabierto");
 }
 
+export type MotivoNoCerrarF2 = "m1_no_aprobado" | "reporte_f2_no_finalizado" | "reporte_f2_de_otro_analisis";
+
+/**
+ * Why F2 cannot be closed, or null when it can. The SERVER (complete-phase) and the «Cerrar Fase 2» button use
+ * this one function, so the button is off exactly when the server would refuse:
+ *  · an M1 under review (draft / reopened) that is not approved;
+ *  · no finalized Reporte F2;
+ *  · an approved M1 whose motors were not generated from it (`motoresSinGenerar`): the finalized Reporte F2
+ *    belongs to a previous analysis.
+ * Projects with no M1 record (anterior / sin_m1 states) only need their Reporte F2.
+ */
+export function motivoNoCerrarF2(i: { estado: EstadoM1 | null; hayDvs: boolean; motoresSinGenerar: boolean }): MotivoNoCerrarF2 | null {
+  if (i.estado === "borrador" || i.estado === "reabierto") return "m1_no_aprobado";
+  if (!i.hayDvs) return "reporte_f2_no_finalizado";
+  if (i.estado === "aprobado" && i.motoresSinGenerar) return "reporte_f2_de_otro_analisis";
+  return null;
+}
+
+export const puedeCerrarFase = (i: Parameters<typeof motivoNoCerrarF2>[0]): boolean => motivoNoCerrarF2(i) === null;
+
+/** Tooltip of the off «Cerrar Fase 2»: says what to do first, never to press the button. */
+export function textoBotonCierreApagado(motivo: MotivoNoCerrarF2, puedeAprobar: boolean): string {
+  if (motivo === "m1_no_aprobado") return motivoCerrarF2SinAprobar(puedeAprobar);
+  if (motivo === "reporte_f2_no_finalizado") return "Finaliza el análisis (M5) para poder cerrar la Fase 2.";
+  return "El Reporte F2 es de un análisis anterior; genera y finaliza los motores del análisis actual para cerrar.";
+}
+
 /** "16 oct 2026, 12:41 p. m." (Mexico City). Null for a missing or invalid value. */
 export function fechaHora(valor: unknown): string | null {
   const d = aFecha(valor);

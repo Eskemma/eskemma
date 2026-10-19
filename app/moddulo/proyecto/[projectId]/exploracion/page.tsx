@@ -26,7 +26,8 @@ import {
   pieM1,
   puedeEditarMotores,
   avisoExitoNuevoAnalisisVisible,
-  motivoCerrarF2SinAprobar,
+  motivoNoCerrarF2,
+  textoBotonCierreApagado,
   motivoSinEditarMotores,
   puedeAprobarM1,
   reporteDelAnalisisAnterior,
@@ -1008,6 +1009,9 @@ export default function ExploracionPage() {
   useEffect(() => { hayAnalisisPrevioRef.current = mapaPESTEL !== null || dvs !== null; });
   // A finalized Reporte F2 belongs to the PREVIOUS analysis while the M1 on screen is new and unapproved.
   const reporteAnterior = reporteDelAnalisisAnterior(m1.estado, dvs !== null);
+  // Why «Cerrar Fase 2» is off (null = it can close): the SAME pure decision complete-phase uses, so the button
+  // is off exactly when the server would refuse and no text invites closing without the button.
+  const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false });
   // What the centre of the motors area shows (pure decision in lib/moddulo/pantallaM1).
   const zonaCentro = zonaCentroMotores({
     faseCompletada: mode === "completed",
@@ -1391,7 +1395,7 @@ export default function ExploracionPage() {
 
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
-    if (reporteAnterior) return;
+    if (motivoCierre !== null) return;
     if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs, mapaPESTEL ?? undefined, projectType));
     setShowReview(true);
   };
@@ -1403,9 +1407,9 @@ export default function ExploracionPage() {
     try {
       // Step 1: close the phase. Nothing else runs (and we do not navigate)
       // unless the server confirmed it.
-      let paso1: RespuestaGuardado;
-      try {
-        const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+      // The body is read so the server's own code (m1_no_aprobado, reporte_f2_no_finalizado) reaches the message.
+      const { resp: paso1 } = await leerRespuestaGuardado(() =>
+        fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -1413,11 +1417,8 @@ export default function ExploracionPage() {
             phaseId: "exploracion",
             reportText: reportText ?? undefined,
           }),
-        });
-        paso1 = { tipo: "respuesta", ok: r.ok, status: r.status };
-      } catch {
-        paso1 = { tipo: "error_red" };
-      }
+        })
+      );
 
       // Step 2 (only after step 1 worked): stamp `aprobadoEn`. If it fails the
       // phase is already closed, so we still navigate and carry a notice.
@@ -1445,7 +1446,7 @@ export default function ExploracionPage() {
         }
       }
 
-      const d = decidirCierreDeFase(paso1, paso2, { fase: "Fase 2" });
+      const d = decidirCierreDeFase(paso1, paso2, { fase: "Fase 2", hayReporte: dvs !== null });
       if (!d.navegar) {
         setCloseError(d.mensajeBloqueante);
         return;
@@ -1851,9 +1852,9 @@ export default function ExploracionPage() {
                 {/* Chip 3: Cerrar Fase 2 */}
                 <button
                   onClick={handleOpenReview}
-                  disabled={headerState !== "lista" || reporteAnterior}
-                  title={reporteAnterior ? motivoCerrarF2SinAprobar(puedeAprobar) : undefined}
-                  className={headerState === "lista" && !reporteAnterior ? btnClose : btnBase}
+                  disabled={headerState !== "lista" || motivoCierre !== null}
+                  title={motivoCierre !== null ? textoBotonCierreApagado(motivoCierre, puedeAprobar) : undefined}
+                  className={headerState === "lista" && motivoCierre === null ? btnClose : btnBase}
                 >
                   Cerrar Fase 2
                 </button>

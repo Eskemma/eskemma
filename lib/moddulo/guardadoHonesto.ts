@@ -169,6 +169,8 @@ export interface ContextoGuardado {
    * Undefined keeps the former wording.
    */
   hayAnalisisPrevio?: boolean;
+  /** For cerrar_fase of F2: a finalized Reporte F2 is on screen (it decides which `m1_no_aprobado` text applies). */
+  hayReporte?: boolean;
   /** For aceptar_condicion_rda: the name of the RDA item, shown in the message. */
   nombre?: string;
   /** For guardar_edicion_m1: label of the dimension being edited ("Político"). */
@@ -695,6 +697,19 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
   return `No se pudo registrar ${que}. ${motivo(resp)} ${cierre}`;
 }
 
+/** 409s of complete-phase when closing F2 (paso 4, H). */
+export const TEXTO_CIERRE_F2 = {
+  m1_no_aprobado:
+    "No se pudo cerrar la Fase 2: el análisis (M1) aún no está aprobado. Apruébalo y finaliza el Reporte F2 con ese análisis. La fase sigue abierta.",
+  // A finalized Reporte F2 exists but belongs to the PREVIOUS analysis (the former text, kept as it was).
+  m1_no_aprobado_con_reporte:
+    "No se pudo cerrar la Fase 2: el análisis nuevo (M1) aún no está aprobado y el Reporte F2 es el del análisis anterior. Apruébalo y vuelve a finalizar el Reporte F2. La fase sigue abierta.",
+  reporte_f2_no_finalizado:
+    "No se pudo cerrar la Fase 2: todavía no hay un Reporte F2 finalizado. Finaliza el análisis (M5) y revisa el reporte. La fase sigue abierta.",
+  reporte_f2_de_otro_analisis:
+    "No se pudo cerrar la Fase 2: el Reporte F2 es de un análisis anterior; genera y finaliza los motores del análisis actual para cerrar. La fase sigue abierta.",
+} as const;
+
 /** 409 `m1_no_aprobado` from the M1 gate (generate-dvs, regenerate-m5, approve-motor, save-draft, finalize-dvs). */
 function textoM1NoAprobado(accion: AccionGuardado, ctx: ContextoGuardado): string | null {
   const base = "el análisis (M1) no está aprobado";
@@ -729,9 +744,13 @@ function mensajeDeFallo(
 ): string {
   if (esAccionSimple(accion)) return mensajeDeFalloSimple(accion, resp, ctx);
   if (accion === "reabrir_m1" || accion === "generar_m1") return mensajeDeFalloM1(accion, resp, ctx);
-  if (accion === "cerrar_fase" && resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_no_aprobado") {
-    // complete-phase: a finalized Reporte F2 exists but the M1 on screen is new and not approved.
-    return "No se pudo cerrar la Fase 2: el análisis nuevo (M1) aún no está aprobado y el Reporte F2 es el del análisis anterior. Apruébalo y vuelve a finalizar el Reporte F2. La fase sigue abierta.";
+  // complete-phase (paso 4, H): F2 closes only with a finalized Reporte F2 and, when the project has an M1 under
+  // review, with that M1 approved. Both are codes of the server itself and it wrote nothing. The texts never tell
+  // the user to press «Cerrar Fase 2»: that button is off in these situations; they say what to do first.
+  if (accion === "cerrar_fase" && resp.tipo === "respuesta" && resp.status === 409) {
+    if (resp.codigo === "m1_no_aprobado") return ctx.hayReporte ? TEXTO_CIERRE_F2.m1_no_aprobado_con_reporte : TEXTO_CIERRE_F2.m1_no_aprobado;
+    if (resp.codigo === "reporte_f2_no_finalizado") return TEXTO_CIERRE_F2.reporte_f2_no_finalizado;
+    if (resp.codigo === "reporte_f2_de_otro_analisis") return TEXTO_CIERRE_F2.reporte_f2_de_otro_analisis;
   }
   // Paso 4: the M1 gate. The routes answer this 409 BEFORE writing anything, so «no se guardó nada» is true
   // by construction (it is a code of the server itself, never deduced from a 5xx or a network failure).
@@ -870,7 +889,7 @@ export interface DecisionCierre {
 export function decidirCierreDeFase(
   paso1: RespuestaGuardado,
   paso2: RespuestaGuardado | null,
-  ctx: { fase: string }
+  ctx: { fase: string; hayReporte?: boolean }
 ): DecisionCierre {
   const d1 = decidirResultadoGuardado("cerrar_fase", paso1, ctx);
   if (!d1.exito) {

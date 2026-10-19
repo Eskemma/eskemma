@@ -8,7 +8,7 @@ import { PHASE_ORDER } from "@/types/moddulo.types";
 import type { PhaseId } from "@/types/moddulo.types";
 import { planRDAUpdate } from "@/lib/moddulo/rda";
 import { analizarM1, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
-import { reporteDelAnalisisAnterior } from "@/lib/moddulo/pantallaM1";
+import { motivoNoCerrarF2 } from "@/lib/moddulo/pantallaM1";
 
 interface CompletePhaseBody {
   phaseId: PhaseId;
@@ -39,13 +39,20 @@ export async function POST(
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
-    // F2 cannot close with the Reporte F2 of a PREVIOUS analysis while the M1 on screen is a new one that
-    // nobody approved (draft or reopened). A project «anterior» (no record about M1) is not this case.
+    // F2 closes only with a FINALIZED Reporte F2 and, when the project has an M1 under review, with that M1
+    // APPROVED and the Reporte F2 generated from it (paso 4, H). A project with no `m1` record (created before the review existed) or with no payload
+    // is not asked for an approval it can never have: it only needs its Reporte F2. The «Cerrar Fase 2» button is
+    // already off in both situations; this is the server saying the same.
     if (phaseId === "exploracion") {
       const exploracion = project.phases?.exploracion as ExploracionParaM1 | undefined;
-      if (reporteDelAnalisisAnterior(analizarM1(exploracion).estado.estado, !!exploracion?.dvs)) {
-        return NextResponse.json({ error: "m1_no_aprobado" }, { status: 409 });
-      }
+      const a = analizarM1(exploracion);
+      // The same pure decision the «Cerrar Fase 2» button uses. With an approved M1 the finalized Reporte F2 must
+      // come from THIS M1 (m1.generacion.huella === m1.aprobacion.huella, i.e. no `motoresSinGenerar`).
+      // Only a project WITH an `m1` record is under review: a payload without `m1` that estadoM1 reads as «borrador»
+      // (no report, no motors) is a project from before the review existed.
+      const estado = a.m1 ? a.estado.estado : a.payload ? "anterior" : "sin_m1";
+      const motivo = motivoNoCerrarF2({ estado, hayDvs: !!exploracion?.dvs, motoresSinGenerar: a.estado.motoresSinGenerar });
+      if (motivo) return NextResponse.json({ error: motivo }, { status: 409 });
     }
 
     const phaseIndex = PHASE_ORDER.indexOf(phaseId);

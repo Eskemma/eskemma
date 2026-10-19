@@ -66,13 +66,16 @@ describe("complete-phase — M1 nuevo sin aprobar con Reporte F2 anterior", () =
     vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: { x: 1 }, m1: { reabiertoEn: "t" }, linkedSource: { kind: "express", payload: MAPA } }) as never);
     expect((await cerrar()).status).toBe(409);
   });
-  it("aprobado (con la aprobación válida) + dvs → cierra", async () => {
+  it("aprobado (con la aprobación válida) + dvs de ESE M1 (paso 4: generacion.huella coincide) → cierra", async () => {
     const huella = huellaMapaPESTEL(MAPA as never);
-    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: { x: 1 }, m1: { aprobacion: { huella, por: "u1", en: "t", categoriasEditadas: 0, total: 1, mapa: MAPA } }, linkedSource: { kind: "express", payload: MAPA } }) as never);
+    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: { x: 1 }, m1: { aprobacion: { huella, por: "u1", en: "t", categoriasEditadas: 0, total: 1, mapa: MAPA }, generacion: { huella, en: "t" } }, linkedSource: { kind: "express", payload: MAPA } }) as never);
     expect((await cerrar()).status).toBe(200);
   });
-  it("borrador SIN dvs → sigue cerrando (no hay reporte anterior que contradecir)", async () => {
+  it("borrador SIN dvs → (paso 4) 409 m1_no_aprobado: ya no cierra con un M1 sin aprobar, haya o no Reporte F2", async () => {
     vi.mocked(getProject).mockResolvedValue(proyecto({ m1: { creadoEn: "t" }, linkedSource: { kind: "express", payload: MAPA } }) as never);
-    expect((await cerrar()).status).toBe(200);
+    const r = await cerrar();
+    expect(r.status).toBe(409);
+    expect(r.cuerpo.error).toBe("m1_no_aprobado");
+    expect(escrituras()).toHaveLength(0);
   });
 });

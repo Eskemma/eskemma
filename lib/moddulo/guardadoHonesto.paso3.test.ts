@@ -35,7 +35,7 @@ describe("generar_m1 — hayAnalisisPrevio (B1)", () => {
 
 describe("cerrar_fase — 409 m1_no_aprobado", () => {
   it("no navega, nombra el motivo y dice que la fase sigue abierta", () => {
-    const d = decidirCierreDeFase(r(409, "m1_no_aprobado"), null, { fase: "Fase 2" });
+    const d = decidirCierreDeFase(r(409, "m1_no_aprobado"), null, { fase: "Fase 2", hayReporte: true });
     expect(d.navegar).toBe(false);
     expect(d.mensajeBloqueante).toContain("análisis nuevo");
     expect(d.mensajeBloqueante).toContain("Reporte F2 es el del análisis anterior");
