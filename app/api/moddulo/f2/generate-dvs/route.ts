@@ -6,10 +6,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
+import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
-import { logAnthropicError } from "@/lib/ai/creditError";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   serializeMapaPESTEL,
@@ -41,7 +41,20 @@ import {
   estadoParaImpactoDesdeProyecto,
   leerEstadoParaImpacto,
 } from "@/lib/moddulo/impactoReemplazoServidor";
-import { codigoDeParseo, medirLlamada, registrarTotal, type MetaLlamada } from "@/lib/moddulo/registroModelo";
+import {
+  codigoDeParseo,
+  descripcionEstructural,
+  medirLlamada,
+  registrarErrorEstructural,
+  registrarTotal,
+  type MetaLlamada,
+} from "@/lib/moddulo/registroModelo";
+import {
+  CompuertaM1Error,
+  coincideCompuertaM1,
+  decidirCompuertaM1,
+  respuestaM1NoAprobado,
+} from "@/lib/moddulo/compuertaM1";
 
 // A full generation is 4+ sequential Claude calls (M2||M3 → M4 → M5, with one
 // retry for M5): same ceiling as generate-m1-express. The route used to declare
@@ -103,7 +116,7 @@ function parseJSON<T>(raw: string, motorName: string): T {
     }
   }
 
-  console.error(`[generate-dvs] ${motorName} parse failure. Raw (300 chars):`, s.slice(0, 300));
+  console.error(`[generate-dvs] ${motorName} parse failure ${descripcionEstructural(raw)}`);
   throw new Error(`${motorName}: JSON inválido`);
 }
 
@@ -145,6 +158,15 @@ export async function POST(request: NextRequest) {
 
   const xpcto = (project.xpcto ?? {}) as Partial<XPCTO>;
 
+  // ── M1 gate (paso 4): with an M1 record AND a payload the motors are generated only from an APPROVED
+  // M1, and from its frozen copy. Before the replace lock and before any Claude call, so the 409 costs
+  // nothing. Projects without `m1` (or without payload) go through exactly as before.
+  const compuerta = decidirCompuertaM1(project.phases?.exploracion as ExploracionParaM1 | undefined);
+  if (compuerta.accion === "bloquea") return respuestaM1NoAprobado("generate-dvs", compuerta.motivo);
+  // The fingerprint of the approval used by THIS generation, captured now: the final write compares the
+  // document against it (never against a fingerprint re-read later).
+  const huellaM1 = compuerta.accion === "pasa" ? compuerta.huella : null;
+
   // ── Replace lock, step 1 (BEFORE the legacy / multi-motor fork, so no path
   // can skip it, and before any Claude call so a 409 costs nothing). It reads
   // the RAW document, not getProject(): the in-transaction check must compute
@@ -165,11 +187,9 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Try new path: mapaPESTEL en phases.exploracion ───────────────────────
-  const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
-
-  // Fingerprint of the approved M1 this draft is generated from (m1.generacion). Only when the project has
-  // an M1 with an approval: projects without m1 are written exactly as before.
-  const huellaM1 = project.phases?.exploracion?.m1?.aprobacion?.huella ?? null;
+  const mapaPESTEL = (compuerta.accion === "pasa"
+    ? compuerta.mapa
+    : project.phases?.exploracion?.linkedSource?.payload) as Record<string, unknown> | undefined;
 
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
@@ -243,7 +263,7 @@ async function runMultiMotorInterno(
     m3Raw = extractText(resM3);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logAnthropicError("generate-dvs M2/M3", err);
+    registrarErrorEstructural("generate-dvs", "fallo del modelo M2/M3", err);
     return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3", codigo: "fallo_modelo" }, { status: 500 });
   }
 
@@ -251,7 +271,7 @@ async function runMultiMotorInterno(
   try {
     m2 = parseJSON<ContrasteXPCTO[]>(m2Raw, "M2");
   } catch {
-    return NextResponse.json({ error: `M2: no se pudo parsear la respuesta`, motor: "M2", codigo: codigoDeParseo(stops.M2), raw: m2Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M2: no se pudo parsear la respuesta`, motor: "M2", codigo: codigoDeParseo(stops.M2) }, { status: 500 });
   }
 
   let m3: ActorVetoF2[];
@@ -261,7 +281,7 @@ async function runMultiMotorInterno(
     // Claude (mismo criterio que PIPItem.pipItemId).
     m3 = m3Parsed.map((a) => ({ ...a, actorId: crypto.randomUUID() }));
   } catch {
-    return NextResponse.json({ error: `M3: no se pudo parsear la respuesta`, motor: "M3", codigo: codigoDeParseo(stops.M3), raw: m3Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M3: no se pudo parsear la respuesta`, motor: "M3", codigo: codigoDeParseo(stops.M3) }, { status: 500 });
   }
 
   // M4 después de M2
@@ -279,7 +299,7 @@ async function runMultiMotorInterno(
     m4Raw = extractText(resM4);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logAnthropicError("generate-dvs M4", err);
+    registrarErrorEstructural("generate-dvs", "fallo del modelo M4", err);
     return NextResponse.json({ error: `Error en M4: ${msg}`, motor: "M4", codigo: "fallo_modelo" }, { status: 500 });
   }
 
@@ -287,7 +307,7 @@ async function runMultiMotorInterno(
   try {
     m4 = parseJSON<IncertidumbreF2[]>(m4Raw, "M4");
   } catch {
-    return NextResponse.json({ error: `M4: no se pudo parsear la respuesta`, motor: "M4", codigo: codigoDeParseo(stops.M4), raw: m4Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: `M4: no se pudo parsear la respuesta`, motor: "M4", codigo: codigoDeParseo(stops.M4) }, { status: 500 });
   }
 
   // M5 después de M3 + M4
@@ -314,10 +334,10 @@ async function runMultiMotorInterno(
       const resM5 = await callClaude(system, user, 5000, { motor: "M5", intento: attempt, t0 });
       stops.M5 = resM5.stop_reason;
       m5Raw = extractText(resM5);
-      console.log(`[generate-dvs] M5 attempt ${attempt} raw (200 chars):`, m5Raw.slice(0, 200));
+      console.log(`[generate-dvs] M5 attempt ${attempt} respuesta ${descripcionEstructural(m5Raw)}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logAnthropicError(`generate-dvs M5 attempt ${attempt}`, err);
+      registrarErrorEstructural("generate-dvs", `fallo del modelo M5 intento ${attempt}`, err);
       if (attempt === 2) {
         return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5", codigo: "fallo_modelo" }, { status: 500 });
       }
@@ -336,7 +356,7 @@ async function runMultiMotorInterno(
       m5 = parsed;
       break;
     } catch {
-      console.error(`[generate-dvs] M5 attempt ${attempt} parse failure. Raw:`, m5Raw.slice(0, 300));
+      console.error(`[generate-dvs] M5 attempt ${attempt} parse failure ${descripcionEstructural(m5Raw)}`);
       if (attempt === 2) {
         return NextResponse.json({ error: "M5: no se pudo parsear la respuesta del modelo.", motor: "M5", codigo: codigoDeParseo(stops.M5) }, { status: 500 });
       }
@@ -421,7 +441,7 @@ async function runLegacyPath(
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logAnthropicError("generate-dvs legacy", err);
+    registrarErrorEstructural("generate-dvs", "fallo del modelo (ruta legada)", err);
     return NextResponse.json({ error: `Error al generar el análisis: ${msg}`, motor: "legacy", codigo: "fallo_modelo" }, { status: 500 });
   }
 
@@ -431,7 +451,7 @@ async function runLegacyPath(
     dvs = parseJSON<DVSF2>(rawText, "DVS");
   } catch {
     return NextResponse.json(
-      { error: "Error al parsear la respuesta del modelo", codigo: codigoDeParseo(response.stop_reason), raw: rawText.slice(0, 500) },
+      { error: "Error al parsear la respuesta del modelo", codigo: codigoDeParseo(response.stop_reason) },
       { status: 500 }
     );
   }
@@ -510,22 +530,40 @@ async function persistAndReturn(
 
   const hasM5Content = dvs.hei?.tensionCentral || dvs.hei?.contexto || (dvs.pip?.length ?? 0) > 0;
   if (!hasM5Content) {
-    console.error("[generate-dvs] M5 empty after sanitization — aborting save", { rawHei: rawDvs.hei });
+    console.error(
+      `[generate-dvs] M5 empty after sanitization — aborting save hei_claves=${Object.keys(rawDvs.hei ?? {}).join(",")} pip=${Array.isArray(rawDvs.pip) ? rawDvs.pip.length : 0}`
+    );
     return NextResponse.json({ error: "M5 generó contenido vacío. Intenta de nuevo.", motor: "M5", codigo: "respuesta_invalida" }, { status: 500 });
   }
 
   if (saveas === "draft") {
-    await adminDb.collection("moddulo_projects").doc(projectId).update({
-      "phases.exploracion.draftDVS": dvs,
-      "phases.exploracion.motorAprobaciones": {},
-      // Which approved M1 this draft comes from (the discriminator the screen uses to tell a dvs of THIS M1
-      // from a dvs of a previous one). Only for projects with an approved M1; others are written as before.
-      ...(huellaM1 && { "phases.exploracion.m1.generacion": { huella: huellaM1, en: FieldValue.serverTimestamp() } }),
-      ...(xpctoSnapshot !== undefined && {
-        "phases.exploracion.xpctoSnapshotAtGeneration": xpctoSnapshot,
-      }),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    // The draft is written inside a transaction that re-reads the document and compares it with the
+    // approval fingerprint captured at the start: if the M1 was reopened, edited or approved with other
+    // content while the model was generating, nothing is written (409 m1_no_aprobado).
+    const ref = adminDb.collection("moddulo_projects").doc(projectId);
+    try {
+      await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists || snap.data()?.deletedAt) throw new CompuertaM1Error("no_aprobado");
+        const c = coincideCompuertaM1(snap.data()?.phases?.exploracion, huellaM1 ?? null);
+        if (!c.ok) throw new CompuertaM1Error(c.motivo);
+        tx.update(ref, {
+          "phases.exploracion.draftDVS": dvs,
+          "phases.exploracion.motorAprobaciones": {},
+          // Which approved M1 this draft comes from (the discriminator the screen uses to tell a dvs of
+          // THIS M1 from a dvs of a previous one): the CAPTURED fingerprint, never a re-read one. Only for
+          // projects with an approved M1; others are written as before.
+          ...(huellaM1 && { "phases.exploracion.m1.generacion": { huella: huellaM1, en: FieldValue.serverTimestamp() } }),
+          ...(xpctoSnapshot !== undefined && {
+            "phases.exploracion.xpctoSnapshotAtGeneration": xpctoSnapshot,
+          }),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (err) {
+      if (err instanceof CompuertaM1Error) return respuestaM1NoAprobado("generate-dvs", err.motivo);
+      throw err;
+    }
   } else {
     // Replace lock, step 2: the ONLY writer of the final dvs on both paths. The
     // check runs INSIDE the same transaction that copies the previous dvs and
@@ -542,6 +580,12 @@ async function persistAndReturn(
         origen: "generate-dvs-final",
         uid,
         guardia: ({ proyecto, resultados }) => {
+          // M1 gate again, inside the transaction, against the fingerprint captured at the start.
+          const c = coincideCompuertaM1(
+            (proyecto as { phases?: { exploracion?: ExploracionParaM1 } } | undefined)?.phases?.exploracion,
+            huellaM1 ?? null
+          );
+          if (!c.ok) throw new CompuertaM1Error(c.motivo);
           const estado = estadoParaImpactoDesdeProyecto(proyecto, resultados);
           if (!estado.dvs) return; // nothing to replace (first generation)
           const candado = decidirCandadoReemplazo({
@@ -555,6 +599,7 @@ async function persistAndReturn(
         },
       });
     } catch (err) {
+      if (err instanceof CompuertaM1Error) return respuestaM1NoAprobado("generate-dvs", err.motivo);
       if (err instanceof ReemplazoRechazadoError) {
         // Nothing was written: the state changed since the user confirmed.
         return respuestaCandado(err.accion, err.decision);
@@ -562,7 +607,7 @@ async function persistAndReturn(
       // Whether the commit reached the server is unknown (the copy and the
       // overwrite are one atomic commit, but a lost response is possible), so
       // this does NOT claim the previous analysis is untouched.
-      console.error("[generate-dvs] no se pudo confirmar el guardado del análisis:", err);
+      registrarErrorEstructural("generate-dvs", "no se pudo confirmar el guardado del análisis", err);
       return NextResponse.json(
         {
           error: "reemplazo_escritura_incierta",

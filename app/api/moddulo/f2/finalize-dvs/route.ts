@@ -22,6 +22,14 @@ import {
 } from "@/lib/moddulo/impactoReemplazoDVS";
 import { estadoParaImpactoDesdeProyecto, leerEstadoParaImpacto } from "@/lib/moddulo/impactoReemplazoServidor";
 import { respuestaCandado } from "@/lib/moddulo/respuestaCandado";
+import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
+import {
+  CompuertaM1Error,
+  coincideCompuertaM1,
+  decidirCompuertaM1,
+  respuestaM1NoAprobado,
+} from "@/lib/moddulo/compuertaM1";
+import { registrarErrorEstructural } from "@/lib/moddulo/registroModelo";
 
 /** Impact of replacing `estado.dvs` with `nuevo`: only the REMOVED ids count. */
 function evaluar(estado: EstadoParaImpacto, nuevo: DVSF2) {
@@ -55,6 +63,12 @@ export async function POST(request: NextRequest) {
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
+
+  // M1 gate (paso 4): finalizing needs the M1 to be approved (projects without m1 or payload are not
+  // gated). The fingerprint is captured and re-checked inside the write transaction.
+  const compuerta = decidirCompuertaM1(project.phases?.exploracion as ExploracionParaM1 | undefined);
+  if (compuerta.accion === "bloquea") return respuestaM1NoAprobado("finalize-dvs", compuerta.motivo);
+  const huellaM1 = compuerta.accion === "pasa" ? compuerta.huella : null;
 
   // Use client-side draft (which may have edits) or fall back to Firestore-stored draft
   const storedDraft = project.phases?.exploracion?.draftDVS as DVSF2 | undefined;
@@ -92,7 +106,7 @@ export async function POST(request: NextRequest) {
       huellaConfirmada = huella ?? null;
     }
   } catch (err) {
-    console.error("[finalize-dvs] no se pudo evaluar el impacto antes de guardar:", err);
+    registrarErrorEstructural("finalize-dvs", "no se pudo evaluar el impacto antes de guardar", err);
     return NextResponse.json(
       {
         error: "finalize_fallo_previo",
@@ -120,6 +134,11 @@ export async function POST(request: NextRequest) {
       origen: "finalize-dvs",
       uid: session.uid,
       guardia: ({ proyecto, resultados }) => {
+        const c = coincideCompuertaM1(
+          (proyecto as { phases?: { exploracion?: ExploracionParaM1 } } | undefined)?.phases?.exploracion,
+          huellaM1
+        );
+        if (!c.ok) throw new CompuertaM1Error(c.motivo);
         const estado = estadoParaImpactoDesdeProyecto(proyecto, resultados);
         if (!estado.dvs) return; // first finalization
         const { eliminados, decision } = evaluar(estado, dvs);
@@ -135,6 +154,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
+    if (err instanceof CompuertaM1Error) return respuestaM1NoAprobado("finalize-dvs", err.motivo);
     if (err instanceof ReemplazoRechazadoError) {
       // Nothing was written: the state changed since the user confirmed.
       return respuestaCandado(err.accion, err.decision, {
@@ -144,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
     // Whether the commit reached the server is unknown, so this does NOT claim
     // the previous analysis is untouched.
-    console.error("[finalize-dvs] no se pudo confirmar el guardado del análisis:", err);
+    registrarErrorEstructural("finalize-dvs", "no se pudo confirmar el guardado del análisis", err);
     return NextResponse.json(
       {
         error: "reemplazo_escritura_incierta",

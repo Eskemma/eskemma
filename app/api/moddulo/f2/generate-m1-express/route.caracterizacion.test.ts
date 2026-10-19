@@ -96,12 +96,12 @@ describe("generate-m1-express — caracterización", () => {
     expect((await llamar()).status).toBe(200);
   });
 
-  it("JSON roto → 500 con `raw` de hasta 500 caracteres, sin escribir", async () => {
+  it("JSON roto → 500 respuesta_invalida SIN `raw` (paso 4: el texto del modelo no sale en la respuesta), sin escribir", async () => {
     responderPorMitad(vi.mocked(anthropic.messages.create), () => respuestaModelo('{"P": {"code": "P", "narra' + "x".repeat(700)));
     const r = await llamar();
     expect(r.status).toBe(500);
     expect(r.cuerpo.codigo).toBe("respuesta_invalida");
-    expect(r.cuerpo.raw.length).toBe(500);
+    expect(r.cuerpo).not.toHaveProperty("raw");
     expect(db.updates()).toEqual([]);
   });
 

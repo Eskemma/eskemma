@@ -12,7 +12,9 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import { serializeMapaPESTEL, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
-import { codigoDeParseo, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
+import { codigoDeParseo, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
+import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
+import { CompuertaM1Error, coincideCompuertaM1, decidirCompuertaM1, respuestaM1NoAprobado } from "@/lib/moddulo/compuertaM1";
 import type { XPCTO, HEIF2, PIPItem } from "@/types/moddulo.types";
 
 function extractText(response: Anthropic.Message): string {
@@ -47,7 +49,7 @@ function parseM5JSON(raw: string): { hei: HEIF2; pip: PIPItem[] } {
     }
   }
 
-  console.error("[regenerate-m5] parse failure. Raw (300 chars):", s.slice(0, 300));
+  console.error(`[regenerate-m5] parse failure ${descripcionEstructural(raw)}`);
   throw new Error("M5: JSON inválido");
 }
 
@@ -102,7 +104,15 @@ export async function POST(request: NextRequest) {
   const draftDVS = project.phases?.exploracion?.draftDVS as Record<string, unknown> | undefined;
   if (!draftDVS) return NextResponse.json({ error: "No existe draftDVS para este proyecto" }, { status: 400 });
 
-  const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload as Record<string, unknown> | undefined;
+  // M1 gate (paso 4): with an M1 record and a payload, M5 is regenerated only from the APPROVED M1 and
+  // from its frozen copy; the approval fingerprint is captured and re-checked at write time.
+  const compuerta = decidirCompuertaM1(project.phases?.exploracion as ExploracionParaM1 | undefined);
+  if (compuerta.accion === "bloquea") return respuestaM1NoAprobado("regenerate-m5", compuerta.motivo);
+  const huellaCapturada = compuerta.accion === "pasa" ? compuerta.huella : null;
+
+  const mapaPESTEL = (compuerta.accion === "pasa"
+    ? compuerta.mapa
+    : project.phases?.exploracion?.linkedSource?.payload) as Record<string, unknown> | undefined;
   if (!mapaPESTEL || Object.keys(mapaPESTEL).length === 0) {
     return NextResponse.json({ error: "No hay mapaPESTEL para generar M5" }, { status: 400 });
   }
@@ -161,11 +171,11 @@ export async function POST(request: NextRequest) {
     m5 = sanitizeM5(parsed);
   } catch {
     registrarTotal("regenerate-m5", codigoDeParseo(stopReason), t0);
-    return NextResponse.json({ error: "M5: no se pudo parsear la respuesta del modelo", codigo: codigoDeParseo(stopReason), raw: m5Raw.slice(0, 400) }, { status: 500 });
+    return NextResponse.json({ error: "M5: no se pudo parsear la respuesta del modelo", codigo: codigoDeParseo(stopReason) }, { status: 500 });
   }
 
   if (!m5.hei.tensionCentral && !m5.hei.contexto && m5.pip.length === 0) {
-    console.error("[regenerate-m5] M5 returned empty after sanitization", { raw: m5Raw.slice(0, 400) });
+    console.error(`[regenerate-m5] M5 returned empty after sanitization ${descripcionEstructural(m5Raw)}`);
     registrarTotal("regenerate-m5", "respuesta_invalida", t0);
     return NextResponse.json({ error: "El modelo devolvió M5 vacío. Intenta de nuevo.", codigo: "respuesta_invalida" }, { status: 500 });
   }
@@ -173,10 +183,24 @@ export async function POST(request: NextRequest) {
   // Merge: preserva M2, M3, M4 — solo sobreescribe hei y pip
   const updatedDVS = { ...draftDVS, hei: m5.hei, pip: m5.pip };
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    "phases.exploracion.draftDVS": updatedDVS,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  // Re-read inside a transaction and compare with the captured fingerprint: if the M1 was reopened or
+  // approved with other content while the model was generating, nothing is written.
+  const ref = adminDb.collection("moddulo_projects").doc(projectId);
+  try {
+    await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.deletedAt) throw new CompuertaM1Error("no_aprobado");
+      const c = coincideCompuertaM1(snap.data()?.phases?.exploracion, huellaCapturada);
+      if (!c.ok) throw new CompuertaM1Error(c.motivo);
+      tx.update(ref, { "phases.exploracion.draftDVS": updatedDVS, updatedAt: FieldValue.serverTimestamp() });
+    });
+  } catch (err) {
+    if (err instanceof CompuertaM1Error) {
+      registrarTotal("regenerate-m5", "m1_no_aprobado", t0);
+      return respuestaM1NoAprobado("regenerate-m5", err.motivo);
+    }
+    throw err;
+  }
 
   registrarTotal("regenerate-m5", "ok", t0);
   return NextResponse.json({ hei: m5.hei, pip: m5.pip });

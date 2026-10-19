@@ -664,6 +664,27 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
   return `No se pudo registrar ${que}. ${motivo(resp)} ${cierre}`;
 }
 
+/** 409 `m1_no_aprobado` from the M1 gate (generate-dvs, regenerate-m5, approve-motor, save-draft, finalize-dvs). */
+function textoM1NoAprobado(accion: AccionGuardado, ctx: ContextoGuardado): string | null {
+  const base = "el análisis (M1) no está aprobado";
+  switch (accion) {
+    case "aprobar_motor":
+      return `No se registró la aprobación de ${ctx.motor ?? "este motor"}: ${base}. Apruébalo y vuelve a intentarlo. No se guardó nada.`;
+    case "guardar_borrador":
+      return `No se guardó tu edición del borrador: ${base}. Tus cambios siguen en pantalla; apruébalo antes de volver a guardar.`;
+    case "finalizar_analisis":
+      return `No se finalizó el análisis: ${base}. Apruébalo para poder finalizar. No se guardó nada.`;
+    case "guardar_analisis":
+      return `No se guardaron los cambios del análisis: ${base}. Tus cambios siguen en pantalla; apruébalo antes de volver a guardar.`;
+    case "reemplazar_analisis":
+      return `No se generó el análisis nuevo: ${base}. Apruébalo para continuar. No se reemplazó nada.`;
+    case "generar_analisis":
+      return `No se generó el análisis: ${base}. Los cambios del formulario sí se guardaron. Apruébalo para continuar.`;
+    default:
+      return null;
+  }
+}
+
 /**
  * A network failure does not prove the server never received the request, so
  * the message must not claim "it was not registered": it says it could not be
@@ -680,6 +701,12 @@ function mensajeDeFallo(
   if (accion === "cerrar_fase" && resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_no_aprobado") {
     // complete-phase: a finalized Reporte F2 exists but the M1 on screen is new and not approved.
     return "No se pudo cerrar la Fase 2: el análisis nuevo (M1) aún no está aprobado y el Reporte F2 es el del análisis anterior. Apruébalo y vuelve a finalizar el Reporte F2. La fase sigue abierta.";
+  }
+  // Paso 4: the M1 gate. The routes answer this 409 BEFORE writing anything, so «no se guardó nada» is true
+  // by construction (it is a code of the server itself, never deduced from a 5xx or a network failure).
+  if (resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_no_aprobado") {
+    const textoGate = textoM1NoAprobado(accion, ctx);
+    if (textoGate) return textoGate;
   }
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {

@@ -7,6 +7,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { decidirCompuertaM1, respuestaM1NoAprobado } from "@/lib/moddulo/compuertaM1";
 
 type MotorId = "M2" | "M3" | "M4" | "M5";
 const VALID_MOTORS: MotorId[] = ["M2", "M3", "M4", "M5"];
@@ -38,10 +39,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
 
-  await adminDb.collection("moddulo_projects").doc(projectId).update({
-    [`phases.exploracion.motorAprobaciones.${motor}`]: true,
-    updatedAt: FieldValue.serverTimestamp(),
+  // M1 gate (paso 4): the read and the write are one transaction, so an M1 reopened in the gap
+  // cannot receive a motor approval.
+  const ref = adminDb.collection("moddulo_projects").doc(projectId);
+  const bloqueo = await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.data()?.deletedAt) return "no_aprobado" as const;
+    const compuerta = decidirCompuertaM1(snap.data()?.phases?.exploracion);
+    if (compuerta.accion === "bloquea") return compuerta.motivo;
+    tx.update(ref, {
+      [`phases.exploracion.motorAprobaciones.${motor}`]: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return null;
   });
+  if (bloqueo) return respuestaM1NoAprobado("approve-motor", bloqueo);
 
   return NextResponse.json({ success: true }, { status: 200 });
 }

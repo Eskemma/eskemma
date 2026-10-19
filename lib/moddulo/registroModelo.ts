@@ -60,3 +60,51 @@ export async function medirLlamada<T extends RespuestaMedible>(tag: string, meta
 export function registrarTotal(tag: string, resultado: string, t0: number): void {
   console.log(lineaTotal(tag, resultado, t0, Date.now()));
 }
+
+// ── Structural descriptions (G, paso 4) ───────────────────────────────────────
+// The logs must never carry text of the project or of the model's answer (it is the user's analysis).
+// What helps a diagnosis is the shape: length, kind of document, which keys are present, stop_reason,
+// and for errors only the class and the HTTP status.
+
+const MAX_CLAVES_DESCRIPCION = 12;
+
+/** «longitud=812 forma=objeto claves=hei,pip» — never any of the text itself. */
+export function descripcionEstructural(texto: string): string {
+  const s0 = texto.trim();
+  const fence = s0.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+  const s = fence ? fence[1].trim() : s0;
+  let forma: string;
+  let claves: string[] | null = null;
+  try {
+    const parsed: unknown = JSON.parse(s);
+    if (Array.isArray(parsed)) forma = "arreglo";
+    else if (parsed && typeof parsed === "object") {
+      forma = "objeto";
+      // Keys come from the schema we asked for; anything that does not look like one is masked.
+      claves = Object.keys(parsed as object)
+        .slice(0, MAX_CLAVES_DESCRIPCION)
+        .map((k) => (/^[A-Za-z][A-Za-z0-9_]{0,30}$/.test(k) ? k : "?"));
+    } else forma = typeof parsed;
+  } catch {
+    forma = s.startsWith("{") ? "objeto_incompleto" : s.startsWith("[") ? "arreglo_incompleto" : s.length === 0 ? "vacio" : "texto";
+  }
+  return `longitud=${texto.length} forma=${forma}${claves ? ` claves=${claves.join(",")}` : ""}`;
+}
+
+/** «clase=APIError status=529» from anything thrown or rejected; never the message or the cause. */
+export function descripcionError(err: unknown): string {
+  const e = err as { name?: unknown; status?: unknown } | null;
+  const clase = typeof e?.name === "string" && /^[A-Za-z][A-Za-z0-9_]{0,60}$/.test(e.name) ? e.name : "Error";
+  const status = typeof e?.status === "number" ? e.status : "n/a";
+  return `clase=${clase} status=${status}`;
+}
+
+/** console.error with class and status only. The credit-exhausted marker is kept (it is a fixed text). */
+export function registrarErrorEstructural(tag: string, contexto: string, err: unknown): void {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("credit balance is too low")) {
+    console.error(`[ANTHROPIC_CREDIT_EXHAUSTED] ${tag} ${contexto}`);
+    return;
+  }
+  console.error(`[${tag}] ${contexto} ${descripcionError(err)}`);
+}

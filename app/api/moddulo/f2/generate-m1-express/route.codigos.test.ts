@@ -141,16 +141,29 @@ describe("generate-m1-express — registro de diagnóstico por mitad", () => {
     expect(t).toMatch(/\[generate-m1-express\] total duracion_ms=\d+ mitades=2 input_tokens=2400 output_tokens=6800/);
   });
 
-  it("en la rama de parseo registra la mitad, stop_reason, longitud, primeros 200 y últimos 100 caracteres", async () => {
+  it("en la rama de parseo registra la mitad, stop_reason, longitud y forma — nunca el texto (paso 4)", async () => {
     const s = espiar();
     const texto = "A".repeat(250) + "M".repeat(300) + "Z".repeat(100);
     responderPorMitad(create(), (m) => (m === "TEcL" ? respuestaModelo(texto, "max_tokens") : respuestaValida(m)));
     await llamar();
     const t = todo(s);
-    expect(t).toContain("mitad=TEcL intento=1 parseo fallido stop_reason=max_tokens longitud=650");
-    expect(t).toContain("A".repeat(200));
-    expect(t).not.toContain("A".repeat(201));
-    expect(t).toContain("Z".repeat(100));
-    expect(t).not.toContain("Z".repeat(101));
+    expect(t).toContain("mitad=TEcL intento=1 parseo fallido stop_reason=max_tokens longitud=650 forma=texto");
+    expect(t).not.toContain("AAAAAAAAAA");
+    expect(t).not.toContain("ZZZZZZZZZZ");
+  });
+
+  it("G (paso 4): los contextos web/Fontana que fallan se registran con clase y status, nunca con el mensaje", async () => {
+    const web = await import("@/lib/search/webContextFetcher");
+    const fon = await import("@/lib/fontana/tabla/insumosPestel");
+    vi.mocked(web.fetchWebEconomicContext).mockRejectedValueOnce(Object.assign(new Error("https://x?q=DATO-DEL-PROYECTO"), { name: "FetchError", status: 502 }));
+    vi.mocked(fon.resolverInsumosFontanaPestel).mockRejectedValueOnce(new Error("DATO-DEL-PROYECTO"));
+    // The web context is only fetched for projects outside Mexico.
+    vi.mocked(getProject).mockResolvedValue({ id: "p1", type: "ciudadano", xpcto: { hito: "h" }, territorio: { nivel: "nacional", nombre: "Colombia", pais: "Colombia" }, phases: {} } as never);
+    const s = espiar();
+    responderPorMitad(create(), (m) => respuestaValida(m));
+    await llamar();
+    const t = todo(s);
+    expect(t).toContain("webEconomicContext error clase=FetchError status=502");
+    expect(t).not.toContain("DATO-DEL-PROYECTO");
   });
 });

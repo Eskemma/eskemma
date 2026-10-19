@@ -63,11 +63,17 @@ function proyecto(conPayload: boolean) {
 const req = (body: Record<string, unknown> = {}) =>
   new Request("http://local/api/moddulo/f2/generate-dvs", { method: "POST", body: JSON.stringify({ projectId: "p1", saveas: "draft", ...body }) }) as never;
 
-const conM1 = (aprobacion?: unknown, payloadOk = true) => {
-  vi.mocked(getProject).mockResolvedValue({
-    id: "p1", type: "electoral", xpcto: { hito: "H" },
-    phases: { exploracion: { linkedSource: payloadOk ? { kind: "express", componente: "moddulo", sourceId: "p1", payload } : undefined, m1: { creadoEn: "t", ...(aprobacion ? { aprobacion } : {}) } } },
-  } as never);
+// Paso 4: the gate needs a REAL approval (fingerprint of the payload + frozen copy). The project is
+// served by getProject AND seeded in the mock database, because the draft is written in a transaction
+// that re-reads the document.
+const huellaPayload = () => huellaMapaPESTEL(payload as never);
+const conM1 = (aprobada: boolean, payloadOk = true) => {
+  const exploracion = {
+    ...(payloadOk ? { linkedSource: { kind: "express", componente: "moddulo", sourceId: "p1", payload } } : {}),
+    m1: { creadoEn: "t", ...(aprobada ? { aprobacion: { huella: huellaPayload(), por: "u", en: "t", categoriasEditadas: 0, total: 1, mapa: payload } } : {}) },
+  };
+  vi.mocked(getProject).mockResolvedValue({ id: "p1", type: "electoral", xpcto: { hito: "H" }, phases: { exploracion } } as never);
+  mockDb.reset({ [P]: { phases: { exploracion } } });
 };
 
 beforeEach(() => {
@@ -85,33 +91,36 @@ const lineas = () => vi.mocked(console.log).mock.calls.map((c) => String(c[0])).
 
 describe("generate-dvs draft — m1.generacion", () => {
   it("con M1 aprobado escribe generacion {huella de la aprobación, en} en el MISMO update, junto al borrador", async () => {
-    conM1({ huella: "h-aprobada", por: "u", en: "t" });
+    conM1(true);
     const res = await POST(req());
     expect(res.status).toBe(200);
     const u = mockDb.updates();
     expect(u).toHaveLength(1);
-    expect(u[0].data["phases.exploracion.m1.generacion"]).toEqual({ huella: "h-aprobada", en: "SERVER_TIMESTAMP" });
+    expect(u[0].data["phases.exploracion.m1.generacion"]).toEqual({ huella: huellaPayload(), en: "SERVER_TIMESTAMP" });
     expect(u[0].data).toHaveProperty("phases.exploracion.draftDVS");
   });
   it("sin m1 NO escribe generacion (comportamiento de siempre)", async () => {
     await POST(req());
     expect(mockDb.updates()[0].data).not.toHaveProperty("phases.exploracion.m1.generacion");
   });
-  it("con m1 pero sin aprobación NO escribe generacion", async () => {
-    conM1(undefined);
-    await POST(req());
-    expect(mockDb.updates()[0].data).not.toHaveProperty("phases.exploracion.m1.generacion");
+  it("con m1 pero sin aprobación: paso 4 → 409 m1_no_aprobado, sin llamar al modelo y sin escribir (antes: escribía el borrador sin generacion)", async () => {
+    conM1(false);
+    const res = await POST(req());
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("m1_no_aprobado");
+    expect(crear).not.toHaveBeenCalled();
+    expect(mockDb.updates()).toEqual([]);
   });
-  it("la ruta legada (sin payload) también la escribe con M1 aprobado", async () => {
-    conM1({ huella: "h2" }, false);
+  it("la ruta legada (m1 SIN payload) no está bajo la compuerta: no escribe generacion (paso 4: sin payload = sin_m1)", async () => {
+    conM1(true, false);
     crear.mockReset();
     crear.mockResolvedValueOnce(texto({ ...M5, contrasteXPCTO: M2, semaforo: M3, incertidumbres: M4 }));
-    await POST(req());
-    expect(mockDb.updates()[0].data["phases.exploracion.m1.generacion"]).toMatchObject({ huella: "h2" });
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(mockDb.updates()[0].data).not.toHaveProperty("phases.exploracion.m1.generacion");
   });
   it("saveas final no escribe generacion (no hay compuerta ni conservación todavía)", async () => {
-    conM1({ huella: "h" });
-    mockDb.reset({ [P]: { phases: { exploracion: {} } } });
+    conM1(true);
     await POST(req({ saveas: "final" }));
     for (const x of mockDb.updates()) expect(x.data).not.toHaveProperty("phases.exploracion.m1.generacion");
   });
@@ -171,7 +180,7 @@ describe("generate-dvs — ida y vuelta con la semántica REAL de rutas con punt
   it("lo que escribe el update, aplicado como Firestore, hace que la LECTURA diga motoresSinGenerar=false y fusiona m1 (no lo reemplaza)", async () => {
     let doc = inicial() as Record<string, unknown>;
     expect(sinGenerar(doc).motoresSinGenerar).toBe(true); // antes: dvs de otro análisis, sin generacion
-    conM1({ huella: huella(), por: "u", en: "t" });
+    conM1(true);
     await POST(req());
     doc = aplicarUpdateFirestore(doc, mockDb.updates()[0].data);
     const e = (doc.phases as { exploracion: Record<string, unknown> }).exploracion;
@@ -184,7 +193,7 @@ describe("generate-dvs — ida y vuelta con la semántica REAL de rutas con punt
   });
 
   it("después de un autoguardado intermedio (PATCH de data) sigue en false", async () => {
-    conM1({ huella: huella(), por: "u", en: "t" });
+    conM1(true);
     await POST(req());
     let doc = aplicarUpdateFirestore(inicial() as Record<string, unknown>, mockDb.updates()[0].data);
     doc = aplicarUpdateFirestore(doc, { "phases.exploracion.data.pestl": { a: 2 }, updatedAt: "TS2" });
@@ -192,7 +201,7 @@ describe("generate-dvs — ida y vuelta con la semántica REAL de rutas con punt
   });
 
   it("y después de aprobar y finalizar los motores (finalize-dvs: borra borrador y aprobaciones, escribe el dvs) sigue en false: M1 aprobado, sin borrador, con dvs de ESTE M1", async () => {
-    conM1({ huella: huella(), por: "u", en: "t" });
+    conM1(true);
     await POST(req());
     let doc = aplicarUpdateFirestore(inicial() as Record<string, unknown>, mockDb.updates()[0].data);
     doc = aplicarUpdateFirestore(doc, { "phases.exploracion.motorAprobaciones": { M2: true, M3: true, M4: true } });

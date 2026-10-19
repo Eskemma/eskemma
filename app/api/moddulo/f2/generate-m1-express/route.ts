@@ -13,6 +13,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getMapaPESTELExpressPrompt } from "@/lib/ai/phases/prompts";
 import type { XPCTO, MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
+import { descripcionError, descripcionEstructural } from "@/lib/moddulo/registroModelo";
 import {
   fetchGoogleNewsRSS,
   getNewsTopicsForProject,
@@ -91,7 +92,6 @@ interface ResultadoMitadFallida {
   mitad: string;
   dims: readonly Dim[];
   codigo: CodigoMitad;
-  raw?: string;
   duracionMs: number;
   inputTokens: number;
   outputTokens: number;
@@ -156,15 +156,13 @@ async function intentarMitad(
     parsed = JSON.parse(jsonToParse);
   } catch {
     console.error(
-      `${etiqueta} parseo fallido stop_reason=${stopReason} longitud=${rawText.length} ` +
-        `inicio=${JSON.stringify(rawText.slice(0, 200))} final=${JSON.stringify(rawText.slice(-100))}`
+      `${etiqueta} parseo fallido stop_reason=${stopReason} ${descripcionEstructural(rawText)}`
     );
     // Truncated (hit max_tokens) vs. otherwise invalid: the client words each case differently.
     return {
       ...base,
       ok: false,
       codigo: stopReason === "max_tokens" ? "respuesta_truncada" : "respuesta_invalida",
-      raw: rawText.slice(0, 500),
       ...tokens,
     };
   }
@@ -178,7 +176,7 @@ async function intentarMitad(
     mitad.dims.every((d) => d in obj && obj[d] !== null && typeof obj[d] === "object" && !Array.isArray(obj[d]));
   if (!valida) {
     console.error(`${etiqueta} claves_invalidas esperadas=${mitad.dims.join(",")} recibidas=${claves.join(",")}`);
-    return { ...base, ok: false, codigo: "respuesta_invalida", raw: rawText.slice(0, 500), ...tokens };
+    return { ...base, ok: false, codigo: "respuesta_invalida", ...tokens };
   }
   return { ...base, ok: true, mapa: obj, ...tokens };
 }
@@ -342,10 +340,10 @@ export async function POST(request: NextRequest) {
       fetchWebLegalContext(territorio),
     ]);
     if (webEconomicResult.status === "rejected") {
-      console.error("[generate-m1-express] webEconomicContext error:", webEconomicResult.reason);
+      console.error(`[generate-m1-express] webEconomicContext error ${descripcionError(webEconomicResult.reason)}`);
     }
     if (webLegalResult.status === "rejected") {
-      console.error("[generate-m1-express] webLegalContext error:", webLegalResult.reason);
+      console.error(`[generate-m1-express] webLegalContext error ${descripcionError(webLegalResult.reason)}`);
     }
     webContext = {
       economic: webEconomicResult.status === "fulfilled" ? webEconomicResult.value : undefined,
@@ -383,7 +381,7 @@ export async function POST(request: NextRequest) {
     fontana = {};
     resultados.forEach((r, i) => {
       if (r.status === "fulfilled") fontana![dimensiones[i]] = r.value;
-      else console.warn(`[generate-m1-express] Fontana insumos ${dimensiones[i]} falló:`, r.reason);
+      else console.warn(`[generate-m1-express] Fontana insumos ${dimensiones[i]} falló ${descripcionError(r.reason)}`);
     });
   }
 
@@ -458,7 +456,6 @@ export async function POST(request: NextRequest) {
         error: "No se pudo generar el análisis completo",
         codigo,
         dimensiones: listaDimensiones(dims),
-        ...(codigo === "respuesta_invalida" ? { raw: fallo.find((f) => f.codigo === codigo)?.raw } : {}),
       },
       { status: 500 }
     );
