@@ -50,6 +50,7 @@ import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
 import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
 import { debeEnviar } from "@/lib/moddulo/textosAcceso";
+import { BOTON_INVITACION_F1, debeInvitarCompletarF1, TEXTO_INVITACION_F1 } from "@/lib/moddulo/invitacionF1";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
@@ -1879,23 +1880,22 @@ export default function ExploracionPage() {
         )}
       </div>
 
-      {/* Banner F1 incompleto — visible cuando PESTEL está importado pero F1 aún no está completado */}
-      {mapaPESTEL && phaseStatusF1 !== "completed" && (
+      {/* Invitación a completar F1 — hay análisis importado, F1 sin completar y F2 abierta. No es una alerta ni un bloqueo
+          (los motores se generan igual): role=status, sin botón de cierre. */}
+      {debeInvitarCompletarF1({ hayMapaPestel: !!mapaPESTEL, estadoF1: phaseStatusF1, f2Cerrada: m1.f2Cerrada }) && (
         <div
-          role="alert"
+          role="status"
           className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-yellow-eske/10 border-l-4 border-yellow-eske text-sm"
         >
           <svg className="w-4 h-4 shrink-0 text-yellow-eske-70 dark:text-yellow-eske" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
-          <span className="text-black-eske dark:text-[#EAF2F8]">
-            <strong>Propósito (F1) incompleto.</strong> El análisis PESTEL está importado. Completa las variables XPCTO en F1 para desbloquear los Motores DVS.
-          </span>
+          <span className="text-black-eske dark:text-[#EAF2F8]">{TEXTO_INVITACION_F1}</span>
           <Link
             href={`/moddulo/proyecto/${projectId}/proposito`}
             className="ml-auto text-bluegreen-eske dark:text-blue-eske-20 underline text-xs shrink-0 hover:text-bluegreen-eske-60"
           >
-            Ir a Propósito →
+            {BOTON_INVITACION_F1}
           </Link>
         </div>
       )}
