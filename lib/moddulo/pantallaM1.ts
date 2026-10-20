@@ -37,7 +37,7 @@ export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: bool
   return hayDvs && (estado === "borrador" || estado === "reabierto");
 }
 
-export type MotivoNoCerrarF2 = "m1_no_aprobado" | "reporte_f2_no_finalizado" | "reporte_f2_de_otro_analisis";
+export type MotivoNoCerrarF2 = "ya_cerrada" | "m1_no_aprobado" | "reporte_f2_no_finalizado" | "reporte_f2_de_otro_analisis";
 
 /**
  * Why F2 cannot be closed, or null when it can. The SERVER (complete-phase) and the «Cerrar Fase 2» button use
@@ -47,8 +47,10 @@ export type MotivoNoCerrarF2 = "m1_no_aprobado" | "reporte_f2_no_finalizado" | "
  *  · an approved M1 whose motors were not generated from it (`motoresSinGenerar`): the finalized Reporte F2
  *    belongs to a previous analysis.
  * Projects with no M1 record (anterior / sin_m1 states) only need their Reporte F2.
+ * A Fase 2 that is already closed (`f2Cerrada`) wins over everything: there is nothing left to close.
  */
-export function motivoNoCerrarF2(i: { estado: EstadoM1 | null; hayDvs: boolean; motoresSinGenerar: boolean }): MotivoNoCerrarF2 | null {
+export function motivoNoCerrarF2(i: { estado: EstadoM1 | null; hayDvs: boolean; motoresSinGenerar: boolean; f2Cerrada?: boolean }): MotivoNoCerrarF2 | null {
+  if (i.f2Cerrada) return "ya_cerrada";
   if (i.estado === "borrador" || i.estado === "reabierto") return "m1_no_aprobado";
   if (!i.hayDvs) return "reporte_f2_no_finalizado";
   if (i.estado === "aprobado" && i.motoresSinGenerar) return "reporte_f2_de_otro_analisis";
@@ -59,9 +61,17 @@ export const puedeCerrarFase = (i: Parameters<typeof motivoNoCerrarF2>[0]): bool
 
 /** Tooltip of the off «Cerrar Fase 2»: says what to do first, never to press the button. */
 export function textoBotonCierreApagado(motivo: MotivoNoCerrarF2, puedeAprobar: boolean): string {
+  if (motivo === "ya_cerrada") return "La Fase 2 ya está cerrada.";
   if (motivo === "m1_no_aprobado") return motivoCerrarF2SinAprobar(puedeAprobar);
   if (motivo === "reporte_f2_no_finalizado") return "Finaliza el análisis (M5) para poder cerrar la Fase 2.";
   return "El Reporte F2 es de un análisis anterior; genera y finaliza los motores del análisis actual para cerrar.";
+}
+
+/** The status badge next to the F2 title: «Cerrada» (closed phase) wins over «Lista» (finalized report). null = none. */
+export function insigniaF2(i: { f2Cerrada: boolean; hayDvs: boolean; editando: boolean }): "Cerrada" | "Lista" | "Editando" | null {
+  if (i.editando) return "Editando";
+  if (i.f2Cerrada) return "Cerrada";
+  return i.hayDvs ? "Lista" : null;
 }
 
 /** "16 oct 2026, 12:41 p. m." (Mexico City). Null for a missing or invalid value. */

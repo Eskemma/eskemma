@@ -32,7 +32,7 @@ const escrituras = () => db.updates().filter((u) => u.path === "moddulo_projects
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.reset({});
+  db.reset({ "moddulo_projects/p1": { phases: {} } }); // commit 5: the close is a transaction that re-reads the document
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);
 });
 

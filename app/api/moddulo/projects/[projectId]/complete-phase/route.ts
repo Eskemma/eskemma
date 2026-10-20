@@ -39,6 +39,29 @@ export async function POST(
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
+    // Idempotent (commit 5): a Fase 2 that is already closed is NOT closed again. completedAt, currentPhase and
+    // RDA are never rewritten; the only thing a retry may still complete is `data.aprobadoEn` (the approval
+    // date, written in the SAME transaction as the close, so it can only be missing in projects closed before
+    // that, or if a past close was partial), and only when it is absent. Present = zero writes. The check runs
+    // again inside the transaction (another request may have closed it meanwhile).
+    const nextPhaseCerrada = PHASE_ORDER[PHASE_ORDER.indexOf(phaseId) + 1] ?? phaseId;
+    if (phaseId === "exploracion" && project.phases?.exploracion?.status === "completed") {
+      const ref0 = adminDb.collection("moddulo_projects").doc(projectId);
+      const r0 = await adminDb.runTransaction(async (tx): Promise<"no_encontrado" | "ok"> => {
+        const snap = await tx.get(ref0);
+        if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
+        const exp = snap.data()?.phases?.exploracion;
+        if (exp?.status === "completed" && !exp?.data?.aprobadoEn) {
+          tx.update(ref0, {
+            "phases.exploracion.data.aprobadoEn": exp.completedAt ?? new Date().toISOString(),
+          });
+        }
+        return "ok";
+      });
+      if (r0 === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+      return NextResponse.json({ success: true, yaCerrada: true, nextPhase: nextPhaseCerrada });
+    }
+
     // F2 closes only with a FINALIZED Reporte F2 and, when the project has an M1 under review, with that M1
     // APPROVED and the Reporte F2 generated from it (paso 4, H). A project with no `m1` record (created before the review existed) or with no payload
     // is not asked for an approval it can never have: it only needs its Reporte F2. The «Cerrar Fase 2» button is
@@ -58,12 +81,18 @@ export async function POST(
     const phaseIndex = PHASE_ORDER.indexOf(phaseId);
     const nextPhase = PHASE_ORDER[phaseIndex + 1] ?? phaseId;
 
+    const ahora = new Date().toISOString();
     const updates: Record<string, unknown> = {
       [`phases.${phaseId}.status`]: "completed",
-      [`phases.${phaseId}.completedAt`]: new Date().toISOString(),
+      [`phases.${phaseId}.completedAt`]: ahora,
       currentPhase: nextPhase,
       updatedAt: FieldValue.serverTimestamp(),
     };
+
+    // Fase 2: the approval date goes in the same write as the close (key-wise, so pestl/semaforo/hipotesis stay).
+    if (phaseId === "exploracion") {
+      updates["phases.exploracion.data.aprobadoEn"] = ahora;
+    }
 
     if (reportText) {
       updates[`phases.${phaseId}.reportText`] = reportText;
@@ -88,7 +117,16 @@ export async function POST(
       updates[`rda.${id}.resueltoPor`] = "sistema";
     }
 
-    await adminDb.collection("moddulo_projects").doc(projectId).update(updates);
+    const ref = adminDb.collection("moddulo_projects").doc(projectId);
+    const resultado = await adminDb.runTransaction(async (tx): Promise<"ok" | "ya_cerrada" | "no_encontrado"> => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
+      if (phaseId === "exploracion" && snap.data()?.phases?.exploracion?.status === "completed") return "ya_cerrada";
+      tx.update(ref, updates);
+      return "ok";
+    });
+    if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+    if (resultado === "ya_cerrada") return NextResponse.json({ success: true, yaCerrada: true, nextPhase });
 
     // Auto-transition to "completed" when all 9 phases are done
     const updatedPhases = {

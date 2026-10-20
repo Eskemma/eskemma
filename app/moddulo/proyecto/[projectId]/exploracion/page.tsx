@@ -27,6 +27,7 @@ import {
   puedeEditarMotores,
   avisoExitoNuevoAnalisisVisible,
   motivoNoCerrarF2,
+  insigniaF2,
   textoBotonCierreApagado,
   motivoSinEditarMotores,
   puedeAprobarM1,
@@ -1014,7 +1015,7 @@ export default function ExploracionPage() {
   const reporteAnterior = reporteDelAnalisisAnterior(m1.estado, dvs !== null);
   // Why «Cerrar Fase 2» is off (null = it can close): the SAME pure decision complete-phase uses, so the button
   // is off exactly when the server would refuse and no text invites closing without the button.
-  const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false });
+  const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false, f2Cerrada: m1.f2Cerrada });
   // What the centre of the motors area shows (pure decision in lib/moddulo/pantallaM1).
   const zonaCentro = zonaCentroMotores({
     faseCompletada: mode === "completed",
@@ -1436,33 +1437,9 @@ export default function ExploracionPage() {
         })
       );
 
-      // Step 2 (only after step 1 worked): stamp `aprobadoEn`. If it fails the
-      // phase is already closed, so we still navigate and carry a notice.
-      let paso2: RespuestaGuardado | null = null;
-      if (paso1.tipo === "respuesta" && paso1.ok && dvs) {
-        try {
-          const r = await fetch(`/api/moddulo/projects/${projectId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              phaseData: {
-                phaseId: "exploracion",
-                data: { aprobadoEn: new Date().toISOString() },
-              },
-              f3Seed: {
-                pip: dvs.pip,
-                incertidumbres: dvs.incertidumbres,
-              },
-            }),
-          });
-          paso2 = { tipo: "respuesta", ok: r.ok, status: r.status };
-        } catch {
-          paso2 = { tipo: "error_red" };
-        }
-      }
+      // `aprobadoEn` is written by the server in the same transaction as the close: no second step.
 
-      const d = decidirCierreDeFase(paso1, paso2, { fase: "Fase 2", hayReporte: dvs !== null });
+      const d = decidirCierreDeFase(paso1, null, { fase: "Fase 2", hayReporte: dvs !== null });
       if (!d.navegar) {
         setCloseError(d.mensajeBloqueante);
         return;
@@ -1797,9 +1774,12 @@ export default function ExploracionPage() {
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-widest text-bluegreen-eske dark:text-blue-eske-20 shrink-0">F2</span>
             <h1 className="text-sm sm:text-base font-bold text-black-eske dark:text-[#EAF2F8] truncate">Exploración</h1>
-            {dvs !== null && mode !== "editing" && (
-              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30 rounded-full">✓ Lista</span>
-            )}
+            {(() => {
+              const insignia = insigniaF2({ f2Cerrada: m1.f2Cerrada, hayDvs: dvs !== null, editando: mode === "editing" });
+              return insignia === "Lista" || insignia === "Cerrada" ? (
+                <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-green-eske/20 text-green-eske-80 dark:text-green-eske-30 rounded-full">✓ {insignia}</span>
+              ) : null;
+            })()}
             {mode === "editing" && (
               <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 bg-orange-eske/20 text-orange-eske-80 dark:text-orange-eske-20 rounded-full">Editando</span>
             )}

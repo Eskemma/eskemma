@@ -32,7 +32,7 @@ const escrituras = () => db.updates().filter((u) => u.path === "moddulo_projects
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.reset({});
+  db.reset({ "moddulo_projects/p1": { phases: {} } }); // commit 5: the close is a transaction that re-reads the document
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);
 });
 
@@ -98,7 +98,7 @@ describe("Paso 4 (H) — lo nuevo", () => {
     vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: DVS, ...express }) as never);
     await cerrar();
     const d = escrituras()[0].data;
-    expect(Object.keys(d).sort()).toEqual(["currentPhase", "phases.exploracion.completedAt", "phases.exploracion.status", "updatedAt"]);
+    expect(Object.keys(d).sort()).toEqual(["currentPhase", "phases.exploracion.completedAt", "phases.exploracion.data.aprobadoEn", "phases.exploracion.status", "updatedAt"]);
   });
 
   describe("el Reporte F2 debe ser de ESTE M1 (m1.generacion.huella === m1.aprobacion.huella)", () => {
@@ -126,4 +126,65 @@ describe("Paso 4 (H) — lo nuevo", () => {
       expect((await cerrar()).status).toBe(200);
     });
   });
+
+describe("Commit 5 — Fase 2 ya cerrada: idempotente, cero escrituras", () => {
+  const cerrada = { status: "completed", completedAt: "2026-08-05T21:55:52.003Z", dvs: DVS, ...express };
+  const docCompleto = { phases: { exploracion: { status: "completed", completedAt: "2026-08-05T21:55:52.003Z", data: { aprobadoEn: "2026-08-05T21:55:52.003Z" } } } };
+  it("doble cierre = 200 {yaCerrada} y 0 escrituras (ni completedAt, ni currentPhase, ni RDA)", async () => {
+    db.reset({ "moddulo_projects/p1": docCompleto });
+    vi.mocked(getProject).mockResolvedValue(proyecto(cerrada) as never);
+    const r = await cerrar();
+    expect(r.status).toBe(200);
+    expect(r.cuerpo).toEqual({ success: true, yaCerrada: true, nextPhase: "investigacion" });
+    expect(escrituras()).toHaveLength(0);
+  });
+  it("gana sobre las demás reglas: cerrada con M1 en borrador, sin Reporte o con Reporte de otro análisis: sigue 200 sin escribir", async () => {
+    db.reset({ "moddulo_projects/p1": docCompleto });
+    for (const exp of [{ status: "completed", m1: { creadoEn: "t" }, ...express }, { status: "completed" }, { status: "completed", dvs: DVS, m1: { creadoEn: "t", aprobacion }, ...express }]) {
+      vi.mocked(getProject).mockResolvedValue(proyecto(exp) as never);
+      expect((await cerrar()).cuerpo.yaCerrada).toBe(true);
+    }
+    expect(escrituras()).toHaveLength(0);
+  });
+  it("[carrera] la lectura previa ve la fase abierta pero al escribir otra petición ya la cerró: 200 yaCerrada y cero escrituras", async () => {
+    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: DVS, ...express }) as never);
+    db.reset({ "moddulo_projects/p1": docCompleto });
+    const r = await cerrar();
+    expect(r.cuerpo.yaCerrada).toBe(true);
+    expect(escrituras()).toHaveLength(0);
+  });
+  it("cerrada SIN aprobadoEn (cierre parcial anterior): completa SOLO eso, con completedAt, sin tocar currentPhase/RDA/completedAt", async () => {
+    db.reset({ "moddulo_projects/p1": { phases: { exploracion: { status: "completed", completedAt: "2026-08-05T21:55:52.003Z", data: { pestl: { x: 1 } } } } } });
+    vi.mocked(getProject).mockResolvedValue(proyecto(cerrada) as never);
+    const r = await cerrar();
+    expect(r.cuerpo).toEqual({ success: true, yaCerrada: true, nextPhase: "investigacion" });
+    expect(escrituras()).toHaveLength(1);
+    expect(escrituras()[0].data).toEqual({ "phases.exploracion.data.aprobadoEn": "2026-08-05T21:55:52.003Z" });
+    // a second retry: now complete → zero writes
+    const antes = escrituras().length;
+    db.reset({ "moddulo_projects/p1": docCompleto });
+    await cerrar();
+    expect(escrituras().length).toBe(0);
+    expect(antes).toBe(1);
+  });
+  it("el primer cierre escribe aprobadoEn en el MISMO update que el cierre (una sola escritura)", async () => {
+    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: DVS, ...express }) as never);
+    await cerrar();
+    expect(escrituras()).toHaveLength(1);
+    const d = escrituras()[0].data;
+    expect(d["phases.exploracion.status"]).toBe("completed");
+    expect(typeof d["phases.exploracion.data.aprobadoEn"]).toBe("string");
+    expect(d["phases.exploracion.data.aprobadoEn"]).toBe(d["phases.exploracion.completedAt"]);
+  });
+  it("otras fases no tienen este atajo (cerrar de nuevo no cambia lo de antes)", async () => {
+    vi.mocked(getProject).mockResolvedValue({ ...proyecto({}), phases: { proposito: { status: "completed" } } } as never);
+    expect((await cerrar("proposito")).cuerpo.yaCerrada).toBeUndefined();
+  });
+  it("el cierre normal sigue escribiendo y no trae yaCerrada", async () => {
+    vi.mocked(getProject).mockResolvedValue(proyecto({ dvs: DVS, ...express }) as never);
+    const r = await cerrar();
+    expect(r.cuerpo).toEqual({ success: true, nextPhase: "investigacion" });
+    expect(escrituras()).toHaveLength(1);
+  });
+});
 });
