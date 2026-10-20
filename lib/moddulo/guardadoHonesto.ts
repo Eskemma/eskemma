@@ -12,6 +12,8 @@ import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
 /** F2 closed = read-only: generate-m1-express, import-pestel and link-moddulo answer 409 `fase_cerrada`. */
 export const MENSAJE_FASE_CERRADA_REEMPLAZO = "La Fase 2 está cerrada: no se puede reemplazar el análisis. No se guardó nada.";
 
+import { estadoHttpValido, TEXTO_SESION } from "./textosAcceso";
+
 export type AccionGuardado =
   | "aprobar_motor"
   | "guardar_borrador"
@@ -353,7 +355,9 @@ function consecuencia(accion: AccionGuardado): string {
 function motivo(resp: RespuestaGuardado): string {
   if (resp.tipo === "error_red") return "Sin conexión con el servidor.";
   if (resp.ok) return "El servidor respondió algo inesperado.";
-  if (resp.status === 401 || resp.status === 403) {
+  // 401 = the session is invalid/expired; 403 = permission (textosAcceso). Never the same message.
+  if (resp.status === 401) return TEXTO_SESION;
+  if (resp.status === 403) {
     return "No tienes permiso para guardar en este proyecto.";
   }
   if (resp.status === 404) return "El proyecto ya no existe o no tienes acceso.";
@@ -608,7 +612,7 @@ function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx
   const propio = t.especifico(resp);
   if (propio) return propio;
   if (resp.status === 404) return t.noEncontrado;
-  const porQue = t.permiso && (resp.status === 401 || resp.status === 403) ? t.permiso : motivo(resp);
+  const porQue = t.permiso && resp.status === 403 ? t.permiso : motivo(resp);
   return `No se pudo registrar ${que}. ${porQue} ${consecuencia(accion)}`;
 }
 
@@ -845,6 +849,8 @@ export function decidirResultadoGuardado(
   resp: RespuestaGuardado,
   ctx: ContextoGuardado = {}
 ): DecisionGuardado {
+  // A «response» with an impossible status (0, NaN) is not an answer of the server: it is treated like a lost one.
+  if (resp.tipo === "respuesta" && !estadoHttpValido(resp.status)) resp = { tipo: "error_red" };
   const exito =
     resp.tipo === "respuesta" && resp.ok && resp.cuerpoValido !== false;
   if (exito) {

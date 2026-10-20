@@ -9,6 +9,7 @@
 // Also the small pure decisions of the automatic import («pest_analysis_id» in the URL).
 
 import { MENSAJE_FASE_CERRADA_REEMPLAZO, type RespuestaGuardado } from "./guardadoHonesto";
+import { clasificarFallo, TEXTO_SESION } from "./textosAcceso";
 
 export type AccionSondeo = "nuevo_analisis" | "desvincular";
 
@@ -38,7 +39,10 @@ export function decidirSondeo(accion: AccionSondeo, resp: RespuestaGuardado, dat
     mensaje: `No se pudo CONFIRMAR lo que se perdería al ${que}: ${porQue}. No se hizo ningún cambio; vuelve a intentarlo.`,
     reintentable: true,
   });
-  if (resp.tipo === "error_red") return reintentar("sin conexión con el servidor");
+  const clase = clasificarFallo(resp);
+  if (clase === "sin_conexion") return reintentar("sin conexión con el servidor");
+  if (clase === "sin_respuesta_valida") return reintentar("el servidor no dio una respuesta válida");
+  if (resp.tipo !== "respuesta") return reintentar("sin conexión con el servidor"); // unreachable: narrows the type
 
   if (resp.ok) {
     // «Nuevo análisis» answers 200 {verificado} only for a clean project. «Desvincular» always asks, so a 200
@@ -81,7 +85,9 @@ export function decidirSondeo(accion: AccionSondeo, resp: RespuestaGuardado, dat
   if (resp.status === 404) {
     return { tipo: "error", mensaje: "No se encontró el proyecto; puede que ya no exista o no tengas acceso. Recarga la página para verificar. No se hizo ningún cambio.", reintentable: false };
   }
-  if (resp.status === 401 || resp.status === 403) {
+  // 401 = the session (not a permission); 403 = permission. Only a real response from the server says either.
+  if (clase === "sesion") return { tipo: "error", mensaje: `${TEXTO_SESION} No se hizo ningún cambio.`, reintentable: false };
+  if (clase === "permiso") {
     return { tipo: "error", mensaje: `No tienes permiso para ${que}. No se hizo ningún cambio.`, reintentable: false };
   }
   return reintentar("el servidor no respondió como se esperaba");
@@ -134,7 +140,10 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
     mensaje: `No se pudo CONFIRMAR la importación del análisis de Centinela: ${porQue}. No se puede saber si se completó; puedes volver a intentarlo o recargar la página para verificar el estado.`,
     reintentable: true,
   });
-  if (resp.tipo === "error_red") return incierto("sin conexión con el servidor");
+  const clase = clasificarFallo(resp);
+  if (clase === "sin_conexion") return incierto("sin conexión con el servidor");
+  if (clase === "sin_respuesta_valida") return incierto("el servidor no dio una respuesta válida");
+  if (resp.tipo !== "respuesta") return incierto("sin conexión con el servidor"); // unreachable: narrows the type
   if (resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta") {
     return incierto("el servidor no respondió como se esperaba");
   }
@@ -152,7 +161,9 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
   // Any other 4xx: the server wrote nothing. Show its own readable text (never a bare code).
   const propio = [datos.message, datos.mensaje, datos.error].find((x): x is string => typeof x === "string" && /\s/.test(x.trim()));
   const base = propio
-    ?? (resp.status === 401 || resp.status === 403
+    ?? (clase === "sesion"
+      ? TEXTO_SESION
+      : clase === "permiso"
       ? "No tienes permiso para importar este análisis."
       : resp.status === 404
         ? "No se encontró el análisis o el proyecto; puede que ya no exista."

@@ -103,7 +103,8 @@ describe("decidirConfirmacionImport — el modal no se cierra en silencio", () =
     const d = decidirConfirmacionImport(r(404), { error: "not_found" }) as { mensaje: string };
     expect(d.mensaje).not.toContain("not_found");
     expect(d.mensaje).toContain("No se importó nada");
-    expect((decidirConfirmacionImport(r(401)) as { mensaje: string }).mensaje).toContain("No tienes permiso");
+    expect((decidirConfirmacionImport(r(401)) as { mensaje: string }).mensaje).toContain("Tu sesión no es válida o expiró"); // paso 4: 401 = sesión
+    expect((decidirConfirmacionImport(r(403)) as { mensaje: string }).mensaje).toContain("No tienes permiso");
   });
   it("Fase 2 cerrada: su texto propio, sin reintento", () => {
     expect(decidirConfirmacionImport(r(409, "fase_cerrada"))).toMatchObject({ tipo: "error", reintentable: false, mensaje: expect.stringContaining("Fase 2 está cerrada") });

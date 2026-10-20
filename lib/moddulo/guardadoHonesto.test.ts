@@ -1,3 +1,4 @@
+import { TEXTO_SESION } from "./textosAcceso";
 import { describe, expect, it } from "vitest";
 import {
   ACCIONES_F3,
@@ -994,7 +995,8 @@ describe("decidirResultadoGuardado — acciones del commit 6b", () => {
       for (const status of [401, 403]) {
         const m = msg(accion, fallo(status), ctx);
         expect(m).toContain(`No se pudo registrar ${que}`);
-        expect(m).toContain(permiso);
+        // Paso 4 (commit 4): 401 is the SESSION, 403 the permission; never the same text.
+        expect(m).toContain(status === 401 ? TEXTO_SESION : permiso);
         expect(m).toContain(sigue);
         expect(m).not.toContain("CONFIRMAR");
         expect(m).not.toContain("en este proyecto");
@@ -1130,7 +1132,8 @@ describe("decidirResultadoGuardado — acciones del commit 6c", () => {
       for (const status of [401, 403]) {
         const m = msg(accion, fallo(status), ctx);
         expect(m).toContain(`No se pudo registrar ${que}`);
-        expect(m).toContain(permiso);
+        // Paso 4 (commit 4): 401 is the SESSION, 403 the permission; never the same text.
+        expect(m).toContain(status === 401 ? TEXTO_SESION : permiso);
         expect(m).toContain(sigue);
         expect(m).not.toContain("CONFIRMAR");
         expect(m).not.toContain("en este proyecto");

@@ -50,7 +50,7 @@ describe("guardar_edicion_m1 — guardar la edición de una dimensión", () => {
   it("401/403: afirma el estado previo (sin guardar) y el permiso", () => {
     for (const s of [401, 403]) {
       const m = msg("guardar_edicion_m1", r(s), ctx);
-      expect(m).toContain("No tienes permiso para editar este análisis");
+      expect(m).toContain(s === 401 ? "Tu sesión no es válida o expiró" : "No tienes permiso para editar este análisis"); // paso 4: 401 = sesión
       expect(m).toContain("Tu texto sigue en pantalla, sin guardar");
     }
   });

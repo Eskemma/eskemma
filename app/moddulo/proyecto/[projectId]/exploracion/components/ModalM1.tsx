@@ -18,11 +18,13 @@ interface Props {
   /** Failure of the last attempt; the modal stays open while it is shown. */
   error?: string | null;
   ocupado?: boolean;
+  /** Hide the «if it fails, X is kept» sentence (the last attempt's result is unknown, so it cannot be promised). */
+  ocultarCierre?: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
 }
 
-export default function ModalM1({ texto, aviso, error, ocupado = false, onConfirmar, onCancelar }: Props) {
+export default function ModalM1({ texto, aviso, error, ocupado = false, ocultarCierre = false, onConfirmar, onCancelar }: Props) {
   const containerRef = useFocusTrap(true) as React.RefObject<HTMLDivElement>;
   const cancelarSiLibre = () => {
     if (!ocupado) onCancelar();
@@ -65,7 +67,7 @@ export default function ModalM1({ texto, aviso, error, ocupado = false, onConfir
                 {texto.lineas.map((l, i) => <li key={i}>{l}</li>)}
               </ul>
             )}
-            {texto.cierre && <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-2">{texto.cierre}</p>}
+            {texto.cierre && !ocultarCierre && <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-2">{texto.cierre}</p>}
           </div>
         </div>
         {error && (

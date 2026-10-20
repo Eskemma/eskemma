@@ -48,6 +48,7 @@ import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
 import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
+import { debeEnviar } from "@/lib/moddulo/textosAcceso";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
@@ -319,6 +320,8 @@ export default function ExploracionPage() {
   const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null } | null>(null);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [errorReplace, setErrorReplace] = useState<string | null>(null);
+  // The failed import left the result unknown: the modal must not also promise «tu análisis actual se conserva».
+  const [errorReplaceAmbiguo, setErrorReplaceAmbiguo] = useState(false);
 
   // Máquina de estados del header (C2)
   const headerState: "en_progreso" | "lista" | "editando" =
@@ -1109,17 +1112,28 @@ export default function ExploracionPage() {
       setVerificandoAccion(accion);
       setErrorSondeo(null);
       try {
-        const { resp, datos } = await leerRespuestaGuardado(
-          () =>
-            fetch(accion === "nuevo_analisis" ? "/api/moddulo/f2/generate-m1-express" : "/api/moddulo/f2/unlink-pestel", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify(accion === "nuevo_analisis" ? { projectId, verificar: true } : { projectId }),
-            }),
-          (d) => d.verificado === true
-        );
-        const d = decidirSondeo(accion, resp, datos);
+        // The browser says it is offline: do not send, say so (nothing is claimed about the server).
+        // Any exception while asking becomes the same honest message, never a classification by accident.
+        let d: ReturnType<typeof decidirSondeo>;
+        if (!debeEnviar(typeof navigator !== "undefined" ? navigator.onLine : undefined)) {
+          d = decidirSondeo(accion, { tipo: "error_red" });
+        } else {
+          try {
+            const { resp, datos } = await leerRespuestaGuardado(
+              () =>
+                fetch(accion === "nuevo_analisis" ? "/api/moddulo/f2/generate-m1-express" : "/api/moddulo/f2/unlink-pestel", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify(accion === "nuevo_analisis" ? { projectId, verificar: true } : { projectId }),
+                }),
+              (x) => x.verificado === true
+            );
+            d = decidirSondeo(accion, resp, datos);
+          } catch {
+            d = decidirSondeo(accion, { tipo: "error_red" });
+          }
+        }
         if (d.tipo === "error") setErrorSondeo({ accion, mensaje: d.mensaje, reintentable: d.reintentable });
         return d;
       } finally {
@@ -1233,6 +1247,7 @@ export default function ExploracionPage() {
     if (!pendingReplaceConfirm) return;
     setIsConfirmingReplace(true);
     setErrorReplace(null);
+    setErrorReplaceAmbiguo(false);
     try {
       const r = await importPestel(pendingReplaceConfirm.pestAnalysisId, { huella: pendingReplaceConfirm.huella });
       // The state changed since the user looked (huella_vencida): keep asking, with the fresh lines.
@@ -1247,6 +1262,7 @@ export default function ExploracionPage() {
           setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso });
         } else {
           setErrorReplace(d.mensaje);
+          setErrorReplaceAmbiguo(d.reintentable);
         }
         return;
       }
@@ -1863,6 +1879,24 @@ export default function ExploracionPage() {
             </div>
           );
         })()}
+        {/* Server check of «Nuevo análisis» / «Desvincular» (convención candidata: sin modal, el error va en la franja del
+            encabezado —siempre visible, no depende del scroll—). Proceso: role=status; error: role=alert. */}
+        {verificandoAccion !== null && (
+          <p role="status" className="mt-2 text-xs text-red-eske-60 dark:text-red-eske-10">Verificando lo que se perdería…</p>
+        )}
+        {errorSondeo !== null && (
+          <div role="alert" className="mt-2 flex items-start justify-between gap-3 rounded-lg border border-red-eske/30 bg-red-eske/10 px-3 py-2 text-xs text-red-eske-60 dark:text-red-eske-10">
+            <span className="min-w-0">{errorSondeo.mensaje}</span>
+            <span className="shrink-0 flex items-center gap-3">
+              {errorSondeo.reintentable && (
+                <button type="button" onClick={() => (errorSondeo.accion === "nuevo_analisis" ? void solicitarNuevoAnalisis() : void pedirDesvincular())} className="font-semibold hover:underline">
+                  Reintentar
+                </button>
+              )}
+              <button type="button" onClick={() => setErrorSondeo(null)} className="font-semibold hover:underline">Cerrar</button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Banner F1 incompleto — visible cuando PESTEL está importado pero F1 aún no está completado */}
@@ -2324,26 +2358,6 @@ export default function ExploracionPage() {
         </>)}
       </div>
 
-      {/* Server check in progress / failed (Nuevo análisis, Desvincular). Process text uses red-eske-60 / dark red-eske-10 with role=status. */}
-      {verificandoAccion !== null && (
-        <p role="status" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 rounded-lg border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] px-4 py-2 text-sm text-red-eske-60 dark:text-red-eske-10 shadow-lg">
-          Verificando lo que se perdería…
-        </p>
-      )}
-      {errorSondeo !== null && (
-        <div role="alert" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-red-eske/30 bg-white-eske dark:bg-[#18324A] px-4 py-3 text-sm text-red-eske-60 dark:text-red-eske-10 shadow-lg sm:max-w-md">
-          <span className="min-w-0">{errorSondeo.mensaje}</span>
-          <span className="shrink-0 flex flex-col gap-1">
-            {errorSondeo.reintentable && (
-              <button type="button" onClick={() => (errorSondeo.accion === "nuevo_analisis" ? void solicitarNuevoAnalisis() : void pedirDesvincular())} className="font-semibold hover:underline">
-                Reintentar
-              </button>
-            )}
-            <button type="button" onClick={() => setErrorSondeo(null)} className="font-semibold hover:underline">Cerrar</button>
-          </span>
-        </div>
-      )}
-
       {/* Nuevo análisis: lines from the real state (or the server's, when it answered a 409) */}
       {nuevoModal && (
         <ModalM1
@@ -2389,9 +2403,11 @@ export default function ExploracionPage() {
           texto={textoModalM1("vincular", impactoPantalla, { lineasServidor: pendingReplaceConfirm.lineas })}
           aviso={pendingReplaceConfirm.aviso}
           error={errorReplace}
+          ocultarCierre={errorReplace !== null && errorReplaceAmbiguo}
           ocupado={isConfirmingReplace}
           onCancelar={() => {
             setErrorReplace(null);
+            setErrorReplaceAmbiguo(false);
             // Cancelling the AUTOMATIC import removes the parameter from the URL, or F5 would ask again.
             const limpia = urlAlCancelarImport(pendingReplaceConfirm.source, window.location.href);
             if (limpia) router.replace(limpia, { scroll: false });

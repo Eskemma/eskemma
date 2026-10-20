@@ -464,6 +464,8 @@ de Tailwind (`blue-500`, `gray-300`) en componentes nuevos.
 
 **Texto de proceso del sistema** («Generando…», «Cargando…»): `text-red-eske-60 dark:text-red-eske-10` con `role="status"` (`role="alert"` queda para errores); medido: claro 7.04:1 sobre `#f7fafb` y 7.38:1 sobre blanco, oscuro 5.39:1 sobre `#18324A` (decisión de Raúl, 26-10-17).
 
+**Dónde se muestra el error de una acción (convención CANDIDATA, 26-10-19; aplicada solo al sondeo de «Nuevo análisis»/«Desvincular» de F2, no al resto):** si la acción tiene modal, el error va DENTRO del modal y el modal no se cierra; si no, va en la franja de error del encabezado de la pantalla (`shrink-0`, siempre visible, `role="alert"`, `text-red-eske-60 dark:text-red-eske-10`, con «Cerrar» y, si sirve, «Reintentar»); el estado de espera usa `role="status"` y el mismo color; un error de un campo va en línea junto al campo; nunca un aviso `fixed` ni nada que dependa del scroll. Antes de decir POR QUÉ falló una petición se clasifica CÓMO (`lib/moddulo/textosAcceso.ts`): red caída o respuesta sin estado válido = ambiguo («No se pudo CONFIRMAR…»); 401 = sesión no válida o expirada; 403 = permiso; solo 401/403 son afirmaciones del servidor.
+
 **Regla (badges/chips de estado — aplica a cualquier app nueva del
 ecosistema):** un badge con fondo de un color "claro fijo" (ej.
 `bg-gray-eske-20`, `bg-yellow-100`) SIEMPRE necesita su propia variante
