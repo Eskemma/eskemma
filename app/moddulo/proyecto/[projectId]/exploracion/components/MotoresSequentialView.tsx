@@ -843,7 +843,7 @@ export default function MotoresSequentialView({
   return (
     <div className="space-y-2 pb-4">
       {isGenerating && (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-bluegreen-eske-70 dark:text-blue-eske-20">
+        <div role="status" className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-red-eske-60 dark:text-red-eske-10">
           <span className="w-3.5 h-3.5 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin shrink-0" />
           Actualizando análisis… lo que ves abajo es la última versión válida.
         </div>

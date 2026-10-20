@@ -47,9 +47,11 @@ interface Params {
   generarMotores: () => Promise<void>;
   /** The page leaves the editing/report views after a successful reopen. */
   alReabrir: () => void;
+  /** Called with the project every time it is re-read successfully (never when the read fails). */
+  alRecibirProyecto?: (project: NonNullable<GetProyecto["project"]>) => void;
 }
 
-type GetProyecto = { project?: { phases?: { exploracion?: { m1?: M1Datos; linkedSource?: { payload?: MapaPESTEL }; status?: string } } }; m1?: ResumenM1Cliente };
+type GetProyecto = { project?: { xpcto?: Record<string, unknown>; phases?: { exploracion?: { m1?: M1Datos; linkedSource?: { payload?: MapaPESTEL }; status?: string } } }; m1?: ResumenM1Cliente };
 
 export function useM1Revision(p: Params) {
   const { projectId } = p;
@@ -92,6 +94,7 @@ export function useM1Revision(p: Params) {
       if (!r.ok) return null;
       const data = (await r.json()) as GetProyecto;
       const nuevo = aplicarGet(data);
+      if (data.project) p.alRecibirProyecto?.(data.project);
       const payload = data.project?.phases?.exploracion?.linkedSource?.payload;
       if (nuevo && payload) p.setMapaPESTEL(payload);
       return nuevo;

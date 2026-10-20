@@ -50,6 +50,7 @@ import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
 import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
 import { debeEnviar } from "@/lib/moddulo/textosAcceso";
+import { decidirAvisoXpcto, diffsXpctoDeProyecto } from "@/lib/moddulo/avisoXpcto";
 import { BOTON_INVITACION_F1, debeInvitarCompletarF1, TEXTO_INVITACION_F1 } from "@/lib/moddulo/invitacionF1";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
@@ -77,7 +78,7 @@ import type {
 } from "@/types/moddulo.types";
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
-import { detectForwardStaleness, type PropagationDiff } from "@/lib/moddulo/phasePropagation";
+import type { ProjectForPropagation, PropagationDiff } from "@/lib/moddulo/phasePropagation";
 import {
   detectarTerritorioStale,
   extraerTerritorioEscalar,
@@ -201,23 +202,8 @@ const PESTL_SECTIONS: { id: PestlSection; label: string; short: string; dimCode?
 ];
 
 // ==========================================
-// STALENESS DETECTION — F1 → F2
+// STALENESS DETECTION — F1 → F2 (la decisión del aviso vive en lib/moddulo/avisoXpcto.ts)
 // ==========================================
-
-// M1 (escaneo PESTEL) se lee "desde la posición del proyecto: ¿qué significa
-// esta variable para este sujeto, con este hito, en esta escala?" (FAT 2.0,
-// Fase 2 · M1). Sujeto e Hito enmarcan el escaneo — Capacidades, Tiempo y
-// Justificación solo alimentan M2 (contraste XPCTO-Entorno), que opera sobre
-// el M1 ya generado sin necesidad de rescanearlo. Clasificación específica
-// de este par F1→F2 — no vive en el motor genérico (lib/moddulo/phasePropagation.ts).
-const FULL_REGEN_FIELDS = new Set([
-  "Sujeto",
-  "Hito",
-]);
-
-function getRegenerationType(diffs: PropagationDiff[]): "full" | "partial" {
-  return diffs.some((d) => FULL_REGEN_FIELDS.has(d.field)) ? "full" : "partial";
-}
 
 // ==========================================
 // PÁGINA PRINCIPAL
@@ -425,8 +411,7 @@ export default function ExploracionPage() {
         // Applies regardless of M1 origin (express or Centinela PESTEL) — both
         // paths capture xpctoSnapshotAtGeneration since the snapshot/redirect fix.
         // Vía el motor genérico de propagación (lib/moddulo/phasePropagation.ts).
-        const staleDiffs = detectForwardStaleness("exploracion", p);
-        if (staleDiffs && staleDiffs.length > 0) setXpctoStaleChanges(staleDiffs);
+        setXpctoStaleChanges(diffsXpctoDeProyecto(p));
 
         // Ronda 13 (26-08-18) — propagación de cambios de territorio,
         // independiente del staleness de XPCTO de arriba. Solo evaluable
@@ -953,6 +938,10 @@ export default function ExploracionPage() {
     },
     generarMotores: generarDraftDVS,
     alReabrir: () => alReabrirRef.current(),
+    // Every successful re-read of the project recomputes the XPCTO differences against the snapshot stored NOW
+    // (after approving, generating the motors, «Reintentar generación», «Actualizar contraste»). A failed read
+    // never reaches this callback, so the previous list is kept.
+    alRecibirProyecto: (proj) => setXpctoStaleChanges(diffsXpctoDeProyecto(proj as unknown as ProjectForPropagation)),
   });
   const refrescarM1Ref = useRef<() => Promise<unknown>>(async () => null);
   useEffect(() => { refrescarM1Ref.current = m1.refrescar; });
@@ -2076,17 +2065,24 @@ export default function ExploracionPage() {
                 )}
               </div>
               {xpctoStaleChanges.length > 0 && (() => {
-                const regenType = getRegenerationType(xpctoStaleChanges);
-                // El M1 vía Centinela no se puede regenerar in-app: pertenece a un
-                // análisis independiente. Redirigir a Centinela en vez de llamar a
-                // generate-m1-express, que sobrescribiría el mapaPESTEL vinculado.
-                const viaCentinela = regenType === "full" && pestlVia === "pestel" && !!pestProjectId;
+                // One pure decision (lib/moddulo/avisoXpcto): a Centinela M1 never depends on the XPCTO, an empty XPCTO
+                // at import is not stale, no notice in a closed phase (provisional until Bloque 4) or while the M1 is
+                // not approved (the gate would answer 409).
+                const aviso = decidirAvisoXpcto({
+                  kind: m1.kind,
+                  hayMotores: motoresGeneradosM1,
+                  camposCambiados: xpctoStaleChanges.map((d) => d.field),
+                  f2Cerrada: m1.f2Cerrada,
+                  m1Estado: m1.estado,
+                });
+                if (aviso === "ninguno") return null;
+                const regenerarM1 = aviso === "regenerar_m1";
                 return (
                   <div className="shrink-0 bg-yellow-eske-10 dark:bg-yellow-eske-80/10 border border-yellow-eske-30 dark:border-yellow-eske-60/40 rounded-lg p-3 mb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-black-eske dark:text-[#EAF2F8] mb-1">
-                          {regenType === "full"
+                          {regenerarM1
                             ? "Cambios en el sujeto o capacidades requieren regenerar el análisis completo."
                             : "El XPCTO fue modificado en F1. El contraste con el entorno está desactualizado."}
                         </p>
@@ -2104,41 +2100,31 @@ export default function ExploracionPage() {
                           )}
                         </ul>
                         <p className="text-xs text-black-eske/50 dark:text-[#9AAEBE] mt-1.5">
-                          {viaCentinela
-                            ? "Este M1 proviene de Centinela PESTEL. Actualiza el análisis ahí y vuelve a importarlo."
-                            : regenType === "full"
+                          {regenerarM1
                             ? "Se regenerará el escaneo PESTEL completo (M1) y el contraste XPCTO-Entorno."
                             : "El escaneo de fuentes no se repite — solo se actualiza el contraste XPCTO-Entorno."}
                         </p>
                       </div>
                       <button
                         onClick={() => {
-                          if (viaCentinela) {
-                            // Etapa 2 (Datos), donde vive "Ejecutar Análisis IA".
-                            // Centinela avanza solo a Etapa 3 al terminar.
-                            router.push(`/centinela/pestel/${pestProjectId}/datos`);
-                            return;
-                          }
-                          if (regenType === "full") {
+                          if (regenerarM1) {
                             // Replaces M1: same notice (and server confirmation) as "Nuevo análisis".
                             setRegenKind("full");
                             solicitarNuevoAnalisis();
                           } else {
                             // Only the contrast against the XPCTO is refreshed; M1 (already
                             // approved) does not change, so its approval is kept.
-                            setXpctoStaleChanges([]);
+                            // The list is NOT cleared here: it is recomputed from the project when the generation ends,
+                            // so a failed generation keeps the notice (the contrast is still outdated).
                             setMotorAprobaciones({});
                             setRegenKind("partial");
                             void generarDraftDVS();
                           }
                         }}
-                        disabled={!viaCentinela && regenType !== "full" && (m1.estado === "borrador" || m1.estado === "reabierto")}
-                        title={!viaCentinela && regenType !== "full" && (m1.estado === "borrador" || m1.estado === "reabierto") ? "Aprueba el análisis (M1) para actualizar el contraste." : undefined}
+                        disabled={isGeneratingMotors}
                         className="shrink-0 text-sm font-medium text-orange-eske hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                       >
-                        {viaCentinela
-                          ? "Ir a Centinela PESTEL →"
-                          : regenType === "full" ? "Regenerar análisis completo ↺" : "Actualizar contraste XPCTO ↺"}
+                        {regenerarM1 ? "Regenerar análisis completo ↺" : "Actualizar contraste XPCTO ↺"}
                       </button>
                     </div>
                   </div>
@@ -2212,13 +2198,7 @@ export default function ExploracionPage() {
                 ) : zonaCentro === "sin_generar" ? (
                   <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center space-y-3">
                     <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">M1 aprobado, motores sin generar</p>
-                    <button
-                      type="button"
-                      onClick={() => void generarDraftDVS()}
-                      className="px-4 py-2 border border-bluegreen-eske-60 dark:border-blue-eske-20 text-bluegreen-eske-60 dark:text-blue-eske-20 rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/5 transition-colors"
-                    >
-                      Reintentar generación
-                    </button>
+                    <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">Usa «Reintentar generación», en el panel «Análisis PESTEL», para generar M2–M5.</p>
                   </div>
                 ) : (
                   <MotoresSequentialView
