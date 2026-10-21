@@ -65,7 +65,7 @@ describe("debeGenerarTrasAprobar — al aprobar se dispara la generación", () =
 
 import { zonaCentroMotores } from "./pantallaM1";
 const base = {
-  faseCompletada: false, hayDvs: false, hayBorrador: false, generando: false, hayErrorGeneracion: false, showReporte: false,
+  f2Cerrada: false, hayDvs: false, hayBorrador: false, generando: false, hayErrorGeneracion: false, showReporte: false,
   reporteAnterior: false, motoresGeneradosDelM1: false, hayMensajeArea: false, avisoSinGenerar: false,
 };
 describe("zonaCentroMotores — el centro tras recargar", () => {
@@ -83,8 +83,8 @@ describe("zonaCentroMotores — el centro tras recargar", () => {
     expect(zonaCentroMotores({ ...base, hayDvs: true, hayErrorGeneracion: true, motoresGeneradosDelM1: true })).toBe("motores");
   });
   it("fase completada con dvs: «completo» como siempre (aunque haya borrador); con el reporte abierto o el reporte anterior no", () => {
-    expect(zonaCentroMotores({ ...base, faseCompletada: true, hayDvs: true, hayBorrador: true })).toBe("completo");
-    expect(zonaCentroMotores({ ...base, faseCompletada: true, hayDvs: true, showReporte: true })).toBe("motores");
+    expect(zonaCentroMotores({ ...base, f2Cerrada: true, hayDvs: true, hayBorrador: true })).toBe("completo");
+    expect(zonaCentroMotores({ ...base, f2Cerrada: true, hayDvs: true, showReporte: true })).toBe("motores");
     expect(zonaCentroMotores({ ...base, hayDvs: true, motoresGeneradosDelM1: true, reporteAnterior: true, hayMensajeArea: true })).toBe("mensaje");
   });
   it("(3) proyecto anterior sin m1 con dvs en fase abierta: «completo» (regla local: el dvs cuenta)", () => {

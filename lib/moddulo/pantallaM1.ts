@@ -344,7 +344,8 @@ export function debeGenerarTrasAprobar(i: { motoresSinGenerarServidor: boolean; 
 export type ZonaCentroMotores = "completo" | "mensaje" | "sin_generar" | "motores";
 
 export function zonaCentroMotores(i: {
-  faseCompletada: boolean;
+  /** The phase is really CLOSED (`m1.f2Cerrada`), NOT «there is a finalized analysis on screen». */
+  f2Cerrada: boolean;
   hayDvs: boolean;
   hayBorrador: boolean;
   generando: boolean;
@@ -356,11 +357,49 @@ export function zonaCentroMotores(i: {
   avisoSinGenerar: boolean;
 }): ZonaCentroMotores {
   const dvsDeEsteM1 = i.hayDvs && !i.hayBorrador && !i.generando && !i.hayErrorGeneracion && i.motoresGeneradosDelM1;
-  if (i.hayDvs && !i.showReporte && !i.reporteAnterior && (i.faseCompletada || dvsDeEsteM1)) return "completo";
+  if (i.hayDvs && !i.showReporte && !i.reporteAnterior && (i.f2Cerrada || dvsDeEsteM1)) return "completo";
   if (i.hayMensajeArea) return "mensaje";
   if (i.avisoSinGenerar) return "sin_generar";
   return "motores";
 }
+
+// ── Working states: what is blocked and what the process indicator says ───────
+
+export type MotivoBloqueoAccionesF2 = "m1_en_edicion" | "generando";
+
+/**
+ * Why «Reporte F2», «Generar Reporte F2», «Editar análisis» and «Cerrar Fase 2» are off, or null when they are
+ * free: the M1 is a draft / reopened (the analysis is being edited, the finalized report belongs to the previous
+ * one) or the motors are being generated. A closed phase is read-only: nothing is blocked, the report can be read.
+ */
+export function motivoBloqueoAccionesF2(i: { estado: EstadoM1 | null; generando: boolean; f2Cerrada?: boolean }): MotivoBloqueoAccionesF2 | null {
+  if (i.f2Cerrada) return null;
+  if (i.estado === "borrador" || i.estado === "reabierto") return "m1_en_edicion";
+  if (i.generando) return "generando";
+  return null;
+}
+
+/** Tooltip of the blocked actions; it only invites to approve when the «Aprobar análisis» button exists. */
+export function textoBloqueoAccionesF2(motivo: MotivoBloqueoAccionesF2, puedeAprobar: boolean): string {
+  if (motivo === "generando") return "Se están generando los motores M2–M5. Espera a que termine.";
+  return puedeAprobar ? "Aprueba el análisis PESTEL para habilitar esta acción." : "El análisis PESTEL no está aprobado.";
+}
+
+/**
+ * The process text shown above the zones of the motors area while M2–M5 are generated. null = nothing to add:
+ * not generating, or the zone is already the loading skeleton (zone «motores» with no draft), which says it itself.
+ * «lo que ves abajo es la última versión válida» is said ONLY when a previous draft is what the zone shows.
+ */
+export function indicadorProcesoMotores(i: { generando: boolean; zona: ZonaCentroMotores; hayBorrador: boolean }): string | null {
+  if (!i.generando) return null;
+  if (i.zona === "motores" && !i.hayBorrador) return null;
+  if (i.zona === "motores" && i.hayBorrador) return "Actualizando análisis… lo que ves abajo es la última versión válida.";
+  return TEXTO_GENERANDO;
+}
+
+/** After a reload in the middle of a generation the server may still be working: only a possibility is stated. */
+export const TEXTO_CAUTELA_RECARGA =
+  "Si acabas de aprobar, la generación puede seguir en curso: espera unos minutos y recarga antes de reintentar.";
 
 // ── Kebab ─────────────────────────────────────────────────────────────────────
 

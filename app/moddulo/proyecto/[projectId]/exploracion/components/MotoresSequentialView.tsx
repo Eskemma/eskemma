@@ -842,12 +842,6 @@ export default function MotoresSequentialView({
   // falla — nunca se blanquea la pantalla teniendo contenido válido que mostrar.
   return (
     <div className="space-y-2 pb-4">
-      {isGenerating && (
-        <div role="status" className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-red-eske-60 dark:text-red-eske-10">
-          <span className="w-3.5 h-3.5 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin shrink-0" />
-          Actualizando análisis… lo que ves abajo es la última versión válida.
-        </div>
-      )}
       {!isGenerating && generationError && (
         <div role="alert" className="flex items-start justify-between gap-3 px-4 py-2.5 rounded-xl border border-red-eske-30 dark:border-red-eske/30 bg-red-eske-10 dark:bg-red-eske/10 text-xs text-red-eske-60 dark:text-red-eske-10">
           <span className="min-w-0">

@@ -22,6 +22,10 @@ import {
   mostrarAvisoSinGenerar,
   motoresGeneradosParaPantalla,
   zonaCentroMotores,
+  motivoBloqueoAccionesF2,
+  textoBloqueoAccionesF2,
+  indicadorProcesoMotores,
+  TEXTO_CAUTELA_RECARGA,
   opcionesKebabM1,
   pieM1,
   puedeEditarMotores,
@@ -1009,7 +1013,7 @@ export default function ExploracionPage() {
   const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false, f2Cerrada: m1.f2Cerrada });
   // What the centre of the motors area shows (pure decision in lib/moddulo/pantallaM1).
   const zonaCentro = zonaCentroMotores({
-    faseCompletada: mode === "completed",
+    f2Cerrada: m1.f2Cerrada,
     hayDvs: dvs !== null,
     hayBorrador: draftDVS !== null,
     generando: isGeneratingMotors,
@@ -1028,6 +1032,12 @@ export default function ExploracionPage() {
   });
   // Every text that invites to «aprobar» depends on this ONE condition (the «Aprobar análisis» button).
   const puedeAprobar = puedeAprobarM1(m1.estado, m1.f2Cerrada);
+  // «Reporte F2», «Generar Reporte F2», «Editar análisis» and «Cerrar Fase 2» are off while the M1 is being edited
+  // (draft / reopened) and while the motors are generated (pure decision in lib/moddulo/pantallaM1).
+  const bloqueoAcciones = motivoBloqueoAccionesF2({ estado: m1.estado, generando: isGeneratingMotors, f2Cerrada: m1.f2Cerrada });
+  const textoBloqueo = bloqueoAcciones !== null ? textoBloqueoAccionesF2(bloqueoAcciones, puedeAprobar) : undefined;
+  // Process text above the zones of the motors area, whatever zone is showing.
+  const textoProceso = indicadorProcesoMotores({ generando: isGeneratingMotors, zona: zonaCentro, hayBorrador: draftDVS !== null });
   // The success notice of «Nuevo análisis» goes away once the new M1 is approved.
   useEffect(() => { if (m1.estado === "aprobado") setAvisoNuevoAnalisis(null); }, [m1.estado]);
 
@@ -1813,7 +1823,8 @@ export default function ExploracionPage() {
                 ) : (
                   <button
                     onClick={() => setShowReporte(true)}
-                    disabled={headerState === "en_progreso"}
+                    disabled={headerState === "en_progreso" || bloqueoAcciones !== null}
+                    title={textoBloqueo}
                     className={btnBase}
                   >
                     Reporte F2
@@ -1828,8 +1839,8 @@ export default function ExploracionPage() {
                 ) : (
                   <button
                     onClick={handleStartEdit}
-                    disabled={headerState === "en_progreso" || !puedeEditarMotores(m1.estado, motoresGeneradosM1)}
-                    title={!puedeEditarMotores(m1.estado, motoresGeneradosM1) ? motivoSinEditarMotores(m1.estado, m1.f2Cerrada) ?? undefined : undefined}
+                    disabled={headerState === "en_progreso" || bloqueoAcciones !== null || !puedeEditarMotores(m1.estado, motoresGeneradosM1)}
+                    title={textoBloqueo ?? (!puedeEditarMotores(m1.estado, motoresGeneradosM1) ? motivoSinEditarMotores(m1.estado, m1.f2Cerrada) ?? undefined : undefined)}
                     className={btnBase}
                   >
                     Editar análisis
@@ -1839,9 +1850,9 @@ export default function ExploracionPage() {
                 {/* Chip 3: Cerrar Fase 2 */}
                 <button
                   onClick={handleOpenReview}
-                  disabled={headerState !== "lista" || motivoCierre !== null}
-                  title={motivoCierre !== null ? textoBotonCierreApagado(motivoCierre, puedeAprobar) : undefined}
-                  className={headerState === "lista" && motivoCierre === null ? btnClose : btnBase}
+                  disabled={headerState !== "lista" || motivoCierre !== null || bloqueoAcciones !== null}
+                  title={textoBloqueo ?? (motivoCierre !== null ? textoBotonCierreApagado(motivoCierre, puedeAprobar) : undefined)}
+                  className={headerState === "lista" && motivoCierre === null && bloqueoAcciones === null ? btnClose : btnBase}
                 >
                   Cerrar Fase 2
                 </button>
@@ -1925,7 +1936,7 @@ export default function ExploracionPage() {
         <div className={`flex-1 flex-col p-3 sm:p-4 overflow-hidden min-w-0 ${mobileTab === "chat" ? "flex" : "hidden lg:flex"}`}>
 
           {/* Reporte F2 — DVS finalizado */}
-          {showReporte && dvs !== null && mode !== "editing" ? (
+          {showReporte && dvs !== null && mode !== "editing" && bloqueoAcciones === null ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="shrink-0 mb-3 space-y-1.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2185,6 +2196,12 @@ export default function ExploracionPage() {
                   </div>
                 </div>
               )}
+              {textoProceso !== null && (
+                <div role="status" className="shrink-0 mb-3 flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-bluegreen-eske-30 dark:border-bluegreen-eske/40 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10 text-xs text-red-eske-60 dark:text-red-eske-10">
+                  <span className="w-3.5 h-3.5 border-2 border-bluegreen-eske border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
+                  {textoProceso}
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 {zonaCentro === "completo" ? (
                   <div className="rounded-xl p-6 border border-bluegreen-eske/30 bg-bluegreen-eske/5 dark:bg-bluegreen-eske/10">
@@ -2200,7 +2217,9 @@ export default function ExploracionPage() {
                     <button
                       type="button"
                       onClick={() => setShowReporte(true)}
-                      className="px-5 py-2 bg-bluegreen-eske text-white rounded-full text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors"
+                      disabled={bloqueoAcciones !== null}
+                      title={textoBloqueo}
+                      className="px-5 py-2 bg-bluegreen-eske text-white rounded-full text-sm font-semibold hover:bg-bluegreen-eske/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Generar Reporte F2
                     </button>
@@ -2214,6 +2233,7 @@ export default function ExploracionPage() {
                   <div role="status" className="rounded-xl border border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] p-6 text-center space-y-3">
                     <p className="text-sm font-semibold text-black-eske dark:text-[#EAF2F8]">M1 aprobado, motores sin generar</p>
                     <p className="text-sm text-black-eske-20 dark:text-[#9AAEBE]">Usa «Reintentar generación», en el panel «Análisis PESTEL», para generar M2–M5.</p>
+                    <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">{TEXTO_CAUTELA_RECARGA}</p>
                   </div>
                 ) : (
                   <MotoresSequentialView
@@ -2532,8 +2552,6 @@ function ExplorationFormPanel({
     consumirFoco();
   }, [dimParaFoco, consumirFoco]);
   const kebabM1 = opcionesKebabM1({ kind: m1.kind, estado: m1.estado, f2Cerrada: m1.f2Cerrada });
-  // Closed F2 with nothing to offer in the menu: the menu is not drawn (a plain label instead).
-  const f2CerradaPanel = m1.f2Cerrada && !kebabM1.hayOpciones;
   const pie = pieM1({
     estado: m1.estado,
     f2Cerrada: m1.f2Cerrada,
@@ -2580,7 +2598,7 @@ function ExplorationFormPanel({
       {/* Header */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A] flex items-center justify-between">
         <h2 className="text-xs font-bold uppercase tracking-widest text-black-eske-40 dark:text-[#9AAEBE]">Análisis PESTEL</h2>
-        {readOnly ? (
+        {m1.f2Cerrada ? (
           m1.permiso.puede ? null : <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
         ) : pestProjectId ? (
           <Link
@@ -2610,8 +2628,6 @@ function ExplorationFormPanel({
               </button>
             )}
           </div>
-        ) : f2CerradaPanel ? (
-          <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Solo lectura</span>
         ) : onNuevoAnalisis && kebabM1.hayOpciones ? (
           <div className="relative shrink-0" ref={kebabRef}>
             <button
