@@ -49,22 +49,32 @@ export interface ResultadoEstadoM1 {
   aprobacionValida: boolean;
   /** Approved, but the motors draft was not generated from this approval. */
   motoresSinGenerar: boolean;
+  /**
+   * Approved, and the finalized Reporte F2 (`dvs`) was NOT built from this approval. With the finalization seal
+   * (`m1.finalizacion`) it is the comparison of fingerprints. COMPATIBILITY RULE for a `dvs` finalized before the
+   * seal existed: it is assumed current only when there is NO saved draft pending (a pending draft next to a
+   * `dvs` means the motors were regenerated and not finalized). It cannot tell apart a legacy `dvs` that really
+   * is current but has a leftover draft (it is reported as «de otro análisis»).
+   */
+  dvsDeOtroAnalisis: boolean;
 }
 
 export function estadoM1(e: EntradaEstadoM1): ResultadoEstadoM1 {
   const restos = e.tieneDraft || e.hayMotoresAprobados;
   if (!e.tienePayload) {
-    return { estado: restos ? "sin_m1_con_restos" : "sin_m1", aprobacionValida: false, motoresSinGenerar: false };
+    return { estado: restos ? "sin_m1_con_restos" : "sin_m1", aprobacionValida: false, motoresSinGenerar: false, dvsDeOtroAnalisis: false };
   }
 
   const aprobacion = e.m1?.aprobacion;
   const aprobacionValida = !!aprobacion && !!e.huellaPayload && aprobacion.huella === e.huellaPayload;
   if (aprobacionValida) {
     const gen = e.m1?.generacion;
+    const sello = e.m1?.finalizacion;
     return {
       estado: "aprobado",
       aprobacionValida: true,
       motoresSinGenerar: !gen || gen.huella !== aprobacion!.huella,
+      dvsDeOtroAnalisis: e.tieneDvs && (sello ? sello.huella !== aprobacion!.huella : e.tieneDraft),
     };
   }
 
@@ -75,12 +85,13 @@ export function estadoM1(e: EntradaEstadoM1): ResultadoEstadoM1 {
       estado: e.tieneDvs || restos ? "anterior" : "borrador",
       aprobacionValida: false,
       motoresSinGenerar: false,
+      dvsDeOtroAnalisis: false,
     };
   }
   if (e.m1.reabiertoEn && !aprobacion) {
-    return { estado: "reabierto", aprobacionValida: false, motoresSinGenerar: false };
+    return { estado: "reabierto", aprobacionValida: false, motoresSinGenerar: false, dvsDeOtroAnalisis: false };
   }
-  return { estado: "borrador", aprobacionValida: false, motoresSinGenerar: false };
+  return { estado: "borrador", aprobacionValida: false, motoresSinGenerar: false, dvsDeOtroAnalisis: false };
 }
 
 // ── Edits by path ─────────────────────────────────────────────────────────────
@@ -104,11 +115,20 @@ export interface EdicionNueva {
  * Editing back to the original text removes the entry (it is not an adjustment).
  * Pure: returns a new object.
  */
+/**
+ * Is `editado` the same as `original` for this field? The narrative is compared TRIMMED on both sides (the route
+ * stores the edited text trimmed, so an original that ends in a space or line break would otherwise count as a
+ * «ghost» edit that looks identical on screen). The classification is compared exactly.
+ */
+export function mismoValorDeEdicion(campo: CampoEditableM1, original: string, editado: string): boolean {
+  return campo === "narrativa" ? original.trim() === editado.trim() : original === editado;
+}
+
 export function registrarEdicion(ediciones: Ediciones | undefined, nueva: EdicionNueva): Ediciones {
   const ruta = rutaEdicion(nueva.dim, nueva.campo);
   const actual = { ...(ediciones ?? {}) };
   const original = actual[ruta]?.original ?? nueva.valorActual;
-  if (nueva.editado === original) {
+  if (mismoValorDeEdicion(nueva.campo, original, nueva.editado)) {
     delete actual[ruta];
     return actual;
   }
@@ -144,7 +164,7 @@ function valorDeCampo(dim: F2DimensionPESTEL | undefined, campo: CampoEditableM1
 function edicionesVigentes(ediciones: Ediciones | undefined, mapa: MapaPESTEL | undefined): [RutaEdicionM1, M1Edicion][] {
   return (Object.entries(ediciones ?? {}) as [RutaEdicionM1, M1Edicion][]).filter(([ruta, ed]) => {
     const [dim, campo] = ruta.split(".") as [string, CampoEditableM1];
-    return valorDeCampo(mapa?.[dim], campo) === ed.editado && ed.editado !== ed.original;
+    return valorDeCampo(mapa?.[dim], campo) === ed.editado && !mismoValorDeEdicion(campo, ed.original, ed.editado);
   });
 }
 

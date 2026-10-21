@@ -122,15 +122,20 @@ export async function POST(request: NextRequest) {
   // Lock, step 2: the same check INSIDE the transaction, recomputing the diff
   // against the dvs read there (another tab may have saved since step 1).
   let eliminadosTardios: IdsEliminados | null = null;
+  // Finalization seal (m1.finalizacion): which approved version the report comes from = the fingerprint of the
+  // generation of the draft being finalized, read INSIDE the transaction (the guard below sets it; it is applied
+  // together with the new dvs). Only for projects under the M1 review (huellaM1 set). With no generation mark the
+  // old seal is deleted: it would claim the new dvs comes from an older approval.
+  const updates: Record<string, unknown> = {
+    "phases.exploracion.estado": "lista",
+    "phases.exploracion.draftDVS": FieldValue.delete(),
+    "phases.exploracion.motorAprobaciones": FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
   try {
     await reemplazarDVSConVersion(adminDb, projectId, {
       nuevoDvs: dvs,
-      updates: {
-        "phases.exploracion.estado": "lista",
-        "phases.exploracion.draftDVS": FieldValue.delete(),
-        "phases.exploracion.motorAprobaciones": FieldValue.delete(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+      updates,
       origen: "finalize-dvs",
       uid: session.uid,
       guardia: ({ proyecto, resultados }) => {
@@ -139,6 +144,12 @@ export async function POST(request: NextRequest) {
           huellaM1
         );
         if (!c.ok) throw new CompuertaM1Error(c.motivo);
+        if (huellaM1 !== null) {
+          const gen = (proyecto as { phases?: { exploracion?: ExploracionParaM1 } } | undefined)?.phases?.exploracion?.m1?.generacion;
+          updates["phases.exploracion.m1.finalizacion"] = gen?.huella
+            ? { huella: gen.huella, en: FieldValue.serverTimestamp() }
+            : FieldValue.delete();
+        }
         const estado = estadoParaImpactoDesdeProyecto(proyecto, resultados);
         if (!estado.dvs) return; // first finalization
         const { eliminados, decision } = evaluar(estado, dvs);

@@ -74,7 +74,14 @@ export async function POST(
       // Only a project WITH an `m1` record is under review: a payload without `m1` that estadoM1 reads as «borrador»
       // (no report, no motors) is a project from before the review existed.
       const estado = a.m1 ? a.estado.estado : a.payload ? "anterior" : "sin_m1";
-      const motivo = motivoNoCerrarF2({ estado, hayDvs: !!exploracion?.dvs, motoresSinGenerar: a.estado.motoresSinGenerar });
+      const motivo = motivoNoCerrarF2({
+        estado,
+        hayDvs: !!exploracion?.dvs,
+        motoresSinGenerar: a.estado.motoresSinGenerar,
+        // The finalized Reporte F2 must come from THIS approval (finalization seal, or the compatibility rule for a
+        // `dvs` finalized before the seal). A phase that is already closed never gets here (idempotent path above).
+        dvsDeOtroAnalisis: a.estado.dvsDeOtroAnalisis,
+      });
       if (motivo) return NextResponse.json({ error: motivo }, { status: 409 });
     }
 

@@ -595,6 +595,8 @@ async function persistAndReturn(
         nuevoDvs: dvs,
         updates: {
           "phases.exploracion.estado": "lista",
+          // Finalization seal: this report was generated from the approved analysis whose fingerprint was captured.
+          ...(huellaM1 && { "phases.exploracion.m1.finalizacion": { huella: huellaM1, en: FieldValue.serverTimestamp() } }),
           updatedAt: FieldValue.serverTimestamp(),
         },
         origen: "generate-dvs-final",

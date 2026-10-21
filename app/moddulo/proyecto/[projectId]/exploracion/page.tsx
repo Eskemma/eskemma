@@ -22,6 +22,11 @@ import {
   mostrarAvisoSinGenerar,
   motoresGeneradosParaPantalla,
   zonaCentroMotores,
+  motivoBloqueoEditarAnalisis,
+  textoMotoresActualizados,
+  avisoMotoresActualizadosVisible,
+  ETIQUETA_REPORTE_VERSION_ANTERIOR,
+  ACCION_REVISAR_MOTORES_NUEVOS,
   motivoBloqueoAccionesF2,
   textoBloqueoAccionesF2,
   indicadorProcesoMotores,
@@ -1007,10 +1012,12 @@ export default function ExploracionPage() {
   const hayAnalisisPrevioRef = useRef(false);
   useEffect(() => { hayAnalisisPrevioRef.current = mapaPESTEL !== null || dvs !== null; });
   // A finalized Reporte F2 belongs to the PREVIOUS analysis while the M1 on screen is new and unapproved.
-  const reporteAnterior = reporteDelAnalisisAnterior(m1.estado, dvs !== null);
+  const dvsDeOtroAnalisis = m1.resumen?.dvsDeOtroAnalisis ?? false;
+  const borradorGuardado = m1.resumen?.borradorGuardado ?? false;
+  const reporteAnterior = reporteDelAnalisisAnterior(m1.estado, dvs !== null, dvsDeOtroAnalisis);
   // Why «Cerrar Fase 2» is off (null = it can close): the SAME pure decision complete-phase uses, so the button
   // is off exactly when the server would refuse and no text invites closing without the button.
-  const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false, f2Cerrada: m1.f2Cerrada });
+  const motivoCierre = motivoNoCerrarF2({ estado: m1.estado, hayDvs: dvs !== null, motoresSinGenerar: m1.resumen?.motoresSinGenerar ?? false, dvsDeOtroAnalisis, f2Cerrada: m1.f2Cerrada });
   // What the centre of the motors area shows (pure decision in lib/moddulo/pantallaM1).
   const zonaCentro = zonaCentroMotores({
     f2Cerrada: m1.f2Cerrada,
@@ -1037,6 +1044,15 @@ export default function ExploracionPage() {
   const bloqueoAcciones = motivoBloqueoAccionesF2({ estado: m1.estado, generando: isGeneratingMotors, f2Cerrada: m1.f2Cerrada });
   const textoBloqueo = bloqueoAcciones !== null ? textoBloqueoAccionesF2(bloqueoAcciones, puedeAprobar) : undefined;
   // Process text above the zones of the motors area, whatever zone is showing.
+  // «Editar análisis» also stays off while a SAVED draft is pending next to the finalized report.
+  const bloqueoEditar = motivoBloqueoEditarAnalisis({
+    estado: m1.estado, generando: isGeneratingMotors, f2Cerrada: m1.f2Cerrada, hayDvs: dvs !== null, borradorGuardado,
+  });
+  const textoBloqueoEditar = bloqueoEditar !== null ? textoBloqueoAccionesF2(bloqueoEditar, puedeAprobar) : undefined;
+  // Notice «motores actualizados»: derived from the SAVED state of the server, not from the local draft.
+  const avisoActualizados = avisoMotoresActualizadosVisible({
+    estado: m1.estado, f2Cerrada: m1.f2Cerrada, hayDvs: dvs !== null, borradorGuardado, dvsDeOtroAnalisis,
+  });
   const textoProceso = indicadorProcesoMotores({ generando: isGeneratingMotors, zona: zonaCentro, hayBorrador: draftDVS !== null });
   // The success notice of «Nuevo análisis» goes away once the new M1 is approved.
   useEffect(() => { if (m1.estado === "aprobado") setAvisoNuevoAnalisis(null); }, [m1.estado]);
@@ -1552,6 +1568,8 @@ export default function ExploracionPage() {
       setDraftDVS(null);
       setMotorAprobaciones({});
       if (mode !== "completed") setMode("completed");
+      // The finalization seal is on the server now: re-read so the notice, the label and the blocks follow it.
+      void refrescarM1Ref.current();
       // showReporte queda en false — el usuario ve el panel "Análisis completo"
       // y decide cuándo abrir el Reporte F2
     }
@@ -1652,6 +1670,7 @@ export default function ExploracionPage() {
             setMode("completed");
             setShowReporte(true);
             setLastSaved(new Date());
+            void refrescarM1Ref.current();
           }
           break;
         case "requiere_confirmacion":
@@ -1839,8 +1858,8 @@ export default function ExploracionPage() {
                 ) : (
                   <button
                     onClick={handleStartEdit}
-                    disabled={headerState === "en_progreso" || bloqueoAcciones !== null || !puedeEditarMotores(m1.estado, motoresGeneradosM1)}
-                    title={textoBloqueo ?? (!puedeEditarMotores(m1.estado, motoresGeneradosM1) ? motivoSinEditarMotores(m1.estado, m1.f2Cerrada) ?? undefined : undefined)}
+                    disabled={headerState === "en_progreso" || bloqueoEditar !== null || !puedeEditarMotores(m1.estado, motoresGeneradosM1)}
+                    title={textoBloqueoEditar ?? (!puedeEditarMotores(m1.estado, motoresGeneradosM1) ? motivoSinEditarMotores(m1.estado, m1.f2Cerrada) ?? undefined : undefined)}
                     className={btnBase}
                   >
                     Editar análisis
@@ -1953,7 +1972,9 @@ export default function ExploracionPage() {
                     {isRegeneratingReport ? (
                       <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Regenerando...</span>
                     ) : reporteAnterior ? (
-                      <span className="text-xs text-brown-eske-60 dark:text-yellow-eske font-medium">Reporte del análisis anterior</span>
+                      <span className="text-xs text-brown-eske-60 dark:text-yellow-eske font-medium">
+                        {m1.estado === "aprobado" ? ETIQUETA_REPORTE_VERSION_ANTERIOR : "Reporte del análisis anterior"}
+                      </span>
                     ) : (
                       <span className="text-xs text-green-eske-60 dark:text-green-eske-30 font-medium">Reporte generado</span>
                     )}
@@ -1967,8 +1988,15 @@ export default function ExploracionPage() {
                     </button>
                   </div>
                 </div>
-                {reporteAnterior && (
+                {reporteAnterior && m1.estado !== "aprobado" && (
                   <p role="status" className="rounded-lg border border-yellow-eske/40 bg-yellow-eske/10 px-3 py-2 text-xs text-brown-eske-60 dark:text-yellow-eske">{textoReporteAnterior(puedeAprobar)}</p>
+                )}
+                {reporteAnterior && m1.estado === "aprobado" && borradorGuardado && (
+                  <p role="status" className="rounded-lg border border-yellow-eske/40 bg-yellow-eske/10 px-3 py-2 text-xs text-brown-eske-60 dark:text-yellow-eske">
+                    <button type="button" onClick={() => setShowReporte(false)} className="font-semibold underline underline-offset-2 hover:no-underline">
+                      {ACCION_REVISAR_MOTORES_NUEVOS}
+                    </button>
+                  </p>
                 )}
                 {reportRegenError && (
                   <p role="alert" className="text-xs text-red-eske-60 dark:text-red-eske-10 text-right">{reportRegenError}</p>
@@ -2194,6 +2222,11 @@ export default function ExploracionPage() {
                       Regenerar análisis ↺
                     </button>
                   </div>
+                </div>
+              )}
+              {avisoActualizados && (
+                <div role="status" className="shrink-0 mb-3 rounded-lg border border-green-eske/30 bg-green-eske/10 px-3 py-2 text-xs text-green-eske-80 dark:text-green-eske-30">
+                  {textoMotoresActualizados(m1.resumen?.dimensionesEditadas ?? [])}
                 </div>
               )}
               {textoProceso !== null && (

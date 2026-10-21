@@ -80,6 +80,13 @@ export interface ResumenM1Cliente {
   estado: ResultadoEstadoM1["estado"];
   aprobacionValida: boolean;
   motoresSinGenerar: boolean;
+  /**
+   * The finalized Reporte F2 comes from a previous version of the analysis (see estadoM1). Always false with F2
+   * closed: a closed phase never changes label nor receives new refusals.
+   */
+  dvsDeOtroAnalisis: boolean;
+  /** There is a motors draft SAVED on the server (not the local draft of «Editar análisis»). */
+  borradorGuardado: boolean;
   /** Fingerprint of the M1 the user is looking at; the client sends it back as `huellaVista`. */
   huella: string | null;
   kind: string | null;
@@ -92,6 +99,8 @@ export function resumenM1ParaCliente(exp: ExploracionParaM1 | undefined): Resume
     estado: a.estado.estado,
     aprobacionValida: a.estado.aprobacionValida,
     motoresSinGenerar: a.estado.motoresSinGenerar,
+    dvsDeOtroAnalisis: !a.cerrada && a.estado.dvsDeOtroAnalisis,
+    borradorGuardado: a.impacto.hayBorrador,
     huella: a.huellaPayload,
     kind: a.kind,
     dimensionesEditadas: a.impacto.dimensionesEditadas,

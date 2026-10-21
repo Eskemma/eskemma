@@ -33,8 +33,8 @@ export const MOTIVO_CERRAR_F2_SIN_APROBAR =
  * reopened): the report belongs to the PREVIOUS analysis. «Cerrar Fase 2» must not advance with it.
  * «anterior» (no record about M1) and «aprobado» are not this case.
  */
-export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: boolean): boolean {
-  return hayDvs && (estado === "borrador" || estado === "reabierto");
+export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: boolean, dvsDeOtroAnalisis = false): boolean {
+  return hayDvs && (estado === "borrador" || estado === "reabierto" || (estado === "aprobado" && dvsDeOtroAnalisis));
 }
 
 export type MotivoNoCerrarF2 = "ya_cerrada" | "m1_no_aprobado" | "reporte_f2_no_finalizado" | "reporte_f2_de_otro_analisis";
@@ -49,11 +49,18 @@ export type MotivoNoCerrarF2 = "ya_cerrada" | "m1_no_aprobado" | "reporte_f2_no_
  * Projects with no M1 record (anterior / sin_m1 states) only need their Reporte F2.
  * A Fase 2 that is already closed (`f2Cerrada`) wins over everything: there is nothing left to close.
  */
-export function motivoNoCerrarF2(i: { estado: EstadoM1 | null; hayDvs: boolean; motoresSinGenerar: boolean; f2Cerrada?: boolean }): MotivoNoCerrarF2 | null {
+export function motivoNoCerrarF2(i: {
+  estado: EstadoM1 | null;
+  hayDvs: boolean;
+  motoresSinGenerar: boolean;
+  /** The finalized report was not built from the approved analysis (finalization seal, or the compatibility rule). */
+  dvsDeOtroAnalisis?: boolean;
+  f2Cerrada?: boolean;
+}): MotivoNoCerrarF2 | null {
   if (i.f2Cerrada) return "ya_cerrada";
   if (i.estado === "borrador" || i.estado === "reabierto") return "m1_no_aprobado";
   if (!i.hayDvs) return "reporte_f2_no_finalizado";
-  if (i.estado === "aprobado" && i.motoresSinGenerar) return "reporte_f2_de_otro_analisis";
+  if (i.estado === "aprobado" && (i.motoresSinGenerar || i.dvsDeOtroAnalisis === true)) return "reporte_f2_de_otro_analisis";
   return null;
 }
 
@@ -366,6 +373,7 @@ export function zonaCentroMotores(i: {
 // ── Working states: what is blocked and what the process indicator says ───────
 
 export type MotivoBloqueoAccionesF2 = "m1_en_edicion" | "generando";
+export type MotivoBloqueoEditarAnalisis = MotivoBloqueoAccionesF2 | "borrador_pendiente";
 
 /**
  * Why «Reporte F2», «Generar Reporte F2», «Editar análisis» and «Cerrar Fase 2» are off, or null when they are
@@ -379,8 +387,22 @@ export function motivoBloqueoAccionesF2(i: { estado: EstadoM1 | null; generando:
   return null;
 }
 
+/**
+ * «Editar análisis» is also off while a saved motors draft is pending next to a finalized report: editing would
+ * replace the new motors on screen with a copy of the old report, and «Guardar cambios» would finalize it as current.
+ */
+export function motivoBloqueoEditarAnalisis(i: {
+  estado: EstadoM1 | null; generando: boolean; f2Cerrada?: boolean; hayDvs: boolean; borradorGuardado: boolean;
+}): MotivoBloqueoEditarAnalisis | null {
+  const general = motivoBloqueoAccionesF2(i);
+  if (general) return general;
+  if (!i.f2Cerrada && i.hayDvs && i.borradorGuardado) return "borrador_pendiente";
+  return null;
+}
+
 /** Tooltip of the blocked actions; it only invites to approve when the «Aprobar análisis» button exists. */
-export function textoBloqueoAccionesF2(motivo: MotivoBloqueoAccionesF2, puedeAprobar: boolean): string {
+export function textoBloqueoAccionesF2(motivo: MotivoBloqueoEditarAnalisis, puedeAprobar: boolean): string {
+  if (motivo === "borrador_pendiente") return "Hay motores nuevos sin finalizar. Revísalos en orden y finaliza el análisis antes de editarlo.";
   if (motivo === "generando") return "Se están generando los motores M2–M5. Espera a que termine.";
   return puedeAprobar ? "Aprueba el análisis PESTEL para habilitar esta acción." : "El análisis PESTEL no está aprobado.";
 }
@@ -396,6 +418,29 @@ export function indicadorProcesoMotores(i: { generando: boolean; zona: ZonaCentr
   if (i.zona === "motores" && i.hayBorrador) return "Actualizando análisis… lo que ves abajo es la última versión válida.";
   return TEXTO_GENERANDO;
 }
+
+/**
+ * Notice shown while new motors are SAVED on the server and the finalized report is not from the current analysis.
+ * «Ajustes» = any edit in force (narrative, classification or both) of the approved analysis; the names come from
+ * `resumen.dimensionesEditadas` in screen order. Never promises that the motors mention the adjustments.
+ */
+export function textoMotoresActualizados(dimensionesEditadas: readonly string[]): string {
+  const nombres = ORDEN_DIMENSIONES.filter((c) => dimensionesEditadas.includes(c)).map((c) => ETIQUETA_DIMENSION[c] ?? c);
+  const cola = "Revísalos en orden; el efecto se ve en cómo se interpreta cada uno.";
+  if (nombres.length === 0) return `Los motores M2–M5 se actualizaron con el análisis PESTEL aprobado. ${cola}`;
+  const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+  return `Los motores M2–M5 se actualizaron con tus ajustes en ${lista}. ${cola}`;
+}
+
+/** The notice is on while: approved, F2 open, a saved draft pending and the finalized report from another version. */
+export function avisoMotoresActualizadosVisible(i: {
+  estado: EstadoM1 | null; f2Cerrada: boolean; hayDvs: boolean; borradorGuardado: boolean; dvsDeOtroAnalisis: boolean;
+}): boolean {
+  return i.estado === "aprobado" && !i.f2Cerrada && i.hayDvs && i.borradorGuardado && i.dvsDeOtroAnalisis;
+}
+
+export const ETIQUETA_REPORTE_VERSION_ANTERIOR = "Este reporte se generó con una versión anterior del análisis PESTEL";
+export const ACCION_REVISAR_MOTORES_NUEVOS = "Revisar los motores nuevos";
 
 /** After a reload in the middle of a generation the server may still be working: only a possibility is stated. */
 export const TEXTO_CAUTELA_RECARGA =

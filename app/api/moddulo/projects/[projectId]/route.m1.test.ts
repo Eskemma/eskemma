@@ -35,7 +35,7 @@ describe("GET proyecto — resumen del M1", () => {
     expect(b.project.id).toBe("p1");
     expect(b.project.phases.exploracion.linkedSource.payload.P.narrativa).toBe("IA P");
     expect(b.m1).toEqual({
-      estado: "borrador", aprobacionValida: false, motoresSinGenerar: false,
+      estado: "borrador", aprobacionValida: false, motoresSinGenerar: false, dvsDeOtroAnalisis: false, borradorGuardado: false,
       huella: huellaDe(mapaM1()), kind: "express", dimensionesEditadas: [],
     });
   });

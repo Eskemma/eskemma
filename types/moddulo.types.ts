@@ -619,12 +619,23 @@ export interface M1Generacion {
   en: unknown;
 }
 
+/**
+ * De qué versión aprobada del análisis salió el Reporte F2 finalizado (`dvs`): la huella del M1 aprobado cuyo
+ * borrador de motores se finalizó (o desde el que se generó el análisis final). La escriben `finalize-dvs` y
+ * `generate-dvs` final. Sin ella (finalizado antes de este sello) se aplica la regla de compatibilidad.
+ */
+export interface M1Finalizacion {
+  huella: string;
+  en: unknown;
+}
+
 export interface M1Datos {
   /** Cuándo se generó o importó este M1 (lo escriben los tres escritores de M1; el sello de la pantalla). */
   creadoEn?: unknown;
   ediciones?: Partial<Record<RutaEdicionM1, M1Edicion>>;
   aprobacion?: M1Aprobacion;
   generacion?: M1Generacion;
+  finalizacion?: M1Finalizacion;
   /** Marca de que el usuario reabrió un M1 aprobado y aún no lo vuelve a aprobar. */
   reabiertoEn?: unknown;
   reabiertoPor?: string;
