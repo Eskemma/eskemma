@@ -158,7 +158,9 @@ export async function POST(request: NextRequest) {
       xpctoRaw,
       mapaSerialized,
       m3Actores,
-      m4Incertidumbres
+      m4Incertidumbres,
+      // The M1 gate passed (fingerprint captured) = the frozen approved copy; no review record = the current analysis.
+      huellaCapturada !== null
     );
     const knowledgeContext = await buildPhaseContext({ phaseId: "exploracion", projectType: project.type });
     const systemPrompt = knowledgeContext ? `${knowledgeContext}\n\n${system}` : system;

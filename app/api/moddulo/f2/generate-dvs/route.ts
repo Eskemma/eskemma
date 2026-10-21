@@ -248,6 +248,8 @@ async function runMultiMotorInterno(
   origen: OrigenAnalisis,
   t0: number
 ): Promise<NextResponse> {
+  // The M1 gate passed (huellaM1 set) = the frozen approved copy; no review record = the project's current analysis.
+  const aprobado = huellaM1 !== null;
   const stops: Record<string, string | null | undefined> = {};
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
@@ -273,8 +275,8 @@ async function runMultiMotorInterno(
   let m2Raw: string;
   let m3Raw: string;
   try {
-    const pM2 = getDVSM2Prompt(projectType, xpctoRaw, mapaSerialized);
-    const pM3 = getDVSM3Prompt(projectType, xpctoRaw, mapaSerialized);
+    const pM2 = getDVSM2Prompt(projectType, xpctoRaw, mapaSerialized, aprobado);
+    const pM3 = getDVSM3Prompt(projectType, xpctoRaw, mapaSerialized, aprobado);
     const [resM2, resM3] = await Promise.all([
       callClaude(pM2.system, pM2.user, 3000, { motor: "M2", intento: 1, t0 }),
       callClaude(pM3.system, pM3.user, 3000, { motor: "M3", intento: 1, t0 }),
@@ -314,7 +316,7 @@ async function runMultiMotorInterno(
 
   let m4Raw: string;
   try {
-    const { system, user } = getDVSM4Prompt(mapaSerialized, m2Veredictos);
+    const { system, user } = getDVSM4Prompt(mapaSerialized, m2Veredictos, aprobado);
     const resM4 = await callClaude(system, user, 2000, { motor: "M4", intento: 1, t0 });
     stops.M4 = resM4.stop_reason;
     m4Raw = extractText(resM4);
@@ -350,7 +352,7 @@ async function runMultiMotorInterno(
   for (let attempt = 1; attempt <= 2; attempt++) {
     let m5Raw: string;
     try {
-      const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres);
+      const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres, aprobado);
       const resM5 = await callClaude(system, user, 5000, { motor: "M5", intento: attempt, t0 });
       stops.M5 = resM5.stop_reason;
       m5Raw = extractText(resM5);

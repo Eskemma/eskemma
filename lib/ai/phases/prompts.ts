@@ -928,10 +928,36 @@ function xpctoToText(xpcto: Record<string, unknown>): string {
   ].join("\n");
 }
 
+// ==========================================
+// DVS MULTI-MOTOR — precedencia del análisis aprobado
+// ==========================================
+
+/**
+ * Rule of product (paso 6): M2–M5 use only the frozen approved copy of the PEST-L analysis, and what the user
+ * approved (narrative and classification of each category, with their adjustments) prevails over the individual
+ * signals and over any other reading the motor would make of that dimension. The motor's own reasoning about
+ * its task is NOT restricted. One shared piece for the four motors, placed in the user prompt after the map
+ * and before the motor's instructions. Two openings: with an explicit approval, and for projects with no
+ * review record (created before it existed), where nothing was «approved».
+ */
+export const PRECEDENCIA_PESTL_APROBADO =
+  "El análisis PEST-L de arriba es el que el usuario revisó y aprobó y, en su caso, con los ajustes que hizo.";
+export const PRECEDENCIA_PESTL_VIGENTE = "El análisis PEST-L de arriba es el vigente de este proyecto.";
+export const PRECEDENCIA_PESTL_CUERPO =
+  "En cada dimensión, la clasificación (OPORTUNIDAD, NEUTRAL o AMENAZA) y la narrativa son la lectura vigente: " +
+  "prevalecen sobre las señales individuales y sobre cualquier otra lectura que tú harías de esa dimensión. " +
+  "Usa las señales como evidencia que sustenta esa lectura; no las uses para reclasificar la dimensión ni para " +
+  "contradecir su narrativa. Puedes señalar matices o incertidumbres que aporten las señales, sin cambiar esa lectura.";
+
+export function seccionPrecedenciaPESTL(aprobado: boolean): string {
+  return `== PRECEDENCIA DEL ANÁLISIS PEST-L ==\n${aprobado ? PRECEDENCIA_PESTL_APROBADO : PRECEDENCIA_PESTL_VIGENTE} ${PRECEDENCIA_PESTL_CUERPO}`;
+}
+
 export function getDVSM2Prompt(
   projectType: string,
   xpcto: Record<string, unknown>,
-  mapaSerialized: string
+  mapaSerialized: string,
+  aprobado: boolean
 ): { system: string; user: string } {
   return {
     system: `Eres un analista político especializado en metodología XPCTO de consultoría Eskemma.
@@ -946,12 +972,14 @@ ${xpctoToText(xpcto)}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
+${seccionPrecedenciaPESTL(aprobado)}
+
 == DIMENSIONES PRIORITARIAS PARA ESTE TIPO DE PROYECTO ==
 ${buildM2PriorityInstruction(projectType)}
 
 == INSTRUCCIONES ==
 Para cada una de las 5 variables XPCTO (X, P, C, T, O):
-1. Escanea TODAS las dimensiones PEST-L buscando señales relevantes para esa variable — pero da mayor
+1. Revisa TODAS las dimensiones PEST-L (su clasificación, su narrativa y sus señales) buscando lo relevante para esa variable — pero da mayor
    peso y detalle en la argumentación a las señales provenientes de las dimensiones prioritarias listadas
    arriba, cuando estén disponibles.
 2. Veredicto:
@@ -978,7 +1006,8 @@ Responde SOLO con este JSON (array de exactamente 5 elementos):
 export function getDVSM3Prompt(
   projectType: string,
   xpcto: Record<string, unknown>,
-  mapaSerialized: string
+  mapaSerialized: string,
+  aprobado: boolean
 ): { system: string; user: string } {
   return {
     system: `Eres un analista político especializado en mapeo de actores políticos.
@@ -992,6 +1021,8 @@ ${xpctoToText(xpcto)}
 
 == MAPA PEST-L ==
 ${mapaSerialized}
+
+${seccionPrecedenciaPESTL(aprobado)}
 
 == INSTRUCCIONES ==
 1. Identifica actores mencionados en el PEST-L o evidentes para este tipo de proyecto.
@@ -1010,7 +1041,8 @@ Responde SOLO con este JSON:
 
 export function getDVSM4Prompt(
   mapaSerialized: string,
-  m2Veredictos: Array<{ dimension: string; veredicto: string; argumentacion: string }>
+  m2Veredictos: Array<{ dimension: string; veredicto: string; argumentacion: string }>,
+  aprobado: boolean
 ): { system: string; user: string } {
   const m2Summary = m2Veredictos
     .map((v) => `${v.dimension}: ${v.veredicto} — ${v.argumentacion}`)
@@ -1029,11 +1061,13 @@ ${m2Summary}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
+${seccionPrecedenciaPESTL(aprobado)}
+
 == INSTRUCCIONES ==
 Una incertidumbre es una BRECHA DE INFORMACIÓN, no un riesgo.
 1. Deriva incertidumbres de:
    - Variables M2 con "requiere_investigacion" → urgencia alta
-   - Señales inciertas del PEST-L → urgencia según relevancia al hito
+   - Todas las señales inciertas del PEST-L → urgencia según relevancia al hito
    - Brechas entre lo conocido y lo necesario
 2. descripcion: brecha concreta y específica al proyecto (no genérica).
 3. urgencia: "alta" si bloquea avanzar | "media" si importante | "baja" si deseable
@@ -1051,7 +1085,8 @@ export function getDVSM5Prompt(
   xpcto: Record<string, unknown>,
   mapaSerialized: string,
   m3Actores: Array<{ nombre: string; nivelRiesgo: string; motivacion: string }>,
-  m4Incertidumbres: Array<{ descripcion: string; urgencia: string; destino: string }>
+  m4Incertidumbres: Array<{ descripcion: string; urgencia: string; destino: string }>,
+  aprobado: boolean
 ): { system: string; user: string } {
   const actoresCriticos = m3Actores
     .filter((a) => a.nivelRiesgo === "rojo" || a.nivelRiesgo === "ambar")
@@ -1075,6 +1110,8 @@ ${xpctoToText(xpcto)}
 
 == MAPA PEST-L ==
 ${mapaSerialized}
+
+${seccionPrecedenciaPESTL(aprobado)}
 
 == ACTORES DE VETO CRÍTICOS (M3) ==
 ${actoresCriticos}
