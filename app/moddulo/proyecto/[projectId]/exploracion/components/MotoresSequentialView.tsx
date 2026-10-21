@@ -849,7 +849,7 @@ export default function MotoresSequentialView({
         </div>
       )}
       {!isGenerating && generationError && (
-        <div className="flex items-start justify-between gap-3 px-4 py-2.5 rounded-xl border border-red-eske-30 dark:border-red-eske/30 bg-red-eske-10 dark:bg-red-eske/10 text-xs text-red-eske-70 dark:text-red-eske-40">
+        <div role="alert" className="flex items-start justify-between gap-3 px-4 py-2.5 rounded-xl border border-red-eske-30 dark:border-red-eske/30 bg-red-eske-10 dark:bg-red-eske/10 text-xs text-red-eske-60 dark:text-red-eske-10">
           <span className="min-w-0">
             No se pudo actualizar: {generationError} Lo que ves abajo es la última versión válida.
           </span>

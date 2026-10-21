@@ -5,6 +5,7 @@
 // thrown. Shared by the screens fixed in H25 so none of them re-implements it.
 
 import type { RespuestaGuardado } from "./guardadoHonesto";
+import { esCausa } from "./registroModelo";
 
 export async function leerRespuestaGuardado(
   pedir: () => Promise<Response>,
@@ -32,6 +33,8 @@ export async function leerRespuestaGuardado(
       // A route may send its own `codigo` next to a readable `error`; the older routes use `error` as the code.
       codigo: typeof datos.codigo === "string" ? datos.codigo : typeof datos.error === "string" ? datos.error : undefined,
       motor: typeof datos.motor === "string" ? datos.motor : undefined,
+      // Cause of a model failure (enumeration); anything else is ignored and read as «otro».
+      ...(esCausa(datos.causa) ? { causa: datos.causa } : {}),
       mensaje: typeof datos.mensaje === "string" ? datos.mensaje : undefined,
       // A short list like "T, Ec y L"; anything else is ignored (it is shown to the user).
       ...(typeof datos.dimensiones === "string" && /^[A-Za-z, ]{1,30}$/.test(datos.dimensiones) ? { dimensiones: datos.dimensiones } : {}),

@@ -39,7 +39,7 @@ describe("descripcionError / registrarErrorEstructural", () => {
     registrarErrorEstructural("ruta", "falló algo", new Error("DATOS-DEL-USUARIO"));
     registrarErrorEstructural("ruta", "falló otra", new Error("Your credit balance is too low (DATOS)"));
     const t = spy.mock.calls.map((c) => c.join(" ")).join("\n");
-    expect(t).toContain("[ruta] falló algo clase=Error status=n/a");
+    expect(t).toContain("[ruta] falló algo clase=Error status=n/a causa=otro");
     expect(t).toContain("[ANTHROPIC_CREDIT_EXHAUSTED] ruta falló otra");
     expect(t).not.toContain("DATOS");
     spy.mockRestore();

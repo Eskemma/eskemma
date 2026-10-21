@@ -12,7 +12,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import { serializeMapaPESTEL, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
-import { codigoDeParseo, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
+import { causaDeFalloModelo, codigoDeParseo, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
 import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { CompuertaM1Error, coincideCompuertaM1, decidirCompuertaM1, respuestaM1NoAprobado } from "@/lib/moddulo/compuertaM1";
 import type { XPCTO, HEIF2, PIPItem } from "@/types/moddulo.types";
@@ -160,9 +160,9 @@ export async function POST(request: NextRequest) {
     stopReason = res.stop_reason;
     m5Raw = extractText(res);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    // Nothing has been written at this point (the only write is the transaction below), so this failure is certain.
     registrarTotal("regenerate-m5", "fallo_modelo", t0);
-    return NextResponse.json({ error: `Error llamando al modelo: ${msg}`, codigo: "fallo_modelo" }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo regenerar M5", motor: "M5", codigo: "fallo_modelo", causa: causaDeFalloModelo(err) }, { status: 500 });
   }
 
   let m5: { hei: HEIF2; pip: PIPItem[] };

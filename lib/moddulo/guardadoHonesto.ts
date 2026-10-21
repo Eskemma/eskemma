@@ -14,6 +14,8 @@ export const MENSAJE_FASE_CERRADA_REEMPLAZO = "La Fase 2 está cerrada: no se pu
 
 import { estadoHttpValido, TEXTO_SESION } from "./textosAcceso";
 
+import type { CausaFallo } from "./registroModelo";
+
 export type AccionGuardado =
   | "aprobar_motor"
   | "guardar_borrador"
@@ -141,6 +143,8 @@ export type RespuestaGuardado =
       codigo?: string;
       /** `motor` field of the JSON body (the Claude motor that failed), when present. */
       motor?: string;
+      /** `causa` of a model failure (saldo | limite | sobrecarga | otro); absent or unknown reads as «otro». */
+      causa?: CausaFallo;
       /** `mensaje` field of the JSON body (e.g. the block reason), when present. */
       mensaje?: string;
       /** `dimensiones` of the JSON body (generate-m1-express: the dimensions of the half that failed). */
@@ -381,6 +385,20 @@ type AccionSimple = {
 export const ACCIONES_SIMPLES: readonly AccionGuardado[] = accionesDelGrupo("simple");
 const esAccionSimple = (a: AccionGuardado): a is AccionSimple => GRUPO_ACCION[a] === "simple";
 
+/** Text for a model failure by cause; null for «otro», absent or unknown (the caller keeps its own text). */
+export function textoPorCausa(causa: unknown): string | null {
+  switch (causa) {
+    case "saldo":
+      return "El servicio de generación no está disponible por un problema con la cuenta del proveedor. Avisa al equipo de Eskemma y vuelve a intentarlo más tarde.";
+    case "limite":
+      return "El servicio está recibiendo demasiadas solicitudes. Espera unos minutos y reintenta.";
+    case "sobrecarga":
+      return "El servicio está saturado en este momento. Espera unos minutos y reintenta.";
+    default:
+      return null;
+  }
+}
+
 const TEXTOS_SIMPLES: Record<
   AccionSimple,
   {
@@ -591,6 +609,8 @@ const TEXTOS_SIMPLES: Record<
     certero: (r) => {
       if (r.status < 500 || !r.motor) return null;
       const nombre = r.motor === "M2/M3" ? "M2 o M3" : /^M[2-5]$/.test(r.motor) ? r.motor : "los motores";
+      const porCausa = textoPorCausa(r.causa);
+      if (porCausa) return `${porCausa} Tu análisis sigue aprobado; M2–M5 no se generaron. Reintentar generación.`;
       return `No se pudo generar ${nombre}. Tu análisis sigue aprobado; M2–M5 no se generaron. Reintentar generación.`;
     },
   },
@@ -672,8 +692,11 @@ function mensajeDeFalloM1(accion: "reabrir_m1" | "generar_m1", resp: RespuestaGu
         return `${que}: la respuesta del modelo se cortó por exceder su límite de longitud. No se guardó nada; inténtalo de nuevo.`;
       case "respuesta_invalida":
         return `${que}: la respuesta del análisis no fue válida. No se guardó nada; inténtalo de nuevo.`;
-      case "fallo_modelo":
+      case "fallo_modelo": {
+        const porCausa = textoPorCausa(resp.causa);
+        if (porCausa) return `${que}: ${porCausa.charAt(0).toLowerCase()}${porCausa.slice(1)} No se guardó nada.`;
         return `${que}: el servicio de análisis no respondió. No se guardó nada; inténtalo de nuevo.`;
+      }
       case "fallo_guardado":
         return "El análisis se generó, pero no se pudo CONFIRMAR que se guardó. Recarga la página para verificar el estado antes de volver a generarlo.";
     }

@@ -8,7 +8,7 @@ describe("registroModelo", () => {
     expect(lineaLlamada("t", { motor: "M5", intento: 2, t0: 0 }, {}, 1, 1)).toContain("stop_reason=n/a input_tokens=n/a output_tokens=n/a");
   });
   it("línea de fallo y total", () => {
-    expect(lineaFallo("t", { motor: "M4", intento: 1, t0: 0 }, Object.assign(new Error("secreto"), { status: 529 }), 7, 9)).toBe("[t] motor=M4 intento=1 codigo=fallo_modelo name=Error status=529 duracion_ms=7 desde_inicio_ms=9");
+    expect(lineaFallo("t", { motor: "M4", intento: 1, t0: 0 }, Object.assign(new Error("secreto"), { status: 529 }), 7, 9)).toBe("[t] motor=M4 intento=1 codigo=fallo_modelo causa=sobrecarga name=Error status=529 duracion_ms=7 desde_inicio_ms=9");
     expect(lineaFallo("t", { motor: "M4", intento: 1, t0: 0 }, new Error("secreto"), 7, 9)).not.toContain("secreto");
     expect(lineaTotal("t", "ok", 100, 350)).toBe("[t] total resultado=ok duracion_ms=250");
   });

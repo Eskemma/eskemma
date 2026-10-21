@@ -13,7 +13,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { getMapaPESTELExpressPrompt } from "@/lib/ai/phases/prompts";
 import type { XPCTO, MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
-import { descripcionError, descripcionEstructural } from "@/lib/moddulo/registroModelo";
+import { causaDeFalloModelo, causaMasGrave, descripcionError, descripcionEstructural, type CausaFallo } from "@/lib/moddulo/registroModelo";
 import { decidirCandadoM1Servidor, respuestaCandadoM1 } from "@/lib/moddulo/candadoM1Servidor";
 import {
   fetchGoogleNewsRSS,
@@ -93,6 +93,8 @@ interface ResultadoMitadFallida {
   mitad: string;
   dims: readonly Dim[];
   codigo: CodigoMitad;
+  /** Only for fallo_modelo (the call itself failed). */
+  causa?: CausaFallo;
   duracionMs: number;
   inputTokens: number;
   outputTokens: number;
@@ -128,10 +130,10 @@ async function intentarMitad(
     // Name and status only: the SDK message can echo request details.
     const err = e as { name?: string; status?: number };
     console.error(
-      `${etiqueta} fallo_modelo name=${err?.name ?? "desconocido"} status=${err?.status ?? "n/a"} ` +
+      `${etiqueta} fallo_modelo causa=${causaDeFalloModelo(e)} name=${err?.name ?? "desconocido"} status=${err?.status ?? "n/a"} ` +
         `duracion_ms=${Date.now() - inicio} desde_inicio_ms=${Date.now() - inicioRuta}`
     );
-    return { ...base, ok: false, codigo: "fallo_modelo", duracionMs: Date.now() - inicio, inputTokens: 0, outputTokens: 0 };
+    return { ...base, ok: false, codigo: "fallo_modelo", causa: causaDeFalloModelo(e), duracionMs: Date.now() - inicio, inputTokens: 0, outputTokens: 0 };
   }
   const duracionMs = Date.now() - inicio;
   const stopReason = response.stop_reason ?? "desconocido";
@@ -471,6 +473,10 @@ export async function POST(request: NextRequest) {
       {
         error: "No se pudo generar el análisis completo",
         codigo,
+        // Only when the call itself failed; the most serious cause among the failed halves.
+        ...(codigo === "fallo_modelo"
+          ? { causa: causaMasGrave(fallo.flatMap((f) => (f.codigo === "fallo_modelo" && f.causa ? [f.causa] : []))) }
+          : {}),
         dimensiones: listaDimensiones(dims),
       },
       { status: 500 }

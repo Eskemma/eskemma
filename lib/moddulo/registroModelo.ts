@@ -21,6 +21,36 @@ interface RespuestaMedible {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
+export type CausaFallo = "saldo" | "limite" | "sobrecarga" | "otro";
+const CAUSAS: readonly CausaFallo[] = ["saldo", "limite", "sobrecarga", "otro"];
+
+/** Any unknown or missing value falls to «otro» (it is shown to the user, so it is never trusted blindly). */
+export function esCausa(x: unknown): x is CausaFallo {
+  return typeof x === "string" && (CAUSAS as readonly string[]).includes(x);
+}
+
+/**
+ * Why a model call failed, from the HTTP status and the error TYPE of the provider only. Never returns or logs
+ * the message. The one text inspection is the fixed phrase the provider uses for an exhausted balance (400);
+ * a status-less error counts too (it keeps the alert marker it always had); if the phrase changes, that case falls to «otro». 402 and the `billing_error` type are billing problems too
+ * (the SDK types declare `billing_error`; 402 is the status the provider documents for it: not confirmed live).
+ */
+export function causaDeFalloModelo(err: unknown): CausaFallo {
+  const e = err as { status?: unknown; message?: unknown; error?: { type?: unknown; error?: { type?: unknown } } } | null;
+  const status = typeof e?.status === "number" ? e.status : null;
+  const tipo = e?.error?.error?.type ?? e?.error?.type;
+  if (status === 402 || tipo === "billing_error") return "saldo";
+  if (status === 429) return "limite";
+  if (status === 529 || status === 503) return "sobrecarga";
+  if ((status === 400 || status === null) && typeof e?.message === "string" && e.message.includes("credit balance is too low")) return "saldo";
+  return "otro";
+}
+
+/** The most serious cause among several failures: saldo > limite > sobrecarga > otro. */
+export function causaMasGrave(causas: readonly CausaFallo[]): CausaFallo {
+  return CAUSAS.find((c) => causas.includes(c)) ?? "otro";
+}
+
 export function codigoDeParseo(stopReason: string | null | undefined): CodigoModelo {
   return stopReason === "max_tokens" ? "respuesta_truncada" : "respuesta_invalida";
 }
@@ -37,7 +67,7 @@ export function lineaFallo(tag: string, m: MetaLlamada, err: unknown, duracionMs
   const e = err as { name?: unknown; status?: unknown };
   const name = typeof e?.name === "string" ? e.name : "Error";
   const status = typeof e?.status === "number" ? e.status : "n/a";
-  return `[${tag}] motor=${m.motor} intento=${m.intento} codigo=fallo_modelo name=${name} status=${status} duracion_ms=${duracionMs} desde_inicio_ms=${ahora - m.t0}`;
+  return `[${tag}] motor=${m.motor} intento=${m.intento} codigo=fallo_modelo causa=${causaDeFalloModelo(err)} name=${name} status=${status} duracion_ms=${duracionMs} desde_inicio_ms=${ahora - m.t0}`;
 }
 
 export function lineaTotal(tag: string, resultado: string, t0: number, ahora: number): string {
@@ -99,12 +129,12 @@ export function descripcionError(err: unknown): string {
   return `clase=${clase} status=${status}`;
 }
 
-/** console.error with class and status only. The credit-exhausted marker is kept (it is a fixed text). */
+/** console.error with class, status and cause only. The credit-exhausted marker is kept (it is a fixed text). */
 export function registrarErrorEstructural(tag: string, contexto: string, err: unknown): void {
-  const message = err instanceof Error ? err.message : "";
-  if (message.includes("credit balance is too low")) {
-    console.error(`[ANTHROPIC_CREDIT_EXHAUSTED] ${tag} ${contexto}`);
+  const causa = causaDeFalloModelo(err);
+  if (causa === "saldo") {
+    console.error(`[ANTHROPIC_CREDIT_EXHAUSTED] ${tag} ${contexto} ${descripcionError(err)} causa=saldo`);
     return;
   }
-  console.error(`[${tag}] ${contexto} ${descripcionError(err)}`);
+  console.error(`[${tag}] ${contexto} ${descripcionError(err)} causa=${causa}`);
 }

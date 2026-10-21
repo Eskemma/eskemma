@@ -42,6 +42,7 @@ import {
   leerEstadoParaImpacto,
 } from "@/lib/moddulo/impactoReemplazoServidor";
 import {
+  causaDeFalloModelo,
   codigoDeParseo,
   descripcionEstructural,
   medirLlamada,
@@ -262,9 +263,8 @@ async function runMultiMotorInterno(
     m2Raw = extractText(resM2);
     m3Raw = extractText(resM3);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     registrarErrorEstructural("generate-dvs", "fallo del modelo M2/M3", err);
-    return NextResponse.json({ error: `Error en M2/M3: ${msg}`, motor: "M2/M3", codigo: "fallo_modelo" }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo generar M2/M3", motor: "M2/M3", codigo: "fallo_modelo", causa: causaDeFalloModelo(err) }, { status: 500 });
   }
 
   let m2: ContrasteXPCTO[];
@@ -298,9 +298,8 @@ async function runMultiMotorInterno(
     stops.M4 = resM4.stop_reason;
     m4Raw = extractText(resM4);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     registrarErrorEstructural("generate-dvs", "fallo del modelo M4", err);
-    return NextResponse.json({ error: `Error en M4: ${msg}`, motor: "M4", codigo: "fallo_modelo" }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo generar M4", motor: "M4", codigo: "fallo_modelo", causa: causaDeFalloModelo(err) }, { status: 500 });
   }
 
   let m4: IncertidumbreF2[];
@@ -336,10 +335,9 @@ async function runMultiMotorInterno(
       m5Raw = extractText(resM5);
       console.log(`[generate-dvs] M5 attempt ${attempt} respuesta ${descripcionEstructural(m5Raw)}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       registrarErrorEstructural("generate-dvs", `fallo del modelo M5 intento ${attempt}`, err);
       if (attempt === 2) {
-        return NextResponse.json({ error: `Error en M5: ${msg}`, motor: "M5", codigo: "fallo_modelo" }, { status: 500 });
+        return NextResponse.json({ error: "No se pudo generar M5", motor: "M5", codigo: "fallo_modelo", causa: causaDeFalloModelo(err) }, { status: 500 });
       }
       continue;
     }
@@ -440,9 +438,8 @@ async function runLegacyPath(
       })
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     registrarErrorEstructural("generate-dvs", "fallo del modelo (ruta legada)", err);
-    return NextResponse.json({ error: `Error al generar el análisis: ${msg}`, motor: "legacy", codigo: "fallo_modelo" }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo generar el análisis", motor: "legacy", codigo: "fallo_modelo", causa: causaDeFalloModelo(err) }, { status: 500 });
   }
 
   const rawText = extractText(response);

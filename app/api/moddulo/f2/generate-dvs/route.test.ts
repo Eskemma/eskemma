@@ -264,7 +264,8 @@ describe("fallos reales", () => {
     expect(res.status).toBe(500);
     const b = await res.json();
     expect(b.motor).toBe("legacy");
-    expect(b.error).toContain("Claude caído");
+    expect(b.error).not.toContain("Claude caído"); // 4f: the provider's message never reaches the client
+    expect(b.causa).toBe("otro");
     expect(mockDb.updates()).toHaveLength(0);
     expect(versiones()).toHaveLength(0);
   });
