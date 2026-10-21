@@ -14,7 +14,7 @@ export const MENSAJE_FASE_CERRADA_REEMPLAZO = "La Fase 2 está cerrada: no se pu
 
 import { estadoHttpValido, TEXTO_SESION } from "./textosAcceso";
 
-import type { CausaFallo } from "./registroModelo";
+import type { CausaFallo, OrigenAnalisis } from "./registroModelo";
 
 export type AccionGuardado =
   | "aprobar_motor"
@@ -143,6 +143,8 @@ export type RespuestaGuardado =
       codigo?: string;
       /** `motor` field of the JSON body (the Claude motor that failed), when present. */
       motor?: string;
+      /** `origen` of the analysis (express | centinela | desconocido), sent with `mapa_demasiado_grande`. */
+      origen?: OrigenAnalisis;
       /** `causa` of a model failure (saldo | limite | sobrecarga | otro); absent or unknown reads as «otro». */
       causa?: CausaFallo;
       /** `mensaje` field of the JSON body (e.g. the block reason), when present. */
@@ -385,6 +387,18 @@ type AccionSimple = {
 export const ACCIONES_SIMPLES: readonly AccionGuardado[] = accionesDelGrupo("simple");
 const esAccionSimple = (a: AccionGuardado): a is AccionSimple => GRUPO_ACCION[a] === "simple";
 
+/**
+ * Text for «the analysis is too large for the motors». No figures. The action is the one that really exists for
+ * the origin: Express can shorten narratives («Editar narrativas», only with the analysis approved) or generate a
+ * new one («Nuevo análisis»); an analysis imported from Centinela cannot be edited here. Unknown origin: no action.
+ */
+export function textoMapaDemasiadoGrande(origen: unknown): string {
+  const base = "El análisis es demasiado extenso para generar los motores. No se generó nada.";
+  if (origen === "express") return `${base} Puedes acortar las narrativas con «Editar narrativas» o generar un análisis nuevo con «Nuevo análisis».`;
+  if (origen === "centinela") return `${base} El análisis importado de Centinela no se puede editar aquí: genera un análisis nuevo en Centinela y vuelve a importarlo.`;
+  return base;
+}
+
 /** Text for a model failure by cause; null for «otro», absent or unknown (the caller keeps its own text). */
 export function textoPorCausa(causa: unknown): string | null {
   switch (causa) {
@@ -601,6 +615,7 @@ const TEXTOS_SIMPLES: Record<
     noEncontrado: "No se encontró el análisis; puede que ya no exista o no tengas acceso. Recarga la página para verificar.",
     permiso: "No tienes permiso para generar los motores de este proyecto.",
     especifico: (r) => {
+      if (r.status === 422 && r.codigo === "mapa_demasiado_grande") return textoMapaDemasiadoGrande(r.origen);
       if (r.status !== 409) return null;
       if (r.codigo === "m1_no_aprobado") return "El análisis ya no está aprobado; no se generaron los motores. Apruébalo de nuevo para generar M2–M5.";
       if (r.codigo === "fase_cerrada") return "La Fase 2 ya está cerrada; no se generaron los motores.";
@@ -784,6 +799,14 @@ function mensajeDeFallo(
   if (resp.tipo === "respuesta" && resp.status === 409 && resp.codigo === "m1_no_aprobado") {
     const textoGate = textoM1NoAprobado(accion, ctx);
     if (textoGate) return textoGate;
+  }
+  // The serialized PESTEL block is over the cap: the route answered BEFORE the model and wrote nothing, so this
+  // is a code of the server itself. The action offered depends on the origin of the analysis.
+  if (
+    resp.tipo === "respuesta" && resp.status === 422 && resp.codigo === "mapa_demasiado_grande" &&
+    (accion === "reemplazar_analisis" || accion === "generar_analisis")
+  ) {
+    return textoMapaDemasiadoGrande(resp.origen);
   }
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {

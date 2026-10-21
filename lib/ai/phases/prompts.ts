@@ -809,61 +809,98 @@ type RawDim = {
   senalesFavorables?: RawSenal[]; senalesAdversas?: RawSenal[]; senalesInciertas?: RawSenal[];
 };
 
-// MAX_SIGNALS: máximo de señales por tipo por dimensión (para mantener el prompt manejable)
-const MAX_SIGNALS = 3;
-// MAX_DESC_CHARS: longitud máxima de la descripción de cada señal individual
-const MAX_DESC_CHARS = 140;
+// Security cap of the serialization alone (not the whole prompt): 150,000 characters. There is NO limit on
+// signals or on the length of a description: the motors receive everything the user approved. Over the cap the
+// serializer throws (see MapaDemasiadoGrandeError) instead of cutting anything silently.
+export const MAX_CHARS_MAPA_SERIALIZADO = 150_000;
 
-const CONFIDENCE_ORDER: Record<string, number> = { alto: 3, medio: 2, bajo: 1 };
-
-function sortByConfidence(signals: RawSenal[]): RawSenal[] {
-  return [...signals].sort((a, b) => {
-    const ca = CONFIDENCE_ORDER[a.nivelConfianza?.toLowerCase() ?? ""] ?? 0;
-    const cb = CONFIDENCE_ORDER[b.nivelConfianza?.toLowerCase() ?? ""] ?? 0;
-    return cb - ca;
-  });
+/** Structural indicators only (numbers); never any text of the analysis. */
+export interface EstadisticasMapa {
+  senales: number;
+  /** Signals per dimension code. */
+  senalesPorDimension: Record<string, number>;
+  /** Characters of the serialized block of each dimension. */
+  caracteresPorDimension: Record<string, number>;
+  maxDesc: number;
+  narrativaTotal: number;
 }
 
+export class MapaDemasiadoGrandeError extends Error {
+  readonly longitud: number;
+  readonly estadisticas: EstadisticasMapa;
+  constructor(longitud: number, estadisticas: EstadisticasMapa) {
+    // Fixed text: it never carries the content.
+    super("mapa_demasiado_grande");
+    this.name = "MapaDemasiadoGrandeError";
+    this.longitud = longitud;
+    this.estadisticas = estadisticas;
+  }
+}
+
+const ORDEN_DIMENSIONES = ["P", "E", "S", "T", "Ec", "L"];
+const ETIQUETAS_DIMENSION: Record<string, string> = {
+  P: "Político", E: "Económico", S: "Social",
+  T: "Tecnológico", Ec: "Ecológico", L: "Legal",
+};
+const CATEGORIAS_SENAL = [
+  { campo: "senalesFavorables", simbolo: "+", etiqueta: "Señales favorables" },
+  { campo: "senalesAdversas", simbolo: "-", etiqueta: "Señales adversas" },
+  { campo: "senalesInciertas", simbolo: "?", etiqueta: "Señales inciertas" },
+] as const;
+
+// RULE: this text is for the PROMPTS of the motors only. It must never feed the fingerprint of the approved
+// analysis (lib/moddulo/m1Huella.ts hashes the stored OBJECT, not this text), or every approved analysis would
+// stop matching its fingerprint when this format changes.
+/**
+ * Everything the user approved, in a deterministic order: dimensions P,E,S,T,Ec,L; inside each category the
+ * signals keep the order they come in; full narrative; full description. A signal shows `(Fuente: X)` only when
+ * `fuente` is not empty. `fechaCorte`, `nivelConfianza`, `origenInternacional` and `escaladaPorRelevanciaLocal`
+ * are NOT printed: they cannot be certified as real (see CLAUDE.md, pending: fabricated data at the source).
+ * Throws MapaDemasiadoGrandeError over MAX_CHARS_MAPA_SERIALIZADO. Does not mutate its input.
+ */
 export function serializeMapaPESTEL(mapa: Record<string, unknown>): string {
-  const ORDER = ["P", "E", "S", "T", "Ec", "L"];
-  const LABELS: Record<string, string> = {
-    P: "Político", E: "Económico", S: "Social",
-    T: "Tecnológico", Ec: "Ecológico", L: "Legal",
-  };
+  const { salida, estadisticas } = construirSerializacion(mapa);
+  if (salida.length > MAX_CHARS_MAPA_SERIALIZADO) throw new MapaDemasiadoGrandeError(salida.length, estadisticas);
+  return salida;
+}
 
-  const truncate = (s: string) =>
-    s.length > MAX_DESC_CHARS ? s.slice(0, MAX_DESC_CHARS - 1) + "…" : s;
+function construirSerializacion(mapa: Record<string, unknown>): { salida: string; estadisticas: EstadisticasMapa } {
+  const bloques: string[] = [];
+  const estadisticas: EstadisticasMapa = { senales: 0, senalesPorDimension: {}, caracteresPorDimension: {}, maxDesc: 0, narrativaTotal: 0 };
 
-  const serSignals = (raw: RawSenal[] | undefined, symbol: string, label: string) => {
-    if (!raw || raw.length === 0) return "";
-    const valid = raw.filter((s) => s.descripcion);
-    const sorted = sortByConfidence(valid);
-    const top = sorted.slice(0, MAX_SIGNALS);
-    const omitted = valid.length - top.length;
-    const lines = top.map((s) => {
-      const cita = s.fuente ? ` (Fuente: ${s.fuente})` : "";
-      return `    ${symbol} ${truncate(s.descripcion!)}${cita}`;
-    }).join("\n");
-    const extra = omitted > 0 ? `\n    (+ ${omitted} señales adicionales omitidas)` : "";
-    return lines ? `\n  ${label}:\n${lines}${extra}` : "";
-  };
+  for (const code of ORDEN_DIMENSIONES) {
+    if (!mapa[code]) continue;
+    const dim = mapa[code] as RawDim;
+    const conf = dim.confidence != null ? ` (confianza: ${dim.confidence}%)` : "";
+    // Full narrative — the most important context for M2 and M3
+    const narrativa = dim.narrativa ? `\n  Narrativa: ${dim.narrativa}` : "";
+    estadisticas.narrativaTotal += dim.narrativa?.length ?? 0;
+    let senalesDim = 0;
+    let texto = `[${code}] ${dim.label ?? ETIQUETAS_DIMENSION[code] ?? code} — ${dim.clasificacion ?? "NEUTRAL"}${conf}${narrativa}`;
+    for (const cat of CATEGORIAS_SENAL) {
+      const validas = (dim[cat.campo] ?? []).filter((s) => s.descripcion);
+      if (validas.length === 0) continue;
+      const lineas = validas.map((s) => {
+        senalesDim++;
+        estadisticas.maxDesc = Math.max(estadisticas.maxDesc, s.descripcion!.length);
+        const cita = s.fuente ? ` (Fuente: ${s.fuente})` : "";
+        return `    ${cat.simbolo} ${s.descripcion}${cita}`;
+      });
+      texto += `\n  ${cat.etiqueta}:\n${lineas.join("\n")}`;
+    }
+    estadisticas.senales += senalesDim;
+    estadisticas.senalesPorDimension[code] = senalesDim;
+    estadisticas.caracteresPorDimension[code] = texto.length;
+    bloques.push(texto);
+  }
 
-  return ORDER
-    .filter((code) => mapa[code])
-    .map((code) => {
-      const dim = mapa[code] as RawDim;
-      const conf = dim.confidence != null ? ` (confianza: ${dim.confidence}%)` : "";
-      // Narrativa completa — es el contexto más importante para M2 y M3
-      const narrativa = dim.narrativa ? `\n  Narrativa: ${dim.narrativa}` : "";
-      return (
-        `[${code}] ${dim.label ?? LABELS[code] ?? code} — ${dim.clasificacion ?? "NEUTRAL"}${conf}` +
-        narrativa +
-        serSignals(dim.senalesFavorables, "+", "Señales favorables") +
-        serSignals(dim.senalesAdversas, "-", "Señales adversas") +
-        serSignals(dim.senalesInciertas, "?", "Señales inciertas")
-      );
-    })
-    .join("\n\n");
+  return { salida: bloques.join("\n\n"), estadisticas };
+}
+
+/** The structural numbers of a mapa (for the measurement log line). Never text; does not apply the cap. */
+export function estadisticasMapa(mapa: Record<string, unknown>): EstadisticasMapa & { longitud: number } {
+  const { salida, estadisticas } = construirSerializacion(mapa);
+  return { ...estadisticas, longitud: salida.length };
 }
 
 // ==========================================

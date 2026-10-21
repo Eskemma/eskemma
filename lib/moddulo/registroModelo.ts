@@ -70,6 +70,24 @@ export function lineaFallo(tag: string, m: MetaLlamada, err: unknown, duracionMs
   return `[${tag}] motor=${m.motor} intento=${m.intento} codigo=fallo_modelo causa=${causaDeFalloModelo(err)} name=${name} status=${status} duracion_ms=${duracionMs} desde_inicio_ms=${ahora - m.t0}`;
 }
 
+/** Measurement line of the serialized PESTEL block: numbers only, never any text of the analysis. */
+export function lineaMapa(
+  tag: string,
+  e: { longitud: number; senales: number; caracteresPorDimension: Record<string, number>; maxDesc: number; narrativaTotal: number }
+): string {
+  const dims = Object.entries(e.caracteresPorDimension).map(([c, n]) => `${c}:${n}`).join(",");
+  return `[${tag}] mapa longitud=${e.longitud} senales=${e.senales} dims=${dims} max_desc=${e.maxDesc} narrativa_total=${e.narrativaTotal}`;
+}
+
+/** Which origin the analysis comes from (for the text of a failure the user can act on). */
+export type OrigenAnalisis = "express" | "centinela" | "desconocido";
+export function origenDeAnalisis(kind: unknown): OrigenAnalisis {
+  return kind === "T22" ? "centinela" : kind === "express" ? "express" : "desconocido";
+}
+export function esOrigen(x: unknown): x is OrigenAnalisis {
+  return x === "express" || x === "centinela" || x === "desconocido";
+}
+
 export function lineaTotal(tag: string, resultado: string, t0: number, ahora: number): string {
   return `[${tag}] total resultado=${resultado} duracion_ms=${ahora - t0}`;
 }

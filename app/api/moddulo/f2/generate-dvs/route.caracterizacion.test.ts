@@ -1,7 +1,7 @@
 // CARACTERIZACIÓN (M1, commit 1) de generate-dvs saveas:"draft", camino multi-motor: fija el
 // comportamiento ACTUAL antes de que el commit de compuerta lo cambie. Hoy la ruta:
 //   · lee el M1 de linkedSource.payload (no hay "aprobación" que exigir),
-//   · lo serializa con serializeMapaPESTEL (límites incluidos),
+//   · lo serializa con serializeMapaPESTEL (desde el paso 5 SIN límites: reescrita a propósito la prueba 2),
 //   · llama a Claude 4 veces (M2‖M3 → M4 → M5) y escribe draftDVS vaciando motorAprobaciones.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,14 +91,14 @@ describe("generate-dvs draft — comportamiento actual (multi-motor)", () => {
     expect(u[0].data).not.toHaveProperty("phases.exploracion.dvs");
   });
 
-  it("2. el M1 que ve Claude sale de linkedSource.payload, serializado CON los límites (descripción cortada, señales omitidas)", async () => {
+  it("2. (paso 5, reescrita a propósito) el M1 que ve Claude sale de linkedSource.payload, serializado SIN límites: descripción íntegra y todas las señales", async () => {
     await POST(req());
     const userM2 = (crear.mock.calls[0][0] as { messages: { content: string }[] }).messages[0].content;
     expect(userM2).toContain("[P] Político — AMENAZA");
     expect(userM2).toContain("Narrativa P.");
-    expect(userM2).toContain("a".repeat(139) + "…");
-    expect(userM2).toContain("señales adicionales omitidas");
-    expect(userM2).not.toContain("adversa 5"); // 5 adversas: solo pasan 3
+    expect(userM2).toContain("a".repeat(300));
+    expect(userM2).not.toContain("omitidas");
+    for (const i of [1, 2, 3, 4, 5]) expect(userM2).toContain(`adversa ${i}`);
   });
 
   it("3. NO exige ninguna aprobación del M1: un payload sin ningún registro de aprobación genera igual", async () => {

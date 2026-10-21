@@ -1,5 +1,5 @@
 // CARACTERIZACIÓN (M1, commit 1) de regenerate-m5: fija el comportamiento ACTUAL. Hoy lee el M1 de
-// linkedSource.payload (serializado CON límites), conserva M2/M3/M4 del borrador y reemplaza solo
+// linkedSource.payload (serializado SIN límites desde el paso 5), conserva M2/M3/M4 del borrador y reemplaza solo
 // hei y pip; exige draftDVS y payload.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,13 +64,13 @@ beforeEach(() => {
 });
 
 describe("regenerate-m5 — comportamiento actual", () => {
-  it("1. lee el M1 de linkedSource.payload (CON límites), llama a Claude una vez y conserva M2/M3/M4 reemplazando solo hei y pip", async () => {
+  it("1. lee el M1 de linkedSource.payload (SIN límites, reescrita a propósito en el paso 5), llama a Claude una vez y conserva M2/M3/M4 reemplazando solo hei y pip", async () => {
     const res = await POST(req());
     expect(res.status).toBe(200);
     expect(crear).toHaveBeenCalledTimes(1);
     const user = (crear.mock.calls[0][0] as { messages: { content: string }[] }).messages[0].content;
     expect(user).toContain("[P] Político — AMENAZA");
-    expect(user).toContain("b".repeat(139) + "…");
+    expect(user).toContain("b".repeat(300));
     const u = mockDb.updates();
     expect(u).toHaveLength(1);
     const escrito = u[0].data["phases.exploracion.draftDVS"] as Record<string, unknown>;

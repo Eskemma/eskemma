@@ -4,6 +4,11 @@
 // approval still matches the content). The pure state logic lives in
 // m1Aprobacion.ts and receives the fingerprint as an argument.
 
+// RULE: the fingerprint hashes the stored OBJECT (key-order independent). It must NEVER depend on the text that
+// the motors' prompts receive (serializeMapaPESTEL in lib/ai/phases/prompts.ts): changing that format must not
+// change any fingerprint, or every approved analysis would stop matching its approval. This file does not import
+// prompts.ts (a test reads the source to keep it so).
+
 import { createHash } from "node:crypto";
 import type { MapaPESTEL } from "@/types/moddulo.types";
 import { serializacionEstable } from "./serializacionEstable";

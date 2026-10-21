@@ -13,6 +13,8 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   serializeMapaPESTEL,
+  estadisticasMapa,
+  MapaDemasiadoGrandeError,
   getDVSM2Prompt,
   getDVSM3Prompt,
   getDVSM4Prompt,
@@ -31,6 +33,7 @@ import type {
 import { DIMENSION_META } from "@/types/pestel.types";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { reemplazarDVSConVersion } from "@/lib/moddulo/dvsVersiones";
+import { respuestaMapaDemasiadoGrande } from "@/lib/moddulo/respuestaMapaDemasiadoGrande";
 import { respuestaCandado } from "@/lib/moddulo/respuestaCandado";
 import {
   ReemplazoRechazadoError,
@@ -44,6 +47,9 @@ import {
 import {
   causaDeFalloModelo,
   codigoDeParseo,
+  lineaMapa,
+  origenDeAnalisis,
+  type OrigenAnalisis,
   descripcionEstructural,
   medirLlamada,
   registrarErrorEstructural,
@@ -195,7 +201,8 @@ export async function POST(request: NextRequest) {
   if (mapaPESTEL && Object.keys(mapaPESTEL).length > 0) {
     return runMultiMotorPath(
       projectId, project.type, xpcto, mapaPESTEL, saveas,
-      JSON.stringify(project.xpcto ?? {}), session.uid, huellaConfirmada, huellaM1
+      JSON.stringify(project.xpcto ?? {}), session.uid, huellaConfirmada, huellaM1,
+      origenDeAnalisis(project.phases?.exploracion?.linkedSource?.kind)
     );
   }
 
@@ -214,12 +221,13 @@ async function runMultiMotorPath(
   xpctoSnapshot: string,
   uid: string,
   huellaConfirmada: string | null,
-  huellaM1: string | null
+  huellaM1: string | null,
+  origen: OrigenAnalisis
 ): Promise<NextResponse> {
   const t0 = Date.now();
   let resultado = "error";
   try {
-    const r = await runMultiMotorInterno(projectId, projectType, xpcto, mapaPESTEL, saveas, xpctoSnapshot, uid, huellaConfirmada, huellaM1, t0);
+    const r = await runMultiMotorInterno(projectId, projectType, xpcto, mapaPESTEL, saveas, xpctoSnapshot, uid, huellaConfirmada, huellaM1, origen, t0);
     resultado = r.status === 200 ? "ok" : `http_${r.status}`;
     return r;
   } finally {
@@ -237,14 +245,27 @@ async function runMultiMotorInterno(
   uid: string,
   huellaConfirmada: string | null,
   huellaM1: string | null,
+  origen: OrigenAnalisis,
   t0: number
 ): Promise<NextResponse> {
   const stops: Record<string, string | null | undefined> = {};
   const mapaDims = Object.keys(mapaPESTEL);
   console.log(`[generate-dvs] multi-motor path. dims=${mapaDims.join(",")}`);
 
-  const mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
-  console.log(`[generate-dvs] mapaSerialized length=${mapaSerialized.length} chars`);
+  // Structural measurement line (numbers only) BEFORE the calls; then the serialization, which refuses a
+  // block over the security cap instead of cutting it: nothing was written and the model was not called.
+  const estMapa = estadisticasMapa(mapaPESTEL);
+  console.log(lineaMapa("generate-dvs", estMapa));
+  let mapaSerialized: string;
+  try {
+    mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
+  } catch (err) {
+    if (err instanceof MapaDemasiadoGrandeError) {
+      console.error(`[generate-dvs] mapa_demasiado_grande longitud=${err.longitud} senales=${err.estadisticas.senales} origen=${origen}`);
+      return respuestaMapaDemasiadoGrande(origen, err);
+    }
+    throw err;
+  }
 
   const xpctoRaw = xpcto as Record<string, unknown>;
 

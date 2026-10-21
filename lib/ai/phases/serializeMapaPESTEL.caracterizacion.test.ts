@@ -1,6 +1,6 @@
-// CARACTERIZACIÓN (M1, commit 1): fija el comportamiento ACTUAL de serializeMapaPESTEL antes de
-// cambiarlo. Los límites (3 señales por grupo, 140 caracteres) se retiran en el commit de
-// serialización completa: esas pruebas se editan allí a propósito y se declara.
+// CARACTERIZACIÓN de serializeMapaPESTEL. Las pruebas 3, 4 y 5 fijaban los límites (3 señales por grupo, 140
+// caracteres, orden por confianza); el paso 5 los retira y esas tres se REESCRIBEN a propósito (declarado en la
+// entrega). Las demás pasan sin editar. Pruebas nuevas del paso 5: serializeMapaPESTEL.sinLimites.test.ts
 
 import { describe, expect, it } from "vitest";
 import { serializeMapaPESTEL } from "./prompts";
@@ -28,25 +28,25 @@ describe("serializeMapaPESTEL — comportamiento actual", () => {
     expect(serializeMapaPESTEL({ P: dim({ narrativa: larga }) })).toContain(`Narrativa: ${larga}`);
   });
 
-  it("3. la descripción de cada señal se trunca a 140 caracteres (139 + «…»)", () => {
+  it("3. (paso 5, reescrita) la descripción de cada señal va ÍNTEGRA, sin cortar", () => {
     const out = serializeMapaPESTEL({ P: dim({ senalesAdversas: [sen("a".repeat(300))] }) });
-    expect(out).toContain(`- ${"a".repeat(139)}… (Fuente: INEGI, 2020)`);
-    expect(out).not.toContain("a".repeat(140));
+    expect(out).toContain(`- ${"a".repeat(300)} (Fuente: INEGI, 2020)`);
+    expect(out).not.toContain("…");
   });
 
-  it("4. máximo 3 señales por grupo, con la línea «(+ N señales adicionales omitidas)»", () => {
+  it("4. (paso 5, reescrita) TODAS las señales de cada grupo, sin línea de «omitidas»", () => {
     const seis = Array.from({ length: 6 }, (_, i) => sen(`señal ${i + 1}`));
     const out = serializeMapaPESTEL({ P: dim({ senalesFavorables: seis }) });
-    expect(out.match(/\+ señal \d/g)).toHaveLength(3);
-    expect(out).toContain("(+ 3 señales adicionales omitidas)");
+    expect(out.match(/\+ señal \d/g)).toHaveLength(6);
+    expect(out).not.toContain("omitidas");
   });
 
-  it("5. dentro de un grupo ordena por confianza (alto > medio > bajo), no por el orden guardado", () => {
+  it("5. (paso 5, reescrita) dentro de un grupo se conserva el orden de entrada, no el de confianza", () => {
     const out = serializeMapaPESTEL({
       P: dim({ senalesInciertas: [sen("baja", { nivelConfianza: "bajo" }), sen("alta", { nivelConfianza: "alto" }), sen("media", { nivelConfianza: "medio" })] }),
     });
+    expect(out.indexOf("? baja")).toBeLessThan(out.indexOf("? alta"));
     expect(out.indexOf("? alta")).toBeLessThan(out.indexOf("? media"));
-    expect(out.indexOf("? media")).toBeLessThan(out.indexOf("? baja"));
   });
 
   it("6. cita solo la fuente: no imprime fecha de corte ni confianza de la señal; filtra señales sin descripción y omite grupos vacíos", () => {

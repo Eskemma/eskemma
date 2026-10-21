@@ -10,9 +10,10 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
-import { serializeMapaPESTEL, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
+import { serializeMapaPESTEL, estadisticasMapa, MapaDemasiadoGrandeError, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
+import { respuestaMapaDemasiadoGrande } from "@/lib/moddulo/respuestaMapaDemasiadoGrande";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
-import { causaDeFalloModelo, codigoDeParseo, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
+import { causaDeFalloModelo, codigoDeParseo, lineaMapa, origenDeAnalisis, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
 import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { CompuertaM1Error, coincideCompuertaM1, decidirCompuertaM1, respuestaM1NoAprobado } from "@/lib/moddulo/compuertaM1";
 import type { XPCTO, HEIF2, PIPItem } from "@/types/moddulo.types";
@@ -135,7 +136,19 @@ export async function POST(request: NextRequest) {
       destino: typeof i.destino === "string" ? i.destino : "",
     }));
 
-  const mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
+  console.log(lineaMapa("regenerate-m5", estadisticasMapa(mapaPESTEL)));
+  let mapaSerialized: string;
+  try {
+    mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
+  } catch (err) {
+    if (err instanceof MapaDemasiadoGrandeError) {
+      const origen = origenDeAnalisis(project.phases?.exploracion?.linkedSource?.kind);
+      console.error(`[regenerate-m5] mapa_demasiado_grande longitud=${err.longitud} senales=${err.estadisticas.senales} origen=${origen}`);
+      registrarTotal("regenerate-m5", "mapa_demasiado_grande", t0);
+      return respuestaMapaDemasiadoGrande(origen, err);
+    }
+    throw err;
+  }
 
   let m5Raw: string;
   let stopReason: string | null | undefined;
