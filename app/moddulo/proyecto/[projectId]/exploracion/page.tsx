@@ -79,6 +79,7 @@ import type {
 import { PHASE_ORDER, emptyExplorationForm } from "@/types/moddulo.types";
 import { evaluarCriteriosDVS, type CriterioDVS } from "@/lib/moddulo/dvs-criteria";
 import type { ProjectForPropagation, PropagationDiff } from "@/lib/moddulo/phasePropagation";
+import { ventanaDeDiferencia } from "@/lib/moddulo/ventanaDiferencia";
 import {
   detectarTerritorioStale,
   extraerTerritorioEscalar,
@@ -2090,9 +2091,16 @@ export default function ExploracionPage() {
                           {xpctoStaleChanges.slice(0, 3).map((d) => (
                             <li key={d.field}>
                               <span className="font-medium">{d.field}:</span>{" "}
-                              <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
-                              {" → "}
-                              {d.to.slice(0, 40)}
+                              {(() => {
+                                const v = ventanaDeDiferencia(d.from, d.to);
+                                return (
+                                  <>
+                                    <span className="line-through opacity-60" title={d.from}>{v.anterior}</span>
+                                    {" → "}
+                                    <span title={d.to}>{v.nuevo}</span>
+                                  </>
+                                );
+                              })()}
                             </li>
                           ))}
                           {xpctoStaleChanges.length > 3 && (
@@ -2145,9 +2153,16 @@ export default function ExploracionPage() {
                         {territorioStaleChanges.slice(0, 3).map((d) => (
                           <li key={d.field}>
                             <span className="font-medium">{d.field}:</span>{" "}
-                            <span className="line-through opacity-60">{d.from.slice(0, 40)}</span>
-                            {" → "}
-                            {d.to.slice(0, 40)}
+                            {(() => {
+                              const v = ventanaDeDiferencia(d.from, d.to);
+                              return (
+                                <>
+                                  <span className="line-through opacity-60" title={d.from}>{v.anterior}</span>
+                                  {" → "}
+                                  <span title={d.to}>{v.nuevo}</span>
+                                </>
+                              );
+                            })()}
                           </li>
                         ))}
                         {territorioStaleChanges.length > 3 && (

@@ -12,6 +12,7 @@ import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionRevie
 import PhaseReportView from "@/app/moddulo/components/PhaseReportView";
 import { detectRisks } from "@/lib/moddulo/risks";
 import { detectForwardStaleness, type PropagationDiff } from "@/lib/moddulo/phasePropagation";
+import { ventanaDeDiferencia } from "@/lib/moddulo/ventanaDiferencia";
 import type { XPCTO, ProjectType, ChatMessage, PhaseId, Dictamen, Territorio } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import PhaseDownloadMenu from "@/app/components/moddulo/PhaseDownloadMenu";
@@ -1176,9 +1177,16 @@ function BackPropagationModal({ affectedPhases, onDismiss }: {
                   {diffs.slice(0, 3).map((d) => (
                     <li key={d.field}>
                       <span className="font-medium">{d.field}:</span>{" "}
-                      <span className="line-through opacity-60">{d.from.slice(0, 80)}{d.from.length > 80 ? "..." : ""}</span>
-                      {" → "}
-                      {d.to.slice(0, 80)}{d.to.length > 80 ? "..." : ""}
+                      {(() => {
+                        const v = ventanaDeDiferencia(d.from, d.to);
+                        return (
+                          <>
+                            <span className="line-through opacity-60" title={d.from}>{v.anterior}</span>
+                            {" → "}
+                            <span title={d.to}>{v.nuevo}</span>
+                          </>
+                        );
+                      })()}
                     </li>
                   ))}
                   {diffs.length > 3 && <li className="opacity-60">+{diffs.length - 3} campos más</li>}
