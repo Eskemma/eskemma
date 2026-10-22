@@ -53,12 +53,30 @@
     {
       "id": "pestel-integracion-moddulo-f2",
       "anchor": "Integración con Moddulo F2",
-      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración). Verificado 26-09-21: las 4 rutas existen y las consume exploracion/page.tsx; la fila pasó de Pendiente a Completado.",
+      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración). Verificado 26-09-21: las 4 rutas existen y las consume exploracion/page.tsx; la fila pasó de Pendiente a Completado. Ampliado 26-10-22 (paso 8): cubre también las rutas y módulos del modelo m1 de F2 (m1-*, generate-dvs, regenerate-m5, finalize-dvs, approve-motor, save-draft, complete-phase; lib/moddulo m1*, pantallaM1, compuertaM1, faseCerrada, dvs-criteria, rda). LÍMITE DECLARADO: NO incluye app/moddulo/proyecto/[projectId]/exploracion/page.tsx (cambia en casi toda tarea de interfaz y haría ruido); un cambio de pantalla no marca esta fila y hay que releer la página a mano. Contrato estable: docs/moddulo/f2-contrato-m1.md.",
       "paths": [
         "app/api/moddulo/f2/generate-m1-express",
         "app/api/moddulo/f2/import-pestel",
         "app/api/moddulo/f2/find-linked-pestel",
-        "app/api/moddulo/f2/unlink-pestel"
+        "app/api/moddulo/f2/unlink-pestel",
+        "app/api/moddulo/f2/m1-edit",
+        "app/api/moddulo/f2/m1-approve",
+        "app/api/moddulo/f2/m1-reopen",
+        "app/api/moddulo/f2/generate-dvs",
+        "app/api/moddulo/f2/regenerate-m5",
+        "app/api/moddulo/f2/finalize-dvs",
+        "app/api/moddulo/f2/approve-motor",
+        "app/api/moddulo/f2/save-draft",
+        "app/api/moddulo/projects/[projectId]/complete-phase",
+        "lib/moddulo/m1Aprobacion.ts",
+        "lib/moddulo/m1Servidor.ts",
+        "lib/moddulo/m1Huella.ts",
+        "lib/moddulo/m1Escritura.ts",
+        "lib/moddulo/pantallaM1.ts",
+        "lib/moddulo/compuertaM1.ts",
+        "lib/moddulo/faseCerrada.ts",
+        "lib/moddulo/dvs-criteria.ts",
+        "lib/moddulo/rda.ts"
       ]
     },
     {
