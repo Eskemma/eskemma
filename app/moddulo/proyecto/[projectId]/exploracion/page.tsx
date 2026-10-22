@@ -12,7 +12,7 @@ import {
   MENSAJE_FASE_CERRADA_REEMPLAZO,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
-import { dimensionEditada, aFecha } from "@/lib/moddulo/m1Aprobacion";
+import { dimensionEditada, aFecha, elegirMapaParaCriterios } from "@/lib/moddulo/m1Aprobacion";
 import { requiereConfirmacionM1, type EstadoParaImpactoM1 } from "@/lib/moddulo/impactoM1";
 import { LIMITE_ABORTAR_S, MENSAJE_ESPERA_EXCEDIDA } from "@/lib/moddulo/esperaMotores";
 import { estadoImpactoDesdePantalla, mensajeRechazoVincularCentinela, textoModalM1 } from "@/lib/moddulo/textosModalM1";
@@ -1430,7 +1430,7 @@ export default function ExploracionPage() {
   // Abre el modal de cierre evaluando los 10 criterios DVS
   const handleOpenReview = () => {
     if (motivoCierre !== null) return;
-    if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs, mapaPESTEL ?? undefined, projectType));
+    if (dvs) setDvsChecklist(evaluarCriteriosDVS(dvs, elegirMapaParaCriterios({ aprobacionValida: m1.resumen?.aprobacionValida ?? false, aprobacion: m1.datos?.aprobacion, payload: mapaPESTEL }), projectType));
     setShowReview(true);
   };
 

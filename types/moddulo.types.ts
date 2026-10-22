@@ -225,6 +225,11 @@ export interface RDAItem {
   descripcion: string;
   nivelImpacto: "prioritario" | "advertencia";
   recomendacion: string;
+  /**
+   * Origin of the PESTEL analysis the item was created from (F2 sufficiency criteria only), so the recommendation
+   * names an action that exists for that origin. Absent in older items: they show the text valid for both.
+   */
+  origenAnalisis?: "express" | "centinela";
   estado: EstadoRDAItem;
   vinculadoA?: { tipo: string; valor: string }[];
   fechaCreacion: Timestamp;

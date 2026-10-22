@@ -5,7 +5,7 @@
 // cannot compute the fingerprint itself).
 
 import type { M1Datos, MapaPESTEL } from "@/types/moddulo.types";
-import { dimensionEditada, estadoM1, totalDimensiones, type ResultadoEstadoM1 } from "./m1Aprobacion";
+import { dimensionEditada, elegirMapaParaCriterios, estadoM1, totalDimensiones, type ResultadoEstadoM1 } from "./m1Aprobacion";
 import { huellaMapaPESTEL } from "./m1Huella";
 import type { EstadoParaImpactoM1 } from "./impactoM1";
 import { lineaTrazabilidadPestel, lineaTrazabilidadReporte } from "./pantallaM1";
@@ -125,5 +125,30 @@ export function resumenM1ParaCliente(exp: ExploracionParaM1 | undefined): Resume
     huella: a.huellaPayload,
     kind: a.kind,
     dimensionesEditadas: a.impacto.dimensionesEditadas,
+  };
+}
+
+/** The map the criteria 1, 8 and 9 read for this exploration (the approved copy when the approval is valid). */
+export function mapaParaCriterios(exp: ExploracionParaM1 | undefined): MapaPESTEL | undefined {
+  const a = analizarM1(exp);
+  return elegirMapaParaCriterios({
+    aprobacionValida: a.estado.aprobacionValida,
+    aprobacion: a.m1?.aprobacion,
+    payload: a.payload,
+  });
+}
+
+/**
+ * The project as `planRDAUpdate` should see it: same data, but with the criteria map for F2 in place of the working
+ * payload. `rda.ts` is imported by the client and cannot compute fingerprints, so the server (complete-phase) swaps
+ * the map before calling it. A project with no map is returned untouched.
+ */
+export function proyectoConMapaParaCriterios<T extends { phases?: { exploracion?: unknown } }>(project: T): T {
+  const exp = project.phases?.exploracion as (ExploracionParaM1 & { linkedSource?: { payload?: unknown } }) | undefined;
+  const mapa = mapaParaCriterios(exp);
+  if (!exp || !mapa || exp.linkedSource?.payload === undefined) return project;
+  return {
+    ...project,
+    phases: { ...project.phases, exploracion: { ...exp, linkedSource: { ...exp.linkedSource, payload: mapa } } },
   };
 }

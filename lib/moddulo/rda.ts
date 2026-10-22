@@ -11,6 +11,7 @@ import {
   criterioDVSToRDAItem,
   getCriterioDVSDescripcion,
   getRecomendacionDVS,
+  origenDeAnalisis,
 } from "@/lib/moddulo/dvs-criteria";
 import {
   evaluarCriteriosInvestigacion,
@@ -46,9 +47,13 @@ function computeRDAItemsParaFase(
   if (phaseId === "exploracion") {
     const dvs = project.phases?.exploracion?.dvs;
     if (!dvs) return null;
+    // The map is whatever the caller put in the payload slot: the server (complete-phase) passes the APPROVED copy
+    // when the approval is valid (proyectoConMapaParaCriterios); rda.ts is imported by the client and computes no
+    // fingerprints.
     const mapaPESTEL = project.phases?.exploracion?.linkedSource?.payload;
+    const origen = mapaPESTEL ? origenDeAnalisis(project.phases?.exploracion?.linkedSource?.kind) : undefined;
     const criterios = evaluarCriteriosDVS(dvs, mapaPESTEL, project.type);
-    return criterios.filter((c) => !c.satisfecho).map(criterioDVSToRDAItem);
+    return criterios.filter((c) => !c.satisfecho).map((c) => criterioDVSToRDAItem(c, origen));
   }
   if (phaseId === "investigacion") {
     const sintesis = project.phases?.investigacion?.f3Sintesis;
@@ -129,7 +134,7 @@ export function getDisplayTextForRDAItem(
         return {
           nombre: item.criterioId,
           descripcion,
-          recomendacion: getRecomendacionDVS(item.criterioId) ?? item.recomendacion,
+          recomendacion: getRecomendacionDVS(item.criterioId, item.origenAnalisis) ?? item.recomendacion,
         };
       }
     }

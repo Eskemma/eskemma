@@ -13,10 +13,9 @@ export interface CriterioDVS {
 
 // Rutas de resolución por criterio — mismo patrón que DEFICIENCIAS en
 // lib/moddulo/criterios.ts (F1). Las claves deben coincidir exactamente con
-// los `id` usados en evaluarCriteriosDVS más abajo.
+// los `id` usados en evaluarCriteriosDVS más abajo. Los criterios 1, 8 y 9 no están aquí: su texto depende del origen
+// del análisis (ver recomendacionDependienteDelOrigen).
 const RECOMENDACIONES_DVS: Record<string, string> = {
-  "cobertura-pestl":
-    "Revisa el Análisis PESTEL (M1) y confirma que las 6 dimensiones tengan al menos una señal clasificada como favorable, adversa o incierta. Si alguna dimensión aparece vacía, relanza el análisis agregando fuentes propias o ajustando el territorio.",
   "contraste-xpcto":
     "Revisa el motor M2 y confirma que las 5 variables del XPCTO (Hito, Sujeto, Capacidades, Tiempo, Justificación) tengan un veredicto explícito (Coherente / Requiere ajuste / Requiere investigación). Completa o aprueba cualquier variable pendiente.",
   "semaforo-veto":
@@ -29,10 +28,6 @@ const RECOMENDACIONES_DVS: Record<string, string> = {
     "Revisa el Programa de Investigación Profunda (PIP) dentro del motor M5 (Hipótesis + PIP) y confirma que cada necesidad de información tenga definido qué se investigará, por qué, con qué método, con qué profundidad y en qué orden.",
   "especificidad-escaneo":
     "Revisa las narrativas del Análisis PESTEL y confirma que estén redactadas en función del proyecto y territorio específicos (mencionando al sujeto, hito o territorio), no como un análisis genérico del entorno.",
-  "pesos-tipo-proyecto":
-    "Revisa que las dimensiones prioritarias según el tipo de proyecto (ej. Político, Social y Legal en Electoral) tengan mayor profundidad de análisis que las de seguimiento. Si no es así, relanza el análisis PESTEL.",
-  "trazabilidad-hallazgos":
-    "Revisa que cada señal del PESTEL cite su fuente y fecha de corte. Si alguna señal carece de esta información, elimínala o complétala manualmente antes de aprobar el motor.",
   "aprobacion-usuario":
     "Revisa y aprueba explícitamente cada uno de los motores M2 a M5 antes de cerrar la Fase 2 y avanzar a Investigación (F3).",
 };
@@ -72,12 +67,52 @@ export function getCriterioDVSDescripcion(id: string): string | undefined {
   return CRITERIO_DVS_DESCRIPCIONES[id];
 }
 
+export type OrigenAnalisisPESTEL = "express" | "centinela";
+
+/** `linkedSource.kind`: everything that is not T22 (Centinela) is treated as Express. */
+export function origenDeAnalisis(kind: string | null | undefined): OrigenAnalisisPESTEL {
+  return kind === "T22" ? "centinela" : "express";
+}
+
+// Criteria 1, 8 and 9 look at SIGNALS and CLASSIFICATIONS of the approved analysis. The signals are not editable in
+// the M1 review, so the only actions that exist are the ones below, and they depend on where the analysis came from.
+// Without a known origin (items created before this field existed) the text is valid for both.
+const ACCION_NUEVO_ANALISIS: Record<OrigenAnalisisPESTEL | "ambos", string> = {
+  express: "genera un «Nuevo análisis» desde el panel «Análisis PESTEL»",
+  centinela: "genera un análisis nuevo en Centinela y vuelve a importarlo",
+  ambos:
+    "si el análisis es Express, genera un «Nuevo análisis» desde el panel «Análisis PESTEL»; si viene de Centinela, genera uno nuevo allá y vuelve a importarlo",
+};
+
+const CRITERIOS_CON_ORIGEN = new Set(["cobertura-pestl", "pesos-tipo-proyecto", "trazabilidad-hallazgos"]);
+
+function recomendacionDependienteDelOrigen(id: string, origen: OrigenAnalisisPESTEL | undefined): string | undefined {
+  const accion = ACCION_NUEVO_ANALISIS[origen ?? "ambos"];
+  if (id === "cobertura-pestl") {
+    return `El análisis aprobado debe tener al menos una señal en cada una de las 6 dimensiones. Las señales no se editan en la revisión del análisis: ${accion}.`;
+  }
+  if (id === "trazabilidad-hallazgos") {
+    return `Cada señal del análisis aprobado debe citar su fuente y su fecha de corte. Las señales no se editan en la revisión del análisis: ${accion}.`;
+  }
+  if (id === "pesos-tipo-proyecto") {
+    const aceptar = "si dejaste una dimensión en Neutral a propósito, puedes aceptar esta advertencia como condición del proyecto";
+    if (origen === "express") {
+      return `Las dimensiones prioritarias para este tipo de proyecto deben estar clasificadas como Oportunidad o Amenaza. Puedes cambiar la clasificación en «Editar narrativas» y aprobar de nuevo, o ${accion}; ${aceptar}.`;
+    }
+    if (origen === "centinela") {
+      return `Las dimensiones prioritarias para este tipo de proyecto deben estar clasificadas como Oportunidad o Amenaza. La clasificación de un análisis de Centinela no se edita aquí: ${accion}; ${aceptar}.`;
+    }
+    return `Las dimensiones prioritarias para este tipo de proyecto deben estar clasificadas como Oportunidad o Amenaza. Si el análisis es Express, puedes cambiar la clasificación en «Editar narrativas» y aprobar de nuevo; si viene de Centinela, no se edita aquí: genera uno nuevo allá y vuelve a importarlo. ${aceptar[0].toUpperCase()}${aceptar.slice(1)}.`;
+  }
+  return undefined;
+}
+
 /**
  * Ruta de resolución estática de un criterio DVS por id, o undefined si
- * no existe.
+ * no existe. Los criterios 1, 8 y 9 nombran la acción según el origen del análisis.
  */
-export function getRecomendacionDVS(id: string): string | undefined {
-  return RECOMENDACIONES_DVS[id];
+export function getRecomendacionDVS(id: string, origen?: OrigenAnalisisPESTEL): string | undefined {
+  return recomendacionDependienteDelOrigen(id, origen) ?? RECOMENDACIONES_DVS[id];
 }
 
 export function evaluarCriteriosDVS(
@@ -221,7 +256,7 @@ export function evaluarCriteriosDVS(
  * Pura — no escribe nada; fechaCreacion se agrega en el punto de escritura
  * (complete-phase) con FieldValue.serverTimestamp().
  */
-export function criterioDVSToRDAItem(c: CriterioDVS): Omit<RDAItem, "fechaCreacion"> {
+export function criterioDVSToRDAItem(c: CriterioDVS, origen?: OrigenAnalisisPESTEL): Omit<RDAItem, "fechaCreacion"> {
   return {
     id: `exploracion:${c.id}`,
     faseOrigen: "exploracion",
@@ -230,7 +265,8 @@ export function criterioDVSToRDAItem(c: CriterioDVS): Omit<RDAItem, "fechaCreaci
     nombre: c.id,
     descripcion: c.descripcion,
     nivelImpacto: c.severidad === "bloqueante" ? "prioritario" : "advertencia",
-    recomendacion: RECOMENDACIONES_DVS[c.id] ?? "",
+    recomendacion: getRecomendacionDVS(c.id, origen) ?? "",
+    ...(origen && CRITERIOS_CON_ORIGEN.has(c.id) ? { origenAnalisis: origen } : {}),
     estado: "activo",
   };
 }

@@ -7,7 +7,7 @@ import { getProject } from "@/lib/moddulo/project";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import type { PhaseId } from "@/types/moddulo.types";
 import { planRDAUpdate } from "@/lib/moddulo/rda";
-import { analizarM1, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
+import { analizarM1, proyectoConMapaParaCriterios, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { motivoNoCerrarF2 } from "@/lib/moddulo/pantallaM1";
 
 interface CompletePhaseBody {
@@ -114,7 +114,7 @@ export async function POST(
     // barriendo todas las fases con evaluador disponible (no solo la que
     // se está cerrando). Evaluado server-side contra los datos que
     // getProject ya trajo — no se confía en nada calculado por el cliente.
-    const { nuevos, resueltos } = planRDAUpdate(project);
+    const { nuevos, resueltos } = planRDAUpdate(proyectoConMapaParaCriterios(project));
     for (const item of nuevos) {
       updates[`rda.${item.id}`] = { ...item, fechaCreacion: FieldValue.serverTimestamp() };
     }

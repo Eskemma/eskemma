@@ -220,3 +220,21 @@ export function lineaTrazabilidadM1(aprobacion: Pick<M1Aprobacion, "en" | "categ
   }
   return `Análisis aprobado sin ajustes el ${fecha}.`;
 }
+
+// ── Map used by the sufficiency criteria ───────────────────────────────────────
+
+/**
+ * Which map the DVS sufficiency criteria 1, 8 and 9 read: the APPROVED COPY when the approval is valid (it is what
+ * M2–M5 read), otherwise the working payload (projects from before the review, drafts, reopened M1). With a valid
+ * approval both have the same fingerprint, so today the result is the same; the rule is the precondition for reopening
+ * a closed phase, where the payload could drift from what the report was built on. Pure: the validity comes from
+ * `estadoM1` (server) or from the project summary (client).
+ */
+export function elegirMapaParaCriterios(i: {
+  aprobacionValida: boolean;
+  aprobacion?: Pick<M1Aprobacion, "mapa"> | null;
+  payload?: MapaPESTEL | null;
+}): MapaPESTEL | undefined {
+  if (i.aprobacionValida && i.aprobacion?.mapa) return i.aprobacion.mapa;
+  return i.payload ?? undefined;
+}
