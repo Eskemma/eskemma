@@ -8,6 +8,7 @@ import type { M1Datos, MapaPESTEL } from "@/types/moddulo.types";
 import { dimensionEditada, estadoM1, totalDimensiones, type ResultadoEstadoM1 } from "./m1Aprobacion";
 import { huellaMapaPESTEL } from "./m1Huella";
 import type { EstadoParaImpactoM1 } from "./impactoM1";
+import { lineaTrazabilidadPestel, lineaTrazabilidadReporte } from "./pantallaM1";
 
 /** The slice of `phases.exploracion` this module reads (the raw document, or getProject's view). */
 export interface ExploracionParaM1 {
@@ -87,6 +88,13 @@ export interface ResumenM1Cliente {
   dvsDeOtroAnalisis: boolean;
   /** There is a motors draft SAVED on the server (not the local draft of «Editar análisis»). */
   borradorGuardado: boolean;
+  /**
+   * The line under the Reporte F2 and in its downloads (see lineaTrazabilidadReporte), or null. Computed here so the
+   * page does not repeat the validity rules.
+   */
+  trazabilidad: string | null;
+  /** The same line for the PESTEL download (does not depend on a Reporte F2), or null. */
+  trazabilidadPestel: string | null;
   /** Fingerprint of the M1 the user is looking at; the client sends it back as `huellaVista`. */
   huella: string | null;
   kind: string | null;
@@ -95,11 +103,24 @@ export interface ResumenM1Cliente {
 
 export function resumenM1ParaCliente(exp: ExploracionParaM1 | undefined): ResumenM1Cliente {
   const a = analizarM1(exp);
+  const dvsDeOtroAnalisis = !a.cerrada && a.estado.dvsDeOtroAnalisis;
   return {
     estado: a.estado.estado,
     aprobacionValida: a.estado.aprobacionValida,
     motoresSinGenerar: a.estado.motoresSinGenerar,
-    dvsDeOtroAnalisis: !a.cerrada && a.estado.dvsDeOtroAnalisis,
+    dvsDeOtroAnalisis,
+    trazabilidad: lineaTrazabilidadReporte({
+      estado: a.estado.estado,
+      aprobacionValida: a.estado.aprobacionValida,
+      aprobacion: a.m1?.aprobacion,
+      hayDvs: a.impacto.hayDvs,
+      dvsDeOtroAnalisis,
+    }),
+    trazabilidadPestel: lineaTrazabilidadPestel({
+      estado: a.estado.estado,
+      aprobacionValida: a.estado.aprobacionValida,
+      aprobacion: a.m1?.aprobacion,
+    }),
     borradorGuardado: a.impacto.hayBorrador,
     huella: a.huellaPayload,
     kind: a.kind,

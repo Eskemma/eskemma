@@ -7,9 +7,9 @@
 // State comes from the server (`m1` of the project GET, see m1Servidor.ts); nothing here computes
 // a fingerprint.
 
-import type { MapaPESTEL } from "@/types/moddulo.types";
+import type { M1Aprobacion, MapaPESTEL } from "@/types/moddulo.types";
 import { ETIQUETA_DIMENSION } from "./impactoM1";
-import { aFecha, type EstadoM1 } from "./m1Aprobacion";
+import { aFecha, lineaTrazabilidadM1, type EstadoM1, type ResultadoEstadoM1 } from "./m1Aprobacion";
 import type { RespuestaGuardado } from "./guardadoHonesto";
 
 export const ORDEN_DIMENSIONES = ["P", "E", "S", "T", "Ec", "L"] as const;
@@ -35,6 +35,40 @@ export const MOTIVO_CERRAR_F2_SIN_APROBAR =
  */
 export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: boolean, dvsDeOtroAnalisis = false): boolean {
   return hayDvs && (estado === "borrador" || estado === "reabierto" || (estado === "aprobado" && dvsDeOtroAnalisis));
+}
+
+/**
+ * The one line under the Reporte F2 (and in its download) saying which analysis it came from. It never
+ * marks anything inside the text and carries no origin. Pure; computed on display, nothing is written.
+ *  · approved M1 whose approval is valid AND whose finalized report was built from it: the approval line;
+ *  · a project from before the review (state «anterior»: PESTEL analysis but no `m1` record): TEXTO_ANTERIOR;
+ *  · anything else (no analysis, draft, reopened, report of another analysis, no report): null.
+ */
+export function lineaTrazabilidadReporte(i: {
+  estado: ResultadoEstadoM1["estado"] | null;
+  aprobacionValida: boolean;
+  aprobacion: Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> | undefined;
+  hayDvs: boolean;
+  dvsDeOtroAnalisis: boolean;
+}): string | null {
+  if (!i.hayDvs) return null;
+  if (i.estado === "aprobado" && i.dvsDeOtroAnalisis) return null;
+  return lineaTrazabilidadPestel(i);
+}
+
+/**
+ * The same line for the PESTEL download. That download uses the approved copy, so the line is true on its own: it
+ * does not depend on a Reporte F2 existing or being current. Approved (valid approval) → the approval line;
+ * state «anterior» → TEXTO_ANTERIOR; draft, reopened, no analysis or leftovers without payload → null.
+ */
+export function lineaTrazabilidadPestel(i: {
+  estado: ResultadoEstadoM1["estado"] | null;
+  aprobacionValida: boolean;
+  aprobacion: Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> | undefined;
+}): string | null {
+  if (i.estado === "anterior") return TEXTO_ANTERIOR;
+  if (i.estado === "aprobado" && i.aprobacionValida) return lineaTrazabilidadM1(i.aprobacion);
+  return null;
 }
 
 export type MotivoNoCerrarF2 = "ya_cerrada" | "m1_no_aprobado" | "reporte_f2_no_finalizado" | "reporte_f2_de_otro_analisis";

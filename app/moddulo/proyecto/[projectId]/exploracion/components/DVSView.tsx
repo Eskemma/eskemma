@@ -9,6 +9,8 @@ import type { DVSF2, ContrasteXPCTO, ActorVetoF2, IncertidumbreF2, PIPItem } fro
 
 interface DVSViewProps {
   dvs: DVSF2;
+  /** Which analysis this report came from (one quiet line), or null. */
+  trazabilidad?: string | null;
 }
 
 type SubTab = "M2" | "M3" | "M4";
@@ -179,7 +181,7 @@ function M4Panel({ items }: { items: IncertidumbreF2[] }) {
 
 // ── Main component ────────────────────────────────────────────
 
-export default function DVSView({ dvs }: DVSViewProps) {
+export default function DVSView({ dvs, trazabilidad }: DVSViewProps) {
   const [activeTab, setActiveTab] = useState<SubTab>("M2");
 
   const SUB_TABS: { id: SubTab; label: string; count?: number }[] = [
@@ -190,6 +192,7 @@ export default function DVSView({ dvs }: DVSViewProps) {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto space-y-4 px-1">
+      {trazabilidad && <p className="text-xs text-black-eske-20 dark:text-[#9AAEBE]">{trazabilidad}</p>}
       {/* HEI — Hipótesis Estratégica Inicial */}
       <div
         className="rounded-xl p-4 border-l-4 border-bluegreen-eske"

@@ -74,8 +74,13 @@ const VEREDICTO_LABEL: Record<string, string> = {
 const NIVEL_RIESGO_LABEL: Record<string, string> = { rojo: "🔴 Rojo", ambar: "🟡 Ámbar", verde: "🟢 Verde" };
 const URGENCIA_LABEL: Record<string, string> = { alta: "Alta", media: "Media", baja: "Baja" };
 
-export function formatF2Report(dvs: DVSF2): string {
-  const sections: string[] = ["# Reporte F2 — Exploración", ""];
+/** The traceability line goes right under the title, in italics, only when there is one (output unchanged without it). */
+function lineaBajoTitulo(trazabilidad: string | null | undefined): string[] {
+  return trazabilidad ? [`_${trazabilidad}_`, ""] : [];
+}
+
+export function formatF2Report(dvs: DVSF2, trazabilidad?: string | null): string {
+  const sections: string[] = ["# Reporte F2 — Exploración", "", ...lineaBajoTitulo(trazabilidad)];
 
   // HEI
   const hei = dvs.hei;
@@ -168,8 +173,8 @@ function formatSenales(label: string, senales: { descripcion: string; fuente: st
   return out;
 }
 
-export function formatPestelAnalysis(mapaPESTEL: MapaPESTEL): string {
-  const sections: string[] = ["# Análisis PESTEL", ""];
+export function formatPestelAnalysis(mapaPESTEL: MapaPESTEL, trazabilidad?: string | null): string {
+  const sections: string[] = ["# Análisis PESTEL", "", ...lineaBajoTitulo(trazabilidad)];
   const missing: string[] = [];
 
   for (const code of PESTEL_DIM_ORDER) {

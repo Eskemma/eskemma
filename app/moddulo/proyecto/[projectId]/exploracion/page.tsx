@@ -1821,8 +1821,14 @@ export default function ExploracionPage() {
               phaseId="exploracion"
               projectName={projectName}
               content={{
-                reporte: (dvs ?? draftDVS) ? formatF2Report(dvs ?? draftDVS!) : null,
-                pestel: mapaPESTEL ? formatPestelAnalysis(mapaPESTEL) : null,
+                // The line only goes with the finalized report; the PESTEL download carries the APPROVED copy when
+                // the approval is valid (what M2–M5 read), not the working payload.
+                reporte: (dvs ?? draftDVS) ? formatF2Report(dvs ?? draftDVS!, dvs ? m1.resumen?.trazabilidad : null) : null,
+                pestel: (() => {
+                  const copia = m1.resumen?.aprobacionValida ? m1.datos?.aprobacion?.mapa : undefined;
+                  const mapa = copia ?? mapaPESTEL;
+                  return mapa ? formatPestelAnalysis(mapa, m1.resumen?.trazabilidadPestel) : null;
+                })(),
               }}
             />
           </div>
@@ -2003,7 +2009,7 @@ export default function ExploracionPage() {
                 )}
               </div>
               <div className="flex-1 overflow-y-auto">
-                <DVSView dvs={dvs} />
+                <DVSView dvs={dvs} trazabilidad={m1.resumen?.trazabilidad} />
               </div>
             </div>
 
