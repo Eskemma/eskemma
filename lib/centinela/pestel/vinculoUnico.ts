@@ -94,3 +94,20 @@ export function aplicarVinculoUnico(
     });
   }
 }
+
+/**
+ * ¿El `linkedSource` de un Moddulo ya reclama un análisis de Centinela DISTINTO del que se va a vincular?
+ * El M1 de origen Express también tiene `sourceId`, pero es el id del propio Moddulo (`generate-m1-express`):
+ * no es un vínculo con ningún PESTEL, así que no cuenta (antes bloqueaba el paso de Express a Centinela con
+ * `moddulo_already_linked`, antes de llegar a la rama de «upgrade»; lo que se pierde al reemplazarlo lo
+ * confirma el candado H15).
+ */
+export function vinculoT22Ajeno(
+  linked: { kind?: string; sourceId?: string } | null | undefined,
+  p: { pestelProjectId: string; modduloProjectId: string }
+): boolean {
+  if (!linked?.sourceId) return false;
+  if (linked.kind === "express") return false;
+  if (linked.sourceId === p.modduloProjectId) return false;
+  return linked.sourceId !== p.pestelProjectId;
+}

@@ -15,6 +15,8 @@ import { getProject } from "@/lib/moddulo/project";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
+import { vinculoT22Ajeno } from "@/lib/centinela/pestel/vinculoUnico";
+import { MENSAJE_MODDULO_CON_OTRO_PESTEL, MENSAJE_MODDULO_OTRA_VERSION } from "@/lib/moddulo/textosVinculo";
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
@@ -74,12 +76,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   // Conflict: Moddulo project's exploracion phase already has a different pestProjectId
   const explorarPhase = modduloProject.phases?.["exploracion"];
-  const existingPestProjectId = explorarPhase?.linkedSource?.sourceId;
-  if (existingPestProjectId && existingPestProjectId !== projectId) {
+  if (vinculoT22Ajeno(explorarPhase?.linkedSource, { pestelProjectId: projectId, modduloProjectId })) {
     return NextResponse.json(
       {
         error: "moddulo_already_linked",
-        message: "Este proyecto de Moddulo ya está vinculado a otro análisis PESTEL. Para cambiar la vinculación, contacta soporte.",
+        message: MENSAJE_MODDULO_CON_OTRO_PESTEL,
       },
       { status: 409 }
     );
@@ -206,9 +207,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!modduloTx.exists || modduloTx.data()?.deletedAt) return "moddulo_no_encontrado";
     if (exploracionCerrada(modduloTx.data()?.phases?.exploracion)) return "fase_cerrada";
     const linkedActual = modduloTx.data()?.phases?.exploracion?.linkedSource as
-      | { sourceId?: string; sourceAnalysisId?: string; payload?: unknown }
+      | { kind?: string; sourceId?: string; sourceAnalysisId?: string; payload?: unknown }
       | undefined;
-    if (linkedActual?.sourceId && linkedActual.sourceId !== projectId) return "moddulo_ya_vinculado";
+    if (vinculoT22Ajeno(linkedActual, { pestelProjectId: projectId, modduloProjectId })) return "moddulo_ya_vinculado";
 
     // If Moddulo already has mapaPESTEL FROM A TRACKED CENTINELA ANALYSIS, check
     // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
@@ -255,7 +256,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json(
         {
           error: "moddulo_already_linked",
-          message: "Este proyecto de Moddulo ya está vinculado a otro análisis PESTEL. Para cambiar la vinculación, contacta soporte.",
+          message: MENSAJE_MODDULO_CON_OTRO_PESTEL,
         },
         { status: 409 }
       );
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json(
         {
           error: "moddulo_already_linked",
-          message: "Este proyecto de Moddulo ya tiene un análisis PESTEL importado. Para cambiar la vinculación, contacta soporte.",
+          message: MENSAJE_MODDULO_OTRA_VERSION,
         },
         { status: 409 }
       );

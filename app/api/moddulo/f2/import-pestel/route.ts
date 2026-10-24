@@ -14,10 +14,7 @@ import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
-
-// Texto del 409 `conflict` (la pantalla de F2 pide la confirmación con las líneas y la huella que trae).
-const MENSAJE_CONFLICTO_IMPORT =
-  "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte.";
+import { MENSAJE_CONFLICTO_IMPORT } from "@/lib/moddulo/textosVinculo";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);

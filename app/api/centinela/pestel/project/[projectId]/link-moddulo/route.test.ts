@@ -14,6 +14,7 @@ vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
+import { MENSAJE_MODDULO_OTRA_VERSION } from "@/lib/moddulo/textosVinculo";
 import { POST } from "./route";
 import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 
@@ -184,7 +185,8 @@ describe("POST link-moddulo — escritura", () => {
     });
     const r = await POST(req({ modduloProjectId: "m1" }), ctx);
     expect(r.status).toBe(409);
-    expect((await r.json()).message).toContain("ya tiene un análisis PESTEL importado");
+    // EDITADA (T2, 1c): el texto ya no remite a «contacta soporte»; dice cómo actualizar la versión.
+    expect((await r.json()).message).toBe(MENSAJE_MODDULO_OTRA_VERSION);
     expect(mockDb.updates()).toHaveLength(0);
   });
 

@@ -5,6 +5,7 @@
 // "Iniciar proyecto en Moddulo" (primary) + "Vincular a proyecto existente" (picker).
 // When already linked, shows "Regresar a Moddulo F2 con resultados".
 
+import { MENSAJE_MODDULO_CON_OTRO_PESTEL } from "@/lib/moddulo/textosVinculo";
 import { mensajeRechazoVincularCentinela } from "@/lib/moddulo/textosModalM1";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -115,8 +116,7 @@ function PickerModal({
         setLinkError(rechazoM1);
       } else if (res.status === 409) {
         setLinkError(
-          err.message ??
-            "Este proyecto de Moddulo ya está vinculado a otro análisis PESTEL. Para cambiar la vinculación, contacta soporte."
+          err.message ?? MENSAJE_MODDULO_CON_OTRO_PESTEL
         );
       } else {
         setLinkError(err.message ?? "No se pudo vincular el proyecto. Intenta de nuevo.");
