@@ -62,6 +62,7 @@ describe("import-pestel — F2 cerrada", () => {
   it("con la fase abierta importa (200)", async () => {
     sembrar({ status: "in-progress" });
     expect((await llamar()).status).toBe(200);
-    expect(db.updates()).toHaveLength(1);
+    // EDITADA (T2, 1b): además del Moddulo se escribe el back-link del PESTEL, en la misma transacción.
+    expect(db.updates().map((u) => u.path).sort()).toEqual(["moddulo_projects/p1", "pestel_projects/pest1"]);
   });
 });

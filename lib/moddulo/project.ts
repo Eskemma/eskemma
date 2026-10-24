@@ -200,6 +200,8 @@ export class PestelProjectNoPropioError extends Error {
 // quien llama no le sirve distinguir los dos casos, y no revela el
 // estado del proyecto ajeno.
 export class PestelYaVinculadoError extends Error {
+  /** Mismo código que `link-moddulo`: el cliente puede distinguirlo sin leer el texto. */
+  readonly codigo = "pestel_already_linked" as const;
   constructor() {
     super("Este proyecto de PESTEL ya está vinculado a otro proyecto de Moddulo.");
     this.name = "PestelYaVinculadoError";

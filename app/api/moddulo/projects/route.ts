@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Proyecto de PESTEL no encontrado" }, { status: 404 });
     }
     if (error instanceof PestelYaVinculadoError) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
+      return NextResponse.json({ error: error.message, codigo: error.codigo }, { status: 409 });
     }
     console.error("Error al crear proyecto:", error);
     return NextResponse.json({ error: "Error al crear proyecto" }, { status: 500 });

@@ -13,6 +13,11 @@ import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
+import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
+
+// Texto del 409 `conflict` (la pantalla de F2 pide la confirmación con las líneas y la huella que trae).
+const MENSAJE_CONFLICTO_IMPORT =
+  "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte.";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -96,7 +101,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "conflict",
-            message: "Este proyecto ya tiene un análisis PESTEL importado. Para vincularlo a uno diferente, contacta soporte.",
+            message: MENSAJE_CONFLICTO_IMPORT,
             lineas: d.accion === "continuar" ? [] : d.lineas,
             huella: d.accion === "continuar" ? null : d.huella,
           },
@@ -132,26 +137,57 @@ export async function POST(request: NextRequest) {
   // H15 lock (paso 4) INSIDE the transaction that writes, against the state read there: replacing an M1
   // that has an approval, edits or motors needs the confirmation tied to the fingerprint the user saw.
   const ref = adminDb.collection("moddulo_projects").doc(projectId);
-  const resultado = await adminDb.runTransaction(
-    async (tx): Promise<"ok" | "no_encontrado" | "fase_cerrada" | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> }> => {
-      const snap = await tx.get(ref);
-      if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
-      const exp = snap.data()?.phases?.exploracion;
-      if (exploracionCerrada(exp)) return "fase_cerrada";
-      const d = decidirCandadoM1Servidor(exp, "vincular", { confirmar: body.confirmar, huella: body.huella });
-      if (d.accion !== "continuar") return { candado: d };
-      tx.update(ref, {
-        "phases.exploracion.linkedSource": linkedSource,
-        "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
-        ...camposNuevoM1(FieldValue),
-        // Ya no hace falta el puntero de "deshacer desvinculación" — este
-        // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
-        "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      return "ok";
-    }
-  );
+  type Resultado =
+    | "ok"
+    | "no_encontrado"
+    | "fase_cerrada"
+    | "pestel_no_encontrado"
+    | "pestel_ya_vinculado"
+    | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
+  const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
+    const exp = snap.data()?.phases?.exploracion;
+    if (exploracionCerrada(exp)) return "fase_cerrada";
+
+    const linkedAhora = exp?.linkedSource as LinkedSourceRef<MapaPESTEL> | undefined;
+
+    // Unicidad del vínculo: el PESTEL es del usuario y no apunta a OTRO Moddulo; el PESTEL (T22) que este
+    // Moddulo tenía antes se desliga si todavía lo reclamaba. Lecturas antes de escrituras.
+    const pestelAnteriorId = linkedAhora?.kind === "T22" && linkedAhora.sourceId ? linkedAhora.sourceId : null;
+    const plan = await prepararVinculoUnico(tx, adminDb, {
+      uid: session.uid,
+      pestelProjectId: pestProjectId,
+      modduloProjectId: projectId,
+      pestelAnteriorId,
+    });
+    if (!plan.ok) return plan.codigo === "pestel_no_encontrado" ? "pestel_no_encontrado" : "pestel_ya_vinculado";
+
+    const d = decidirCandadoM1Servidor(exp, "vincular", { confirmar: body.confirmar, huella: body.huella });
+    if (d.accion !== "continuar") return { candado: d };
+    tx.update(ref, {
+      "phases.exploracion.linkedSource": linkedSource,
+      "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
+      ...camposNuevoM1(FieldValue),
+      // Ya no hace falta el puntero de "deshacer desvinculación" — este
+      // import (primero, re-sync, o restauración manual) ya es el vínculo vigente.
+      "phases.exploracion.lastUnlinkedLinkedSource": FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    // El back-link del PESTEL en la MISMA transacción (antes no se escribía: tras «Vincular de nuevo» el
+    // Moddulo apuntaba a un PESTEL que no lo reconocía).
+    aplicarVinculoUnico(tx, adminDb, FieldValue, { pestelProjectId: pestProjectId, modduloProjectId: projectId }, plan);
+    return "ok";
+  });
+  if (resultado === "pestel_no_encontrado") {
+    return NextResponse.json({ error: "Sin permisos para este análisis PESTEL" }, { status: 403 });
+  }
+  if (resultado === "pestel_ya_vinculado") {
+    return NextResponse.json(
+      { error: "pestel_already_linked", message: "Este proyecto PESTEL ya está vinculado a otro proyecto de Moddulo." },
+      { status: 409 }
+    );
+  }
   if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   if (resultado === "fase_cerrada") return respuestaFaseCerrada();
   if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
