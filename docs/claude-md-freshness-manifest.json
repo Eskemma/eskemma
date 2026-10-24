@@ -52,8 +52,8 @@
     },
     {
       "id": "pestel-integracion-moddulo-f2",
-      "anchor": "Integración con Moddulo F2",
-      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración). Verificado 26-09-21: las 4 rutas existen y las consume exploracion/page.tsx; la fila pasó de Pendiente a Completado. Ampliado 26-10-22 (paso 8): cubre también las rutas y módulos del modelo m1 de F2 (m1-*, generate-dvs, regenerate-m5, finalize-dvs, approve-motor, save-draft, complete-phase; lib/moddulo m1*, pantallaM1, compuertaM1, faseCerrada, dvs-criteria, rda). LÍMITE DECLARADO: NO incluye app/moddulo/proyecto/[projectId]/exploracion/page.tsx (cambia en casi toda tarea de interfaz y haría ruido); un cambio de pantalla no marca esta fila y hay que releer la página a mano. Contrato estable: docs/moddulo/f2-contrato-m1.md.",
+      "anchor": "Integración con Moddulo F2 (exploración)",
+      "description": "Estado de fases PESTEL — integración con Moddulo F2 (exploración). Verificado 26-09-21: las 4 rutas existen y las consume exploracion/page.tsx; la fila pasó de Pendiente a Completado. Ampliado 26-10-22 (paso 8): cubre también las rutas y módulos del modelo m1 de F2 (m1-*, generate-dvs, regenerate-m5, finalize-dvs, approve-motor, save-draft, complete-phase; lib/moddulo m1*, pantallaM1, compuertaM1, faseCerrada, dvs-criteria, rda). LÍMITE DECLARADO: NO incluye app/moddulo/proyecto/[projectId]/exploracion/page.tsx (cambia en casi toda tarea de interfaz y haría ruido); un cambio de pantalla no marca esta fila y hay que releer la página a mano. Contrato estable: docs/moddulo/f2-contrato-m1.md. NO citar la frase completa del ancla en otras líneas de CLAUDE.md (el Historial dice «integración con Moddulo F2» en minúscula y sin el sufijo): con 2 coincidencias el detector no puede vigilar la entrada; scripts/check-docs-freshness.test.ts lo verifica.",
       "paths": [
         "app/api/moddulo/f2/generate-m1-express",
         "app/api/moddulo/f2/import-pestel",

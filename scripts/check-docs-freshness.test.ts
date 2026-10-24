@@ -5,9 +5,13 @@
 // ORQUESTACIÓN (resolución de ancla, comparación de fechas, manejo de
 // error) sin depender del estado real del repo ni correr git de verdad.
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   checkEntry,
+  loadManifest,
+  resolveAnchorLine,
   validateManifest,
   ManifestValidationError,
   type GitDeps,
@@ -158,4 +162,29 @@ describe("validateManifest", () => {
     const bad = { id: "x", anchor: "| X", paths: ["a"] };
     expect(() => validateManifest({ entries: [bad] })).toThrow(ManifestValidationError);
   });
+});
+
+// Un ancla que coincide con más de una línea de CLAUDE.md deja a su entrada SIN vigilancia: el detector
+// devuelve un error de resolución en vez de comparar fechas (y el pre-push solo avisa). Esta prueba lee el
+// manifest y el CLAUDE.md REALES (copia de trabajo, sin git) con la misma resolveAnchorLine del detector y
+// corre en `npm run test`, que sí bloquea el pre-push. Caso real: d7cb7cd citó en el Historial la frase del
+// ancla de la integración con Moddulo F2 y la entrada quedó sin vigilar.
+describe("anclas del manifest real", () => {
+  const raiz = path.resolve(__dirname, "..");
+  const claudeMd = readFileSync(path.join(raiz, "CLAUDE.md"), "utf-8");
+  const manifest = loadManifest();
+
+  for (const entrada of manifest.entries) {
+    it(`el ancla de "${entrada.id}" coincide con exactamente 1 línea de CLAUDE.md`, () => {
+      const r = resolveAnchorLine(entrada.anchor, "HEAD", () => claudeMd);
+      if (typeof r !== "number") {
+        throw new Error(
+          `${r.error}. Esa entrada ("${entrada.id}") no se está vigilando. ` +
+            `Hazla más específica en docs/claude-md-freshness-manifest.json (agrega el sufijo de la fila de la tabla) ` +
+            `o reformula la otra línea para que no cite la frase del ancla.`
+        );
+      }
+      expect(r).toBeGreaterThan(0);
+    });
+  }
 });
