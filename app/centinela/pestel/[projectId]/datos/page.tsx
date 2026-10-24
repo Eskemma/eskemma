@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import AvisoAsistentePestel from "@/app/components/centinela/pestel/AvisoAsistentePestel";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { useParams, useRouter } from "next/navigation";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
@@ -329,6 +330,8 @@ export default function DatosPage() {
           </p>
         </div>
       </div>
+
+      <AvisoAsistentePestel />
 
       {/* Navegación de etapas */}
       {project && (

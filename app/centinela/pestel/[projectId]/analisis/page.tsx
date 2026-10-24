@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import AvisoAsistentePestel from "@/app/components/centinela/pestel/AvisoAsistentePestel";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
@@ -265,6 +266,8 @@ export default function AnalisisPage() {
           </div>
         </div>
       </div>
+
+      <AvisoAsistentePestel />
 
       {/* Navegación de etapas */}
       {project && (

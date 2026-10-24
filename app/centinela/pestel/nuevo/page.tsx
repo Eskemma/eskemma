@@ -9,6 +9,7 @@ import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/Wizar
 import ConfirmReplacePestelModal, {
   type ConfirmReplacePestelSource,
 } from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
+import { planTrasCrearProyecto, rutaProyectoExistente } from "@/lib/centinela/pestel/destinoTrasCrear";
 import type {
   TipoProyecto,
   Territorio,
@@ -119,6 +120,21 @@ export default function NuevoProyectoPage() {
       }
 
       const { projectId } = (await projectRes.json()) as { projectId: string };
+
+      // 200 = el dedup devolvió el PESTEL ya vinculado a este Moddulo: no se le escriben las variables
+      // del asistente (reemplazarían las suyas); se abre tal como está, en su etapa.
+      const plan = planTrasCrearProyecto(projectRes.status);
+      if (!plan.guardarVariables) {
+        let etapa: unknown;
+        try {
+          const proj = await fetch(`/api/centinela/pestel/project/${projectId}`);
+          if (proj.ok) etapa = ((await proj.json()) as { project?: { currentStage?: unknown } }).project?.currentStage;
+        } catch {
+          // sin etapa: se abre en Datos
+        }
+        router.push(rutaProyectoExistente(projectId, etapa, plan.aviso));
+        return;
+      }
 
       // Save variable config (E3)
       const varsRes = await fetch(
