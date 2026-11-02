@@ -561,10 +561,13 @@ export interface DIE {
 
 export interface F2Senal {
   descripcion: string;
-  fuente: string;
-  fechaCorte: string;
-  nivelConfianza: "alto" | "medio" | "bajo";
-  origenInternacional: boolean;
+  // T3 (N7): opcionales. Lo que el análisis no trae se OMITE (nunca `undefined`/`null`); antes se fabricaban
+  // `""` y «medio» (98–100 % de las señales express decían «medio» por esa razón). Los mapas ya guardados siguen
+  // siendo válidos (traen los valores fabricados).
+  fuente?: string;
+  fechaCorte?: string;
+  nivelConfianza?: "alto" | "medio" | "bajo";
+  origenInternacional?: boolean;
 }
 
 export interface F2DimensionPESTEL {

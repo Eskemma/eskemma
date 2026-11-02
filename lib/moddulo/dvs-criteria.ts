@@ -233,7 +233,7 @@ export function evaluarCriteriosDVS(
         ? Object.values(mapaPESTEL).every((d) =>
             d === undefined ||
             [...(d.senalesFavorables ?? []), ...(d.senalesAdversas ?? []), ...(d.senalesInciertas ?? [])].every(
-              (s) => s.fuente.trim().length > 0 && s.fechaCorte.trim().length > 0
+              (s) => (s.fuente ?? "").trim().length > 0 && (s.fechaCorte ?? "").trim().length > 0
             )
           )
         : dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1),

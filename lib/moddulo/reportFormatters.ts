@@ -162,7 +162,7 @@ const PESTEL_DIM_FALLBACK_LABEL: Record<string, string> = {
   P: "Político", E: "Económico", S: "Social", T: "Tecnológico", Ec: "Ecológico", L: "Legal",
 };
 
-function formatSenales(label: string, senales: { descripcion: string; fuente: string; fechaCorte: string }[] | undefined): string[] {
+function formatSenales(label: string, senales: { descripcion: string; fuente?: string; fechaCorte?: string }[] | undefined): string[] {
   if (!senales || senales.length === 0) return [];
   const out = [`**${label}:**`];
   for (const s of senales) {

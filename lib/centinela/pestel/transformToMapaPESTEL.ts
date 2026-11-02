@@ -39,14 +39,15 @@ export type RawAdjustment = {
 const CLASIFICACIONES: readonly string[] = ["OPORTUNIDAD", "NEUTRAL", "AMENAZA"];
 const esClasificacion = (v: unknown): v is Clasificacion => typeof v === "string" && CLASIFICACIONES.includes(v);
 
+// T3 (N7): lo que el análisis no trae se OMITE; ya no se fabrica «», «» ni «medio». Nunca `undefined`/`null`
+// (Firestore rechaza `undefined`).
 function toF2Senal(s: RawSenal): F2Senal {
-  return {
-    descripcion: s.descripcion ?? "",
-    fuente: s.fuente ?? "",
-    fechaCorte: s.fechaCorte ?? "",
-    nivelConfianza: s.nivelConfianza ?? "medio",
-    origenInternacional: s.origenInternacional ?? false,
-  };
+  const out: F2Senal = { descripcion: s.descripcion ?? "" };
+  if (s.fuente !== undefined && s.fuente !== null) out.fuente = s.fuente;
+  if (s.fechaCorte !== undefined && s.fechaCorte !== null) out.fechaCorte = s.fechaCorte;
+  if (s.nivelConfianza !== undefined && s.nivelConfianza !== null) out.nivelConfianza = s.nivelConfianza;
+  if (s.origenInternacional !== undefined && s.origenInternacional !== null) out.origenInternacional = s.origenInternacional;
+  return out;
 }
 
 const esNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
