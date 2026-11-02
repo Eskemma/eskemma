@@ -47,7 +47,7 @@ export function reporteDelAnalisisAnterior(estado: EstadoM1 | null, hayDvs: bool
 export function lineaTrazabilidadReporte(i: {
   estado: ResultadoEstadoM1["estado"] | null;
   aprobacionValida: boolean;
-  aprobacion: Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> | undefined;
+  aprobacion: (Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> & { mapa?: MapaPESTEL }) | undefined;
   hayDvs: boolean;
   dvsDeOtroAnalisis: boolean;
 }): string | null {
@@ -64,7 +64,7 @@ export function lineaTrazabilidadReporte(i: {
 export function lineaTrazabilidadPestel(i: {
   estado: ResultadoEstadoM1["estado"] | null;
   aprobacionValida: boolean;
-  aprobacion: Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> | undefined;
+  aprobacion: (Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> & { mapa?: MapaPESTEL }) | undefined;
 }): string | null {
   if (i.estado === "anterior") return TEXTO_ANTERIOR;
   if (i.estado === "aprobado" && i.aprobacionValida) return lineaTrazabilidadM1(i.aprobacion);

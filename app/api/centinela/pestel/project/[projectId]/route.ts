@@ -8,6 +8,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { getPestelProjectPropio } from "@/lib/centinela/pestel/projectPropio";
 import { FieldValue } from "firebase-admin/firestore";
+import { ajustesDelMapaImportado, type MapaImportadoResumen } from "@/lib/centinela/pestel/ajustesSinReflejar";
 import type { PESTELProject, TipoProyecto, Territorio, PESTELProjectStatus } from "@/types/pestel.types";
 
 interface RouteContext {
@@ -24,6 +25,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const project = await getPestelProjectPropio(projectId, session.uid);
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+  }
+
+  // T3 (opt-in: `?ajustesImportados=1`): resumen MÍNIMO del mapa que Moddulo F2 importó (solo el `ajuste` de cada
+  // dimensión) para que Interpretación sepa si F2 ya refleja los ajustes. Una lectura del Moddulo vinculado; sin ruta
+  // nueva. `null` = no se pudo saber (sin acceso, en papelera o inexistente): la pantalla no afirma nada.
+  if (request.nextUrl.searchParams.get("ajustesImportados") === "1" && project.modduloProjectId) {
+    let importado: MapaImportadoResumen | null = null;
+    try {
+      const snap = await adminDb.collection("moddulo_projects").doc(project.modduloProjectId).get();
+      const d = snap.exists ? snap.data() : undefined;
+      const colabora = !!d?.collaborators?.some((c: { uid?: string }) => c.uid === session.uid);
+      if (d && !d.deletedAt && colabora) importado = ajustesDelMapaImportado(d.phases?.exploracion?.linkedSource?.payload);
+    } catch {
+      importado = null;
+    }
+    return NextResponse.json({ project, importado });
   }
 
   return NextResponse.json({ project });

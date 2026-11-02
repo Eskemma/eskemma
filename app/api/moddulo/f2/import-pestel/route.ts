@@ -12,7 +12,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
-import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
+import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
 import { MENSAJE_CONFLICTO_IMPORT } from "@/lib/moddulo/textosVinculo";
 
@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
   }
 
   const mapaPESTEL: MapaPESTEL = transformToMapaPESTEL(
-    (analysis.dimensions ?? []) as RawDimension[]
+    (analysis.dimensions ?? []) as RawDimension[],
+    (analysis.adjustments ?? []) as RawAdjustment[]
   );
 
   const pestProjectId = analysis.projectId as string;

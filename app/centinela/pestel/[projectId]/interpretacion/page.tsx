@@ -11,6 +11,7 @@ import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useRouter } from "next/navigation";
 import { confianzaInsuficiente, textoAprobacionRetirada } from "@/lib/centinela/pestel/aprobacion";
+import { ajustesSinReflejarEnF2, listaEnEspanol, type MapaImportadoResumen } from "@/lib/centinela/pestel/ajustesSinReflejar";
 import AprobacionConfianzaModal from "@/app/components/centinela/pestel/interpretacion/AprobacionConfianzaModal";
 import { DIMENSION_META } from "@/types/pestel.types";
 import type {
@@ -49,6 +50,8 @@ export default function InterpretacionPage() {
   // T6: el proyecto está vinculado a Moddulo (para la nota de que F2 aún no incluye los ajustes) y la
   // aprobación con confianza baja pide una justificación en un modal.
   const [vinculadoAModdulo, setVinculadoAModdulo] = useState(false);
+  // Resumen del mapa que F2 importó (solo el `ajuste` de cada dimensión); null = aún no se sabe o no se pudo leer.
+  const [importadoF2, setImportadoF2] = useState<MapaImportadoResumen | null>(null);
   const [mostrarModalConfianza, setMostrarModalConfianza] = useState(false);
   const [errorAprobacionModal, setErrorAprobacionModal] = useState<string | null>(null);
 
@@ -238,6 +241,27 @@ export default function InterpretacionPage() {
     if (msg) setErrorAprobacionModal(msg);
   }
 
+  // T3: con el proyecto vinculado y al menos un ajuste, se lee UNA vez el resumen del mapa que F2 importó (la misma
+  // ruta del proyecto, con ?ajustesImportados=1). Un ajuste posterior se compara contra ese mismo resumen. Si la
+  // lectura falla no se afirma nada (sin nota).
+  const hayAjustes = (analysis?.adjustments ?? []).length > 0;
+  useEffect(() => {
+    if (!vinculadoAModdulo || !hayAjustes) return;
+    let cancelado = false;
+    fetch(`/api/centinela/pestel/project/${projectId}?ajustesImportados=1`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { importado?: MapaImportadoResumen | null } | null) => {
+        if (!cancelado) setImportadoF2(d?.importado ?? null);
+      })
+      .catch(() => {
+        if (!cancelado) setImportadoF2(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [vinculadoAModdulo, hayAjustes, projectId]);
+  const dimsSinReflejarF2 = vinculadoAModdulo ? ajustesSinReflejarEnF2(analysis?.adjustments, importadoF2) : [];
+
   // ─── Derived state ───────────────────────────────────────────────────────
 
   const unacknowledgedBiases = (analysis?.biasAlerts ?? []).filter(
@@ -392,7 +416,7 @@ export default function InterpretacionPage() {
           </div>
         )}
 
-        {vinculadoAModdulo && (analysis.adjustments ?? []).length > 0 && (
+        {dimsSinReflejarF2.length > 0 && (
           <div
             role="status"
             className="border-l-4 border-y border-r border-brown-eske-60 dark:border-yellow-eske bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske text-sm px-4 py-2.5 rounded-lg flex items-start gap-2.5"
@@ -400,7 +424,9 @@ export default function InterpretacionPage() {
             <svg aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
-            <span>Moddulo F2 todavía no incluye tus ajustes al importar este análisis.</span>
+            <span>
+              Moddulo F2 todavía no incluye tus ajustes en: {listaEnEspanol(dimsSinReflejarF2.map((c) => DIMENSION_META[c as DimensionCode]?.label ?? c))}.
+            </span>
           </div>
         )}
 

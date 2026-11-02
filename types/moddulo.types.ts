@@ -581,6 +581,21 @@ export interface F2DimensionPESTEL {
   // prioritaria por relevancia del contexto local — señal auditable para no
   // depender de inferir el criterio leyendo la narrativa.
   escaladaPorRelevanciaLocal?: boolean;
+  /**
+   * Ajuste del analista hecho en Centinela (E6) sobre esta dimensión (T3, D3). La clave se OMITE cuando no hay
+   * ajuste (nunca `undefined`/`null`): así la huella de los mapas ya aprobados no cambia. `clasificacion` ya es
+   * la ajustada; la narrativa y la confianza siguen siendo las de la IA (previas al ajuste). Sin `ajustadoPor`.
+   */
+  ajuste?: AjusteAnalistaF2;
+}
+
+export interface AjusteAnalistaF2 {
+  clasificacionOriginal: "OPORTUNIDAD" | "NEUTRAL" | "AMENAZA";
+  clasificacionAjustada: "OPORTUNIDAD" | "NEUTRAL" | "AMENAZA";
+  justificacion: string;
+  /** ISO 8601; se omite si la fecha guardada no se pudo convertir (el ajuste se conserva). */
+  ajustadoEn?: string;
+  posiciones?: { original: { x: number; y: number }; nueva: { x: number; y: number } };
 }
 
 export type MapaPESTEL = Partial<Record<string, F2DimensionPESTEL>>;

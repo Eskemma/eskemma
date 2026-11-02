@@ -10,7 +10,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
-import { serializeMapaPESTEL, estadisticasMapa, MapaDemasiadoGrandeError, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
+import { serializeMapaPESTEL, mapaTieneAjustes, estadisticasMapa, MapaDemasiadoGrandeError, getDVSM5Prompt } from "@/lib/ai/phases/prompts";
 import { respuestaMapaDemasiadoGrande } from "@/lib/moddulo/respuestaMapaDemasiadoGrande";
 import { buildPhaseContext } from "@/lib/moddulo/knowledge-injector";
 import { causaDeFalloModelo, codigoDeParseo, lineaMapa, origenDeAnalisis, descripcionEstructural, medirLlamada, registrarTotal } from "@/lib/moddulo/registroModelo";
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
     }));
 
   console.log(lineaMapa("regenerate-m5", estadisticasMapa(mapaPESTEL)));
+  const hayAjustes = mapaTieneAjustes(mapaPESTEL);
   let mapaSerialized: string;
   try {
     mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
@@ -160,7 +161,8 @@ export async function POST(request: NextRequest) {
       m3Actores,
       m4Incertidumbres,
       // The M1 gate passed (fingerprint captured) = the frozen approved copy; no review record = the current analysis.
-      huellaCapturada !== null
+      huellaCapturada !== null,
+      hayAjustes
     );
     const knowledgeContext = await buildPhaseContext({ phaseId: "exploracion", projectType: project.type });
     const systemPrompt = knowledgeContext ? `${knowledgeContext}\n\n${system}` : system;

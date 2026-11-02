@@ -53,6 +53,7 @@ import Link from "next/link";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
+import AjusteAnalista from "./components/AjusteAnalista";
 import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
@@ -2931,6 +2932,11 @@ function TripartiteSignalsPanel({ dim, edicion }: { dim: F2DimensionPESTEL; edic
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CLASIF_COLORS[dim.clasificacion] ?? CLASIF_COLORS.NEUTRAL}`}>
           {dim.clasificacion}
         </span>
+        {dim.ajuste && (
+          <span className="text-[11px] font-medium px-1.5 py-0.5 rounded border border-brown-eske-60/50 bg-brown-eske-60/10 text-brown-eske-80 dark:border-yellow-eske/30 dark:bg-yellow-eske/10 dark:text-yellow-eske">
+            Ajustado por el analista
+          </span>
+        )}
         {edicion?.editado && (
           <span
             title={edicion.tooltipEditado}
@@ -2941,7 +2947,7 @@ function TripartiteSignalsPanel({ dim, edicion }: { dim: F2DimensionPESTEL; edic
         )}
         {dim.confidence !== undefined && (
           <span className="text-xs text-black-eske-20 dark:text-[#9AAEBE]" title="Confianza del análisis generado por la IA; no se edita.">
-            {ROTULO_CONFIANZA_IA}: {dim.confidence}%
+            {dim.ajuste ? `${ROTULO_CONFIANZA_IA} (de la clasificación original)` : ROTULO_CONFIANZA_IA}: {dim.confidence}%
           </span>
         )}
         {edicion?.puede && !editando && (
@@ -3026,6 +3032,10 @@ function TripartiteSignalsPanel({ dim, edicion }: { dim: F2DimensionPESTEL; edic
         </div>
       ) : (
         <>
+          {dim.ajuste && <AjusteAnalista ajuste={dim.ajuste} />}
+          {dim.ajuste && dim.narrativa && (
+            <p className="text-xs font-semibold text-black-eske-20 dark:text-[#C7D6E0]">Narrativa de la IA (previa al ajuste)</p>
+          )}
           {dim.narrativa && (
             <div className="text-xs text-black-eske-40 dark:text-[#C5D8E8] space-y-2">
               {dim.narrativa.split("\n\n").filter(Boolean).map((para, i) => (

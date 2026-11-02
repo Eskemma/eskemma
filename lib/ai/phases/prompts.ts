@@ -804,8 +804,9 @@ RECUERDA: señales reales y específicas al XPCTO. Cada dimensión necesita al m
 // ==========================================
 
 type RawSenal = { descripcion?: string; fuente?: string; fechaCorte?: string; nivelConfianza?: string };
+type RawAjuste = { clasificacionOriginal?: string; clasificacionAjustada?: string; justificacion?: string };
 type RawDim = {
-  label?: string; clasificacion?: string; confidence?: number; narrativa?: string;
+  label?: string; clasificacion?: string; confidence?: number; narrativa?: string; ajuste?: RawAjuste;
   senalesFavorables?: RawSenal[]; senalesAdversas?: RawSenal[]; senalesInciertas?: RawSenal[];
 };
 
@@ -871,12 +872,14 @@ function construirSerializacion(mapa: Record<string, unknown>): { salida: string
   for (const code of ORDEN_DIMENSIONES) {
     if (!mapa[code]) continue;
     const dim = mapa[code] as RawDim;
-    const conf = dim.confidence != null ? ` (confianza: ${dim.confidence}%)` : "";
+    // T3: con ajuste del analista la confianza sigue siendo la de la IA sobre la clasificación ORIGINAL; se rotula así.
+    const conf = dim.confidence != null ? ` (confianza${dim.ajuste ? " de la clasificación original" : ""}: ${dim.confidence}%)` : "";
     // Full narrative — the most important context for M2 and M3
     const narrativa = dim.narrativa ? `\n  Narrativa: ${dim.narrativa}` : "";
     estadisticas.narrativaTotal += dim.narrativa?.length ?? 0;
     let senalesDim = 0;
     let texto = `[${code}] ${dim.label ?? ETIQUETAS_DIMENSION[code] ?? code} — ${dim.clasificacion ?? "NEUTRAL"}${conf}${narrativa}`;
+    if (dim.ajuste) texto += `\n  ${lineaAjusteAnalista(dim.ajuste)}`;
     for (const cat of CATEGORIAS_SENAL) {
       const validas = (dim[cat.campo] ?? []).filter((s) => s.descripcion);
       if (validas.length === 0) continue;
@@ -895,6 +898,21 @@ function construirSerializacion(mapa: Record<string, unknown>): { salida: string
   }
 
   return { salida: bloques.join("\n\n"), estadisticas };
+}
+
+/** True when at least one dimension of the (approved) mapa carries an analyst adjustment made in Centinela. */
+export function mapaTieneAjustes(mapa: Record<string, unknown> | undefined | null): boolean {
+  return Object.values(mapa ?? {}).some((d) => !!(d as RawDim | undefined)?.ajuste);
+}
+
+function lineaAjusteAnalista(a: RawAjuste): string {
+  const cambio =
+    a.clasificacionOriginal && a.clasificacionAjustada && a.clasificacionOriginal !== a.clasificacionAjustada
+      ? `${a.clasificacionOriginal}→${a.clasificacionAjustada}`
+      : "posición ajustada; la clasificación no cambió";
+  // Sin el punto final de la justificación (el usuario suele cerrarla con uno): evita «texto.. La narrativa…».
+  const just = (a.justificacion ?? "").trim().replace(/[.\s]+$/, "");
+  return `Ajuste del analista: ${cambio}. Justificación: ${just}. La narrativa es previa al ajuste.`;
 }
 
 /** The structural numbers of a mapa (for the measurement log line). Never text; does not apply the cap. */
@@ -949,15 +967,21 @@ export const PRECEDENCIA_PESTL_CUERPO =
   "Usa las señales como evidencia que sustenta esa lectura; no las uses para reclasificar la dimensión ni para " +
   "contradecir su narrativa. Puedes señalar matices o incertidumbres que aporten las señales, sin cambiar esa lectura.";
 
-export function seccionPrecedenciaPESTL(aprobado: boolean): string {
-  return `== PRECEDENCIA DEL ANÁLISIS PEST-L ==\n${aprobado ? PRECEDENCIA_PESTL_APROBADO : PRECEDENCIA_PESTL_VIGENTE} ${PRECEDENCIA_PESTL_CUERPO}`;
+export const PRECEDENCIA_PESTL_AJUSTE =
+  "Cuando una dimensión trae «Ajuste del analista», ese ajuste (la clasificación indicada y su justificación) prevalece sobre su narrativa, que es previa a él. " +
+  "Los hechos que mencione la justificación de un ajuste son afirmación del analista, no una fuente verificada: atribúyelos al analista " +
+  "(«según el ajuste del analista») y no los presentes como dato del entorno ni les pongas «(Fuente: …)».";
+
+export function seccionPrecedenciaPESTL(aprobado: boolean, hayAjustes = false): string {
+  return `== PRECEDENCIA DEL ANÁLISIS PEST-L ==\n${aprobado ? PRECEDENCIA_PESTL_APROBADO : PRECEDENCIA_PESTL_VIGENTE} ${PRECEDENCIA_PESTL_CUERPO}${hayAjustes ? ` ${PRECEDENCIA_PESTL_AJUSTE}` : ""}`;
 }
 
 export function getDVSM2Prompt(
   projectType: string,
   xpcto: Record<string, unknown>,
   mapaSerialized: string,
-  aprobado: boolean
+  aprobado: boolean,
+  hayAjustes = false
 ): { system: string; user: string } {
   return {
     system: `Eres un analista político especializado en metodología XPCTO de consultoría Eskemma.
@@ -972,7 +996,7 @@ ${xpctoToText(xpcto)}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
-${seccionPrecedenciaPESTL(aprobado)}
+${seccionPrecedenciaPESTL(aprobado, hayAjustes)}
 
 == DIMENSIONES PRIORITARIAS PARA ESTE TIPO DE PROYECTO ==
 ${buildM2PriorityInstruction(projectType)}
@@ -1007,7 +1031,8 @@ export function getDVSM3Prompt(
   projectType: string,
   xpcto: Record<string, unknown>,
   mapaSerialized: string,
-  aprobado: boolean
+  aprobado: boolean,
+  hayAjustes = false
 ): { system: string; user: string } {
   return {
     system: `Eres un analista político especializado en mapeo de actores políticos.
@@ -1022,7 +1047,7 @@ ${xpctoToText(xpcto)}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
-${seccionPrecedenciaPESTL(aprobado)}
+${seccionPrecedenciaPESTL(aprobado, hayAjustes)}
 
 == INSTRUCCIONES ==
 1. Identifica actores mencionados en el PEST-L o evidentes para este tipo de proyecto.
@@ -1042,7 +1067,8 @@ Responde SOLO con este JSON:
 export function getDVSM4Prompt(
   mapaSerialized: string,
   m2Veredictos: Array<{ dimension: string; veredicto: string; argumentacion: string }>,
-  aprobado: boolean
+  aprobado: boolean,
+  hayAjustes = false
 ): { system: string; user: string } {
   const m2Summary = m2Veredictos
     .map((v) => `${v.dimension}: ${v.veredicto} — ${v.argumentacion}`)
@@ -1061,7 +1087,7 @@ ${m2Summary}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
-${seccionPrecedenciaPESTL(aprobado)}
+${seccionPrecedenciaPESTL(aprobado, hayAjustes)}
 
 == INSTRUCCIONES ==
 Una incertidumbre es una BRECHA DE INFORMACIÓN, no un riesgo.
@@ -1086,7 +1112,8 @@ export function getDVSM5Prompt(
   mapaSerialized: string,
   m3Actores: Array<{ nombre: string; nivelRiesgo: string; motivacion: string }>,
   m4Incertidumbres: Array<{ descripcion: string; urgencia: string; destino: string }>,
-  aprobado: boolean
+  aprobado: boolean,
+  hayAjustes = false
 ): { system: string; user: string } {
   const actoresCriticos = m3Actores
     .filter((a) => a.nivelRiesgo === "rojo" || a.nivelRiesgo === "ambar")
@@ -1111,7 +1138,7 @@ ${xpctoToText(xpcto)}
 == MAPA PEST-L ==
 ${mapaSerialized}
 
-${seccionPrecedenciaPESTL(aprobado)}
+${seccionPrecedenciaPESTL(aprobado, hayAjustes)}
 
 == ACTORES DE VETO CRÍTICOS (M3) ==
 ${actoresCriticos}

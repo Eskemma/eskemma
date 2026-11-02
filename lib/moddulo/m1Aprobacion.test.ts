@@ -192,3 +192,22 @@ describe("lineaTrazabilidadM1", () => {
     expect(aFecha(null)).toBeNull();
   });
 });
+
+describe("lineaTrazabilidadM1 — ajustes hechos en Centinela (T3)", () => {
+  const en = new Date("2026-10-15T18:00:00Z");
+  const dim = (ajuste?: boolean) => ({ code: "P", label: "P", clasificacion: "AMENAZA" as const, senalesFavorables: [], senalesAdversas: [], senalesInciertas: [], ...(ajuste ? { ajuste: { clasificacionOriginal: "NEUTRAL" as const, clasificacionAjustada: "AMENAZA" as const, justificacion: "j" } } : {}) });
+  const mapa = (n: number) => Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`D${i}`, { ...dim(i < n), code: `D${i}` }]));
+  it("solo ajustes de Centinela: lo dice (singular y plural)", () => {
+    expect(lineaTrazabilidadM1({ en, categoriasEditadas: 0, total: 6, mapa: mapa(1) })).toBe("Análisis aprobado el 15 de octubre de 2026; incluye 1 ajuste del analista hecho en Centinela.");
+    expect(lineaTrazabilidadM1({ en, categoriasEditadas: 0, total: 6, mapa: mapa(3) })).toBe("Análisis aprobado el 15 de octubre de 2026; incluye 3 ajustes del analista hechos en Centinela.");
+  });
+  it("ediciones de Moddulo Y ajustes de Centinela a la vez: muestra ambos datos", () => {
+    expect(lineaTrazabilidadM1({ en, categoriasEditadas: 2, total: 6, mapa: mapa(3) })).toBe(
+      "Análisis revisado y ajustado por el usuario el 15 de octubre de 2026, en 2 de 6 categorías; incluye 3 ajustes del analista hechos en Centinela."
+    );
+  });
+  it("sin ajustes de Centinela (o sin mapa) las líneas de siempre", () => {
+    expect(lineaTrazabilidadM1({ en, categoriasEditadas: 0, total: 6, mapa: mapa(0) })).toBe("Análisis aprobado sin ajustes el 15 de octubre de 2026.");
+    expect(lineaTrazabilidadM1({ en, categoriasEditadas: 2, total: 6, mapa: mapa(0) })).toBe("Análisis revisado y ajustado por el usuario el 15 de octubre de 2026, en 2 de 6 categorías.");
+  });
+});

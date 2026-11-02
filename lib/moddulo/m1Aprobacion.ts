@@ -211,14 +211,26 @@ function fechaLarga(valor: unknown): string | null {
  * One line for the F2 report and the PESTEL download. Never marks anything inside the text.
  * Returns null when there is no approval record (projects created before this feature).
  */
-export function lineaTrazabilidadM1(aprobacion: Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> | undefined): string | null {
+export function lineaTrazabilidadM1(
+  aprobacion: (Pick<M1Aprobacion, "en" | "categoriasEditadas" | "total"> & { mapa?: MapaPESTEL }) | undefined
+): string | null {
   if (!aprobacion) return null;
   const fecha = fechaLarga(aprobacion.en);
   if (!fecha) return null;
+  const ajustes = contarDimensionesAjustadas(aprobacion.mapa);
+  const deCentinela = ajustes === 1 ? "incluye 1 ajuste del analista hecho en Centinela" : `incluye ${ajustes} ajustes del analista hechos en Centinela`;
   if (aprobacion.categoriasEditadas > 0) {
-    return `Análisis revisado y ajustado por el usuario el ${fecha}, en ${aprobacion.categoriasEditadas} de ${aprobacion.total} categorías.`;
+    const base = `Análisis revisado y ajustado por el usuario el ${fecha}, en ${aprobacion.categoriasEditadas} de ${aprobacion.total} categorías`;
+    // Ambos datos se muestran (T3): las ediciones de Moddulo y los ajustes hechos en Centinela no se ocultan entre sí.
+    return ajustes > 0 ? `${base}; ${deCentinela}.` : `${base}.`;
   }
+  if (ajustes > 0) return `Análisis aprobado el ${fecha}; ${deCentinela}.`;
   return `Análisis aprobado sin ajustes el ${fecha}.`;
+}
+
+/** Dimensiones del mapa que traen un ajuste del analista hecho en Centinela (T3). */
+export function contarDimensionesAjustadas(mapa: MapaPESTEL | undefined | null): number {
+  return Object.values(mapa ?? {}).filter((d) => !!d?.ajuste).length;
 }
 
 // ── Map used by the sufficiency criteria ───────────────────────────────────────

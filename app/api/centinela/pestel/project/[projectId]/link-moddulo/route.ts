@@ -14,7 +14,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
-import { transformToMapaPESTEL, type RawDimension } from "@/lib/centinela/pestel/transformToMapaPESTEL";
+import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { vinculoT22Ajeno } from "@/lib/centinela/pestel/vinculoUnico";
 import { MENSAJE_MODDULO_CON_OTRO_PESTEL, MENSAJE_MODDULO_OTRA_VERSION } from "@/lib/moddulo/textosVinculo";
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
@@ -161,7 +161,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   if (latestAnalysisId && latestAnalysisData) {
     const mapaPESTEL = transformToMapaPESTEL(
-      (latestAnalysisData.dimensions ?? []) as RawDimension[]
+      (latestAnalysisData.dimensions ?? []) as RawDimension[],
+      (latestAnalysisData.adjustments ?? []) as RawAdjustment[]
     );
     linkedSource.sourceAnalysisId = latestAnalysisId;
     linkedSource.payload = mapaPESTEL;

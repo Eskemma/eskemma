@@ -13,6 +13,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   serializeMapaPESTEL,
+  mapaTieneAjustes,
   estadisticasMapa,
   MapaDemasiadoGrandeError,
   getDVSM2Prompt,
@@ -258,6 +259,7 @@ async function runMultiMotorInterno(
   // block over the security cap instead of cutting it: nothing was written and the model was not called.
   const estMapa = estadisticasMapa(mapaPESTEL);
   console.log(lineaMapa("generate-dvs", estMapa));
+  const hayAjustes = mapaTieneAjustes(mapaPESTEL);
   let mapaSerialized: string;
   try {
     mapaSerialized = serializeMapaPESTEL(mapaPESTEL);
@@ -275,8 +277,8 @@ async function runMultiMotorInterno(
   let m2Raw: string;
   let m3Raw: string;
   try {
-    const pM2 = getDVSM2Prompt(projectType, xpctoRaw, mapaSerialized, aprobado);
-    const pM3 = getDVSM3Prompt(projectType, xpctoRaw, mapaSerialized, aprobado);
+    const pM2 = getDVSM2Prompt(projectType, xpctoRaw, mapaSerialized, aprobado, hayAjustes);
+    const pM3 = getDVSM3Prompt(projectType, xpctoRaw, mapaSerialized, aprobado, hayAjustes);
     const [resM2, resM3] = await Promise.all([
       callClaude(pM2.system, pM2.user, 3000, { motor: "M2", intento: 1, t0 }),
       callClaude(pM3.system, pM3.user, 3000, { motor: "M3", intento: 1, t0 }),
@@ -316,7 +318,7 @@ async function runMultiMotorInterno(
 
   let m4Raw: string;
   try {
-    const { system, user } = getDVSM4Prompt(mapaSerialized, m2Veredictos, aprobado);
+    const { system, user } = getDVSM4Prompt(mapaSerialized, m2Veredictos, aprobado, hayAjustes);
     const resM4 = await callClaude(system, user, 2000, { motor: "M4", intento: 1, t0 });
     stops.M4 = resM4.stop_reason;
     m4Raw = extractText(resM4);
@@ -352,7 +354,7 @@ async function runMultiMotorInterno(
   for (let attempt = 1; attempt <= 2; attempt++) {
     let m5Raw: string;
     try {
-      const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres, aprobado);
+      const { system, user } = getDVSM5Prompt(projectType, xpctoRaw, mapaSerialized, m3Actores, m4Incertidumbres, aprobado, hayAjustes);
       const resM5 = await callClaude(system, user, 5000, { motor: "M5", intento: attempt, t0 });
       stops.M5 = resM5.stop_reason;
       m5Raw = extractText(resM5);
