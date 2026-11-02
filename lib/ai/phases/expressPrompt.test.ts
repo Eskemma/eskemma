@@ -1,9 +1,19 @@
 // getMapaPESTELExpressPrompt: (1) caracterización — con las 6 dimensiones el texto sale idéntico byte a byte
 // al de antes de parametrizarlo (fixture generado con el código anterior); (2) subconjuntos de 3 dimensiones.
 
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getMapaPESTELExpressPrompt } from "./prompts";
 import golden from "./__fixtures__/express-prompt-antes-paso2.json";
+
+// El prompt incluye el mes ACTUAL (`fechaCorte`, prompts.ts) y el fixture se generó en 2026-10: se fija el
+// reloj para que la caracterización byte a byte no dependa de la fecha real de ejecución.
+beforeAll(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-15T12:00:00Z"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const xpcto = { hito: "Ganar", sujeto: "Sujeto X", capacidades: { financiero: "f", humano: "h", logistico: "l" }, tiempo: { fechaLimite: "2027-11-04", duracionMeses: 12 }, justificacion: "j" };
 const ctx = {
