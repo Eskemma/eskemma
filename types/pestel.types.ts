@@ -267,6 +267,18 @@ export interface PestlAnalysisV2 {
   adjustments?: HumanAdjustment[];
   // C7: informes generados con datos estructurados
   informes?: InformeGenerado[];
+  // ── Aprobación (E6) ───────────────────────────────────────────────
+  approvedAt?: Timestamp | string;
+  approvedBy?: string;
+  /** T6 (D4): al ajustar un análisis APPROVED se retira la aprobación y se archiva aquí (un solo nivel; el
+   *  historial completo es del Grupo 2). */
+  aprobacionAnterior?: {
+    approvedAt: Timestamp | string | null;
+    approvedBy: string | null;
+    justificacion?: string;
+    confianza?: number;
+  };
+  aprobacionRetirada?: { en: Timestamp | string; porDimension: DimensionCode; ajustadoPor: string };
 }
 
 // ==========================================

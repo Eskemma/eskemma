@@ -10,6 +10,8 @@ import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useRouter } from "next/navigation";
+import { textoAprobacionRetirada } from "@/lib/centinela/pestel/aprobacion";
+import { DIMENSION_META } from "@/types/pestel.types";
 import type {
   PestlAnalysisV2,
   HumanAdjustment,
@@ -43,6 +45,8 @@ export default function InterpretacionPage() {
   const [activeSection, setActiveSection] = useState<ActiveSection>("matrix");
   // Stage nav — minimum 6 (we're in E6); updated from project data
   const [projectCurrentStage, setProjectCurrentStage] = useState(6);
+  // T6: el proyecto está vinculado a Moddulo (para la nota de que F2 aún no incluye los ajustes).
+  const [vinculadoAModdulo, setVinculadoAModdulo] = useState(false);
 
   // Load the latest approved/reviewed analysis for this project
   const loadAnalysis = useCallback(async () => {
@@ -101,9 +105,10 @@ export default function InterpretacionPage() {
     // Load project currentStage for StageNav (non-blocking)
     fetch("/api/centinela/pestel/project")
       .then((r) => r.json())
-      .then((data: { projects: { id: string; currentStage?: number }[] }) => {
+      .then((data: { projects: { id: string; currentStage?: number; modduloProjectId?: string }[] }) => {
         const p = data.projects.find((pr) => pr.id === projectId);
         if (p?.currentStage) setProjectCurrentStage(p.currentStage);
+        setVinculadoAModdulo(!!p?.modduloProjectId);
       })
       .catch(() => {/* non-critical */});
 
@@ -138,15 +143,24 @@ export default function InterpretacionPage() {
         const { error: msg } = (await res.json()) as { error?: string };
         throw new Error(msg ?? "Error al guardar ajuste.");
       }
-      const { adjustment } = (await res.json()) as {
+      const { adjustment, status, aprobacionRetirada, vigente } = (await res.json()) as {
         adjustment: HumanAdjustment;
+        status?: string | null;
+        aprobacionRetirada?: boolean;
+        vigente?: boolean;
       };
+      // El ajuste pudo retirar la aprobación (o ya estaba retirada por un reintento): se recarga el
+      // análisis para mostrar el estado REAL del servidor (status, franja con fecha y dimensión).
+      if (aprobacionRetirada || (status && status !== analysis.status)) {
+        await loadAnalysis();
+        return;
+      }
       // Update local state
       setAnalysis((prev) => {
         if (!prev) return prev;
         const existing = prev.adjustments ?? [];
         const filtered = existing.filter((a) => a.dimensionCode !== code);
-        return { ...prev, adjustments: [...filtered, adjustment] };
+        return { ...prev, adjustments: [...filtered, adjustment], ...(vigente === false ? { vigente: false } : {}) };
       });
     } catch (err) {
       setError(
@@ -326,6 +340,46 @@ export default function InterpretacionPage() {
           </div>
         )}
 
+        {(() => {
+          const retirada = textoAprobacionRetirada(
+            analysis,
+            (c) => DIMENSION_META[c as DimensionCode]?.label ?? c,
+            (ms) => new Date(ms).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+          );
+          return retirada ? (
+            <div
+              role="status"
+              className="border border-brown-eske-60/50 dark:border-yellow-eske/30 bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske text-sm px-4 py-2.5 rounded-lg"
+            >
+              {retirada}
+            </div>
+          ) : null;
+        })()}
+
+        {analysis.vigente === false && (
+          <div
+            role="status"
+            className="border border-brown-eske-60/50 dark:border-yellow-eske/30 bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske text-sm px-4 py-2.5 rounded-lg flex items-center justify-between gap-3"
+          >
+            <span>Hay una versión más nueva de este análisis. Tus cambios se guardan en esta versión, no en la vigente.</span>
+            <button type="button" onClick={() => void loadAnalysis()} className="shrink-0 font-medium underline focus-visible:outline focus-visible:outline-2">
+              Ir a la versión vigente
+            </button>
+          </div>
+        )}
+
+        {vinculadoAModdulo && (analysis.adjustments ?? []).length > 0 && (
+          <div
+            role="status"
+            className="border-l-4 border-y border-r border-brown-eske-60 dark:border-yellow-eske bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske text-sm px-4 py-2.5 rounded-lg flex items-start gap-2.5"
+          >
+            <svg aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <span>Moddulo F2 todavía no incluye tus ajustes al importar este análisis.</span>
+          </div>
+        )}
+
         {/* Section tabs */}
         <div
           className="flex gap-1 bg-gray-eske-10 dark:bg-[#112233] rounded-xl p-1"
@@ -352,7 +406,7 @@ export default function InterpretacionPage() {
                   className={[
                     "text-xs px-1.5 py-0.5 rounded-full font-medium",
                     s.id === "bias"
-                      ? "bg-yellow-eske/20 text-yellow-eske"
+                      ? "bg-brown-eske-60/15 text-brown-eske-80 dark:bg-yellow-eske/20 dark:text-yellow-eske"
                       : "bg-bluegreen-eske/10 text-bluegreen-eske",
                   ].join(" ")}
                 >
@@ -479,7 +533,7 @@ export default function InterpretacionPage() {
           {analysis.status !== "APPROVED" ? (
             <div className="flex flex-col items-end gap-1.5">
               {unacknowledgedBiases.length > 0 && (
-                <p className="text-xs text-yellow-eske">
+                <p className="text-xs text-brown-eske-80 dark:text-yellow-eske">
                   Revisa {unacknowledgedBiases.length} alerta(s) de sesgo antes
                   de aprobar.
                 </p>

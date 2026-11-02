@@ -7,6 +7,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getAnalisisPropio } from "@/lib/centinela/pestel/analisisPropio";
+import { planRetiroAprobacion, validarJustificacionAjuste } from "@/lib/centinela/pestel/aprobacion";
 import type {
   Classification,
   DimensionCode,
@@ -63,15 +65,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  // Validate justification (min 20 chars)
-  if (
-    typeof justification !== "string" ||
-    justification.trim().length < 20
-  ) {
-    return NextResponse.json(
-      { error: "La justificación debe tener al menos 20 caracteres." },
-      { status: 400 }
-    );
+  // Validate justification: 20 a 1 000 caracteres (recortada)
+  const justif = validarJustificacionAjuste(justification);
+  if (!justif.ok) {
+    return NextResponse.json({ error: justif.mensaje }, { status: 400 });
   }
 
   // Validate newPosition
@@ -104,28 +101,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  // Verify analysis ownership
+  // Propiedad POR PROYECTO (`getAnalisisPropio`, el mismo criterio que `approve`, `acknowledge-bias`,
+  // `impact-chain` e `informes`) en vez de la copia `userId` del análisis; 404 igual para inexistente o
+  // ajeno. Esta lectura previa solo decide el 404 y da las dimensiones para el ajuste; el estado que
+  // cuenta (ajustes previos, status) es el que se lee DENTRO de la transacción de abajo.
   const analysisRef = adminDb.collection("pestel_analyses").doc(analysisId);
-  const analysisSnap = await analysisRef.get();
-
-  if (!analysisSnap.exists) {
-    return NextResponse.json(
-      { error: "Análisis no encontrado" },
-      { status: 404 }
-    );
+  const propio = await getAnalisisPropio(analysisId, session.uid);
+  if (!propio) {
+    return NextResponse.json({ error: "Análisis no encontrado" }, { status: 404 });
   }
-
-  const analysisData = analysisSnap.data()!;
-  if (analysisData.userId !== session.uid) {
-    return NextResponse.json(
-      { error: "Análisis no encontrado" },
-      { status: 404 }
-    );
-  }
+  const analysisData = propio.analysis as unknown as Record<string, unknown>;
 
   // Build the adjustment object. originalPosition and originalClassification
   // are derived from the stored dimension data.
-  const dimensions = analysisData.dimensions as Array<{
+  const dimensions = (analysisData.dimensions ?? []) as Array<{
     code: string;
     classification: Classification;
   }>;
@@ -139,7 +128,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   // Read original AI-proposed position from matrizUtils logic
   // (replicated inline here to avoid importing client-side utils in server code)
-  const originalPosition = getAIPosition(analysisData.dimensions, dimensionCode as DimensionCode);
+  const originalPosition = getAIPosition(
+    dimensions as unknown as Parameters<typeof getAIPosition>[0],
+    dimensionCode as DimensionCode
+  );
 
   const adjustment: HumanAdjustment = {
     dimensionCode: dimensionCode as DimensionCode,
@@ -147,27 +139,52 @@ export async function POST(request: NextRequest, context: RouteContext) {
     adjustedAt: new Date().toISOString(),
     originalClassification: originalDim.classification,
     newClassification: (newClassification as Classification) ?? originalDim.classification,
-    justification: justification.trim(),
+    justification: justif.valor,
     originalPosition,
     newPosition: pos,
   };
 
-  // Transaction: replace existing adjustment for this dimension (if any),
-  // then add the new one.
-  await adminDb.runTransaction(async (tx) => {
+  // UNA transacción, UN `tx.update`: reemplaza el ajuste previo de esa dimensión y, si el análisis estaba
+  // APPROVED, retira la aprobación en el mismo write (copiándola a `aprobacionAnterior` antes de borrar
+  // `approvedAt/approvedBy`): los dos cambios se aplican juntos o no se aplican. El callback puede
+  // reintentarse: relee el documento, y si otra petición ya retiró la aprobación el status ya no es
+  // APPROVED, no se vuelve a copiar (no se pisa `aprobacionAnterior`) y solo se agrega el ajuste. No tiene
+  // efectos fuera de `tx`; la respuesta se arma fuera. `currentStage` del proyecto no se toca.
+  const resultado = await adminDb.runTransaction(async (tx) => {
     const snap = await tx.get(analysisRef);
-    const existing = (snap.data()?.adjustments ?? []) as HumanAdjustment[];
-    const filtered = existing.filter(
-      (a) => a.dimensionCode !== dimensionCode
-    );
+    const data = (snap.data() ?? {}) as Record<string, unknown>;
+    const existing = (data.adjustments ?? []) as HumanAdjustment[];
+    const filtered = existing.filter((a) => a.dimensionCode !== dimensionCode);
     filtered.push(adjustment);
-    tx.update(analysisRef, {
+    const update: Record<string, unknown> = {
       adjustments: filtered,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    const retiro = planRetiroAprobacion(data);
+    if (retiro) {
+      Object.assign(update, {
+        status: "REVIEWED",
+        approvedAt: FieldValue.delete(),
+        approvedBy: FieldValue.delete(),
+        aprobacionJustificacion: FieldValue.delete(),
+        aprobacionConfianza: FieldValue.delete(),
+        aprobacionAnterior: retiro.anterior,
+        aprobacionRetirada: {
+          en: FieldValue.serverTimestamp(),
+          porDimension: dimensionCode,
+          ajustadoPor: session.uid,
+        },
+      });
+    }
+    tx.update(analysisRef, update);
+    return {
+      status: retiro ? "REVIEWED" : (data.status as string | undefined) ?? null,
+      aprobacionRetirada: retiro !== null,
+      vigente: data.vigente !== false,
+    };
   });
 
-  return NextResponse.json({ ok: true, adjustment }, { status: 200 });
+  return NextResponse.json({ ok: true, adjustment, ...resultado }, { status: 200 });
 }
 
 // Deterministic AI position (mirrors matrizUtils.ts logic — kept in sync manually)

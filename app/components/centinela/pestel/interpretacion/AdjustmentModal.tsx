@@ -10,6 +10,7 @@ import { useFocusTrap } from "@/app/hooks/useFocusTrap";
 import { useEscapeKey } from "@/app/hooks/useEscapeKey";
 import type { Classification, DimensionCode } from "@/types/pestel.types";
 import { DIMENSION_META } from "@/types/pestel.types";
+import { JUSTIFICACION_MAX, JUSTIFICACION_MIN } from "@/lib/centinela/pestel/aprobacion";
 
 const CLASSIFICATION_LABELS: Record<Classification, string> = {
   OPORTUNIDAD: "Oportunidad",
@@ -40,7 +41,7 @@ export default function AdjustmentModal({
   useEscapeKey(true, onCancel);
 
   const charCount = justification.trim().length;
-  const canSave = charCount >= 20 && !saving;
+  const canSave = charCount >= JUSTIFICACION_MIN && charCount <= JUSTIFICACION_MAX && !saving;
 
   return (
     <div
@@ -75,7 +76,7 @@ export default function AdjustmentModal({
             </span>
           </h2>
           <p className="text-xs text-black-eske dark:text-[#C7D6E0] mt-0.5">
-            Explica por qué reposicionas este factor. Mínimo 20 caracteres.
+            Explica por qué reposicionas este factor. Entre 20 y 1 000 caracteres.
           </p>
         </div>
 
@@ -98,16 +99,21 @@ export default function AdjustmentModal({
               focus:outline-none focus-visible:ring-2
               focus-visible:ring-bluegreen-eske placeholder:text-gray-eske-90 dark:placeholder:text-[#6D8294]
               resize-none"
+            maxLength={JUSTIFICACION_MAX + 200}
             autoFocus
           />
           <p
             className={[
               "text-xs text-right",
-              charCount >= 20 ? "text-green-eske" : "text-black-eske-20 dark:text-[#6D8294]",
+              charCount > JUSTIFICACION_MAX
+                ? "text-red-eske-60 dark:text-red-eske-10"
+                : charCount >= JUSTIFICACION_MIN
+                  ? "text-green-eske"
+                  : "text-black-eske-20 dark:text-[#6D8294]",
             ].join(" ")}
             aria-live="polite"
           >
-            {charCount} / 20 caracteres mínimos
+            {charCount} / entre {JUSTIFICACION_MIN} y 1 000 caracteres
           </p>
         </div>
 

@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { useParams, useRouter } from "next/navigation";
 import ScorecardTable from "@/app/components/centinela/pestel/informes/ScorecardTable";
+import { informeAnteriorAlAjuste } from "@/lib/centinela/pestel/aprobacion";
 import ReportViewer from "@/app/components/centinela/pestel/informes/ReportViewer";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import {
@@ -767,6 +768,21 @@ export default function InformesPage() {
                 </button>
               </div>
             </div>
+
+            {(() => {
+              // T6: los informes usan los ajustes del analista; uno generado antes del último ajuste quedó
+              // desfasado. Solo se rotula el que viene de Firestore (uno generado en esta sesión es posterior).
+              const idActivo = activeFormat ? informeIds[activeFormat] : undefined;
+              const informe = idActivo ? analysis?.informes?.find((i) => i.id === idActivo) : undefined;
+              return informeAnteriorAlAjuste(informe, analysis?.adjustments) ? (
+                <p
+                  role="status"
+                  className="mb-3 text-xs border border-brown-eske-60/50 dark:border-yellow-eske/30 bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske rounded-lg px-3 py-2"
+                >
+                  Generado antes del último ajuste. Si quieres que lo incluya, usa «Regenerar».
+                </p>
+              ) : null;
+            })()}
 
             <ReportViewer
               content={currentContent}
