@@ -10,7 +10,8 @@ import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useRouter } from "next/navigation";
-import { textoAprobacionRetirada } from "@/lib/centinela/pestel/aprobacion";
+import { confianzaInsuficiente, textoAprobacionRetirada } from "@/lib/centinela/pestel/aprobacion";
+import AprobacionConfianzaModal from "@/app/components/centinela/pestel/interpretacion/AprobacionConfianzaModal";
 import { DIMENSION_META } from "@/types/pestel.types";
 import type {
   PestlAnalysisV2,
@@ -45,8 +46,11 @@ export default function InterpretacionPage() {
   const [activeSection, setActiveSection] = useState<ActiveSection>("matrix");
   // Stage nav — minimum 6 (we're in E6); updated from project data
   const [projectCurrentStage, setProjectCurrentStage] = useState(6);
-  // T6: el proyecto está vinculado a Moddulo (para la nota de que F2 aún no incluye los ajustes).
+  // T6: el proyecto está vinculado a Moddulo (para la nota de que F2 aún no incluye los ajustes) y la
+  // aprobación con confianza baja pide una justificación en un modal.
   const [vinculadoAModdulo, setVinculadoAModdulo] = useState(false);
+  const [mostrarModalConfianza, setMostrarModalConfianza] = useState(false);
+  const [errorAprobacionModal, setErrorAprobacionModal] = useState<string | null>(null);
 
   // Load the latest approved/reviewed analysis for this project
   const loadAnalysis = useCallback(async () => {
@@ -192,26 +196,46 @@ export default function InterpretacionPage() {
     await loadAnalysis();
   }
 
-  async function handleApprove() {
-    if (!analysis) return;
+  // Devuelve el mensaje de error (para mostrarlo dentro del modal) o null si aprobó y navegó.
+  async function aprobar(justificacion?: string): Promise<string | null> {
+    if (!analysis) return null;
     setApproving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/centinela/pestel/analysis/${analysis.id}/approve`,
-        { method: "POST" }
-      );
+      const res = await fetch(`/api/centinela/pestel/analysis/${analysis.id}/approve`, {
+        method: "POST",
+        ...(justificacion
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ justificacion }) }
+          : {}),
+      });
       if (!res.ok) {
-        const { error: msg } = (await res.json()) as { error?: string };
+        const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(msg ?? "Error al aprobar el análisis.");
       }
       router.push(`/centinela/pestel/${projectId}/informes`);
+      return null;
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al aprobar el análisis."
-      );
       setApproving(false);
+      return err instanceof Error ? err.message : "Error al aprobar el análisis.";
     }
+  }
+
+  function handleApprove() {
+    if (!analysis) return;
+    // Confianza global < 50: la aprobación pide una justificación (se calcula al leer, no por el status).
+    if (confianzaInsuficiente(analysis.globalConfidence)) {
+      setErrorAprobacionModal(null);
+      setMostrarModalConfianza(true);
+      return;
+    }
+    void aprobar().then((msg) => {
+      if (msg) setError(msg);
+    });
+  }
+
+  async function confirmarConfianza(justificacion: string) {
+    const msg = await aprobar(justificacion);
+    if (msg) setErrorAprobacionModal(msg);
   }
 
   // ─── Derived state ───────────────────────────────────────────────────────
@@ -563,6 +587,15 @@ export default function InterpretacionPage() {
           )}
         </div>
       </div>
+      {mostrarModalConfianza && (
+        <AprobacionConfianzaModal
+          confianza={analysis.globalConfidence}
+          aprobando={approving}
+          error={errorAprobacionModal}
+          onConfirmar={(j) => void confirmarConfianza(j)}
+          onCancelar={() => setMostrarModalConfianza(false)}
+        />
+      )}
     </div>
   );
 }

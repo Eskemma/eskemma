@@ -1,5 +1,6 @@
 "use client";
 
+import { confianzaInsuficiente } from "@/lib/centinela/pestel/aprobacion";
 import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
 import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
@@ -180,7 +181,7 @@ export default function PESTLPanelV2({ analysis, onAcknowledgeBias, onChainAdded
             aria-valuemax={100}
           />
         </div>
-        {analysis.globalConfidence < 50 && (
+        {confianzaInsuficiente(analysis.globalConfidence) && (
           <p className="mt-3 text-sm text-red-eske bg-red-eske/5 border border-red-eske/20
             rounded-lg px-3 py-2">
             Análisis insuficiente — regresa a Datos y agrega más fuentes para

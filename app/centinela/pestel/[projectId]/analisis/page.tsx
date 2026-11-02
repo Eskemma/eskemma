@@ -6,6 +6,7 @@ import PESTELStageNav from "@/app/components/centinela/pestel/PESTELStageNav";
 import { decidirResultadoGuardado } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { confianzaInsuficiente } from "@/lib/centinela/pestel/aprobacion";
 import PESTLPanelV2 from "@/app/components/centinela/pestel/dashboard/PESTLPanelV2";
 import ModduloButton from "@/app/components/centinela/pestel/ModduloButton";
 import type {
@@ -359,8 +360,8 @@ export default function AnalisisPage() {
                   )
                 }
                 className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm shrink-0 ${
-                  analysis.status === "PENDING_REVIEW"
-                    ? "bg-yellow-eske/10 text-black-eske border border-yellow-eske/30 hover:bg-yellow-eske/20 dark:text-yellow-eske-70"
+                  confianzaInsuficiente(analysis.globalConfidence)
+                    ? "bg-brown-eske-60/10 text-black-eske border border-brown-eske-60/50 hover:bg-brown-eske-60/20 dark:bg-yellow-eske/10 dark:border-yellow-eske/30 dark:hover:bg-yellow-eske/20 dark:text-yellow-eske-70"
                     : "bg-orange-eske text-white hover:bg-orange-eske-60"
                 }`}
               >
@@ -369,7 +370,7 @@ export default function AnalisisPage() {
                   : "Continuar a Interpretación →"}
               </button>
             </div>
-            {analysis.status === "PENDING_REVIEW" && (
+            {confianzaInsuficiente(analysis.globalConfidence) && (
               <p className="text-xs text-black-eske-40 dark:text-yellow-eske-70 -mt-1">
                 Confianza por debajo del umbral recomendado — puedes continuar, pero considera agregar más fuentes primero.
               </p>

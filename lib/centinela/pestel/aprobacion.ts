@@ -5,6 +5,16 @@
 
 export const JUSTIFICACION_MIN = 20;
 export const JUSTIFICACION_MAX = 1000;
+export const UMBRAL_CONFIANZA = 50;
+
+/**
+ * Confianza global por debajo del umbral recomendado. Se calcula al LEER a partir de `globalConfidence`
+ * (que no cambia después de creado el análisis); el estado PENDING_REVIEW no sirve de señal porque se
+ * pierde al reconocer los sesgos. Un valor ausente o no numérico no cuenta como insuficiente.
+ */
+export function confianzaInsuficiente(globalConfidence: unknown): boolean {
+  return typeof globalConfidence === "number" && globalConfidence < UMBRAL_CONFIANZA;
+}
 
 export type ResultadoJustificacion =
   | { ok: true; valor: string }
@@ -20,6 +30,19 @@ export function validarJustificacionAjuste(texto: unknown): ResultadoJustificaci
     return { ok: false, motivo: "corta", mensaje: "La justificación debe tener al menos 20 caracteres." };
   }
   const valor = texto.trim();
+  if (valor.length > JUSTIFICACION_MAX) {
+    return { ok: false, motivo: "larga", mensaje: mensajeJustificacionLarga(valor.length) };
+  }
+  return { ok: true, valor };
+}
+
+/** Justificación de APROBAR con confianza global baja: 20 a 1 000 caracteres (recortada). */
+export function validarJustificacionAprobacion(texto: unknown): ResultadoJustificacion {
+  const pide =
+    "Con una confianza global menor a 50 debes explicar por qué apruebas este análisis (entre 20 y 1 000 caracteres).";
+  if (typeof texto !== "string" || texto.trim().length === 0) return { ok: false, motivo: "falta", mensaje: pide };
+  const valor = texto.trim();
+  if (valor.length < JUSTIFICACION_MIN) return { ok: false, motivo: "corta", mensaje: pide };
   if (valor.length > JUSTIFICACION_MAX) {
     return { ok: false, motivo: "larga", mensaje: mensajeJustificacionLarga(valor.length) };
   }

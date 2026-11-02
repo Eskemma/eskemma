@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   aMillis,
+  confianzaInsuficiente,
   informeAnteriorAlAjuste,
   planRetiroAprobacion,
   textoAprobacionRetirada,
   validarJustificacionAjuste,
+  validarJustificacionAprobacion,
 } from "./aprobacion";
+
+describe("confianzaInsuficiente", () => {
+  it("solo un número menor a 50", () => {
+    expect(confianzaInsuficiente(39)).toBe(true);
+    expect(confianzaInsuficiente(49.9)).toBe(true);
+    for (const v of [50, 57, 100, undefined, null, "30", NaN]) expect(confianzaInsuficiente(v)).toBe(false);
+  });
+});
 
 describe("validarJustificacionAjuste", () => {
   it("corta, justa, tope y larga (el conteo es del texto recortado)", () => {
@@ -14,6 +24,16 @@ describe("validarJustificacionAjuste", () => {
     expect(validarJustificacionAjuste("x".repeat(20))).toEqual({ ok: true, valor: "x".repeat(20) });
     expect(validarJustificacionAjuste(` ${"x".repeat(1000)} `)).toEqual({ ok: true, valor: "x".repeat(1000) });
     expect(validarJustificacionAjuste("x".repeat(1001))).toMatchObject({ ok: false, motivo: "larga" });
+  });
+});
+
+describe("validarJustificacionAprobacion", () => {
+  it("falta / corta / larga / válida", () => {
+    expect(validarJustificacionAprobacion(undefined)).toMatchObject({ motivo: "falta" });
+    expect(validarJustificacionAprobacion("   ")).toMatchObject({ motivo: "falta" });
+    expect(validarJustificacionAprobacion("corta")).toMatchObject({ motivo: "corta" });
+    expect(validarJustificacionAprobacion("x".repeat(1001))).toMatchObject({ motivo: "larga" });
+    expect(validarJustificacionAprobacion(` ${"x".repeat(25)} `)).toEqual({ ok: true, valor: "x".repeat(25) });
   });
 });
 

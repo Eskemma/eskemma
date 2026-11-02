@@ -270,6 +270,9 @@ export interface PestlAnalysisV2 {
   // ── Aprobación (E6) ───────────────────────────────────────────────
   approvedAt?: Timestamp | string;
   approvedBy?: string;
+  /** T6 (D2): justificación y confianza guardadas al aprobar con `globalConfidence` < 50. */
+  aprobacionJustificacion?: string;
+  aprobacionConfianza?: number;
   /** T6 (D4): al ajustar un análisis APPROVED se retira la aprobación y se archiva aquí (un solo nivel; el
    *  historial completo es del Grupo 2). */
   aprobacionAnterior?: {

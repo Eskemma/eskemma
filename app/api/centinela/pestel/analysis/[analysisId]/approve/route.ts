@@ -7,6 +7,7 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAnalisisPropio } from "@/lib/centinela/pestel/analisisPropio";
+import { confianzaInsuficiente, validarJustificacionAprobacion } from "@/lib/centinela/pestel/aprobacion";
 import type { BiasAlert } from "@/types/pestel.types";
 
 interface RouteContext {
@@ -31,6 +32,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Análisis no encontrado" }, { status: 404 });
   }
 
+  // T6 (D2): con confianza global < 50 la aprobación exige una justificación (20 a 1 000 caracteres) que viaja al
+  // RDA de F2 como nota. El cuerpo es opcional (con ≥ 50 no hace falta): un cuerpo ausente o inválido es {}.
+  let body: { justificacion?: unknown } = {};
+  try {
+    body = (await request.json()) as { justificacion?: unknown };
+  } catch {
+    body = {};
+  }
+
   // El análisis APPROVED y el avance del proyecto a la etapa 7 salen en UNA transacción (antes, dos
   // `update` sueltos: si fallaba el 2.º quedaba APPROVED con el proyecto en su etapa anterior). El 422 se
   // evalúa con la lectura transaccional del análisis y antes de cualquier escritura, de modo que una
@@ -43,7 +53,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   type Resultado =
     | { tipo: "ok" }
     | { tipo: "no_encontrado" }
-    | { tipo: "sesgos_sin_revisar"; cuantos: number };
+    | { tipo: "sesgos_sin_revisar"; cuantos: number }
+    | { tipo: "justificacion"; mensaje: string };
 
   const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
     const analysisSnap = await tx.get(analysisRef);
@@ -59,11 +70,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const unacknowledged = biasAlerts.filter((a) => !a.acknowledgedAt);
     if (unacknowledged.length > 0) return { tipo: "sesgos_sin_revisar", cuantos: unacknowledged.length };
 
+    // Confianza baja: la justificación se valida con la lectura transaccional (globalConfidence no cambia
+    // después de creado el análisis, pero la regla vive aquí, no en la pantalla).
+    const baja = confianzaInsuficiente(data.globalConfidence);
+    let justificacion: string | null = null;
+    if (baja) {
+      const j = validarJustificacionAprobacion(body.justificacion);
+      if (!j.ok) return { tipo: "justificacion", mensaje: j.mensaje };
+      justificacion = j.valor;
+    }
+
     // Mark analysis as APPROVED
     tx.update(analysisRef, {
       status: "APPROVED",
       approvedAt: FieldValue.serverTimestamp(),
       approvedBy: session.uid,
+      ...(baja
+        ? { aprobacionJustificacion: justificacion, aprobacionConfianza: data.globalConfidence as number }
+        : {}),
     });
     // Advance project stage to 7 (interpretation complete → informes)
     tx.update(projectRef, {
@@ -83,6 +107,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
       { status: 422 }
     );
+  }
+  if (resultado.tipo === "justificacion") {
+    return NextResponse.json({ error: resultado.mensaje, codigo: "justificacion_requerida" }, { status: 422 });
   }
   return NextResponse.json({ ok: true }, { status: 200 });
 }
