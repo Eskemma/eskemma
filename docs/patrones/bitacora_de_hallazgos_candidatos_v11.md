@@ -1,8 +1,8 @@
 # Bitácora de hallazgos candidatos — Documento de Patrones Reutilizables
 
-**Versión:** 8
-**Última actualización:** 2026-10-14
-**Propósito:** Registrar, a medida que avanzamos en la nivelación del sistema contra los 9 Principios Rectores de Eskemma (Grupos 1, 2 y 3) y en las series de correcciones que de ahí se derivan, los hallazgos que podrían convertirse en patrones reutilizables, principios reforzados, o advertencias de diseño para el documento final. Esta bitácora se actualiza al cierre de cada ronda y se versiona (v1, v2, v3, v4, v5, v6, v7, v8...) hasta que se retome la redacción del documento de patrones reutilizables, momento en el que su contenido se integra y esta bitácora se da por cerrada.
+**Versión:** 11
+**Última actualización:** 2026-11-02
+**Propósito:** Registrar, a medida que avanzamos en la nivelación del sistema contra los 9 Principios Rectores de Eskemma (Grupos 1, 2 y 3) y en las series de correcciones que de ahí se derivan, los hallazgos que podrían convertirse en patrones reutilizables, principios reforzados, o advertencias de diseño para el documento final. Esta bitácora se actualiza al cierre de cada ronda y se versiona (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11...) hasta que se retome la redacción del documento de patrones reutilizables, momento en el que su contenido se integra y esta bitácora se da por cerrada.
 
 **Cómo leer cada entrada:**
 - **Hallazgo:** qué se encontró, en una frase.
@@ -626,6 +626,433 @@ Evolución de la suite a lo largo de la serie de endurecimiento: de 1189 (primer
 
 ---
 
+## Origen: ronda PESTEL → Moddulo F2-Exploración (H16 y H15, tras el cierre de la serie H25; cierre de esta versión 2026-10-22)
+
+### Contexto y decisión funcional de la ronda
+
+El diagnóstico de solo lectura de la ronda (árbol limpio en `0e24f86`, cierre de la serie H25) midió el flujo PESTEL → F2 y entregó 14 hallazgos nuevos (N1 a N14, tabla más abajo), una partición en commits y siete preguntas de producto. **Raúl fijó la definición funcional** que gobernó todo el Bloque 1:
+
+- Al cerrar F1, F2 ofrece dos vías: Express (el análisis se genera dentro de Moddulo) o la app PESTEL de Centinela.
+- El **M1** muestra las seis dimensiones PESTEL. Cada categoría tiene lápiz (narrativa y clasificación OPORTUNIDAD/NEUTRAL/AMENAZA) y guardado explícito. **«Aprobar análisis» es el único disparador de M2 a M5**, que usan solo la copia congelada aprobada. Lo que el usuario ajusta prevalece sobre lo que generó la IA.
+- Menú ⋮: «Analizar con PESTEL», «Nuevo análisis», «Vincular con análisis independiente», «Editar narrativas». «Nuevo análisis» declara exactamente lo que se pierde. Los proyectos anteriores muestran «Aprobación no registrada (proyecto anterior)».
+- Principio de interfaz: claridad y simplicidad sin perder información, y sin información extra.
+- Requisito de producto que se difiere al Bloque 4: **una fase cerrada debe poder reabrirse aunque haya trabajo posterior, y el cambio debe propagarse.**
+- Decisión posterior sobre el banner de F1: es una **invitación**, no un bloqueo. Tras importar de Centinela, el usuario completa F1 (todas las variables XPCTO) y luego continúa en F2; el M1 de Centinela no depende del XPCTO de F1, y M2 contrasta ese XPCTO contra el M1.
+
+Esta ronda adopta, en Moddulo, la opción B del diagnóstico para H-P1 (M1 como nodo aprobable dentro de F2, para Express y Centinela) en lugar de bloquear la importación. El lado Centinela (H-P1 como gate de origen, H-P2, H-P3, H-X) queda para el Bloque 2.
+
+### Hoja de ruta por bloques
+
+| Bloque | Contenido | Estado a 2026-10-22 |
+|---|---|---|
+| 1 — F2-Express (M1 revisión y aprobación antes de M2–M5) | Pasos 1 a 8, ajustes 4a a 4f y dos commits de «estados de trabajo» | **Construido, verificado en navegador, commiteado y documentado** (último commit `d7cb7cd`, paso 8). Pendiente menor: ajuste 4g (normalizar la comparación de diferencias del XPCTO), sin construir. |
+| 2 — Centinela PESTEL (app) | H-P1 como gate de origen, H-P2, H-P3, H-X, retiro de `export-to-moddulo` y del `generate-dvs` legado tras medir, la confianza «medio» fabricada de T22, el flujo banner F1 → Centinela → Moddulo, la línea de origen del análisis (`origen {analysisId, version, analyzedAt}` con enlace al análisis específico) y el modal viejo `ConfirmReplacePestelModal` de `centinela/pestel/nuevo`, que dice «los motores M2–M5 se regenerarán» (falso desde 3b) | Pendiente |
+| 3 — Reporte F3 | Adenda de Fontana, H29 y H30, 7b-5 | Pendiente |
+| 4 — Reapertura de fases cerradas con trabajo posterior | Patrón «dependencia aguas arriba por huella», inventario de caminos de la fase cerrada (lo entrega Code) y el aviso de cambio aguas arriba en fases cerradas, que debe volver | Pendiente |
+| Serie F1-Propósito (4 commits) | Diferida; no entra a la bitácora hasta que se trabaje | Diferida |
+
+### Pasos, commits y tamaño de la suite
+
+Los hashes de esta tabla son los reales: Code los obtuvo de `git log` desde `0e24f86` (cierre de la serie H25) y el último lo entregó Raúl con `git log --oneline -1`. La numeración «commit N de 9» de los mensajes de la primera parte **no es 1:1 con git** (solo existen como commits propios el 1 y el 3a); se documenta por hash. El mensaje del commit del paso 8 habla de 20 commits (de `56e0873` a `c3b4890`) y Code midió 23 puntos intermedios de suite; la diferencia es de conteo y no afecta a ningún hash (por reconciliar si se cita la cifra).
+
+| Paso | Contenido | Commit | Suite |
+|---|---|---|---|
+| Antes de la ronda | Cierre de la serie H25, 7b-6b | `0e24f86` | 1728 |
+| 1 (base) | Modelo del M1 y rutas `m1-edit`, `m1-approve` y `m1-reopen` (el «commit 1 de 9»; contiene también las 3 rutas que el texto llama «commit 2») | `56e0873` | — |
+| 3a | Acciones y textos del M1 | `2c48d54` | — |
+| 2 | `generate-m1-express` (diagnóstico y dos llamadas) | `4fe2d93` (su rótulo no dice que contiene la pantalla de 3b), `599838b` | — |
+| 3 | Limpieza de la pantalla del M1 (3 commits) | `e5b6283`, `73a2159`, `ca05d1e` | — |
+| 4 | Compuerta, candados H15 y cierre (commits 1 a 3) | `8089473`, `80f2ee7`, `a94926c` | — |
+| 4 | Clasificación 401/403/red, franja de error, `ocultarCierre` | `f468886` | — |
+| 4 | `complete-phase` idempotente | `07d0ace` | — |
+| 4c | Banner de F1 como invitación | `0e8f98e` | — |
+| 4d | Aviso de XPCTO: regla de decisión y recálculo tras cualquier generación, un solo «Reintentar generación», color de proceso | `530eeb2` | 2381 |
+| 4e | Ventana de diferencia legible | `44e5ea7` | 2399 |
+| 4f | Causa del fallo del modelo y textos honestos | `de1829e` | 2449 |
+| 5 | Serialización sin límites, tope de 150 000 caracteres | `6f3f326` | 2482 |
+| 6 | Instrucción de precedencia en M2 a M5 | `b875ef7` | 2517 |
+| Estados de trabajo, commit 1 | Causa raíz de la zona, indicador, bloqueo de acciones, cautela | `ce1a0b9` | 2548 |
+| Estados de trabajo, commit 2 | Sello de finalización, estado vigente, aviso de motores actualizados | `05c7982` | 2603 |
+| 7, commit 1 | Línea de trazabilidad en el Reporte F2 y en sus descargas (ver H51) | `8428583` | 2632 |
+| 7, commit 2 | Criterios del cierre sobre la copia aprobada y recomendaciones por origen (ver H52) | `c3b4890` | 2673 |
+| 8 | Contrato estable de F2/M1, manifest ampliado e historial (ver H53) | `d7cb7cd` | 2673 (solo documentación) |
+
+Nota: la cifra 2619 que circuló durante la ronda para el commit 1 del paso 7 era la primera construcción; el commit real quedó en **2632**.
+
+### H38 — El M1 no tenía paso de aprobación: el análisis PESTEL alimentaba a M2–M5 sin que el usuario lo hiciera propio
+
+- **Hallazgo:** N13: ni en Express ni en Centinela el M1 se aprobaba dentro de F2, aunque el FAT lo exige para cada motor, y de ahí colgaban M2 a M5, el PIP y el RDA. Era el núcleo de H16 (H-P1) del lado de Moddulo.
+- **Principio(s):** Principio 4 (Editabilidad y aprobación) y H03 (aprobación con autoría y fecha).
+- **Estado:** **Corregido en Moddulo (pasos 1 a 4).** `phases.exploracion.m1` guarda `aprobacion {por, en, huella, categoriasEditadas, total, mapa}` y la copia congelada. La **compuerta del servidor** (`decidirCompuertaM1`: sin m1, pasa o bloquea) devuelve 409 `m1_no_aprobado` en `generate-dvs`, `regenerate-m5`, `approve-motor`, `save-draft` y `finalize-dvs`, dentro de las transacciones. `generate-dvs` y `regenerate-m5` leen el mapa congelado y comparan la huella al final. `complete-phase` exige el M1 aprobado. Los proyectos anteriores (7 de 11 sin registro m1) conservan su comportamiento por diseño y se rotulan «Aprobación no registrada».
+- **¿Patrón o caso aislado?:** Patrón: es la primera instancia concreta del tipo común de «aprobación con autoría y fecha» que pide H03.
+- **Nota para el documento final:** Un resultado que alimenta procesos posteriores se modela como **nodo con aprobación explícita**: (1) registro `{por, en, huella}` de lo aprobado, (2) copia congelada que es lo único que leen los consumidores, (3) compuerta en el servidor dentro de la transacción de cada escritor, no solo en la pantalla, (4) los proyectos previos a la regla se rotulan, no se migran en silencio. La huella (SHA-256 de la serialización estable del objeto guardado) permite detectar que lo consumido sigue siendo lo aprobado. Insumo para el Grupo 2 (H03).
+
+### H39 — Confirmación de impacto del M1: reemplazos con candado de servidor y huella
+
+- **Hallazgo:** Cambiar el M1 (importar de nuevo, vincular, «Nuevo análisis», desvincular, o abrir con `?pest_analysis_id=`) descartaba aprobaciones, el borrador editado y el análisis finalizado sin avisar, y el servidor no tenía candado. Cierra los casos pendientes de H15 para P2, H-P4 y `unlink-pestel`.
+- **Principio(s):** Principios 1 y 3 (H15).
+- **Estado:** **Corregido en Moddulo (paso 4).** Los códigos `reemplazo_requiere_confirmacion` y `reemplazo_huella_vencida` devuelven en el 409 las líneas de lo que se perdería y la huella; `generate-m1-express` acepta además `verificar:true` como sondeo. Aplica a `generate-m1-express`, `import-pestel`, `link-moddulo` y `unlink-pestel` (esta última confirma siempre y pierde m1, borrador y aprobaciones de motores). La primera acción del usuario sondea el servidor y el 409 abre el modal una sola vez. La importación automática por URL abre el modal y, al cancelar, quita el parámetro de la URL. Sin conexión (`navigator.onLine === false`) no se envía nada.
+- **¿Patrón o caso aislado?:** Patrón: es la segunda aplicación completa del modelo (a) nombrar, (b) confirmar diciendo qué se pierde y (c) candado en servidor de H15 (la primera fue M8 y H-M3).
+- **Nota para el documento final:** El texto de un modal de confirmación se **deriva de lo que el servidor reporta que se perdería** (líneas + huella), y la huella permite rechazar la confirmación si el estado cambió entre el sondeo y la acción. La pantalla nunca enumera pérdidas por su cuenta.
+
+### H40 — Fallos de autorización, sesión y red se mostraban como el mismo error
+
+- **Hallazgo:** Durante la verificación apareció «No tienes permiso…» sin que el permiso hubiera fallado. Una caída de red, una sesión vencida y un permiso denegado se mostraban igual.
+- **Principio(s):** Principios 1 y 7; variante «autorización» de la familia «la pantalla no afirma lo que el servidor no confirmó».
+- **Estado:** **Corregido (paso 4, `f468886`).** 401 → «Tu sesión no es válida o expiró. Vuelve a iniciar sesión. No se hizo ningún cambio.» sin «Reintentar»; 403 → permiso; estado 0, excepciones y red → ambiguo («No se pudo CONFIRMAR…»). La franja de error está en el encabezado de F2 (`role="alert"`) y «Verificando lo que se perdería…» es `role="status"`. 21 pruebas de autenticación (`sesion.paso4.test.ts`) fijan que las rutas autentican solo con la cookie `eskemma-session` (`verifySessionCookie` con `checkRevoked`, 5 días), sin respaldo por `Authorization` ni `x-user-id`. Comprobado: borrar la cookie no produce 401 porque `AuthContext` la recrea (no es una vulnerabilidad), y cerrar sesión en otra pestaña sí produce el mensaje de sesión.
+- **¿Patrón o caso aislado?:** Patrón: nueva variante de la familia (ver «Regla común» de la serie de guardado honesto).
+- **Nota para el documento final:** Los fallos se clasifican **por estructura** (estado HTTP, tipo, excepción), nunca por el texto del mensaje, y cada clase tiene su propio texto y su propia salida (reintentar o iniciar sesión). Una clase ambigua nunca afirma que no se hizo el cambio.
+
+### H41 — Cierre de fase: un reintento tras un fallo parcial no completaba lo que faltaba
+
+- **Hallazgo:** Con el cierre en dos pasos (cerrar y escribir `aprobadoEn`), un reintento tras un fallo parcial quedaba como «ya cerrada» y no escribía la fecha. Además existía un PATCH del cliente y un `f3Seed` que duplicaban escrituras.
+- **Principio(s):** Principio 7; continuación de H20 y de H14.
+- **Estado:** **Corregido (`07d0ace`).** `complete-phase` es idempotente: con la fase ya cerrada responde 200 `yaCerrada`, **solo completa las claves que faltan** (`data.aprobadoEn`) y nunca reescribe `completedAt`, `currentPhase` ni el RDA; `aprobadoEn` va en la misma actualización que el cierre; se eliminaron el PATCH del cliente y `f3Seed`. Nuevos 409: `m1_no_aprobado`, `reporte_f2_no_finalizado`, `reporte_f2_de_otro_analisis`. La pantalla usa `motivoNoCerrarF2` y `puedeCerrarFase` (gana `ya_cerrada`).
+- **¿Patrón o caso aislado?:** Patrón (cierres encadenados).
+- **Nota para el documento final:** Toda operación de cierre es idempotente y, ante un reintento, **completa lo faltante sin reescribir lo ya hecho**. Regla de revisión: si dos escrituras forman un solo hecho, van en una sola actualización.
+
+### H42 — Contención PROVISIONAL de la fase cerrada y entradas del Bloque 4
+
+- **Hallazgo:** Los escritores del M1 operaban sobre una fase cerrada. Además, `finalize-dvs` con ids conservados escribe sin preguntar aunque haya trabajo de F3 o Reporte F3 (hueco **H-M3b**).
+- **Principio(s):** Principios 1 y 3; continuación de H30.
+- **Estado:** **Contenido de forma provisional (opción A).** Módulo central `faseCerrada.ts` con 409 `fase_cerrada` en los escritores del M1, menú ⋮ oculto, «Solo lectura» y tarjeta «Cerrada». **No se bloquean a propósito** `finalize-dvs`, `generate-dvs` (borrador), «Editar análisis», «Actualizar contraste XPCTO» ni «Reemplazar análisis finalizado»: su tratamiento es del Bloque 4. Entradas para ese bloque: el inventario de caminos de la fase cerrada (lo entrega Code), H-M3b, el aviso de cambio aguas arriba en fases cerradas (debe volver), `unlink-pestel` pierde el registro de aprobación y el borrador huérfano de un proyecto real (Anaya, tras pulsar «Actualizar contraste XPCTO»; inocuo, se dejó).
+- **¿Patrón o caso aislado?:** Patrón: la contención provisional se repite en H30 (Reporte F3) y aquí.
+- **Nota para el documento final:** Cuando se contiene un camino de forma provisional, se registra qué quedó **a propósito** sin bloquear y con qué decisión de producto se resolverá. El requisito de producto es que una fase cerrada sea reabrible aunque haya trabajo posterior; el mecanismo es la «dependencia aguas arriba por huella» (ver H50).
+
+### H43 — Aviso de XPCTO: regla errónea para Centinela y estado derivado que se calculaba una sola vez
+
+- **Hallazgo:** (a) Un M1 de Centinela mostraba «cambios en el sujeto o capacidades requieren regenerar el análisis completo», falso porque ese M1 no depende del XPCTO de F1 (solo cambia el contraste de M2). (b) Tras aprobar y generar, o tras «Reintentar generación», reaparecía un aviso falso de XPCTO modificado: `xpctoStaleChanges` se calculaba una sola vez, al cargar, con el punto de comparación de la importación (vacío), aunque el sistema ya había guardado el XPCTO vigente; recargar lo limpiaba. «Actualizar contraste» lo limpiaba solo porque borraba el aviso al hacer clic (efecto lateral: si la generación fallaba, el aviso desaparecía con el contraste aún desactualizado).
+- **Principio(s):** Principio 1 (la pantalla no afirma lo falso); H15.
+- **Estado:** **Corregido (4d, `530eeb2`).** `decidirAvisoXpcto({origen, hayMotores, diffs, f2Cerrada, m1Estado})` → ninguno / `regenerar_m1` / `actualizar_contraste` (26 pruebas, 6 de ellas de `diffsXpctoDeProyecto`). La función pura `diffsXpctoDeProyecto(project)` alimenta la carga y **cada relectura del proyecto** (callback `alRecibirProyecto` del hook de revisión); si la lectura falla se conserva el estado anterior; se quitó el borrado optimista; el botón se deshabilita mientras genera; la franja no aparece sin motores ni con la fase cerrada. Verificado en navegador (reabrir quita el aviso, volver a aprobar lo devuelve, actualizar contraste lo limpia sin recargar). No se probó de punta a punta el escenario original (importar, llenar F1, aprobar y generar por primera vez): lo cubre el mismo mecanismo de relectura.
+- **¿Patrón o caso aislado?:** Patrón: «estado derivado calculado en un solo punto».
+- **Nota para el documento final:** Todo estado derivado de datos del servidor tiene **una sola función pura de derivación** que se ejecuta en cada relectura; nunca se calcula una vez al cargar y se deja. No se limpia un aviso de forma optimista: se limpia cuando la relectura confirma que desapareció la causa. La regla de decisión depende del **origen** del dato (un análisis de Centinela y uno de Express no comparten reglas).
+
+### H44 — Un cambio mostrado recortando por el inicio se veía igual antes y después
+
+- **Hallazgo:** Los listados de diferencias de XPCTO y territorio (`slice(0, 40)`) y el modal de impacto de F1 (`slice(0, 80)` + «...») recortaban el valor anterior y el nuevo por el inicio. Si la diferencia estaba después del recorte, el aviso decía «cambió A por A» (caso real: «Capacidad logistico»).
+- **Principio(s):** Principio 1 (Transparencia); Diseño visual.
+- **Estado:** **Corregido (4e, `44e5ea7`).** `ventanaDeDiferencia(anterior, nuevo, { max = 60, contexto = 15 })`: prefijo común por grafemas (`Intl.Segmenter`, con respaldo por puntos de código), ambas ventanas alineadas en el mismo inicio, «…» solo donde falta texto, «(vacío)» para valores ausentes, saltos de línea y espacios colapsados, cálculo lineal (prueba con ~10 000 caracteres), valor completo en `title`. 18 pruebas. **Límite declarado (pendiente 4g):** `diffXpcto` compara con `!==` exacto sin normalizar, de modo que una diferencia solo de espacios o de forma Unicode (NFC/NFD) sigue reportándose como cambio y se vería «A → A». Otros sitios que recortan el inicio, sin tocar: `F3Tablero.tsx:191`, `F3ResultadosRecibidos.tsx:197` (justificación), `MotoresSequentialView.tsx:112` (resumen de tensión central), `PESTLPanel.tsx:45 y 49` (fuente).
+- **¿Patrón o caso aislado?:** Patrón en cuatro pantallas.
+- **Nota para el documento final:** Mostrar un cambio exige mostrar **la diferencia**, no el inicio de los valores: una ventana alrededor de la primera discrepancia, con elipsis solo donde se cortó y el valor completo accesible. Si la regla de comparación no normaliza, lo que se muestra puede no distinguirse; la normalización pertenece a la comparación, no a la presentación.
+
+### H45 — Fallo del modelo: sin causa visible, y el mensaje crudo del proveedor viajaba al navegador
+
+- **Hallazgo:** Cuando la llamada al modelo falló (caso real: crédito de la API agotado durante una prueba), la pantalla decía solo «No se pudo generar M2 o M3…», sin distinguir saldo, límite o saturación. Además, los 500 de `generate-dvs` (cuatro sitios) y `regenerate-m5` devolvían `Error en M2/M3: ${msg}` con el mensaje crudo del SDK, que puede traer texto y `request_id` del proveedor.
+- **Principio(s):** Principio 1; Seguridad (registros y respuestas sin contenido del proveedor).
+- **Estado:** **Corregido en las rutas de F2 (4f, `de1829e`).** `causaDeFalloModelo(err)` por estructura (429 → límite; 529/503 → sobrecarga; 402 o tipo `billing_error` → saldo; 400 con la frase fija «credit balance is too low» → saldo; resto → otro; sin mensaje del proveedor en la respuesta ni en el registro, que conserva el marcador `[ANTHROPIC_CREDIT_EXHAUSTED]`). Textos por causa en `generar_motores` y `generar_m1`, conservando «Tu análisis sigue aprobado; M2–M5 no se generaron.»; causa ausente o desconocida cae al texto de siempre. Color y `role="alert"` del mensaje de error de generación (el `red-eske-70` en oscuro no tenía color). `regenerate-m5` pasa a fallo cierto con `motor: "M5"` (la única escritura es la transacción final). **Límites declarados:** el 402 viene de la documentación del proveedor, no se confirmó en vivo; el color y el cableado se ven solo en navegador; el fallo real por saldo no se provoca a propósito (no se pudo garantizar que un override de DevTools impida que la petición llegue al proveedor). **Fuera de alcance, sin tocar:** `f3/sintesis/generar` (l.133), `f3/veredicto/generar` (l.112), `f3/tareas/generar` (l.122), `f3/tareas/sincronizar` (l.87), `geo/candidatos` (l.78) y `posts` (l.65 y l.104) devuelven el mensaje; `generate-report` y `upload-source` lo registran completo con `logAnthropicError` (`lib/ai/creditError.ts`); las acciones `generar_analisis` y `reemplazar_analisis` siguen mostrando «(falló M3)» sin causa.
+- **¿Patrón o caso aislado?:** Patrón: variante «generación» de la familia, más la regla de no exponer contenido del proveedor.
+- **Nota para el documento final:** Se clasifica por estructura y se emite una **enumeración de causa**, nunca el texto del proveedor, ni al cliente ni al registro. El texto para el usuario no culpa al usuario ni usa vocabulario de facturación. La causa operativa (saldo) debe disparar una **alarma** (alerta sobre el marcador en los registros y alerta de saldo o recarga automática en la consola del proveedor): ver la lista previa a la Beta.
+
+### H46 — Los motores recibían una versión truncada de lo que el usuario aprobó
+
+- **Hallazgo:** `serializeMapaPESTEL` recortaba cada categoría a 3 señales y cada descripción a 140 caracteres (la más larga medida: 491), y ordenaba por una confianza no certificable, de modo que M2 a M5 trabajaban con una versión truncada del análisis aprobado.
+- **Principio(s):** Principios 1, 4 y 9; coherencia entre lo aprobado y lo consumido.
+- **Estado:** **Corregido (paso 5, `6f3f326`).** Se emiten todas las señales con su descripción íntegra, la narrativa completa y `(Fuente: X)` solo si la fuente no está vacía, en el orden de entrada y con las dimensiones P, E, S, T, Ec, L; **no** se emiten `nivelConfianza`, `fechaCorte`, `origenInternacional` ni la marca de escalada. Tope de seguridad de 150 000 caracteres **sin truncar en silencio**: `MapaDemasiadoGrandeError` → 422 `mapa_demasiado_grande` antes de llamar al modelo y sin escrituras, con texto por origen (Express o Centinela) que no promete una acción inexistente y sin cifras. La línea de medición del registro lleva solo números. **Huella independiente:** la huella (`huellaMapaPESTEL`, SHA-256 de la serialización estable del objeto guardado) y la serialización del prompt son funciones distintas; lo fijan tres pruebas: huella literal calculada antes del cambio, no mutación de la entrada y que `m1Huella.ts` no importa `prompts.ts`.
+- **Medición real (corrida de Raúl, local):** serialización de 24 120 caracteres y 42 señales; entrada de M2 a M5 entre 7 081 y 9 149 tokens; ningún motor sobre 76 % de su tope de salida; un intento cada uno; total 130 a 136 s de los 300 s de Vercel; costo ≈ $0.22 (crecimiento de la entrada estimado +7 % a +12 %). En local no existe el límite de 300 s: **el margen real de M5 en Vercel se confirma antes de la Beta**.
+- **¿Patrón o caso aislado?:** Patrón: lo que se aprueba debe ser lo que se consume.
+- **Nota para el documento final:** (1) Lo que el usuario aprueba es **exactamente** lo que consume el proceso siguiente; una serialización con límites debe declararlos y no truncar sin aviso. (2) **La serialización de un prompt nunca entra al hash** de integridad: el hash se calcula sobre el objeto guardado y se fija con una prueba de valor literal. (3) Un tope de seguridad falla de forma visible, barata y accionable, no recorta. (4) Se mide antes de decidir (longitudes, tokens, duración y costo reales).
+
+### H47 — Datos por defecto fabricados, indistinguibles de datos reales
+
+- **Hallazgo:** N7 y N8: `transformToMapaPESTEL` (T22) fabrica `nivelConfianza: "medio"` y deja fuente y fecha vacías; en el camino Express el prompt trae el literal `"nivelConfianza": "medio"` y `"fechaCorte": "<mes actual>"` en el esquema de ejemplo, y en los 5 proyectos Express medidos entre el 98 % y el 100 % de las señales dicen «medio» (copia del ejemplo), mientras que en T22 hay mezcla (15/43 y 18/42). Además, 14 de 200 señales no tienen fuente y el criterio 9 no exige confianza.
+- **Principio(s):** Principio 9 (Veracidad); continuación de H05.
+- **Estado:** **Mitigado, no corregido en origen.** Desde el paso 5 esos campos ya no llegan a los motores. La corrección en el origen (que `transformToMapaPESTEL` deje `undefined`, que el esquema Express no traiga literales de ejemplo y que el criterio 9 exija confianza real) es una ronda propia, **después del paso 6 / Bloque 2**, porque toca tipos y prompts del M1. Las huellas de los análisis ya aprobados no cambian (se calculan sobre lo guardado).
+- **¿Patrón o caso aislado?:** Patrón: un valor por defecto o de ejemplo que se guarda como si fuera dato.
+- **Nota para el documento final:** Un valor por defecto que se guarda es indistinguible de uno real. Se omite lo que no se puede certificar, y los literales de ejemplo de un prompt no se copian a datos. Conecta con H05.
+
+### H48 — Instrucción de precedencia en M2 a M5: qué manda cuando el análisis aprobado y las señales discrepan
+
+- **Hallazgo:** Aunque desde el paso 4 los motores leen la copia congelada (que ya trae lo editado), faltaba decirle al modelo cómo pesar clasificación y narrativa frente a las señales individuales. El diagnóstico previo encontró 7 de 11 proyectos sin registro m1, para los cuales decir «el usuario revisó y aprobó» sería falso.
+- **Principio(s):** Principios 3 y 4.
+- **Estado:** **Construido y commiteado (paso 6).** Una sola constante compartida (`seccionPrecedenciaPESTL(aprobado)` con `PRECEDENCIA_PESTL_CUERPO`) en el prompt de **usuario** de los cuatro motores, después del mapa y antes de las instrucciones propias; el sistema no cambia. Dos variantes de la primera frase: «…el que el usuario revisó y aprobó y, en su caso, con los ajustes que hizo» (compuerta «pasa») y «…el vigente de este proyecto» (proyectos sin registro m1). El cuerpo dice que la clasificación y la narrativa son la lectura vigente, que prevalecen sobre las señales individuales y sobre cualquier otra lectura de esa dimensión, que las señales son evidencia y no sirven para reclasificar, y que se pueden señalar matices o incertidumbres sin cambiar esa lectura (así no choca con M4). Se ajustaron solo la frase de M2 («Revisa TODAS las dimensiones… su clasificación, su narrativa y sus señales») y la de M4 («Todas las señales inciertas…»). No se marcan las categorías editadas dentro del texto. **Resultado de la corrida de calidad (un proyecto Express, Legal reclasificada de AMENAZA a NEUTRAL): sin daño visible, efecto no demostrado.** Ningún motor escaló Legal a veto ni se contradijo, pero M4 y M5 siguen usando señales legales como evidencia adversa (lo que la regla permite), y una sola corrida no separa el efecto de la variación normal del modelo. **Pendiente:** el encabezado de cada dimensión que ven los motores imprime la «confianza de la IA» sin aclaración aunque el usuario haya editado la clasificación (la barra lateral del M1 sí la rotula como «Confianza de la IA… no se edita»).
+- **¿Patrón o caso aislado?:** Patrón (reglas de precedencia en prompts).
+- **Nota para el documento final:** Una regla de precedencia en un prompt debe ser **verdadera para cada origen del dato** (de ahí las dos variantes) y se fija por pruebas sobre anclas estables, no sobre el texto completo. Un resultado «sin daño visible, efecto no demostrado» se registra tal cual; no se vende como mejora.
+
+### H49 — La pantalla confundía «hay un análisis finalizado» con «la fase está cerrada»
+
+- **Hallazgo:** Tras reabrir el M1 de un proyecto con análisis finalizado y volver a aprobar, la generación de motores corría en el servidor pero la pantalla no mostraba la franja «Actualizando análisis…», ni aviso al terminar, ni los motores nuevos, y decía «Solo lectura», «Análisis de exploración completo» y «Documento listo» (de la versión anterior) mientras decía «Generando los motores M2–M5…» en el pie. Causa raíz única: `zonaCentroMotores` y la cabecera del panel PESTEL recibían `mode === "completed"` (hay un análisis finalizado en pantalla) en un parámetro que se llamaba «fase completada». Al recargar todo se veía bien.
+- **Principio(s):** Principio 1; Proceso de desarrollo.
+- **Estado:** **Corregido (estados de trabajo, commit 1, `ce1a0b9`).** Se alimenta con el cierre real (`m1.f2Cerrada`) y el parámetro se renombra; el formulario heredado conserva `mode`. Indicador de proceso en la zona principal (franja `role="status"`, convención `text-red-eske-60 dark:text-red-eske-10`, con la frase «lo que ves abajo es la última versión válida» solo cuando es verdad). `motivoBloqueoAccionesF2` apaga «Reporte F2», «Generar Reporte F2», «Editar análisis» y «Cerrar Fase 2», con aviso del motivo, mientras el M1 está reabierto o en borrador y mientras se generan los motores; con la fase cerrada no bloquea nada. Texto de cautela si se recarga a mitad de la generación. 47 pruebas de zonas y bloqueo (22 fallan contra el código anterior, incluida la que reproduce el defecto). **Límites declarados:** sin pruebas de DOM; recargar a mitad de generación sigue ofreciendo «Reintentar generación» (podría costar ≈ $0.22 extra); se registra como pendiente previo a la Beta un marcador de «generación en curso» en el servidor.
+- **¿Patrón o caso aislado?:** Patrón (nombre de parámetro que no dice lo que se le alimenta).
+- **Nota para el documento final:** Un parámetro se nombra por **la fuente real que lo alimenta**; si el código lo alimenta con un modo de pantalla, el nombre debe decirlo. Las decisiones de qué zona mostrar son una función pura probada por una tabla que incluye el defecto reproducido. Cuando una acción asíncrona larga corre, **cada zona posible** de la pantalla debe poder mostrar el indicador.
+
+### H50 — Hueco de integridad: se podía cerrar F2 con un Reporte F2 construido sobre un análisis anterior
+
+- **Hallazgo:** Tras reaprobar el M1 con contenido distinto y generar el borrador nuevo, `motoresSinGenerar` valía falso y `motivoNoCerrarF2` devolvía null aunque el análisis finalizado (y su «Reporte F2», que es la vista de ese análisis) fuera del análisis anterior; `complete-phase` lo aceptaba. El análisis finalizado no llevaba huella ni fecha. En paralelo, «Editar análisis» seguía habilitado y reemplazaba en pantalla el borrador nuevo por una copia del análisis viejo, y «Guardar cambios» lo habría finalizado como vigente. Y un borde pequeño: la narrativa guardada se recorta con `trim()` pero el original no, así que un texto original con espacio final «editado» sin cambios contaba como edición (cero casos reales).
+- **Principio(s):** Principios 1, 4 y 7; integridad entre lo aprobado y lo finalizado.
+- **Estado:** **Corregido (estados de trabajo, commit 2).** `finalize-dvs` escribe `m1.finalizacion = {huella, en}` en la misma transacción que el análisis finalizado (la huella de `m1.generacion`, leída dentro de la transacción; sin marca de generación borra el sello anterior; sin m1 no escribe); `generate-dvs` en modo final también sella. `motivoNoCerrarF2` y `complete-phase` exigen que el sello coincida con la aprobación (409 `reporte_f2_de_otro_analisis`). **Regla de compatibilidad:** un análisis finalizado antes del sello se asume vigente solo si no hay borrador guardado pendiente (límite: un análisis vigente con un borrador sobrante se marca como «de otro análisis», lo que solo pide finalizar de nuevo, sin costo). «Editar análisis» se apaga mientras haya borrador guardado pendiente con análisis finalizado. El Reporte F2 viejo se etiqueta en amarillo («Este reporte se generó con una versión anterior del análisis PESTEL») con la acción «Revisar los motores nuevos». Aviso de motores actualizados, derivado del estado guardado del servidor (no del borrador local), con los nombres de las categorías ajustadas («con tus ajustes en Económico y Legal»; sin ediciones: «con el análisis PESTEL aprobado»). Las ediciones se cuentan por campo: una categoría cuenta si tiene al menos una edición vigente de texto, de etiqueta o de ambos; si el valor vuelve al original, deja de contar; la comparación de narrativa ahora es recortada contra recortada. **Fase cerrada intacta:** el resumen fuerza `dvsDeOtroAnalisis` en falso y `complete-phase` responde `yaCerrada` antes de cualquier validación; revisado proyecto por proyecto (11 con análisis), solo cambia el proyecto de pruebas abierto; los 8 con fase cerrada y los proyectos sin registro m1 no cambian. 55 pruebas nuevas (37 fallan contra el código anterior).
+- **¿Patrón o caso aislado?:** Patrón: primer eslabón de la «dependencia aguas arriba por huella».
+- **Nota para el documento final:** **Todo artefacto derivado guarda la huella de aquello a partir de lo cual se construyó**, y todo consumidor o cierre compara esa huella con la vigente; lo contrario permite que un entregable viejo parezca actual. El sello es también el dato que le da a la línea de trazabilidad del Reporte F2 una fuente confiable (paso 7) y la base del Bloque 4. Reglas de compatibilidad para datos anteriores al sello: se declaran con sus límites y se verifican proyecto por proyecto, en solo lectura, antes de construir.
+
+### H51 — El Reporte F2 y el PESTEL descargado no decían de qué análisis aprobado salían
+
+- **Hallazgo:** El usuario podía revisar y ajustar el análisis PESTEL, aprobarlo y generar el Reporte F2, pero ni la vista del reporte ni los archivos descargados (Reporte F2 y PESTEL) decían qué se había aprobado, cuándo ni con cuántos ajustes. La descarga del PESTEL usaba además el análisis de trabajo y no la copia aprobada, de modo que un archivo entregado podía diferir de lo que el usuario aprobó.
+- **Principio(s):** Principios 1 y 4; trazabilidad (conecta con H01 y H03).
+- **Estado:** **Corregido (paso 7, commit 1, `8428583`).** Dos funciones puras de línea, que reutilizan los textos del panel del M1 (`lineaTrazabilidadM1`) sin duplicarlos: `lineaTrazabilidadPestel` (depende solo de la aprobación) y `lineaTrazabilidadReporte` (exige además un Reporte F2 vigente y delega en la anterior). Con aprobación válida: «Análisis aprobado sin ajustes el …» o «Análisis revisado y ajustado por el usuario el …, en N de T categorías» (sin origen). Proyecto anterior (hay análisis PESTEL y no hay registro del M1): «Aprobación no registrada (proyecto anterior)», con el mismo texto del panel. Sin línea en borrador, reabierto, sin análisis, y, solo para el reporte, sin Reporte F2 o con un Reporte de otro análisis. Se muestra en gris bajo el encabezado del Reporte F2 (sin color de alerta) y en cursiva bajo el título de ambas descargas; la descarga del PESTEL usa la copia aprobada cuando la aprobación es válida. Se calcula al leer, sin escribir ni migrar datos, y el resumen del GET trae los dos valores sin crecer en peso (la copia aprobada ya viajaba). Salida byte a byte idéntica sin línea. Medido en solo lectura en los 11 proyectos con análisis: 7 cerrados anteriores muestran «Aprobación no registrada…»; uno aprobado sin ajustes; Chihuahua «ajustado… en 2 de 6 categorías»; «Prueba Olmos 2» (aprobado, sin Reporte) lleva la línea solo en la descarga del PESTEL; el de borrador no lleva ninguna. 32 pruebas de la capa pura y 4 del GET (29 de 33 fallan contra el código anterior; las 4 que pasan ya pasaban). Verificado en navegador por Raúl.
+- **Decisión de producto:** para los proyectos anteriores, Code proponía silencio; se adoptó mostrar «Aprobación no registrada (proyecto anterior)» (honesto: no se sabe, no se inventa), reversible si Raúl lo decide.
+- **Hallazgo de revisión previo a la verificación:** la primera construcción hacía depender la línea de la descarga del PESTEL de que existiera un Reporte F2 vigente, aunque esa descarga lee la copia aprobada. Resultado: en «Prueba Olmos 2» el archivo usaba el texto aprobado y salía sin la línea, que era verdadera. Se separó en dos funciones antes de que se verificara en navegador. **Lección:** la condición para mostrar una línea de procedencia debe ser la de la fuente que realmente alimenta ese entregable, no la de otro entregable del mismo flujo.
+- **Límites declarados:** en un proyecto anterior la línea del reporte sale aunque no se pueda saber si el reporte es vigente (regla decidida); «Exploración sociedades» no tiene sello de finalización y su línea depende de la regla de compatibilidad de H50 (si apareciera un borrador sobrante, la línea desaparecería aunque el reporte siga siendo suyo); sin pruebas de DOM.
+- **¿Patrón o caso aislado?:** Patrón: la procedencia de un entregable se declara solo cuando es verdadera, se deriva del estado guardado y no se inventa para datos anteriores.
+- **Nota para el documento final:** **Todo entregable (pantalla o archivo) que se derive de un resultado aprobado debe poder decir de cuál**, con autoría o fecha y con cuántos ajustes humanos, usando una función pura única para los textos. Para datos anteriores al registro se muestra explícitamente que no hay registro, nunca una fecha o autoría inferidas. El entregable que lee la copia aprobada se rotula con las reglas de la copia aprobada.
+
+### H52 — Los criterios del cierre de F2 medían el análisis de trabajo y sus recomendaciones prometían acciones inexistentes
+
+- **Hallazgo:** El checklist de cierre (RDA: `computeRDAItemsParaFase` y `planRDAUpdate`, y `handleOpenReview` en la pantalla) evaluaba los criterios 1, 8 y 9 sobre el análisis de trabajo (`linkedSource.payload`) y no sobre lo que el usuario aprobó. Además, los textos de recomendación de esos criterios prometían acciones que la pantalla no ofrece (completar señales a mano, relanzar el análisis).
+- **Principio(s):** Principios 1 y 4; integridad entre lo aprobado y lo evaluado.
+- **Estado:** **Corregido en la regla, sin efecto observable hoy (paso 7, commit 2, `c3b4890`).** `elegirMapaParaCriterios` devuelve la copia aprobada si la aprobación es válida (reutiliza la validez de `estadoM1`) y, si no, el payload (proyectos anteriores y borrador); se usa en `handleOpenReview` y, en el servidor, en `complete-phase` mediante `proyectoConMapaParaCriterios`, que pasa a `planRDAUpdate` el proyecto con la copia en la ranura del payload. Recomendaciones por origen con `getRecomendacionDVS(id, origen)`: Express → «Nuevo análisis» (el criterio 8 añade «Editar narrativas» y aprobar de nuevo); Centinela → generar uno nuevo allá y reimportar (las señales no se editan en el M1); sin origen conocido → texto válido para ambos. El ítem del RDA guarda un campo opcional `origenAnalisis` al crearse desde esos tres criterios; los ítems anteriores muestran la versión para ambos. **Medición antes de construir (solo lectura, 11 proyectos):** RDA y criterios idénticos con la copia y con el payload; con aprobación válida ambos tienen la misma huella. 9 pruebas de caracterización de `planRDAUpdate` (F1, F2 y F3) escritas y verificadas contra el código anterior antes de tocarlo; en total 41 pruebas nuevas (27 fallan contra el código anterior; pasan las de caracterización y las de comportamiento que no cambia). Verificado en navegador en Anaya (el texto del criterio «Pesos por tipo de proyecto»).
+- **No cambia:** el criterio 8 con una dimensión NEUTRAL dejada a propósito sigue saliendo como advertencia que se puede aceptar como condición del proyecto (**pregunta de producto abierta para el Bloque 4**: ¿debe penalizarse una prioridad deliberadamente neutral editada por el usuario?); el criterio 10 queda igual.
+- **Límites declarados:** hoy es imposible ver un efecto (la prueba que distingue copia y payload usa una copia inconsistente fabricada); **`m1-reopen` borra la aprobación, así que esta regla puede dejar de proteger algo cuando se reabran fases cerradas** (revisar en el Bloque 4); los ítems del RDA ya creados no se reescriben; sin pruebas de DOM.
+- **Incidencia de proceso:** Code editó una línea de `app/api/.../complete-phase/route.ts` aunque se había pedido no tocar `app/api`. La razón era técnica y válida (`rda.ts` corre en el navegador y no puede calcular huellas, por lo que el servidor debe pasar la copia aprobada), y el conteo de rutas siguió en 151, pero lo avisó después de construir. **Regla acordada:** cuando una restricción choca con la arquitectura, Code se detiene y lo plantea antes de escribir código.
+- **¿Patrón o caso aislado?:** Patrón: «lo aprobado es lo consumido» (H46) extendido a los criterios de cierre; la recomendación de un criterio debe ser verdadera para cada origen del dato.
+- **Nota para el documento final:** **Toda evaluación de cierre se calcula sobre la misma copia congelada que consumen los procesos posteriores**, no sobre el estado de trabajo, aunque hoy coincidan; una regla sin efecto observable se entrega con su medición previa, su caracterización y la declaración explícita de que es condición previa de la siguiente ronda. Las recomendaciones de un criterio se redactan por origen del dato y no prometen acciones que la interfaz no ofrece. Código de cliente no calcula huellas: el servidor debe entregarle el dato ya validado.
+
+### H53 — Deriva de documentación: la ronda vivía en una celda de 23 mil caracteres y el detector de frescura no la vigilaba
+
+- **Hallazgo:** Los pasos 1 a 7 y los estados de trabajo estaban descritos casi por completo en una sola celda de `CLAUDE.md` (la fila «Integración con Moddulo F2», 23 473 caracteres, en un archivo de 629 KB y más de 2 000 líneas), sin entrada en el Historial de Sprints, sin documento de contrato estable y con tres frases que describían un estado ya superado («sin compuerta ni conservación todavía», «`unlink-pestel` queda pendiente del commit 4», «Transitorio hasta el commit 2…»). El detector `check-docs-freshness` daba 7/7 al día, pero la entrada del manifest `pestel-integracion-moddulo-f2` cubría solo 4 rutas escritas en septiembre; una descripción vieja de cualquier otra ruta o módulo de la ronda no se habría marcado. Ningún documento mencionaba un hash de la ronda, y la tabla de specs de PESTEL citaba `00_contexto_metodologico.md` y `data_model.md`, que no existen.
+- **Principio(s):** Documentación viva; Principio 1 (la documentación no afirma lo que el código ya no hace).
+- **Estado:** **Corregido (paso 8, `d7cb7cd`).** Solo documentación (3 archivos, +112/−5; sin cambios en código ni pruebas). Nuevo `docs/moddulo/f2-contrato-m1.md`, escrito contra el código actual y no copiado de la fila, con archivo y función por cada afirmación: modelo `phases.exploracion.m1` (aprobación con copia congelada, generación, finalización, reapertura) y qué conserva cada acción, estados, huella, compuerta de M2 a M5, precedencia del análisis aprobado en los prompts y serialización sin límites con su tope, vigencia del Reporte F2 y cierre de fase, línea de trazabilidad (dos variantes), `elegirMapaParaCriterios` y sus invariantes; con una sección «Provisional», rotulada **no estable** y vinculada al Bloque 4 (contención de fase cerrada, la regla de `elegirMapaParaCriterios` frente a `m1-reopen`, N6 y el camino legado de `generate-dvs`), y la anotación de que `docs/moddulo/arquitectura/` (junio) quedó superada en esta parte. Manifest: la entrada pasa de 4 a 21 rutas y módulos, **sin `exploracion/page.tsx`** (cambia en casi toda tarea de interfaz y haría ruido; límite declarado en la descripción de la entrada y en el Historial). `CLAUDE.md`: tres frases corregidas, puntero al contrato, una sola entrada de Historial para la ronda con los hashes reales y las cifras de suite (medidas con un worktree por commit) y la tabla de specs corregida (la spec está como sección «Spec — data_model» en `00_metodologia_pestl.md`, línea 65; se marca que no existe `data_model.md`). Verificación: 7/7 al día; con el manifest nuevo y `CLAUDE.md` en HEAD el detector da 0 (no marca nada hoy); **prueba en negativo** en un worktree desechable: al tocar `m1-edit/route.ts` el detector marcó la entrada y el conteo de rutas; el worktree se eliminó.
+- **Límites declarados:** `exploracion/page.tsx` queda fuera del manifest; la nota fechada «revisado 26-10-15» («el servidor exigirá en el commit 4») se conserva como instantánea histórica por decisión de Raúl; la bitácora no se edita en el repo (la lleva Raúl en archivo aparte).
+- **¿Patrón o caso aislado?:** Patrón: la documentación viva falla donde el detector no mira.
+- **Nota para el documento final:** **Un detector de frescura solo protege lo que su manifest cubre**: al cerrar una ronda hay que comparar la lista de rutas y módulos que la documentación describe con la que el manifest vigila, y probarlo en negativo. Lo estable se escribe una vez en un contrato corto verificado contra el código (con archivo y función por afirmación) y separado de lo provisional; el historial por commit vive en una sola entrada del Historial y en git. No se resume ni se reordena una celda grande sin necesidad: se corrigen las frases vencidas y se agrega un puntero.
+
+
+---
+
+## Origen: Ronda PESTEL → Moddulo F2-Exploración, Bloque 2 — app PESTEL de Centinela ↔ Moddulo F2 (2026-10-23 a 2026-11-02)
+
+**Alcance de este bloque.** La app PESTEL de Centinela es la fuente de verdad del análisis; Moddulo F2 lo recibe (importación) y lo aprueba (M1). Flujo acordado con Raúl: el usuario ajusta en Centinela, reexporta y reaprueba en Moddulo; no hay retorno de ajustes de Moddulo hacia Centinela. Se trabaja por tandas, en este orden: **T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8**. Estado a 2026-11-02: T0, 1a, T2 y T6 construidas, verificadas y commiteadas por Raúl; **T3 en planeación** (Code); T4, T5, T7 y T8 pendientes.
+
+**Decisiones de producto registradas (D1 a D8 y posteriores, resumen):**
+- Centinela es la fuente de verdad; el mensaje de F2 ante un conflicto de vínculo es pertinente por esa razón.
+- Ajustar en Centinela un análisis ya aprobado **retira la aprobación** (con constancia), y en F2 se invalida la aprobación del M1 al reexportar (D4).
+- Aprobar con confianza global < 50 exige una justificación de 20 a 1 000 caracteres, guardada con autor y fecha (D2).
+- El vínculo pendiente vive solo en el back-link `pestel_projects.modduloProjectId`; un PESTEL solo puede estar vinculado a un Moddulo existente (la papelera cuenta como vinculado).
+- Retiro de `export-to-moddulo` con 410 y contador `retiros_rutas/export-to-moddulo` (solo total y fecha, sin uid; los 401 en un campo aparte). Se medirá con Vercel Pro (Hobby conserva 1 hora de registros; Pro, 1 día) y el retiro definitivo llega 30 días después (N5, T8).
+- Convención de color de avisos: marrón en modo claro y amarillo en oscuro (ver H60).
+- Regla de Firestore `hasAny → hasOnly` en `firestore.rules:297-303`: va en un commit aparte y el despliegue lo hace Raúl.
+
+**Tabla de commits y de suite (Bloque 2):**
+
+| Tanda | Contenido | Commit | Suite |
+|---|---|---|---|
+| 1a | No pisar variables del asistente «Nuevo PESTEL» con un 200; solo aviso (H57) | `dc9ff80` | 2687 |
+| T0 | Detector de anclas (conteo de rutas y frescura) | `16d9a95` | 2694 |
+| T2-1b | Unicidad del vínculo en `import-pestel` + back-link atómico (H56) | `983a44f` | 2712 |
+| T2-1c | Upgrade Express→Centinela y mensajes sin «contacta soporte» (H55, H56) | `ac207f9` | 2721 |
+| Reloj | Fecha fija en `expressPrompt.test.ts` con `vi.setSystemTime` (H61) | `96f2d27` | 2759/2759 |
+| T6-8 | Ajustar un análisis aprobado retira la aprobación (H58) + presentación | `6d20b9b` | 2750 |
+| T6-9a | Aprobar con confianza < 50 exige justificación (H59) + presentación | `28b08c6` | 2759 |
+
+Nota: la suite sube a 2759 con T6 completo; antes del arreglo del reloj, 5 pruebas fallaban en HEAD limpio por la fecha del sistema (2754/2759). Conteo de rutas de `CLAUDE.md`: línea 1113, valor 151 (sin rutas nuevas en T2 ni T6).
+
+### H54 — El flujo real de Centinela no es el que el diagnóstico (ni las guías de verificación) suponían
+
+- **Hallazgo:** El diagnóstico y las guías de verificación describieron flujos que no existen: que el asistente «elige» las variables (las variables por defecto son fijas y solo se agregan; «Crear proyecto» cierra la configuración), que se puede reabrir `/nuevo`, que el menú ⋮ ofrece «Analizar con PESTEL» cuando ya hay un PESTEL (no aparece), y que existe un gesto de ajuste en la matriz (el ajuste se hace en la etapa Interpretación, con el control de la matriz). Invocar PESTEL desde F2 con un proyecto ya configurado remite al paso 4 (Datos); modificar variables exige «Configurar».
+- **Principio(s):** Principio 1 (la documentación y la guía no afirman lo que el sistema no hace); Proceso de desarrollo.
+- **Estado:** **Corregido en el proceso.** Las guías se reescribieron con lo que Code leyó y lo que Raúl observó; Code reconoció que su lectura del menú ⋮ estaba equivocada. Un prompt a Code pedía revisar un «banner F1→Centinela» inexistente (reconocido y corregido).
+- **¿Patrón o caso aislado?:** Patrón (tres veces en el bloque; ya visto en la ronda anterior, ver lecciones de proceso).
+- **Nota para el documento final:** **Antes de mandar a una persona a verificar un flujo, confirmar en el código y en la pantalla real que ese flujo existe; lo que el usuario ve en la app manda sobre cualquier lectura del código o del diagnóstico.** La guía nombra el estado necesario, su costo y el camino exacto (URL o control).
+
+### H55 — Afirmaciones propias del diagnóstico resultaron falsas y las pruebas con datos irreales las ocultaban
+
+- **Hallazgo:** El diagnóstico dio por «funcionando» el upgrade Express→Centinela de `link-moddulo` y por «siempre visible» el menú ⋮. Las pruebas existentes forzaban `sourceId = pest1`, un dato que el sistema real no produce (un M1 Express guarda como `sourceId` el id de su propio Moddulo: 6 de 6 casos reales), y por eso el defecto nunca saltó.
+- **Principio(s):** Principios 1 y 4; Proceso de desarrollo.
+- **Estado:** **Corregido (T2-1c, `ac207f9`).** Ver H56.
+- **¿Patrón o caso aislado?:** Patrón (familia de N4 y de las pruebas con forma irreal).
+- **Nota para el documento final:** **Las pruebas de caracterización usan la forma real del dato** (tomada de documentos reales en solo lectura), no la que hace pasar la prueba. Una afirmación del propio diagnóstico se trata como hipótesis hasta verificarla con datos reales.
+
+### H56 — `link-moddulo` confundía el id del propio Moddulo con otro análisis; `import-pestel` no garantizaba un solo vínculo
+
+- **Hallazgo:** (i) `link-moddulo` interpretaba el `sourceId` de un M1 Express —que es el id del propio Moddulo— como un vínculo con otro PESTEL, de modo que el upgrade nunca llegaba a ejecutarse. (ii) `import-pestel` no leía el PESTEL de origen dentro de la transacción ni escribía el back-link junto con el vínculo, y permitía importar un PESTEL ya reclamado por otro Moddulo. (iii) Cinco mensajes terminaban en «contacta soporte».
+- **Principio(s):** Principios 1 y 4; Ciclo de vida de recursos; Integridad de datos.
+- **Estado:** **Corregido (T2-1b y T2-1c).**
+  - *1b:* `import-pestel` lee el PESTEL dentro de la misma transacción, escribe el back-link junto con el vínculo (todo o nada) y limpia el back-link del PESTEL anterior si todavía apuntaba a este Moddulo. Rechaza con 409 `pestel_already_linked` si el PESTEL ya está vinculado a otro Moddulo existente (la papelera cuenta); un back-link a un documento inexistente no bloquea; 403 si el PESTEL es ajeno. Helper `lib/centinela/pestel/vinculoUnico.ts`. `createProject` trae `codigo: "pestel_already_linked"` sin cambiar el texto. 18 pruebas nuevas (9 de 11 de ruta fallan contra el código anterior; 7 del helper por construcción).
+  - *1c:* `vinculoT22Ajeno` cuenta como ajeno solo un `sourceId` que no sea el del propio Moddulo, ni el PESTEL destino, ni de un `linkedSource` Express; se usa en la lectura previa y en la transacción. Mensajes en `lib/moddulo/textosVinculo.ts` (otro PESTEL → «Desvincular»; Express con trabajo → candado existente que remite a «Vincular con análisis independiente»; Express sin payload ni borrador → vincula directo; fase cerrada sin cambio). Una prueba escanea `app/`, `lib/` y `functions/src` y falla si reaparece «contacta soporte». 9 pruebas nuevas (7 fallan contra el código anterior).
+- **Límites declarados:** sin emulador de Firestore (Java 17): la atomicidad real y el aislamiento no se prueban, la carrera se simula en secuencia. La importación completa no se puede ver en navegador sin pagar un análisis real; queda cubierta por pruebas. F2 no tiene texto propio para `pestel_already_linked` (muestra el rechazo genérico): anotado para T5. El selector de Centinela no puede confirmar el reemplazo y remite a F2.
+- **¿Patrón o caso aislado?:** Patrón: «un recurso, un dueño» (unicidad con back-link atómico); mensajes terminados en «contacta soporte» (cinco sitios).
+- **Nota para el documento final:** **Una relación uno a uno se escribe en una sola transacción por ambos lados y se rechaza con un código estable cuando ya está tomada.** Los mensajes de error dicen qué hacer en pantalla; una prueba de escaneo impide que vuelvan las frases vedadas.
+
+### H57 — El asistente «Nuevo PESTEL» pisaba las variables ya configuradas y el servidor respondía 200
+
+- **Hallazgo:** Al crear el proyecto, el asistente enviaba variables que sobrescribían las ya guardadas, con respuesta 200 y sin aviso. La verificación en navegador necesitó distinguir el PUT esperado del segundo PUT (con las variables A y B) y confirmar que PRUEBA-A seguía presente.
+- **Principio(s):** Principios 1 y 4; Integridad de datos.
+- **Estado:** **Corregido (1a, `dc9ff80`).** El asistente no sobrescribe variables con un 200 y emite solo un aviso. Verificado por Raúl en navegador (URL cambia al id de PESTEL; POST 201 con `modduloProjectId`; PUT 200).
+- **Decisión:** la red de seguridad se justifica por N6 futuro (la ventana de procedencia mixta); recomendación aprobada: solo avisar, no bloquear.
+- **¿Patrón o caso aislado?:** Caso aislado hasta ahora (variante de «escritura que pisa sin confirmar», ver H15).
+- **Nota para el documento final:** **Una escritura que puede pisar datos existentes no responde 200 en silencio: o pide confirmación o avisa y conserva lo que había.**
+
+### H58 — Ajustar un análisis ya aprobado no retiraba la aprobación
+
+- **Hallazgo (N3):** `adjust` no miraba el estado: se podía ajustar un análisis APPROVED sin invalidar la aprobación (8 aprobados con ajustes, 6 cambian clasificación). La ruta no tenía pruebas, el campo de justificación no tenía tope y la propiedad se comprobaba sin pasar por el proyecto.
+- **Principio(s):** Principios 1, 4 y 7; conecta con H03 y H38.
+- **Estado:** **Corregido (T6, commit 8, `6d20b9b`).**
+  - Un solo update atómico: el ajuste reemplaza al de esa dimensión; si el análisis estaba APPROVED, el mismo update lo pasa a REVIEWED, borra `approvedAt` y `approvedBy` y guarda `aprobacionAnterior` y `aprobacionRetirada` (constancia). La respuesta suma `status`, `aprobacionRetirada` y `vigente`.
+  - Reintento: el callback relee el documento; si otra petición ya retiró la aprobación, no se vuelve a copiar ni se pisa `aprobacionAnterior`.
+  - Tope de 1 000 caracteres en la justificación (400 con el conteo), solo al escribir: los ajustes existentes se leen y conservan intactos (prueba con uno de 131 y otro de 5 000). Propiedad por proyecto con el mismo 404. `AdjustmentModal` muestra el contador «N / entre 20 y 1 000».
+  - Pantalla de interpretación: franja derivada de lo guardado («La aprobación del <fecha> se retiró por un ajuste en <dimensión> el <fecha>…»), que sobrevive a una recarga; aviso de «versión más nueva» que ofrece ir a la vigente sin bloquear; nota «Moddulo F2 todavía no incluye tus ajustes al importar este análisis» (solo si el proyecto está vinculado y hay al menos un ajuste; se retira en T3). Informes: rótulo «Generado antes del último ajuste».
+  - Pruebas: 14 nuevas (9 fallan contra el código anterior), más 2 de caracterización invertidas a propósito (APPROVED ya no se queda así; 1 001 caracteres se rechazan) y 8 de caracterización de `adjust` que antes no existían (6 sin editar). 9 pruebas del módulo puro.
+- **Verificación:** Raúl la hizo en navegador con datos de prueba sintéticos (ver H62 y lecciones): todo conforme salvo la presentación (H60).
+- **Límites declarados:** sin emulador (el reintento se simula); sin DOM; el aviso de «versión más nueva» solo está cubierto por pruebas unitarias (los datos de prueba no actualizan documentos existentes y verlo costaría una segunda corrida de IA).
+- **¿Patrón o caso aislado?:** Patrón: invalidación de la aprobación por cambio aguas arriba, con constancia (conecta con H03/H38).
+- **Nota para el documento final:** **Todo cambio al contenido de un resultado aprobado retira la aprobación en la misma escritura que guarda el cambio, y deja constancia de qué se retiró, cuándo y por qué.** La pantalla muestra esa constancia derivada de lo guardado, no de un estado local. El tope de longitud se aplica al escribir, nunca a lo ya guardado.
+
+### H59 — Aprobar con confianza global < 50 no pedía justificación
+
+- **Hallazgo (N2):** `acknowledge-bias` borraba la marca «insuficiente» (PENDING_REVIEW → REVIEWED) y `approve` no chequeaba la confianza: 5 análisis APPROVED tienen confianza < 50, incluido el único importado a F2 (39).
+- **Principio(s):** Principios 4 y 7; nodo de aprobación explícita (H03).
+- **Estado:** **Corregido (T6, commit 9a, `28b08c6`), sin tocar los 5 análisis existentes.**
+  - Servidor: `/approve` con `globalConfidence` < 50 exige 20 a 1 000 caracteres; si falta responde 422 `justificacion_requerida`; guarda la justificación junto con la confianza, quién y cuándo. Con 50 o más, el payload es el de siempre (una justificación enviada se ignora).
+  - Pantalla: «Finalizar interpretación» abre `AprobacionConfianzaModal` cuando la confianza es < 50; el error del servidor se muestra dentro y el modal no se cierra. `confianzaInsuficiente` (leída sin desplegar Cloud Function) sustituye a PENDING_REVIEW como señal en la pantalla del análisis y en el panel; el botón de «analisis» y su leyenda se corrigieron de presentación.
+  - Pruebas: 7 de `approve` (4 fallan contra el código anterior; las 3 que pasan en ambos son el 422 de sesgos primero y las dos de 50 o más) y 2 del módulo puro. La caracterización existente (atomicidad y propiedad) no se editó.
+- **Límites declarados:** la justificación aún no llega a F2 (T7). Un análisis con confianza < 50 no se puede obtener sin IA (unas 7 llamadas a Claude más scrapers); por eso la verificación usó datos sintéticos.
+- **¿Patrón o caso aislado?:** Patrón: la señal de «insuficiente» se deriva de un dato (la confianza) y no de un estado que otra acción puede borrar (H43, H49).
+- **Nota para el documento final:** **Un umbral de calidad que condiciona una aprobación se evalúa en el servidor, se exige justificación humana por debajo y se guarda con autor y fecha; la señal visible se deriva del dato y no de un estado que una acción posterior puede limpiar.** Lo ya aprobado no se reescribe retroactivamente.
+
+### H60 — Contraste: el amarillo de los avisos no se veía en modo claro
+
+- **Hallazgo:** Se asumió un fondo blanco; el fondo real es `#ededed` en claro y `#0B1620` en oscuro. El tinte `yellow/10` quedaba a 1.03:1 de la página y el borde `yellow/30` a 1.07:1 (invisibles); la insignia «Sesgo» (amarillo sobre amarillo) a 1.18–1.29:1; el texto «Revisa N alerta(s)» a 1.24:1. La nota de Moddulo F2 se leía como un párrafo suelto, casi imperceptible.
+- **Principio(s):** Diseño visual; Principio 1 (lo que se muestra debe poder leerse).
+- **Estado:** **Corregido en los avisos de T6 (commits 8 y 9a).** Modo claro en marrón (`brown-eske-60` en borde y relleno, `brown-eske-80` solo para el texto, porque el marrón 60 sobre su tinte llegaba a 4.37:1, bajo AA); modo oscuro en el amarillo actual. Medidas: franja fondo 1.03→1.14:1 y borde 1.07→2.05:1 en claro (oscuro 1.23 y 2.18); texto 4.85→6.90:1 (oscuro 10.23); insignia «Sesgo» 7.13:1 activa y 6.46:1 inactiva en claro; «Revisa N alerta(s)» 7.86:1. La nota de Moddulo F2 pasa a aviso con ícono de información, borde izquierdo grueso y el mismo fondo que la franja de retiro, justo debajo de ella. Se mantiene `role="status"`. Verificado por Raúl en navegador en los dos modos.
+- **Fuera de T6 (pendiente, propuesta de commit aparte):** `BiasCheckPanel` (cada alerta sin reconocer usa `bg-yellow/5` y `border-yellow/30`, y su aviso `text-yellow-eske` plano), la insignia «Aprobado», la barra de etapas y la pestaña activa en oscuro. Continúa el barrido de H23.
+- **¿Patrón o caso aislado?:** Patrón (H23 y la convención de colores de proceso y error).
+- **Nota para el documento final:** **Los contrastes se miden contra el fondo real compuesto (con los hex de `globals.css`), no contra blanco, y se declaran los ratios;** una convención por modo (marrón en claro, amarillo en oscuro) con un token de texto aparte. Los avisos que son consecuencia de una acción se pegan visualmente a ella.
+
+### H61 — Pruebas con fecha fija rotas por el cambio de mes
+
+- **Hallazgo:** Cinco pruebas de `lib/ai/phases/expressPrompt.test.ts` fallaban en un HEAD limpio porque el fixture llevaba «2026-10» fija y el reloj ya marcaba noviembre; no era de T6, pero dejaba la suite en 2754/2759.
+- **Principio(s):** Proceso de desarrollo.
+- **Estado:** **Corregido (`96f2d27`).** Reloj fijado con `vi.useFakeTimers()` y `vi.setSystemTime("2026-10-15T12:00Z")`; suite 2759/2759.
+- **¿Patrón o caso aislado?:** Patrón candidato (pruebas que dependen del reloj real).
+- **Nota para el documento final:** **Toda prueba cuyo resultado depende de la fecha fija el reloj;** un fixture con fecha literal sin reloj fijo es una falla futura segura.
+
+### H62 — La verificación contra la base real exige datos de prueba marcados y limpieza comprobada
+
+- **Hallazgo:** La base de datos que usa el entorno local es la real (Firebase). Un análisis con confianza < 50 o un aprobado no se obtienen sin IA, así que T6 se verificó con un script de Code (`datos-prueba-t6.ts`) que crea documentos sintéticos nuevos (con `create()`, marca «PRUEBA T6», `autoMonitorEnabled: false`) con `--simular`, `--apply`, respaldo y autoprueba de exclusión, y los borra con `--limpiar` verificando la marca. Se crearon 6 documentos (3 análisis, 2 PESTEL, 1 Moddulo): 142/6/17 → 145/8/18 → 142/6/17 tras limpiar (`contar-datos-reales.ts`).
+- **Incidentes:** (i) el primer `--limpiar` borró 2 de 6 porque la protección de «reales» trataba como reales a los de prueba vinculados entre sí (falló del lado seguro); Code corrigió el script y completó; (ii) los archivos de `/private/tmp` desaparecieron, se regeneraron en `/Users/raul/Documents/development/eskemma-local/t6/`; (iii) si el usuario usa «Datos» o «Configurar» en los proyectos de prueba, la app crea documentos relacionados que el script reporta pero no borra.
+- **Principio(s):** Seguridad; Proceso de desarrollo.
+- **Estado:** **Cerrado para T6.** Proyectos reales (los dos T22 vinculados y el de Anaya) fuera de alcance.
+- **Nota para el documento final:** **Una verificación que escribe en la base real solo se hace con un script que (a) crea documentos nuevos marcados, (b) simula primero, (c) respalda, (d) limpia comprobando la marca de cada uno y (e) cuenta antes y después.** Si el entorno local apunta a datos reales, esto se pregunta antes de autorizar escrituras. Los scripts viven en una ruta persistente fuera del repo.
+
+
+### Hallazgos del diagnóstico de la ronda (N1 a N14) y su estado a 2026-11-02 (actualizado en v11)
+
+Los números y las evidencias vienen del diagnóstico de solo lectura de la ronda. En v10 se confirmaron con Code (con archivo y línea) los estados de N6, N9, N10, N12 y N14.
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| N1 | `REVIEWED` se asigna al crear el análisis (confianza ≥ 50) sin revisión humana; solo `APPROVED` es decisión explícita (`generateFeed.ts:544-545`; 89 de 142) | Pendiente (Bloque 2, H-X; requiere despliegue de una Cloud Function). La señal «insuficiente» ya se deriva de la confianza (H59), no del estado |
+| N2 | `acknowledge-bias` borra la marca «insuficiente» (PENDING_REVIEW → REVIEWED) y 5 análisis `APPROVED` tienen confianza < 50, incluido el único importado a F2 (39); `approve` sin chequeo de confianza | **Parcial.** Aprobar con confianza < 50 exige justificación con autor y fecha (T6, H59, `28b08c6`); los 5 aprobados existentes no se tocan. La justificación aún no llega a F2 (T7) |
+| N3 | `adjust` no mira el estado: permite ajustar un análisis aprobado sin invalidar la aprobación (8 aprobados con ajustes, 6 cambian clasificación) | **Parcial.** Ajustar un aprobado retira la aprobación con constancia (T6, H58, `6d20b9b`). Falta que los ajustes viajen a F2 (T3) |
+| N4 | `link-moddulo`: el «upgrade express → Centinela» no es alcanzable con datos reales (el express guarda como `sourceId` su propio Moddulo, 6 de 6; la prueba siembra un `sourceId` irreal) | **Corregido** (T2-1c, `ac207f9`; H55 y H56) |
+| N5 | `export-to-moddulo` sin llamadores; escribe `linkedSource` sin payload ni reinicio | **En proceso:** retiro con 410 y contador (T8); se mide con Vercel Pro y se elimina 30 días después |
+| N6 | Ventana de procedencia mixta: tras crear el PESTEL desde F2 el Moddulo dice T22 con `sourceId` nuevo pero el payload sigue siendo el Express (`app/api/centinela/pestel/project/route.ts:196-215`, sin tocar desde 26-09-18) | **Abierto** (Bloque 4 / ronda H16; el vínculo pendiente vive solo en el back-link, T3). Efecto añadido por la ronda: `origenDeAnalisis(kind)` dice «Centinela» durante esa ventana, y las recomendaciones por origen del paso 7 (H52) podrían mostrar el origen equivocado |
+| N7 | `toF2Senal` fabrica `nivelConfianza: "medio"` y vacíos en fuente y fecha; 14 de 200 señales sin fuente | Mitigado (ver H47); origen pendiente (T7) |
+| N8 | Los motores no recibían fecha ni confianza (solo fuente, 3 por tipo, 140 caracteres) | Corregido el recorte (H46); fecha y confianza deliberadamente no se emiten |
+| N9 | El auto-regenerado de borrador sobrescribe ediciones manuales y aprobaciones sin confirmación | **Cerrado** (pasos 3 y 4): `generarDraftDVS` solo se llama desde botones, el reintento y el hook tras aprobar; el efecto automático ya no existe; reemplazar un borrador pasa por la confirmación de «Nuevo análisis» (candado H15) |
+| N10 | `import-pestel` no mira F2 cerrada y el análisis finalizado no avisa de divergencia con el M1 | **Cerrado**: `import-pestel` responde `fase_cerrada` dentro de la transacción (paso 3); la divergencia la señala `dvsDeOtroAnalisis` y la etiqueta amarilla (H50, `05c7982`) |
+| N11 | «Regresar a Moddulo F2» y el botón de E5 envían el análisis más reciente sin mirar su estado | Pendiente (T5, H-P1 como gate de origen; incluye el texto propio en F2 para `pestel_already_linked`) |
+| N12 | `regenerate-m5` mezcla vintages (M1 vigente + M3/M4 del borrador viejo); el `generate-dvs` legado lee el análisis en vivo, no el snapshot | **Mitad cerrada, mitad abierta.** Cerrada: `regenerate-m5` pasa por la compuerta y su escritura final valida la huella capturada. **Residual abierto:** la ruta legada de `generate-dvs` lee `pestel_analyses` en vivo (solo corre si no hay payload); se retira en un paso aparte antes de la Beta, **con medición previa** de cuántos proyectos la usan. `regenerate-m5` sigue sin llamador en la pantalla |
+| N13 | El M1 no tiene paso de aprobación en F2 | Corregido (H38) |
+| N14 | Deriva de documentación: `CLAUDE.md` citaba specs inexistentes (`00_contexto_metodologico.md`, `data_model.md`) y el modelo del ajuste humano difiere entre las specs 00, 05 y 06 y el código | **Parcial.** Corregidas las referencias en el paso 8 (H53). **Sigue abierta** la divergencia del modelo del ajuste humano entre las specs 00, 05 y 06 y el código (Documentación viva) |
+
+### Actualización de entradas existentes
+
+- **H15:** además de M8 y H-M3, esta ronda cierra los casos P2 y H-P4 (análisis nuevo de PESTEL que anulaba una aprobación) y `unlink-pestel` en Moddulo (ver H39). El modal viejo `ConfirmReplacePestelModal` de `centinela/pestel/nuevo` sigue con un texto falso («los motores M2–M5 se regenerarán»): Bloque 2. Siguen pendientes M3 y M4 de F1/F2, M7, M17, F3 y H-F1.
+- **H16:** **En curso (v11: Bloque 2 avanzado, ver H54 a H62; faltan T3, T4, T5, T7 y T8).** Del lado de Moddulo, el M1 ya es un nodo aprobable con compuerta de servidor y candados (H38, H39); H-P1 se resolvió por la vía de aprobación dentro de F2 (opción B del diagnóstico). Siguen pendientes, en el Bloque 2, H-P1 como gate de origen en Centinela, H-P2 (los ajustes humanos de la matriz viajan), H-P3 (confianza < 50) y H-X (semántica de estados de PESTEL).
+- **H03 (v11):** el retiro de la aprobación al ajustar (H58) y la justificación con autor y fecha al aprobar con confianza baja (H59) amplían el registro de autoría en Centinela; sigue pendiente el Grupo 2 general.
+- **H23 (v11):** el barrido de contraste continúa; los avisos de T6 están corregidos (H60) y quedan `BiasCheckPanel`, la insignia «Aprobado», la barra de etapas y la pestaña activa en oscuro.
+- **H30 y H36:** siguen diferidas al Bloque 3 (adenda de investigación con Reporte F3 emitido) y al Bloque 4 (reapertura con dependencias).
+- **Familia «la pantalla no afirma lo que el servidor no confirmó»:** variantes nuevas de esta ronda: autorización (H40), generación (H45), estado derivado (H43) y proceso en curso (H49). Misma regla común.
+
+### Hallazgos menores de la ronda (sin entrada propia)
+
+- **Banner de F1 como invitación (4c, `0e8f98e`):** `debeInvitarCompletarF1` (8 combinaciones), `role="status"`, franja amarilla y botón «Ir a F1-Propósito →». Tras cerrar F1 se redirige a F2 y el análisis importado queda en borrador.
+- **Dos botones «Reintentar generación»:** coincidían sin decisión de diseño; queda uno, el del pie, y el panel central solo explica el estado y dónde está el botón.
+- **Colores de proceso y error:** convención `text-red-eske-60 dark:text-red-eske-10` con `role="status"` (proceso) o `role="alert"` (error), sin la palabra «Claude». Textos que no la siguen: «Cargando indicadores…» (`FontanaIndicadoresAccordion.tsx` l.301: `text-red-eske` sin variante oscura ni `role`) y `analisis/[id]/page.tsx` l.302 (V1 legado, `dark:text-red-eske-20`). Tokens `red-eske-70` en oscuro (remapea a `--surface-5`, inexistente) y similares, sin tocar: `MotoresSequentialView.tsx` l.592 y l.621, `exploracion/page.tsx` l.2996, `SenalesGrupo.tsx` l.31, `DVSView.tsx` l.222 (hex `#E07070`) y l.22 y 53 (`red-eske-80` sin variante oscura). Falta un barrido completo de «Cargando…» y «Generando…» fuera de `app/moddulo` y `app/components`.
+- **Fallo silencioso de la confirmación de importación:** se corrigió en la serie (el flujo de importación confirmaba sin avisar si fallaba).
+- **Formato de fecha inconsistente** en las diferencias de XPCTO (mes frente a fecha completa): pertenece a la serie F1.
+- **Rutas y acciones sin llamador o fuera del serializador:** `regenerate-m5` sin llamador en la pantalla; `guardar_analisis` y `finalizar_analisis` no pasan por el serializador.
+- **El M1 está en el borde del tope de tokens de salida** (por medir antes de ampliar el contenido).
+- **Un commit previo con contenido mezclado:** `4fe2d93` contiene la pantalla de 3b y su rótulo no lo dice; no se reescribe.
+- **Datos externos, hallazgos sueltos:** series de INEGI con `ErrorCode 100`, CONAPO con 301 y arranque en frío lento de Fontana en F3-2.
+- **Pendiente de producto:** la confianza de la IA junto a una clasificación editada por el usuario (H48); `categoriasEditadas` es un conteo, no una lista.
+
+### Pendientes de operación (lista previa a la Beta)
+
+- **Vercel:** el plan Hobby es no comercial; pasar a Pro antes de la Beta (Fluid compute, máximo 300 s). Observability Plus ≈ $0.
+- **Crédito de la API:** configurar alerta de saldo o recarga automática en la consola del proveedor; alerta sobre `[ANTHROPIC_CREDIT_EXHAUSTED]` en los registros; el crédito se agotó una vez durante las pruebas.
+- **Costo por análisis Express:** ≈ $0.37 (M1 ≈ $0.16, M2–M5 ≈ $0.21 a $0.22).
+- **Margen de M5 contra los 300 s en Vercel:** medir ahí; en local no aplica el límite.
+- **Barrido de mensajes crudos del proveedor** en respuestas y registros fuera de F2 (lista en H45).
+- **Marcador de «generación en curso»** en el servidor para no ofrecer un reintento que cueste de más.
+- **Retirar o proteger** `regenerate-m5` (sin llamador) y `export-to-moddulo` tras medir.
+- **Retirar el camino legado de `generate-dvs`** (lee `pestel_analyses` en vivo, solo si no hay payload; N12 residual) en un paso aparte, **midiendo antes** cuántos proyectos lo usan.
+- **Ajuste 4g:** normalizar la comparación de `diffXpcto` (recortar, colapsar espacios, NFC) para que una diferencia invisible no produzca un aviso «A → A». Raúl cree que ya se resolvió y verificó en navegador; **por confirmar** en la próxima ejecución antes de cerrarlo.
+- **Bloque 4, entradas nuevas de la ronda:** revisar `elegirMapaParaCriterios` frente a `m1-reopen` (H52); la pregunta de producto sobre el criterio 8 con una dimensión NEUTRAL deliberada; el efecto de N6 en los textos por origen.
+- **Regla de Firestore** (`firestore.rules:297-303`): cambiar `hasAny` por `hasOnly` en un commit aparte; el despliegue lo hace Raúl.
+- **Ronda de contraste** (continuación de H23): `BiasCheckPanel`, insignia «Aprobado», barra de etapas, pestaña activa en oscuro.
+- **Texto propio en F2 para `pestel_already_linked`** (T5); la nota de F2 «todavía no incluye tus ajustes» se retira en T3.
+- **Aviso de «versión más nueva»** (H58): solo cubierto por pruebas unitarias; verlo en navegador exige dos análisis del mismo proyecto.
+- **Retiro definitivo de `export-to-moddulo`:** tras pasar a Vercel Pro y medir el contador durante 30 días (T8).
+- **Pruebas manuales aún sin hacer:** el escenario original del aviso de XPCTO de punta a punta (importar, llenar F1, aprobar y generar la primera vez), y el caso de fase cerrada del 4d (cubierto solo por pruebas unitarias).
+
+### Lecciones de proceso (ronda PESTEL → F2)
+
+- **Caracterización primero y prueba en negativo contra el código anterior**, con el conteo de fallos y de aciertos explicado (45 de 50, 22 de 47, 37 de 55, 25 de 35, 23 de 33; los que pasan son comprobaciones que no deben cambiar, como la huella).
+- **Las guías de verificación asumieron casos no probados.** Se pidió esperar una franja que no vive en el estado «análisis finalizado», y un cambio de categoría en un análisis importado de Centinela, que no se edita en Moddulo. **Regla:** antes de mandar al usuario a verificar, confirmar leyendo el código el origen y el estado del proyecto que la guía supone; la guía nombra el estado necesario y su costo.
+- **Las afirmaciones de Code sobre el estado del repositorio se verifican con `git log`** (Code dio por commiteado un paso que no lo estaba).
+- **Mecánica de parches:** `$E` debe redefinirse en cada terminal; revisar `git diff --cached --stat` (debe salir vacío) y el mensaje antes de aplicar; nunca reaplicar un parche; `git fetch` y `git status -sb` antes del `push`; el directorio de parches en `/private/tmp` puede vaciarse.
+- **Límites de verificación declarados:** no hay pruebas de DOM (el cableado y los colores van a navegador); un override de DevTools no garantiza que la petición no llegue al proveedor y no se usa si cuesta crédito; el fallo real por saldo no se provoca a propósito; una sola corrida no aísla el efecto de un cambio de prompt.
+- **Los incidentes del entorno de pruebas son hallazgos:** el crédito agotado reveló el fallo sin clasificar y el aviso de XPCTO congelado.
+- **Los estados de prueba tienen costo y se reproducen:** una reaprobación con contenido distinto cuesta ≈ $0.22 y deja el estado «análisis anterior + borrador nuevo» necesario para verificar el sello.
+- **Se separan los commits por tema** (el rótulo de `4fe2d93` quedó engañoso): decisión y estado frente a presentación frente a servidor.
+- **La revisión crítica antes de la verificación en navegador encontró un defecto de diseño** (la línea del PESTEL descargado dependía de un reporte que ese archivo no usa); corregirlo antes ahorró una segunda ronda de verificación. **Regla:** cuando un entregable lee una fuente distinta de otro entregable del mismo flujo, la condición de cada uno se deriva de su propia fuente.
+- **Las restricciones de alcance que chocan con la arquitectura se plantean antes de escribir código** (el caso de `complete-phase`, H52); Code lo registró como regla propia.
+- **Las cifras de suite se miden por commit** (un worktree por commit) y se contrastan con las anotadas; la discrepancia 2619 frente a 2632 vino de una construcción intermedia.
+- **Los resúmenes para la bitácora los prepara quien la lleva:** Code no prepara texto para ella (se le corrigió el plan del paso 8) y la colocación del archivo en el repo (`docs/patrones`) la decide Raúl.
+- **Antes de construir una regla sin efecto observable se mide en solo lectura en todos los proyectos reales** y se detiene la construcción si hay una sola diferencia (H52).
+- **(v11) Las guías asumieron flujos inexistentes tres veces más** (asistente que «elige» variables, reabrir `/nuevo`, menú ⋮ con PESTEL, gesto de ajuste en la matriz). Lo que la persona ve en la app manda; la guía parte del control y la URL reales (H54).
+- **(v11) Las afirmaciones del propio diagnóstico se verifican con datos reales:** «el upgrade funcionaba» y «el menú aparece siempre» eran falsas y las pruebas con datos irreales las ocultaban (H55). La urgencia del diagnóstico también estaba inflada («reemplazar el vínculo» resultó solo de metadatos).
+- **(v11) Preguntar el entorno antes de autorizar escrituras de Code:** el entorno local apunta a la base real; la verificación exige un script con marca, simulación, respaldo y limpieza comprobada (H62). El primer `--limpiar` falló del lado seguro.
+- **(v11) `/private/tmp` se vacía:** los parches y scripts viven en una ruta persistente fuera del repo (`eskemma-local/t6/`, `eskemma-local/t3/`). Los comandos se entregan completos, con solo el dato personal (uid) por completar.
+- **(v11) Las pruebas con fecha fija se rompen con el calendario:** se fija el reloj (H61).
+- **(v11) Un defecto de presentación puede no ser del commit que lo muestra:** el contraste dependía del fondo real y no del blanco asumido; se mide y se separa lo que es de la tanda de lo que no (H60).
+
+### Síntesis: patrones candidatos de la ronda y su uso en componentes, apps y artefactos nuevos
+
+Esta tabla no sustituye a las entradas: indica qué se desprende de la ronda para construir cosas nuevas y en qué categoría del borrador de patrones cae cada regla. No todo es reutilizable: lo particular de PESTEL y Moddulo (reglas de estado de Centinela, los criterios 1, 8 y 9 del FAT) queda en las entradas y no se generaliza.
+
+| Patrón candidato | Qué hacer al construir algo nuevo | Entradas | Categoría |
+|---|---|---|---|
+| Nodo de aprobación con copia congelada y huella | Si un resultado alimenta procesos posteriores: registrar `{por, en, huella}`, congelar una copia que es lo único que se consume y poner la compuerta en el servidor dentro de la transacción | H38, H50 | Integridad de datos e IA; Arquitectura de datos |
+| Dependencia aguas arriba por huella | Todo derivado guarda la huella de su origen; todo cierre o consumo la compara con la vigente | H50, H46, H42 | Arquitectura de datos; Ciclo de vida de recursos |
+| La serialización del prompt no entra al hash | El hash se calcula sobre el objeto guardado; se fija con una prueba de valor literal | H46 | Integridad de datos e IA |
+| Lo aprobado es lo consumido | Los topes de entrada se declaran, se miden y fallan de forma visible; nunca recortan en silencio | H46 | Integridad de datos e IA |
+| Confirmación de impacto derivada del servidor | El texto del modal se arma con lo que el servidor reporta (líneas y huella); el candado va en el servidor | H39 (y H15) | Ciclo de vida de recursos |
+| Clasificar por estructura, no por texto | 401, 403, red y causa del fallo del modelo se distinguen por estado o tipo; cada clase tiene su texto y su salida; nunca se muestra ni se registra el texto del proveedor | H40, H45 | Seguridad; Integridad de datos e IA |
+| Idempotencia en operaciones encadenadas | Un reintento completa lo faltante sin reescribir lo hecho; dos escrituras de un mismo hecho van en una sola actualización | H41 | Integridad de datos e IA |
+| Estado derivado con una sola fuente | Una función pura de derivación que se ejecuta en cada relectura; no se limpia un aviso de forma optimista | H43, H49 | Arquitectura de datos; Proceso de desarrollo |
+| El nombre del parámetro dice su fuente real | No alimentar «fase cerrada» con un modo de pantalla; tabla de pruebas que reproduce el defecto | H49 | Proceso de desarrollo |
+| Mostrar la diferencia, no el inicio | Ventana alrededor de la primera discrepancia, con elipsis solo donde se cortó y el valor completo accesible; la normalización va en la comparación | H44 | Diseño visual |
+| No fabricar datos por defecto | Se omite lo no certificable; los literales de ejemplo de un prompt no se guardan como datos | H47 (y H05) | Integridad de datos e IA |
+| Reglas de precedencia en prompts verdaderas para cada origen | Variantes por origen del dato, pruebas por anclas, resultados «sin daño visible, efecto no demostrado» se registran tal cual | H48 | Integridad de datos e IA |
+| Contención provisional con lo no bloqueado declarado | Se anota qué quedó a propósito sin bloquear y con qué decisión se resolverá | H42 (y H30) | Ciclo de vida de recursos |
+| Indicador de proceso en cada zona posible | Toda acción larga se ve desde cualquier zona de la pantalla; convención de color y `role` | H49, H23 | Diseño visual |
+| Operación como parte del patrón | Alarma sobre la causa operativa (saldo), costo por unidad medido y margen de tiempo medido en el entorno real | H45, H46 | Seguridad; Documentación viva |
+| Procedencia declarada solo cuando es verdadera | Todo entregable derivado de un resultado aprobado dice de cuál (fecha, ajustes humanos) con una función pura única; para datos anteriores se dice que no hay registro; la condición sale de la fuente real de cada entregable | H51 | Integridad de datos e IA; Diseño visual |
+| Evaluar el cierre sobre la copia aprobada | Los criterios de cierre y sus recomendaciones se calculan sobre el mismo dato congelado que consumen los procesos posteriores, y las recomendaciones se redactan por origen del dato; cliente no calcula huellas | H52 | Integridad de datos e IA; Arquitectura de datos |
+| Documentación con cobertura real | Contrato estable verificado contra el código (archivo y función), separado de lo provisional; el detector de frescura se amplía a lo que la documentación describe y se prueba en negativo | H53 | Documentación viva |
+| Un recurso, un dueño | Las relaciones uno a uno se escriben por ambos lados en una sola transacción y se rechazan con un código estable cuando ya están tomadas; la papelera cuenta como tomado | H56 | Ciclo de vida de recursos; Arquitectura de datos |
+| Cambio aguas arriba retira la aprobación con constancia | Modificar un resultado aprobado retira la aprobación en la misma escritura y deja constancia derivada de lo guardado; el reintento no pisa la constancia | H58 (y H03, H38) | Integridad de datos e IA |
+| Umbral de calidad con justificación humana | El servidor exige justificación (con autor y fecha) por debajo del umbral; la señal visible se deriva del dato, no de un estado que una acción posterior limpia | H59 | Integridad de datos e IA |
+| Pruebas con la forma real del dato | Las pruebas de caracterización usan la forma tomada de documentos reales; las afirmaciones del diagnóstico son hipótesis hasta verificarlas | H55 | Proceso de desarrollo |
+| Contraste medido contra el fondo real | Ratios declarados sobre el fondo compuesto con los hex reales; convención por modo (marrón en claro, amarillo en oscuro) y token de texto aparte | H60 (y H23) | Diseño visual |
+| Pruebas independientes del calendario | Todo resultado que depende de la fecha fija el reloj | H61 | Proceso de desarrollo |
+| Verificación segura en base real | Script que crea datos marcados, simula, respalda, limpia comprobando la marca y cuenta antes y después | H62 | Seguridad; Proceso de desarrollo |
+| Ciclo de trabajo | Diagnóstico → plan → revisión crítica → construcción → verificación en navegador → commit; caracterización primero, prueba en negativo, límites declarados, un commit por tema | Lecciones de proceso | Proceso de desarrollo |
+
+---
+
 ## Grupo 3 — CERRADO en lo textual (2026-10-07)
 
 Clasificación de ~50 casos entregada y aprobada. Con el criterio de aprobación implícita vs. explícita, el trabajo de lenguaje resultó mínimo (5 ajustes). El peso real quedó en tres rondas futuras: Grupo 2 (autoría y fecha en los nodos, ver H03), confirmación de impacto (H15) y PESTEL a Moddulo (H16). H-M5 se atendió antes que todo lo demás por ser un defecto de integridad.
@@ -652,7 +1079,7 @@ Estos quedaron señalados por Code como "no verificado" durante la auditoría de
 
 ---
 
-## Agenda de rondas (orden acordado a 2026-10-14, ajustado el mismo día)
+## Agenda de rondas (orden acordado a 2026-10-14; actualizada en v11, 2026-11-02)
 
 1. ~~Commit 5 y commit 6: cierre de la familia H25.~~ **Hecho (5a, 5b, 6a, 6b, 6c; ver H32).**
 2. ~~Commit 7a: id de las cadenas de impacto (H34).~~ **Hecho (`97cd737`).**
@@ -663,13 +1090,13 @@ Estos quedaron señalados por Code como "no verificado" durante la auditoría de
 7. ~~Cierre de la serie de guardado honesto.~~ **Cerrada con 7b-6b** (ver el cuadro de cierre antes del Grupo 3).
 8. **Ronda 7b-7 (propia):** atomicidad de `canal1/entregar` y `canal3/vincular` (2 o 3 escrituras no atómicas).
 9. ~~Ronda de confirmación de impacto (H15), empezando por M8.~~ **Hecha para M8 y H-M3 (commits 1 a 4, 2026-10-08 y 2026-10-09).** Quedan los demás casos de H15 (M3 y M4 de F1/F2, M7, M17, P2, H-P4, `unlink-pestel`, F3 y H-F1) y la confirmación de «regenerar síntesis o veredicto» cuando exista el botón.
-10. PESTEL a Moddulo (H16, H-P1, H-P2, H-P3), con el requisito de diseño de la **actualización controlada de lo derivado en F3** (ver H30), que incluye la **adenda de investigación con Reporte emitido** (ver H36), la decisión sobre H-M3b y el retiro de los bloqueos provisionales.
+10. **En curso (v10; ver la sección «ronda PESTEL → Moddulo F2»; Bloque 1 completo con sus pasos 1 a 8, `d7cb7cd`; quedan el ajuste 4g y los Bloques 2, 3 y 4):** PESTEL a Moddulo (H16, H-P1, H-P2, H-P3), con el requisito de diseño de la **actualización controlada de lo derivado en F3** (ver H30), que incluye la **adenda de investigación con Reporte emitido** (ver H36), la decisión sobre H-M3b y el retiro de los bloqueos provisionales. **v11: Bloque 2 (Centinela PESTEL ↔ Moddulo F2) en curso por tandas T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8. Hechas T0, 1a, T2 y T6 (ver H54 a H62). Siguiente: T3 (los ajustes humanos viajan a F2; vínculo pendiente solo en el back-link; planeación de Code en curso), luego T4, T5, T7 y T8.**
 11. Grupo 2: trazabilidad (H01), aprobación con autoría y fecha (H03, incluida la sobrescritura de fecha y autor al re-aprobar), antigüedad (H04), distinción IA/institucional (H05), versionado con `changelog.ts` (H06, H08, y la unificación de `dvsVersiones`), resolución geográfica (H07). Una ronda por principio. La fecha de finalización visible del análisis (H31) va junto con H04.
 12. Sefix (H26), ronda propia con helper común de lectura.
 13. Ronda de auth: `RegisterModal`/`setUserRole` (#3 de la auditoría ampliada de H25).
 14. Documento de patrones reutilizables, con esta bitácora como insumo.
 
-Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-eske-70` en oscuro, la insignia «Archivado» en oscuro, el kebab de Fontana, `ConfirmUnlinkPestelModal` sin Escape ni trampa de foco, la configuración de ESLint de la raíz, la idea del test ratchet, el job de reporte en vuelo y la unificación 403/404 de las rutas de PESTEL.
+Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-eske-70` en oscuro, la insignia «Archivado» en oscuro, el kebab de Fontana, `ConfirmUnlinkPestelModal` sin Escape ni trampa de foco, la configuración de ESLint de la raíz, la idea del test ratchet, el job de reporte en vuelo y la unificación 403/404 de las rutas de PESTEL. Se añaden en v9 (y siguen vigentes en v10): el ajuste 4g (normalizar la comparación de diferencias del XPCTO), el barrido de colores de proceso y error, el marcador de «generación en curso» en el servidor, la confianza de la IA junto a una clasificación editada por el usuario y el modal viejo de `centinela/pestel/nuevo`.
 
 ---
 
@@ -683,3 +1110,8 @@ Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-e
 - **v6 (2026-10-12):** Cierre de la familia H25 (commits 5a, 5b, 6a, 6b y 6c; H25 pasa a Corregido). Nuevas entradas H32 a H35 (auditoría ampliada y commits de cierre, infraestructura de exhaustividad `GRUPO_ACCION`, `impact-chain` por índice con el commit 7a en curso, escrituras dobles sin atomicidad y rutas que escriben antes de validar con el commit 7b pendiente), hallazgos menores y lecciones de proceso del cierre. H15 anota que «Regenerar veredicto…» y «Regenerar síntesis…» necesitarán huella y descarte del borrador. La tabla de verificaciones diferidas suma las guías de 5a, 5b y 6c. Se reordena la agenda de rondas.
 - **v7 (2026-10-14):** Cierre de los commits 7a y 7b-1 a 7b-4. H34 (id de las cadenas de impacto) y H35 (escrituras dobles y validar antes de escribir) pasan a Corregido, con tablas de commits, pruebas y límites. Nuevas entradas H36 (auditoría del Reporte F3 en las rutas de escritura de F3, con la decisión de producto sobre la entrega de Fontana) y H37 (`createProject` y el repair de `find-linked-pestel`, plan 7b-6a/6b), hallazgos menores, regla práctica del detector de frescura y lecciones de proceso. H15 suma el caso `unlink-pestel`. Se añaden tres verificaciones diferidas y se reordena la agenda: 7b-6 (alcanzable hoy) cierra la serie; el guard del Reporte F3 (7b-5) se difiere a la ronda H16 por decisión de Raúl, porque el producto debe permitir ampliar la investigación tras el Reporte (adenda) y actualizarlo.
 - **v8 (2026-10-14):** Cierre de la serie de guardado honesto con los commits 7b-6a y 7b-6b. H37 pasa a Corregido (`createProject` atómico y repair de `find-linked-pestel` con revalidación transaccional y regla de `kind`). Se corrige la atribución del `try/catch` del write-back de `createProject` (`58c6bc3`, 2026-07-14; su motivo nunca estuvo documentado). Cuadro de cierre con los hashes y el tamaño de la suite en cada commit de 5a a 7b-6b. H36 queda diferida a la ronda PESTEL a Moddulo por decisión de producto (adenda de investigación con Reporte emitido). Nuevos hallazgos menores y una lección de proceso.
+- **v9 (2026-10-22):** Ronda PESTEL → Moddulo F2-Exploración (Bloque 1). Nuevas entradas H38 a H50 (aprobación del M1 con compuerta de servidor, candados de confirmación de impacto, fallos de autorización/sesión/red, cierre de fase idempotente, contención provisional de la fase cerrada, aviso de XPCTO y estado derivado, diferencias legibles, causa del fallo del modelo, serialización sin límites, datos por defecto fabricados, instrucción de precedencia, zona de pantalla confundida con fase cerrada y sello de finalización), la definición funcional de la ronda, la hoja de ruta por bloques, la tabla de commits y de tamaño de la suite, el estado de los hallazgos N1 a N14 del diagnóstico, los hallazgos menores, la lista previa a la Beta, las lecciones de proceso y una síntesis de patrones candidatos para componentes, apps y artefactos nuevos. Se actualizan H15, H16, H30 y H36 y la agenda. La serie de F1-Propósito sigue diferida y no entra. Los hashes marcados «(deducido)» y el de los commits del paso 6 y del commit 2 de estados de trabajo deben verificarse con `git log`.
+
+- **v10 (2026-10-22):** Cierre del Bloque 1 de la ronda PESTEL → Moddulo F2-Exploración con el paso 7 (commits `8428583` y `c3b4890`) y el paso 8 (`d7cb7cd`). Nuevas entradas H51 (línea de trazabilidad del Reporte F2 y de sus descargas, con el defecto de diseño hallado en la revisión previa a la verificación), H52 (criterios del cierre sobre la copia aprobada y recomendaciones por origen, con la incidencia de `app/api`) y H53 (deriva de documentación, contrato estable y manifest ampliado). La tabla de commits y de suite pasa a hashes reales (se elimina «deducido» y «por registrar»; la cifra del commit 1 del paso 7 es 2632, no 2619), la tabla N1 a N14 actualiza N6, N9, N10, N12 y N14 con la evidencia de Code, y se añaden pendientes previos a la Beta (retiro del camino legado de `generate-dvs` con medición previa, ajuste 4g, entradas del Bloque 4), lecciones de proceso, tres filas a la síntesis de patrones y la agenda actualizada. Se corrige el dato de la v8 sobre 7b-6b («pendiente de commit»): ya está en `0e24f86`. Siguiente: Bloque 2 (Centinela PESTEL).
+
+- **v11 (2026-11-02):** Avance del Bloque 2 de la ronda (app PESTEL de Centinela ↔ Moddulo F2): tandas T0, 1a, T2 y T6 construidas, verificadas y commiteadas (`dc9ff80`, `16d9a95`, `983a44f`, `ac207f9`, `96f2d27`, `6d20b9b`, `28b08c6`; suite 2687 → 2759). Nueva sección «Origen: Bloque 2» con las decisiones D1 a D8 y posteriores, la tabla de commits y las entradas H54 a H62 (flujo real de Centinela frente al diagnóstico, afirmaciones falsas ocultas por pruebas con datos irreales, unicidad del vínculo y upgrade Express→Centinela, asistente que pisaba variables, retiro de aprobación al ajustar, justificación al aprobar con confianza < 50, contraste de avisos, pruebas con fecha fija y verificación segura en base real). La tabla N1 a N14 actualiza N1 a N7 y N11; se añaden pendientes previos a la Beta (regla de Firestore `hasOnly`, ronda de contraste, texto de `pestel_already_linked`, retiro de `export-to-moddulo`, 4g por confirmar), lecciones de proceso, siete filas a la síntesis de patrones y la agenda actualizada. Siguiente: T3.
