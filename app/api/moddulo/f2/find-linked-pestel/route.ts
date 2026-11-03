@@ -1,12 +1,15 @@
 // app/api/moddulo/f2/find-linked-pestel/route.ts
 // GET ?moddulo_project_id=X  — find pestel_projects by modduloProjectId (fallback path)
 // GET ?pestel_project_id=Y   — fetch fresh currentStage by direct ID (happy path)
+//   + &moddulo_project_id=X&verificar=1 (T4) — además `origen`: ¿el análisis importado sigue al día?
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { getProject } from "@/lib/moddulo/project";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { verificarOrigen } from "@/lib/centinela/pestel/verificarOrigen";
+import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -27,11 +30,25 @@ export async function GET(request: NextRequest) {
     if (!doc.exists || doc.data()?.userId !== session.uid) {
       return NextResponse.json({ found: false });
     }
-    return NextResponse.json({
-      found: true,
-      sourceId: doc.id,
-      currentStage: doc.data()?.currentStage ?? 3,
-    });
+    const base = { found: true, sourceId: doc.id, currentStage: doc.data()?.currentStage ?? 3 };
+    // T4 (opt-in, sin ruta nueva): ¿el análisis que F2 importó sigue al día? Solo con `verificar=1` y el id del
+    // Moddulo; sin esos parámetros la respuesta es exactamente la de siempre. Un fallo de lectura no afirma nada.
+    if (searchParams.get("verificar") === "1" && modduloProjectId) {
+      let origen: ResultadoOrigen;
+      try {
+        origen = await verificarOrigen(adminDb, {
+          uid: session.uid,
+          pestelProjectId: doc.id,
+          pestelUserId: doc.data()?.userId,
+          modduloProjectId,
+        });
+      } catch (err) {
+        console.warn("[find-linked-pestel][verificar] no se pudo verificar el origen:", err instanceof Error ? err.name : "error");
+        origen = { estado: "no_verificable", razon: "error_lectura" };
+      }
+      return NextResponse.json({ ...base, origen });
+    }
+    return NextResponse.json(base);
   }
 
   // Mode 1: query by modduloProjectId — fallback + repair

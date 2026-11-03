@@ -122,7 +122,8 @@ export async function POST(request: NextRequest) {
         ? guardada.h !== huellaActual.h
         : ajustesSinReflejarEnF2(analysis.adjustments, ajustesDelMapaImportado(existingMapa)).length > 0;
       if (!mismoAnalisisCambiado) {
-        return NextResponse.json({ linkedSource: existingLinkedSource }, { status: 200 });
+        // `idempotente`: nada se escribió ni cambió; la pantalla no debe reiniciar su estado (T4).
+        return NextResponse.json({ linkedSource: existingLinkedSource, idempotente: true }, { status: 200 });
       }
     }
     // Same linked PESTEL project (renewed analysis), o confirmReplace — fall through to re-sync/overwrite.

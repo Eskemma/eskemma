@@ -87,6 +87,7 @@ describe("import-pestel — el MISMO análisis (T4)", () => {
     sembrar(exp);
     const r = await llamar();
     expect(r.status).toBe(200);
+    expect(r.cuerpo.idempotente).toBe(true); // la pantalla no reinicia su estado
     expect(db.updates()).toEqual([]);
   });
 
@@ -98,6 +99,7 @@ describe("import-pestel — el MISMO análisis (T4)", () => {
     expect(r.status).toBe(200);
     expect(escrituras()).toHaveLength(1);
     expect(r.cuerpo.linkedSource.huellaFuente).toEqual(huellaDe(AJUSTE_NUEVO));
+    expect(r.cuerpo.idempotente).toBeUndefined();
     expect(r.cuerpo.linkedSource.payload.P.ajuste.clasificacionAjustada).toBe("NEUTRAL");
   });
 

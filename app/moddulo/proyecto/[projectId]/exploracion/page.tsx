@@ -61,6 +61,9 @@ import ModalM1 from "./components/ModalM1";
 import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
 import { debeEnviar } from "@/lib/moddulo/textosAcceso";
 import { decidirAvisoXpcto, diffsXpctoDeProyecto } from "@/lib/moddulo/avisoXpcto";
+import { decidirAvisoOrigen } from "@/lib/moddulo/avisoOrigen";
+import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
+import { AvisoOrigenPestel } from "./components/AvisoOrigenPestel";
 import { BOTON_INVITACION_F1, debeInvitarCompletarF1, TEXTO_INVITACION_F1 } from "@/lib/moddulo/invitacionF1";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
@@ -316,7 +319,10 @@ export default function ExploracionPage() {
   // Conflicto detectado por import-pestel (409): mapaPESTEL existente viene
   // de una fuente distinta. Se resuelve con confirmación explícita del
   // usuario antes de reintentar con confirmReplace: true.
-  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null } | null>(null);
+  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio" } | null>(null);
+  // T4: ¿el análisis de Centinela que se importó sigue al día? (se verifica al montar y tras cada import exitoso)
+  const [origenPestel, setOrigenPestel] = useState<ResultadoOrigen | null>(null);
+  const [origenRefresco, setOrigenRefresco] = useState(0);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [errorReplace, setErrorReplace] = useState<string | null>(null);
   // The failed import left the result unknown: the modal must not also promise «tu análisis actual se conserva».
@@ -449,10 +455,14 @@ export default function ExploracionPage() {
           setPestlVia("pestel");
           // Happy path: fetch fresh currentStage — never use a cached value
           setPestStageLoading(true);
-          fetch(`/api/moddulo/f2/find-linked-pestel?pestel_project_id=${savedPestProjectId}`)
+          // T4: la MISMA llamada trae además si el análisis importado sigue al día (`origen`); solo se pide con un
+          // análisis importado. Sin esos parámetros la ruta responde como siempre.
+          const verificarOrigenQs = savedPestAnalysisId ? `&moddulo_project_id=${projectId}&verificar=1` : "";
+          fetch(`/api/moddulo/f2/find-linked-pestel?pestel_project_id=${savedPestProjectId}${verificarOrigenQs}`)
             .then((r) => r.ok ? r.json() : null)
-            .then((data: { found: boolean; currentStage?: number } | null) => {
+            .then((data: { found: boolean; currentStage?: number; origen?: ResultadoOrigen } | null) => {
               if (data?.found) setPestCurrentStage(data.currentStage ?? 3);
+              if (data?.origen) setOrigenPestel(data.origen);
             })
             .catch(() => { /* non-fatal — button falls back to /datos */ })
             .finally(() => setPestStageLoading(false));
@@ -497,7 +507,7 @@ export default function ExploracionPage() {
   // backend rechazó con 409 porque mapaPESTEL viene de otra fuente; el
   // llamador decide si ofrece confirmación (confirmReplace: true) o no.
   const importPestel = useCallback(
-    async (pestAnalysisId: string, confirmacion: { huella: string | null } | null = null): Promise<{ ok: boolean; conflict: boolean; confirmar?: { lineas?: string[]; huella: string | null; aviso: string | null }; fallo?: { resp: RespuestaGuardado; datos: Record<string, unknown> } }> => {
+    async (pestAnalysisId: string, confirmacion: { huella: string | null } | null = null): Promise<{ ok: boolean; conflict: boolean; confirmar?: { lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio" }; fallo?: { resp: RespuestaGuardado; datos: Record<string, unknown> } }> => {
       try {
         const r = await fetch("/api/moddulo/f2/import-pestel", {
           method: "POST",
@@ -512,7 +522,7 @@ export default function ExploracionPage() {
         });
         if (r.status === 409) {
           // F2 closed is not a source conflict: it must not offer «confirm replace».
-          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown };
+          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown; motivo?: unknown };
           if (cuerpo.error === "fase_cerrada") {
             setExpressError(MENSAJE_FASE_CERRADA_REEMPLAZO);
             return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: 409, codigo: "fase_cerrada" }, datos: cuerpo as Record<string, unknown> } };
@@ -527,6 +537,8 @@ export default function ExploracionPage() {
                 lineas: Array.isArray(cuerpo.lineas) && cuerpo.lineas.every((x) => typeof x === "string") ? (cuerpo.lineas as string[]) : undefined,
                 huella: typeof cuerpo.huella === "string" ? cuerpo.huella : null,
                 aviso: cuerpo.error === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se importó nada: revisa lo que se perderá y confirma de nuevo." : null,
+                // T4: el MISMO análisis, con contenido distinto (la pantalla lo dice con su propio texto).
+                ...(cuerpo.motivo === "analisis_cambio" ? { motivo: "analisis_cambio" as const } : {}),
               },
             };
           }
@@ -538,6 +550,8 @@ export default function ExploracionPage() {
         }
 
         const data = await r.json();
+        // T4: «idempotente» = el servidor no escribió nada (el análisis no cambió). Solo se limpia el parámetro de la
+        // URL: reiniciar aprobaciones de motores o releer el M1 describiría un cambio que no ocurrió.
         const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
         if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
         if (linkedSource?.sourceId) {
@@ -545,6 +559,14 @@ export default function ExploracionPage() {
           setPestlVia("pestel");
         }
         setPestAnalysisId(pestAnalysisId);
+        if (data.idempotente === true) {
+          if (window.location.search.includes("pest_analysis_id")) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("pest_analysis_id");
+            router.replace(url.pathname + url.search, { scroll: false });
+          }
+          return { ok: true, conflict: false };
+        }
         // M1 pudo haberse refrescado (análisis renovado, restaurado, o
         // reemplazando un express) — M2-M5 aprobados contra el M1 anterior
         // quedarían obsoletos. Since 3b nothing regenerates the motors here: the imported M1 is a
@@ -555,6 +577,8 @@ export default function ExploracionPage() {
         setTerritorioStaleChanges([]);
         setLastUnlinkedPestAnalysisId(null);
         void refrescarM1Ref.current();
+        // T4: tras importar hay que volver a verificar el origen (si no, quedaría el aviso de antes).
+        setOrigenRefresco((n) => n + 1);
 
         // Limpia el query param — evita que el efecto C7 vuelva a disparar
         // este mismo import (aunque sea idempotente) en visitas futuras.
@@ -584,7 +608,8 @@ export default function ExploracionPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const pestId = urlParams.get("pest_analysis_id");
     if (!pestId) return;
-    if (mapaPESTEL && pestId === pestAnalysisId) return; // ya sincronizado
+    // T4: ya NO se salta cuando es el mismo análisis: puede haber cambiado en Centinela (el servidor responde 200
+    // idempotente si no cambió, o pide la confirmación H15 si cambió). Un import exitoso o cancelado quita el parámetro.
 
     importPestel(pestId).then((result) => {
       if (!result.ok && result.conflict) {
@@ -592,6 +617,18 @@ export default function ExploracionPage() {
       }
     });
   }, [isLoaded, projectId, mapaPESTEL, pestAnalysisId, importPestel]);
+
+  // T4 — Tras un import exitoso se vuelve a verificar el origen (la carga inicial ya lo trajo con la llamada de
+  // `currentStage`). Un fallo de red o de lectura no afirma nada: sin aviso.
+  useEffect(() => {
+    if (origenRefresco === 0 || !projectId || !pestProjectId) return;
+    let cancelado = false;
+    fetch(`/api/moddulo/f2/find-linked-pestel?pestel_project_id=${pestProjectId}&moddulo_project_id=${projectId}&verificar=1`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { origen?: ResultadoOrigen } | null) => { if (!cancelado) setOrigenPestel(d?.origen ?? null); })
+      .catch(() => { if (!cancelado) setOrigenPestel(null); });
+    return () => { cancelado = true; };
+  }, [origenRefresco, projectId, pestProjectId]);
 
   // C7b — Resolver pestProjectId cuando existe pestAnalysisId pero no pestProjectId.
   // Si M1 ya existe, usa analysis-meta (solo lectura) para evitar sobreescribir mapaPESTEL.
@@ -1229,6 +1266,7 @@ export default function ExploracionPage() {
       setLastUnlinkedPestAnalysisId(pestAnalysisId);
       setPestlVia(null);
       setPestProjectId(null);
+      setOrigenPestel(null); // T4: sin vínculo no hay origen que verificar
       setPestAnalysisId(null);
       setMapaPESTEL(null);
       setXpctoStaleChanges([]);
@@ -1278,7 +1316,7 @@ export default function ExploracionPage() {
       if (!r.ok && r.fallo) {
         const d = decidirConfirmacionImport(r.fallo.resp, r.fallo.datos);
         if (d.tipo === "reconfirmar") {
-          setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso });
+          setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso, motivo: pendingReplaceConfirm.motivo });
         } else {
           setErrorReplace(d.mensaje);
           setErrorReplaceAmbiguo(d.reintentable);
@@ -2111,6 +2149,9 @@ export default function ExploracionPage() {
                   </div>
                 )}
               </div>
+              {/* T4: una decisión pura (lib/moddulo/avisoOrigen): nada con la fase cerrada ni si no se pudo verificar.
+                  Sin descarte: describe un estado del proyecto y se quita al actualizar el análisis. */}
+              <AvisoOrigenPestel aviso={decidirAvisoOrigen({ origen: origenPestel, f2Cerrada: m1.f2Cerrada })} pestProjectId={pestProjectId} />
               {xpctoStaleChanges.length > 0 && (() => {
                 // One pure decision (lib/moddulo/avisoXpcto): a Centinela M1 never depends on the XPCTO, an empty XPCTO
                 // at import is not stale, no notice in a closed phase (provisional until Bloque 4) or while the M1 is
@@ -2435,7 +2476,7 @@ export default function ExploracionPage() {
       {/* Modal confirmación reemplazo — mapaPESTEL existente viene de otra fuente */}
       {pendingReplaceConfirm && (
         <ModalM1
-          texto={textoModalM1("vincular", impactoPantalla, { lineasServidor: pendingReplaceConfirm.lineas })}
+          texto={textoModalM1("vincular", impactoPantalla, { lineasServidor: pendingReplaceConfirm.lineas, origenCambio: pendingReplaceConfirm.motivo === "analisis_cambio" })}
           aviso={pendingReplaceConfirm.aviso}
           error={errorReplace}
           ocultarCierre={errorReplace !== null && errorReplaceAmbiguo}

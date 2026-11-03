@@ -31,6 +31,8 @@ export interface OpcionesModalM1 {
   nombre?: string;
   /** Lines the server returned in its 409; they replace the locally computed ones. */
   lineasServidor?: string[];
+  /** T4: el análisis que se importa es el MISMO que ya estaba, pero su contenido cambió en Centinela. */
+  origenCambio?: boolean;
 }
 
 export const MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES =
@@ -56,6 +58,15 @@ export function textoModalM1(accion: AccionM1, e: EstadoParaImpactoM1, o: Opcion
         confirmar: "Generar análisis nuevo",
       };
     case "vincular":
+      if (o.origenCambio) {
+        return {
+          ...base,
+          titulo: "¿Actualizar el análisis con los cambios de Centinela?",
+          intro: ["El análisis de Centinela que importaste cambió después de importarlo (por ejemplo, por un ajuste del analista). Se importará de nuevo y reemplazará al actual."],
+          cierre: "Si la importación falla, tu análisis actual se conserva.",
+          confirmar: "Actualizar",
+        };
+      }
       return {
         ...base,
         titulo: "¿Reemplazar el análisis actual por el de Centinela?",

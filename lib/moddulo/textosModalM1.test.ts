@@ -147,3 +147,21 @@ describe("mensajeRechazoVincularCentinela", () => {
     expect(mensajeRechazoVincularCentinela({ status: 500, codigo: "reemplazo_requiere_confirmacion" })).toBeNull();
   });
 });
+
+describe("textoModalM1 «vincular» — el mismo análisis cambió en Centinela (T4)", () => {
+  const e = {} as never;
+  it("dice que el análisis de origen CAMBIÓ (no «otro análisis»), con su propio título y botón", () => {
+    const t = textoModalM1("vincular", e, { lineasServidor: ["Se perderá la aprobación del análisis."], origenCambio: true });
+    expect(t.titulo).toBe("¿Actualizar el análisis con los cambios de Centinela?");
+    expect(t.intro.join(" ")).toContain("cambió después de importarlo");
+    expect(t.intro.join(" ")).not.toContain("otro");
+    expect(t.confirmar).toBe("Actualizar");
+    expect(t.lineas).toEqual(["Se perderá la aprobación del análisis."]);
+    expect(t.cierre).toContain("se conserva");
+  });
+  it("sin `origenCambio` el texto es el de siempre", () => {
+    const t = textoModalM1("vincular", e, { lineasServidor: [] });
+    expect(t.titulo).toBe("¿Reemplazar el análisis actual por el de Centinela?");
+    expect(t.confirmar).toBe("Reemplazar");
+  });
+});
