@@ -15,6 +15,8 @@ import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Ser
 import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
 import { MENSAJE_CONFLICTO_IMPORT } from "@/lib/moddulo/textosVinculo";
+import { huellaComparable, huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
+import { ajustesDelMapaImportado, ajustesSinReflejarEnF2 } from "@/lib/centinela/pestel/ajustesSinReflejar";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -89,6 +91,11 @@ export async function POST(request: NextRequest) {
   // keeps its code and message but now carries the real `lineas` and the `huella` to confirm against; a
   // request with `confirmar` + `huella` is the explicit confirmation (it also satisfies `confirmReplace`).
   const confirmaConHuella = body.confirmar === true && typeof body.huella === "string";
+  // T4: huella del CONTENIDO del análisis de origen tal como está ahora (se guarda al importar).
+  const huellaActual = huellaDeOrigen(analysis.dimensions, analysis.adjustments);
+  // El MISMO análisis ya importado pero con contenido distinto (p. ej. el analista lo ajustó en Centinela) NO es
+  // idempotente: se re-sincroniza por el mismo camino y con el mismo candado H15 que cualquier reemplazo.
+  let mismoAnalisisCambiado = false;
   if (existingMapa) {
     const sameLinkedProject = existingPestProjectId && existingPestProjectId === incomingPestProjectId;
 
@@ -107,8 +114,16 @@ export async function POST(request: NextRequest) {
       }
       // Usuario confirmó el reemplazo explícitamente — la confirmación con huella se valida abajo.
     } else if (existingAnalysisId === pestAnalysisId) {
-      // Same analysis already imported — return existing data idempotently.
-      return NextResponse.json({ linkedSource: existingLinkedSource }, { status: 200 });
+      // Same analysis already imported. Con huella comparable (v igual) se compara el contenido; una importación
+      // anterior a T4 (sin huella) solo se re-sincroniza si hay ajustes del analista que su mapa no trae (el mismo
+      // criterio de la nota de T3 en Centinela). Si nada cambió: idempotente, como siempre.
+      const guardada = existingLinkedSource?.huellaFuente;
+      mismoAnalisisCambiado = huellaComparable(guardada)
+        ? guardada.h !== huellaActual.h
+        : ajustesSinReflejarEnF2(analysis.adjustments, ajustesDelMapaImportado(existingMapa)).length > 0;
+      if (!mismoAnalisisCambiado) {
+        return NextResponse.json({ linkedSource: existingLinkedSource }, { status: 200 });
+      }
     }
     // Same linked PESTEL project (renewed analysis), o confirmReplace — fall through to re-sync/overwrite.
   }
@@ -125,6 +140,7 @@ export async function POST(request: NextRequest) {
     sourceId: pestProjectId,
     sourceAnalysisId: pestAnalysisId,
     payload: mapaPESTEL,
+    huellaFuente: huellaActual,
   };
 
   // Save to Moddulo project. The imported M1 is a NEW M1 in draft (m1Escritura.ts): the user reviews and
@@ -188,7 +204,12 @@ export async function POST(request: NextRequest) {
   }
   if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   if (resultado === "fase_cerrada") return respuestaFaseCerrada();
-  if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
+  if (typeof resultado === "object") {
+    const r = respuestaCandadoM1(resultado.candado);
+    if (!mismoAnalisisCambiado) return r;
+    // Mismo análisis, contenido distinto: la pantalla lo dice con su propio texto («cambió», no «otro análisis»).
+    return NextResponse.json({ ...(await r.json()), motivo: "analisis_cambio" }, { status: r.status });
+  }
 
   return NextResponse.json({ linkedSource }, { status: 200 });
 }

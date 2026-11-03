@@ -2,6 +2,8 @@
 // T3: ¿qué ajustes del analista (Centinela) NO están reflejados en el mapa que Moddulo F2 importó? Puro: lo comparten
 // la ruta (que arma el resumen del mapa importado) y la pantalla de Interpretación (que decide si avisa).
 
+import { ajusteEquivalente } from "./contenidoOrigen";
+
 /** Lo mínimo de un ajuste guardado en el análisis. */
 export interface AjusteAnalisis {
   dimensionCode: string;
@@ -54,12 +56,8 @@ export function ajustesSinReflejarEnF2(
   const sin: string[] = [];
   for (const adj of adjustments ?? []) {
     if (!adj?.dimensionCode || sin.includes(adj.dimensionCode)) continue;
-    const imp = importado.ajustes[adj.dimensionCode];
-    const igual =
-      !!imp &&
-      imp.clasificacionAjustada === adj.newClassification &&
-      (imp.justificacion ?? "").trim() === (adj.justification ?? "").trim();
-    if (!igual) sin.push(adj.dimensionCode);
+    // T4: mismo criterio que la huella de origen (`contenidoOrigen.ts`): clasificación ajustada + justificación recortada.
+    if (!ajusteEquivalente(importado.ajustes[adj.dimensionCode], adj)) sin.push(adj.dimensionCode);
   }
   return sin;
 }

@@ -15,6 +15,12 @@ export interface LinkedSourceRef<TPayload = unknown> {
   sourceId: string;
   sourceAnalysisId?: string;
   payload?: TPayload;
+  /**
+   * T4: huella del CONTENIDO del análisis de Centinela tal como estaba al importarlo (ver
+   * `lib/centinela/pestel/contenidoOrigen.ts`). Ausente en las importaciones anteriores a T4 (quedan «no
+   * verificables»: nunca se les dice que cambiaron). `v` es la versión de la regla de qué cuenta como contenido.
+   */
+  huellaFuente?: { v: number; h: string };
 }
 
 // ==========================================

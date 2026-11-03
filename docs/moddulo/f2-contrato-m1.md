@@ -81,6 +81,13 @@ Una sola línea, calculada al mostrar; no se escribe ni se migra nada. `resumenM
 
 ---
 
+## 7. Huella del análisis de origen (T4)
+
+- **Qué es.** Al importar un análisis de Centinela (`import-pestel`, `link-moddulo` con análisis) se guarda `linkedSource.huellaFuente = { v: 1, h }`: sha-256 de la serialización estable del CONTENIDO del análisis (`lib/centinela/pestel/contenidoOrigen.ts`, `huellaOrigen.ts`). `createProject` no la guarda (no hay mapa). Las importaciones anteriores a T4 no la tienen y nunca se tratan como «cambiadas» por ella.
+- **Una sola regla de contenido.** La huella y la nota de T3 (`ajustesSinReflejarEnF2`) comparten `ajusteEquivalente`/`recortarJustificacion`. Entra todo lo que F2 consume del análisis (clasificación de la IA, narrativa, confianza, señales con sus cinco campos, y por ajuste: dimensión, clasificación original y ajustada, justificación, fecha); quedan fuera, con su razón en el encabezado del módulo, el estado de revisión, alertas, cadenas, informes, `globalConfidence`, `trend`/`intensity`/`mainSignal`, `adjustedBy` y las posiciones. `CAMPOS_MAPA` clasifica cada campo del mapa y una prueba falla si se agrega uno sin clasificar.
+- **Mismo análisis, contenido distinto.** `import-pestel` ya no responde idempotente si la huella guardada (`v:1`) difiere de la del análisis actual, o si no hay huella y el análisis trae ajustes que el mapa importado no refleja: re-sincroniza por el mismo camino y el mismo candado H15 (409 con `motivo: "analisis_cambio"` mientras no se confirme). Con la Fase 2 cerrada responde `fase_cerrada`.
+- **Contrato de escritores.** `lib/centinela/pestel/escritoresDeAnalisis.ts` lista los archivos que escriben y mencionan `pestel_analyses`; `contratoEscritores.test.ts` (capa A, por texto) y `contratoEscritores.capaB.test.ts` (se ejecutan las rutas) fallan si aparece un escritor nuevo o si alguno toca `dimensions`, `globalConfidence` o `version`.
+
 ## Provisional — NO estable (vinculado al Bloque 4, «reapertura de fases cerradas con trabajo posterior»)
 
 1. **Contención de fase cerrada.** Con F2 cerrada, `generate-m1-express`, `import-pestel`, `link-moddulo`, `unlink-pestel`, `m1-edit`, `m1-approve` y `m1-reopen` responden `409 fase_cerrada`; la pantalla no avisa de XPCTO modificado y no bloquea acciones del reporte. Es una medida de contención, no el diseño final: el Bloque 4 decide cómo se reabre una fase cerrada y qué pasa con lo construido encima (F3).

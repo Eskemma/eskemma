@@ -20,7 +20,7 @@ import { MENSAJE_MODDULO_CON_OTRO_PESTEL, MENSAJE_MODDULO_OTRA_VERSION } from "@
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
-
+import { huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
 interface RouteContext {
   params: Promise<{ projectId: string }>;
 }
@@ -166,6 +166,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
     linkedSource.sourceAnalysisId = latestAnalysisId;
     linkedSource.payload = mapaPESTEL;
+    linkedSource.huellaFuente = huellaDeOrigen(latestAnalysisData.dimensions as never, latestAnalysisData.adjustments as never);
     updatePayload["phases.exploracion.xpctoSnapshotAtGeneration"] = JSON.stringify(modduloProject.xpcto ?? {});
     // M1 puede estar reemplazando uno de origen express (upgrade): el M1 vinculado es un M1 NUEVO en
     // borrador (m1Escritura.ts) y el borrador de motores y las aprobaciones hechos contra el anterior
