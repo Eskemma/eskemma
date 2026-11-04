@@ -6,10 +6,7 @@ import { fetchTerritorioOrigen } from "@/lib/territorio/fetchOrigen";
 import WizardStep1Tipo from "@/app/components/centinela/pestel/wizard/WizardStep1Tipo";
 import WizardStep2Territorio from "@/app/components/centinela/pestel/wizard/WizardStep2Territorio";
 import WizardStep3Variables from "@/app/components/centinela/pestel/wizard/WizardStep3Variables";
-import ConfirmReplacePestelModal, {
-  type ConfirmReplacePestelSource,
-} from "@/app/components/centinela/pestel/ConfirmReplacePestelModal";
-import { planTrasCrearProyecto, rutaProyectoExistente } from "@/lib/centinela/pestel/destinoTrasCrear";
+import { planTrasCrearProyecto, rutaProyectoExistente, textoRechazoCrear } from "@/lib/centinela/pestel/destinoTrasCrear";
 import type {
   TipoProyecto,
   Territorio,
@@ -67,13 +64,6 @@ export default function NuevoProyectoPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Conflicto detectado por el guard de creación (409: el proyecto Moddulo
-  // destino ya tiene un vínculo PESTEL vigente — express o Centinela).
-  const [pendingReplace, setPendingReplace] = useState<{ source: ConfirmReplacePestelSource } | null>(null);
-  const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
-  // Se guardan para poder reintentar todo el flujo (crear + variables) tras confirmar.
-  const [pendingDimensions, setPendingDimensions] = useState<PestlDimensionConfig[] | null>(null);
-
   function goNext() {
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
@@ -82,7 +72,7 @@ export default function NuevoProyectoPage() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  async function handleFinish(finalDimensions: PestlDimensionConfig[], confirmReplace = false) {
+  async function handleFinish(finalDimensions: PestlDimensionConfig[]) {
     if (!data.tipo || !data.territorio) return;
     setSaving(true);
     setError(null);
@@ -102,21 +92,14 @@ export default function NuevoProyectoPage() {
             modduloProjectId: data.modduloProjectId,
             modduloOrigenEscenario: data.modduloOrigenEscenario,
           } : {}),
-          ...(confirmReplace ? { confirmReplace: true } : {}),
         }),
       });
 
-      if (projectRes.status === 409) {
-        const err = (await projectRes.json()) as { currentSource?: "centinela" | "express" };
-        setPendingDimensions(finalDimensions);
-        setPendingReplace({ source: err.currentSource === "centinela" ? "recreate" : "sync" });
-        setSaving(false);
-        return;
-      }
-
+      // T5: el POST ya no pide confirmar reemplazos (no escribe en el Moddulo). Un 409 es un rechazo con su propio
+      // texto: Fase 2 cerrada, o el Moddulo ya usa otro análisis. Se muestra en el error del asistente.
       if (!projectRes.ok) {
-        const err = (await projectRes.json()) as { error?: string };
-        throw new Error(err.error ?? "Error al crear proyecto");
+        const err = (await projectRes.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(textoRechazoCrear(projectRes.status, err));
       }
 
       const { projectId } = (await projectRes.json()) as { projectId: string };
@@ -155,17 +138,6 @@ export default function NuevoProyectoPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
       setSaving(false);
-    }
-  }
-
-  async function handleConfirmReplace() {
-    if (!pendingDimensions) return;
-    setIsConfirmingReplace(true);
-    try {
-      await handleFinish(pendingDimensions, true);
-    } finally {
-      setIsConfirmingReplace(false);
-      setPendingReplace(null);
     }
   }
 
@@ -264,15 +236,6 @@ export default function NuevoProyectoPage() {
           </p>
         )}
       </div>
-
-      {pendingReplace && (
-        <ConfirmReplacePestelModal
-          source={pendingReplace.source}
-          isConfirming={isConfirmingReplace}
-          onCancel={() => setPendingReplace(null)}
-          onConfirm={handleConfirmReplace}
-        />
-      )}
     </div>
   );
 }

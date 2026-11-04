@@ -32,17 +32,30 @@ describe("prepararVinculoUnico", () => {
     expect(await correr({ uid: "u1", pestelProjectId: "p", modduloProjectId: "m1" })).toMatchObject({ ok: true, escribirBacklink: true });
   });
   it("PESTEL anterior: se limpia solo si es del usuario y todavía apunta a este Moddulo", async () => {
-    db.reset({
-      "pestel_projects/nuevo": { userId: "u1" },
-      "pestel_projects/viejo": { userId: "u1", modduloProjectId: "m1" },
-      "pestel_projects/otroDueno": { userId: "x", modduloProjectId: "m1" },
-      "pestel_projects/apuntaOtro": { userId: "u1", modduloProjectId: "m9" },
-    });
+    // T5: cada caso se siembra por separado — dos PESTEL del usuario con back-link a m1 a la vez ya no es un estado
+    // válido (el segundo se rechaza como `moddulo_con_pendiente`), y antes esta prueba los sembraba juntos.
     const c = (anterior: string) => correr({ uid: "u1", pestelProjectId: "nuevo", modduloProjectId: "m1", pestelAnteriorId: anterior });
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" }, "pestel_projects/viejo": { userId: "u1", modduloProjectId: "m1" } });
     expect(await c("viejo")).toMatchObject({ limpiarAnteriorId: "viejo" });
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" }, "pestel_projects/otroDueno": { userId: "x", modduloProjectId: "m1" } });
     expect(await c("otroDueno")).toMatchObject({ limpiarAnteriorId: null });
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" }, "pestel_projects/apuntaOtro": { userId: "u1", modduloProjectId: "m9" } });
     expect(await c("apuntaOtro")).toMatchObject({ limpiarAnteriorId: null });
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" } });
     expect(await c("nuevo")).toMatchObject({ limpiarAnteriorId: null });
+  });
+});
+
+describe("prepararVinculoUnico — pendiente duplicado (T5)", () => {
+  it("OTRO PESTEL del usuario ya apunta a este Moddulo: moddulo_con_pendiente", async () => {
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" }, "pestel_projects/pendiente": { userId: "u1", modduloProjectId: "m1" } });
+    expect(await correr({ uid: "u1", pestelProjectId: "nuevo", modduloProjectId: "m1" })).toEqual({ ok: false, codigo: "moddulo_con_pendiente" });
+  });
+  it("el propio PESTEL con su back-link, el T22 que se reemplaza y los PESTEL de otros usuarios NO cuentan", async () => {
+    db.reset({ "pestel_projects/p": { userId: "u1", modduloProjectId: "m1" }, "pestel_projects/ajeno": { userId: "x", modduloProjectId: "m1" } });
+    expect(await correr({ uid: "u1", pestelProjectId: "p", modduloProjectId: "m1" })).toMatchObject({ ok: true, escribirBacklink: false });
+    db.reset({ "pestel_projects/nuevo": { userId: "u1" }, "pestel_projects/viejo": { userId: "u1", modduloProjectId: "m1" } });
+    expect(await correr({ uid: "u1", pestelProjectId: "nuevo", modduloProjectId: "m1", pestelAnteriorId: "viejo" })).toMatchObject({ ok: true, limpiarAnteriorId: "viejo" });
   });
 });
 

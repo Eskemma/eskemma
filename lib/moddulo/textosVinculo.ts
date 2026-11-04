@@ -17,3 +17,19 @@ export const MENSAJE_MODDULO_OTRA_VERSION =
 /** `import-pestel`: el proyecto tiene un análisis importado de otra fuente (la pantalla pide confirmar). */
 export const MENSAJE_CONFLICTO_IMPORT =
   "Este proyecto ya tiene un análisis PESTEL importado de otra fuente. Se reemplazará solo si lo confirmas.";
+
+/**
+ * T5: el Moddulo ya tiene un análisis de Centinela EN PREPARACIÓN (un proyecto PESTEL que apunta a él, aún sin
+ * importar) y se intentó vincular otro. «Cancelar vínculo pendiente» es el control de la Fase 2 (menú de «Análisis
+ * PESTEL») cuando el proyecto está en ese estado.
+ */
+export const MENSAJE_MODDULO_CON_PENDIENTE =
+  "Este proyecto de Moddulo ya tiene un análisis de Centinela en preparación. Abre su Fase 2 y usa «Cancelar vínculo pendiente» si quieres vincular otro.";
+
+/** T5: `unlink-pestel` en modo pendiente: el vínculo que la pantalla creía pendiente ya no es ese. */
+export const MENSAJE_PENDIENTE_CAMBIO =
+  "El estado del vínculo con Centinela cambió mientras tanto. No se canceló nada: recarga la página para ver el estado actual.";
+
+/** T5: no hay nada pendiente que cancelar (ya se canceló o nunca existió). */
+export const MENSAJE_PENDIENTE_NO_ENCONTRADO =
+  "Este proyecto no tiene un vínculo pendiente con Centinela. Recarga la página para ver el estado actual.";

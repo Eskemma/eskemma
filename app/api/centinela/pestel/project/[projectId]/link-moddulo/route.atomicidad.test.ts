@@ -94,7 +94,21 @@ describe("link-moddulo — guard de doble vínculo dentro de la transacción", (
     });
     const r = await POST(req("m1"), ctx);
     expect(r.status).toBe(409);
-    expect((await r.json()).error).toBe("moddulo_already_linked");
+    // T5 (INVERTIDA a propósito): ese T22 de otro PESTEL no trae análisis importado, o sea que es un PENDIENTE
+    // (antes se rechazaba como «ya usa otro análisis»). El 409 y la ausencia de escrituras no cambian.
+    expect((await r.json()).error).toBe("moddulo_con_pendiente");
     expect((mockDb.snapshot()["pestel_projects/pest1"] as { modduloProjectId?: string }).modduloProjectId).toBeUndefined();
+  });
+
+  it("[real] lo mismo, pero el otro PESTEL YA importó su análisis: sigue siendo moddulo_already_linked", async () => {
+    vi.mocked(getProject).mockImplementationOnce(async () => {
+      await mockDb.collection("moddulo_projects").doc("m1").update({
+        phases: { exploracion: { linkedSource: { kind: "T22", sourceId: "pestOtro", sourceAnalysisId: "anOtro", payload: { P: {} } } } },
+      });
+      return moddulo() as never;
+    });
+    const r = await POST(req("m1"), ctx);
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toBe("moddulo_already_linked");
   });
 });

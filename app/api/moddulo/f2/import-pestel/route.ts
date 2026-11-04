@@ -14,7 +14,7 @@ import { camposNuevoM1 } from "@/lib/moddulo/m1Escritura";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
-import { MENSAJE_CONFLICTO_IMPORT } from "@/lib/moddulo/textosVinculo";
+import { MENSAJE_CONFLICTO_IMPORT, MENSAJE_MODDULO_CON_PENDIENTE } from "@/lib/moddulo/textosVinculo";
 import { huellaComparable, huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
 import { ajustesDelMapaImportado, ajustesSinReflejarEnF2 } from "@/lib/centinela/pestel/ajustesSinReflejar";
 
@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
     | "fase_cerrada"
     | "pestel_no_encontrado"
     | "pestel_ya_vinculado"
+    | "moddulo_con_pendiente"
     | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
   const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
     const snap = await tx.get(ref);
@@ -176,7 +177,9 @@ export async function POST(request: NextRequest) {
       modduloProjectId: projectId,
       pestelAnteriorId,
     });
-    if (!plan.ok) return plan.codigo === "pestel_no_encontrado" ? "pestel_no_encontrado" : "pestel_ya_vinculado";
+    if (!plan.ok) {
+      return plan.codigo === "pestel_no_encontrado" ? "pestel_no_encontrado" : plan.codigo === "moddulo_con_pendiente" ? "moddulo_con_pendiente" : "pestel_ya_vinculado";
+    }
 
     const d = decidirCandadoM1Servidor(exp, "vincular", { confirmar: body.confirmar, huella: body.huella });
     if (d.accion !== "continuar") return { candado: d };
@@ -196,6 +199,9 @@ export async function POST(request: NextRequest) {
   });
   if (resultado === "pestel_no_encontrado") {
     return NextResponse.json({ error: "Sin permisos para este análisis PESTEL" }, { status: 403 });
+  }
+  if (resultado === "moddulo_con_pendiente") {
+    return NextResponse.json({ error: "moddulo_con_pendiente", message: MENSAJE_MODDULO_CON_PENDIENTE }, { status: 409 });
   }
   if (resultado === "pestel_ya_vinculado") {
     return NextResponse.json(

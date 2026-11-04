@@ -46,7 +46,8 @@ describe("aviso del asistente (lista cerrada)", () => {
   });
   it("el texto es fijo y dice lo que pasó", () => {
     expect(mensajeDeAvisoAsistente("pestel_existente")).toBe(
-      "Este proyecto ya tenía un análisis PESTEL; se abrió ese. Las variables que elegiste no se guardaron."
+      // T5 (TEXTO CAMBIADO a propósito): con el vínculo pendiente el PESTEL existente puede no tener análisis aún.
+      "Este proyecto ya tenía un proyecto de Centinela vinculado; se abrió ese. Las variables que elegiste no se guardaron."
     );
     expect(Object.keys(AVISOS_ASISTENTE)).toEqual(["pestel_existente"]);
   });
@@ -67,5 +68,16 @@ describe("aviso del asistente (lista cerrada)", () => {
     const anterior = (_s: number) => ({ guardarVariables: true, aviso: null });
     expect(anterior(200).aviso).toBeNull();
     expect(planTrasCrearProyecto(200).aviso).not.toBeNull();
+  });
+});
+
+describe("textoRechazoCrear (T5: ya no hay modal de reemplazo)", () => {
+  it("409 fase_cerrada → el texto de la fase cerrada; un 409 con mensaje propio lo muestra; 404 y el resto, textos fijos", async () => {
+    const { textoRechazoCrear } = await import("./destinoTrasCrear");
+    expect(textoRechazoCrear(409, { error: "fase_cerrada" })).toContain("Fase 2 está cerrada");
+    expect(textoRechazoCrear(409, { error: "moddulo_already_linked", message: "Este proyecto de Moddulo ya usa otro análisis PESTEL. Para cambiarlo, usa «Desvincular»." })).toContain("«Desvincular»");
+    expect(textoRechazoCrear(404, { error: "Proyecto Moddulo no encontrado" })).toContain("No se encontró el proyecto de Moddulo");
+    expect(textoRechazoCrear(500, {})).toBe("No se pudo crear el proyecto. Intenta de nuevo.");
+    for (const t of [textoRechazoCrear(409, { error: "fase_cerrada" }), textoRechazoCrear(500, {})]) expect(t).not.toMatch(/soporte/i);
   });
 });

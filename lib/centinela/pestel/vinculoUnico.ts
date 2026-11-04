@@ -17,7 +17,7 @@ import type { FieldValue, Firestore, Transaction } from "firebase-admin/firestor
 const PESTEL = "pestel_projects";
 const MODDULO = "moddulo_projects";
 
-export type CodigoVinculoUnico = "pestel_no_encontrado" | "pestel_already_linked";
+export type CodigoVinculoUnico = "pestel_no_encontrado" | "pestel_already_linked" | "moddulo_con_pendiente";
 
 export type PlanVinculoUnico =
   | {
@@ -43,6 +43,15 @@ export async function prepararVinculoUnico(
   const pestelSnap = await tx.get(db.collection(PESTEL).doc(p.pestelProjectId));
   if (!pestelSnap.exists || pestelSnap.data()?.userId !== p.uid) {
     return { ok: false, codigo: "pestel_no_encontrado" };
+  }
+
+  // T5: a lo sumo UN PESTEL del usuario apunta a este Moddulo. Si OTRO (que no sea el T22 que se está
+  // reemplazando) ya lo reclama como pendiente, se rechaza: antes de vincular otro hay que cancelar ese pendiente.
+  // La consulta bloquea los documentos que devuelve; no impide por sí sola que otra transacción inserte a la vez
+  // un PESTEL nuevo con el mismo back-link (residual declarado, ver CLAUDE.md).
+  const reclaman = await tx.get(db.collection(PESTEL).where("userId", "==", p.uid).where("modduloProjectId", "==", p.modduloProjectId));
+  if (reclaman.docs.some((d) => d.id !== p.pestelProjectId && d.id !== p.pestelAnteriorId)) {
+    return { ok: false, codigo: "moddulo_con_pendiente" };
   }
 
   const vinculado = pestelSnap.data()?.modduloProjectId;

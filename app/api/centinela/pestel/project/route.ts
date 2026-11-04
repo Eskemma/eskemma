@@ -7,6 +7,8 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getProject } from "@/lib/moddulo/project";
+import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
+import { MENSAJE_MODDULO_CON_OTRO_PESTEL } from "@/lib/moddulo/textosVinculo";
 import type { PESTELProject } from "@/types/pestel.types";
 
 export async function GET(request: NextRequest) {
@@ -47,11 +49,10 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as Partial<PESTELProject> & {
     modduloProjectId?: string;
     modduloOrigenEscenario?: "A" | "B";
-    confirmReplace?: boolean;
   };
   const {
     nombre, tipo, territorio, horizonte, alertas,
-    color, modduloProjectId, modduloOrigenEscenario, confirmReplace,
+    color, modduloProjectId, modduloOrigenEscenario,
   } = body;
 
   if (!nombre || !tipo || !territorio || !horizonte) {
@@ -66,101 +67,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "tipo inválido" }, { status: 400 });
   }
 
-  // Verify Moddulo project ownership BEFORE any use of modduloProjectId: the
-  // dedup write-back, the conflict reads and the final write-back below all
-  // read/write moddulo_projects/{modduloProjectId} via Admin SDK. Same check
-  // as link-moddulo/route.ts.
+  // Verify Moddulo project ownership BEFORE any use of modduloProjectId: the transaction below reads
+  // moddulo_projects/{modduloProjectId} via Admin SDK. Same check as link-moddulo/route.ts.
   if (modduloProjectId) {
     const modduloProject = await getProject(modduloProjectId, session.uid);
     if (!modduloProject) {
       return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
     }
-  }
-
-  // Dedup: if a pestel_project with this modduloProjectId already exists, return it
-  // and retry the write-back (the most likely cause of a dedup hit is a prior failed write-back).
-  if (modduloProjectId) {
-    try {
-      const existingSnap = await adminDb
-        .collection("pestel_projects")
-        .where("userId", "==", session.uid)
-        .where("modduloProjectId", "==", modduloProjectId)
-        .get();
-
-      if (!existingSnap.empty) {
-        const existing = existingSnap.docs.sort((a, b) => {
-          const at = (a.data().createdAt as { _seconds?: number })?._seconds ?? 0;
-          const bt = (b.data().createdAt as { _seconds?: number })?._seconds ?? 0;
-          return bt - at;
-        })[0];
-
-        try {
-          await adminDb
-            .collection("moddulo_projects")
-            .doc(modduloProjectId)
-            .update({
-              // kind/componente se reafirman aquí también — este write-back
-              // existe justo porque el intento anterior de escribirlos pudo
-              // haber fallado (ver comentario de "dedup" arriba).
-              "phases.exploracion.linkedSource.sourceId": existing.id,
-              "phases.exploracion.linkedSource.kind": "T22",
-              "phases.exploracion.linkedSource.componente": "centinela",
-              updatedAt: FieldValue.serverTimestamp(),
-            });
-        } catch (wbErr) {
-          console.error(
-            "[pestel/project POST] write-back retry falló para modduloProjectId:",
-            modduloProjectId, "→ pestProjectId:", existing.id, wbErr
-          );
-        }
-
-        return NextResponse.json({ projectId: existing.id }, { status: 200 });
-      }
-    } catch (err) {
-      console.error(
-        "[pestel/project POST] dedup query falló para modduloProjectId:", modduloProjectId, err
-      );
-      // Permissive: proceed with creation rather than block on query failure.
-    }
-  }
-
-  // Guard: this creation's write-back is about to point the Moddulo project
-  // at a brand-new (empty) pestel_project. If that Moddulo project already
-  // has a PESTEL vínculo vigente (Centinela link or express mapaPESTEL),
-  // silently reassigning pestProjectId here would leave pestAnalysisId
-  // pointing at a source that no longer matches the pointer — same class of
-  // silent-overwrite bug already fixed in import-pestel (confirmReplace) and
-  // guarded in link-moddulo. Requires explicit confirmation, same pattern.
-  let oldPestProjectIdToUnlink: string | undefined;
-  if (modduloProjectId && !confirmReplace) {
-    const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
-    const explorarPhase = modduloSnap.data()?.phases?.exploracion;
-    const existingPestProjectId = explorarPhase?.linkedSource?.sourceId as string | undefined;
-    const existingMapa = explorarPhase?.linkedSource?.payload;
-
-    if (existingPestProjectId) {
-      return NextResponse.json(
-        {
-          error: "conflict",
-          currentSource: "centinela",
-          message: "Este proyecto de Moddulo ya está vinculado a otro análisis de Centinela PESTEL.",
-        },
-        { status: 409 }
-      );
-    }
-    if (existingMapa) {
-      return NextResponse.json(
-        {
-          error: "conflict",
-          currentSource: "express",
-          message: "Este proyecto de Moddulo ya tiene un análisis PESTEL express generado.",
-        },
-        { status: 409 }
-      );
-    }
-  } else if (modduloProjectId && confirmReplace) {
-    const modduloSnap = await adminDb.collection("moddulo_projects").doc(modduloProjectId).get();
-    oldPestProjectIdToUnlink = modduloSnap.data()?.phases?.exploracion?.linkedSource?.sourceId as string | undefined;
   }
 
   const projectRef = adminDb.collection("pestel_projects").doc();
@@ -189,52 +102,70 @@ export async function POST(request: NextRequest) {
   if (modduloProjectId) projectData.modduloProjectId = modduloProjectId;
   if (modduloOrigenEscenario) projectData.modduloOrigenEscenario = modduloOrigenEscenario;
 
-  await projectRef.set(projectData);
-
-  // Write-back: let Moddulo know about the linked PESTEL project immediately,
-  // without waiting for the round-trip import (pest_analysis_id in URL).
-  // Solo sourceId/kind/componente se tocan aquí — sourceAnalysisId/payload
-  // quedan como están (viejo contenido express o de un Centinela anterior)
-  // hasta que el round-trip real de import-pestel los reemplace, mismo
-  // principio de "no destruir hasta que el reemplazo esté confirmado" usado
-  // en el resto de F2. kind/componente SÍ se fijan siempre a "T22"/"centinela"
-  // aquí — este write establece (o reemplaza, vía confirmReplace) un vínculo
-  // Centinela, así que no pueden quedar ausentes ni heredar un valor "express"
-  // de un linkedSource anterior.
-  if (modduloProjectId) {
-    try {
-      await adminDb
-        .collection("moddulo_projects")
-        .doc(modduloProjectId)
-        .update({
-          "phases.exploracion.linkedSource.sourceId": projectRef.id,
-          "phases.exploracion.linkedSource.kind": "T22",
-          "phases.exploracion.linkedSource.componente": "centinela",
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-    } catch {
-      // Non-fatal: the fallback query in F2 covers this case.
-    }
-
-    // Reemplazo confirmado de un vínculo Centinela anterior: limpiar su
-    // referencia inversa para no dejarla colgando (mismo patrón de simetría
-    // que unlink-pestel/route.ts).
-    if (oldPestProjectIdToUnlink) {
-      try {
-        const oldPestelSnap = await adminDb.collection("pestel_projects").doc(oldPestProjectIdToUnlink).get();
-        if (oldPestelSnap.exists && oldPestelSnap.data()?.modduloProjectId === modduloProjectId) {
-          await adminDb.collection("pestel_projects").doc(oldPestProjectIdToUnlink).update({
-            modduloProjectId: FieldValue.delete(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-      } catch (err) {
-        console.error(
-          "[pestel/project POST] no se pudo limpiar la referencia inversa de", oldPestProjectIdToUnlink, err
-        );
-      }
-    }
+  // Sin Moddulo de origen no hay nada que vincular: el camino no cambia.
+  if (!modduloProjectId) {
+    await projectRef.set(projectData);
+    return NextResponse.json({ projectId: projectRef.id }, { status: 201 });
   }
 
+  // T5 (N6): el vínculo PENDIENTE vive SOLO en el back-link `pestel_projects.modduloProjectId`. Este POST ya no
+  // escribe NADA en el Moddulo (antes dejaba un `linkedSource` T22 sin mapa ni análisis, que F2 leía como
+  // «vinculado» y que sobre un express mezclaba `kind` T22 con contenido express). El Moddulo lo sigue siendo de
+  // su `linkedSource` hasta que `import-pestel` importe de verdad.
+  //
+  // UNA transacción: lee el Moddulo (existe, sin papelera, Fase 2 abierta), busca un PESTEL del usuario que ya lo
+  // reclame y, si no hay, crea el nuevo. Dedup: si ya hay uno, responde 200 con el más reciente y no escribe.
+  // Residual declarado: la consulta bloquea los documentos que devuelve, pero no impide por sí sola que otra
+  // transacción inserte a la vez un PESTEL con el mismo back-link (dos pestañas en el mismo instante).
+  type Resultado =
+    | { creado: true }
+    | { dedup: string }
+    | "no_encontrado"
+    | "fase_cerrada"
+    | "moddulo_ya_vinculado";
+  const modRef = adminDb.collection("moddulo_projects").doc(modduloProjectId);
+  let resultado: Resultado;
+  try {
+    resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+      const modSnap = await tx.get(modRef);
+      if (!modSnap.exists || modSnap.data()?.deletedAt) return "no_encontrado";
+      const exploracion = modSnap.data()?.phases?.exploracion;
+      if (exploracionCerrada(exploracion)) return "fase_cerrada";
+
+      const existentes = await tx.get(
+        adminDb
+          .collection("pestel_projects")
+          .where("userId", "==", session.uid)
+          .where("modduloProjectId", "==", modduloProjectId)
+      );
+      if (!existentes.empty) {
+        const masReciente = [...existentes.docs].sort((a, b) => {
+          const at = (a.data().createdAt as { _seconds?: number })?._seconds ?? 0;
+          const bt = (b.data().createdAt as { _seconds?: number })?._seconds ?? 0;
+          return bt - at;
+        })[0];
+        return { dedup: masReciente.id };
+      }
+
+      // Un T22 con análisis importado sin back-link (asimetría; 0 casos reales): no se le agrega otro PESTEL.
+      const ls = exploracion?.linkedSource as { kind?: string; sourceAnalysisId?: string } | undefined;
+      if (ls?.kind === "T22" && ls.sourceAnalysisId) return "moddulo_ya_vinculado";
+
+      tx.set(projectRef, projectData);
+      return { creado: true };
+    });
+  } catch (err) {
+    console.error("[pestel/project POST] transacción falló para modduloProjectId:", modduloProjectId, err instanceof Error ? err.name : "error");
+    return NextResponse.json({ error: "No se pudo crear el proyecto" }, { status: 500 });
+  }
+
+  if (resultado === "no_encontrado") {
+    return NextResponse.json({ error: "Proyecto Moddulo no encontrado" }, { status: 404 });
+  }
+  if (resultado === "fase_cerrada") return respuestaFaseCerrada();
+  if (resultado === "moddulo_ya_vinculado") {
+    return NextResponse.json({ error: "moddulo_already_linked", message: MENSAJE_MODDULO_CON_OTRO_PESTEL }, { status: 409 });
+  }
+  if ("dedup" in resultado) return NextResponse.json({ projectId: resultado.dedup }, { status: 200 });
   return NextResponse.json({ projectId: projectRef.id }, { status: 201 });
 }

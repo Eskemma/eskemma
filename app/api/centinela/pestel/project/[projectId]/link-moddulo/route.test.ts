@@ -94,8 +94,10 @@ describe("POST link-moddulo — respuestas previas a escribir", () => {
   it("409 moddulo_already_linked si el Moddulo ya apunta a OTRO análisis PESTEL", async () => {
     sembrar({
       "pestel_projects/pest1": pestel(),
-      "moddulo_projects/m1": moddulo({ phases: { exploracion: { linkedSource: { kind: "T22", sourceId: "otro" } } } }),
+      "moddulo_projects/m1": moddulo({ phases: { exploracion: { linkedSource: { kind: "T22", sourceId: "otro", sourceAnalysisId: "anOtro", payload: { P: {} } } } } }),
     });
+    // T5 (RE-SEMBRADA a propósito): antes el «otro» T22 no traía análisis; ahora eso es un PENDIENTE
+    // (moddulo_con_pendiente, ver route.pendiente.test.ts). Con el análisis importado la respuesta no cambia.
     const r = await POST(req({ modduloProjectId: "m1" }), ctx);
     expect(r.status).toBe(409);
     expect((await r.json()).error).toBe("moddulo_already_linked");

@@ -16,7 +16,7 @@ import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerr
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/lib/centinela/pestel/transformToMapaPESTEL";
 import { vinculoT22Ajeno } from "@/lib/centinela/pestel/vinculoUnico";
-import { MENSAJE_MODDULO_CON_OTRO_PESTEL, MENSAJE_MODDULO_OTRA_VERSION } from "@/lib/moddulo/textosVinculo";
+import { MENSAJE_MODDULO_CON_OTRO_PESTEL, MENSAJE_MODDULO_OTRA_VERSION, MENSAJE_MODDULO_CON_PENDIENTE } from "@/lib/moddulo/textosVinculo";
 import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } from "@/lib/moddulo/linkCompatibility";
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
@@ -76,6 +76,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   // Conflict: Moddulo project's exploracion phase already has a different pestProjectId
   const explorarPhase = modduloProject.phases?.["exploracion"];
+  // T5: un T22 SIN análisis de otro PESTEL es un pendiente (no «otro análisis»): su propio texto.
+  const lsPrevio = explorarPhase?.linkedSource;
+  if (lsPrevio?.kind === "T22" && lsPrevio.sourceId && !lsPrevio.sourceAnalysisId && lsPrevio.sourceId !== projectId) {
+    return NextResponse.json({ error: "moddulo_con_pendiente", message: MENSAJE_MODDULO_CON_PENDIENTE }, { status: 409 });
+  }
   if (vinculoT22Ajeno(explorarPhase?.linkedSource, { pestelProjectId: projectId, modduloProjectId })) {
     return NextResponse.json(
       {
@@ -192,6 +197,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     | "idempotente"
     | "pestel_ya_vinculado"
     | "moddulo_ya_vinculado"
+    | "moddulo_con_pendiente"
     | "mapa_ya_importado"
     | "mismo_analisis"
     | "fase_cerrada"
@@ -211,7 +217,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const linkedActual = modduloTx.data()?.phases?.exploracion?.linkedSource as
       | { kind?: string; sourceId?: string; sourceAnalysisId?: string; payload?: unknown }
       | undefined;
+    // T5: orden de los rechazos — (1) un T22 SIN análisis de otro PESTEL (la ventana N6 / `createProject` sin análisis)
+    // es un pendiente; (2) un T22 con análisis de otro PESTEL (o la forma antigua) sigue siendo «ya usa otro análisis»;
+    // (3) un back-link de OTRO PESTEL del usuario que no es el T22 vigente de este Moddulo es un pendiente.
+    if (linkedActual?.kind === "T22" && linkedActual.sourceId && !linkedActual.sourceAnalysisId && linkedActual.sourceId !== projectId) {
+      return "moddulo_con_pendiente";
+    }
     if (vinculoT22Ajeno(linkedActual, { pestelProjectId: projectId, modduloProjectId })) return "moddulo_ya_vinculado";
+    const reclaman = await tx.get(adminDb.collection("pestel_projects").where("userId", "==", session.uid).where("modduloProjectId", "==", modduloProjectId));
+    const t22Vigente = linkedActual?.kind === "T22" ? linkedActual.sourceId : undefined;
+    if (reclaman.docs.some((d) => d.id !== projectId && d.id !== t22Vigente)) return "moddulo_con_pendiente";
 
     // If Moddulo already has mapaPESTEL FROM A TRACKED CENTINELA ANALYSIS, check
     // if it's the same one (C7b guard). A mapaPESTEL with no pestAnalysisId came
@@ -254,6 +269,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { error: "pestel_already_linked", message: "Este proyecto PESTEL ya está vinculado a otro proyecto de Moddulo." },
         { status: 409 }
       );
+    case "moddulo_con_pendiente":
+      return NextResponse.json({ error: "moddulo_con_pendiente", message: MENSAJE_MODDULO_CON_PENDIENTE }, { status: 409 });
     case "moddulo_ya_vinculado":
       return NextResponse.json(
         {

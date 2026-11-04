@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
-describe("find-linked-pestel — repair con revalidación", () => {
+describe("find-linked-pestel — el repair ya no existe (T5): nunca escribe", () => {
   it("[real] el back-link se borra entre la consulta y el repair: no escribe", async () => {
     sembrar({ [P]: pestel(), [M]: moddulo() });
     conHueco({ [P]: pestel({ modduloProjectId: undefined }), [M]: moddulo() });
@@ -116,32 +116,8 @@ describe("find-linked-pestel — repair con revalidación", () => {
     expect(repairs()).toHaveLength(0);
   });
 
-  it("[real] el repair legítimo va en UNA transacción", async () => {
-    sembrar({ [P]: pestel(), [M]: moddulo() });
-    await GET(req());
-    expect(mockDb.runTransaction).toHaveBeenCalledTimes(1);
-    expect(repairs()).toHaveLength(1);
-  });
 
-  it("[real] si el repair falla, avisa con la etiqueta identificable y sigue sin ser fatal", async () => {
-    sembrar({ [P]: pestel(), [M]: moddulo() });
-    mockDb.failUpdateOn(M);
-    const res = await GET(req());
-    expect(await res.json()).toMatchObject({ found: true, sourceId: "pest1" });
-    expect(vi.mocked(console.warn).mock.calls.some((c) => String(c[0]).includes("[find-linked-pestel][repair]"))).toBe(true);
-  });
 
-  it("[local] falta el linkedSource: el repair escribe los 3 campos y updatedAt, una sola vez", async () => {
-    sembrar({ [P]: pestel(), [M]: moddulo() });
-    await GET(req());
-    expect(repairs()).toHaveLength(1);
-    expect(repairs()[0].data).toEqual({
-      "phases.exploracion.linkedSource.sourceId": "pest1",
-      "phases.exploracion.linkedSource.kind": "T22",
-      "phases.exploracion.linkedSource.componente": "centinela",
-      updatedAt: "SERVER_TIMESTAMP",
-    });
-  });
 
   it("[local] Moddulo sin acceso (getProject null): no escribe y no abre transacción", async () => {
     sembrar({ [P]: pestel(), [M]: moddulo() });

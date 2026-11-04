@@ -6,10 +6,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
-import { getProject } from "@/lib/moddulo/project";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import type { Timestamp } from "firebase-admin/firestore";
+import { clasificarAsimetrias } from "@/lib/centinela/pestel/asimetriasVinculo";
 import { verificarOrigen } from "@/lib/centinela/pestel/verificarOrigen";
 import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
+
+/** Un proyecto PESTEL archivado (o con `deletedAt`, que hoy ninguno tiene) sigue existiendo pero no es un destino «vivo». */
+function esArchivado(d: { status?: unknown; deletedAt?: unknown } | undefined): boolean {
+  return d?.status === "archived" || !!d?.deletedAt;
+}
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -30,7 +35,11 @@ export async function GET(request: NextRequest) {
     if (!doc.exists || doc.data()?.userId !== session.uid) {
       return NextResponse.json({ found: false });
     }
-    const base = { found: true, sourceId: doc.id, currentStage: doc.data()?.currentStage ?? 3 };
+    const base = { found: true, sourceId: doc.id, currentStage: doc.data()?.currentStage ?? 3, ...(esArchivado(doc.data()) ? { archivado: true } : {}) };
+    // T5: con un análisis importado (verificar=1) el back-link debe apuntar a este Moddulo; si no, se deja en el log.
+    if (searchParams.get("verificar") === "1" && modduloProjectId && doc.data()?.modduloProjectId !== modduloProjectId) {
+      console.warn(`[find-linked-pestel][asimetria] t22_sin_backlink moddulo=${modduloProjectId} pestel=${doc.id}`);
+    }
     // T4 (opt-in, sin ruta nueva): ¿el análisis que F2 importó sigue al día? Solo con `verificar=1` y el id del
     // Moddulo; sin esos parámetros la respuesta es exactamente la de siempre. Un fallo de lectura no afirma nada.
     if (searchParams.get("verificar") === "1" && modduloProjectId) {
@@ -51,7 +60,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(base);
   }
 
-  // Mode 1: query by modduloProjectId — fallback + repair
+  // Mode 1: query by modduloProjectId — ¿qué PESTEL del usuario apunta a este Moddulo? (el vínculo PENDIENTE de T5
+  // vive solo en ese back-link). SOLO LECTURA: ya no hay «repair» (T5). El repair escribía el `linkedSource` del
+  // Moddulo desde un GET —con `getProject`, que además escribe `lastAccessedAt`— y convertía el pendiente en el
+  // estado N6 (T22 sin mapa ni análisis). Las asimetrías que antes tapaba ahora se ven en el log (tipo e ids, sin
+  // contenido). Lecturas: la consulta (≥ 1) + el Moddulo con máscara de campos (1); 0 escrituras.
   if (modduloProjectId) {
     const snap = await adminDb
       .collection("pestel_projects")
@@ -59,66 +72,37 @@ export async function GET(request: NextRequest) {
       .where("userId", "==", session.uid)
       .get();
 
+    // Best-effort: un fallo de lectura aquí nunca afecta la respuesta.
+    try {
+      const [modSnap] = await adminDb.getAll(adminDb.collection("moddulo_projects").doc(modduloProjectId), {
+        fieldMask: ["collaborators", "deletedAt", "phases.exploracion.linkedSource.kind", "phases.exploracion.linkedSource.sourceId", "phases.exploracion.linkedSource.sourceAnalysisId"],
+      });
+      const mod = modSnap?.exists ? (modSnap.data() as { collaborators?: Array<{ uid?: string }>; deletedAt?: unknown; phases?: { exploracion?: { linkedSource?: { kind?: string; sourceId?: string; sourceAnalysisId?: string } } } }) : undefined;
+      if (mod && !mod.deletedAt && mod.collaborators?.some((c) => c.uid === session.uid)) {
+        for (const a of clasificarAsimetrias({ modduloId: modduloProjectId, linkedSource: mod.phases?.exploracion?.linkedSource, backlinks: snap.docs.map((d) => d.id) })) {
+          console.warn(`[find-linked-pestel][asimetria] ${a.tipo} moddulo=${a.modduloId} pestel=${a.pestelIds.join(",")}`);
+        }
+      }
+    } catch {
+      // sin aviso: la detección es solo diagnóstico
+    }
+
     if (snap.empty) {
       return NextResponse.json({ found: false });
     }
 
-    // Sort in memory: most recent first (handles duplicate edge case without
-    // requiring a composite index)
+    // Sort in memory: most recent first (handles duplicate edge case without requiring a composite index)
     const doc = snap.docs.sort((a, b) => {
       const aTime = (a.data().createdAt as Timestamp)?.seconds ?? 0;
       const bTime = (b.data().createdAt as Timestamp)?.seconds ?? 0;
       return bTime - aTime;
     })[0];
 
-    // Repair (7b-6b, H25). Sigue siendo un GET con efecto de escritura y el fallo sigue siendo no
-    // fatal (un solo write: no hay medio estado), pero ahora REVALIDA en una transacción antes de
-    // escribir. Antes, un `update` suelto con la lectura de la consulta: (a) resucitaba un vínculo que
-    // `unlink-pestel` acababa de quitar (la consulta veía el back-link, el unlink borraba ambos lados
-    // y el repair escribía después); (b) pisaba un sourceId distinto o convertía un vínculo `express`
-    // en T22; (c) escribía y bumpeaba updatedAt aunque ya estuviera bien.
-    // Regla (la más conservadora): se escribe SOLO si el Moddulo existe, no está en papelera y el
-    // usuario colabora; el PESTEL sigue siendo suyo y sigue apuntando a ESTE Moddulo; y el
-    // linkedSource está ausente, o es de kind vacío/T22 SIN sourceId. Cualquier sourceId presente
-    // (igual o distinto, de cualquier kind) o un kind distinto de T22 → cero escrituras.
-    // getProject queda solo como acceso (404 del proyecto = sin repair, como antes).
-    const modduloProject = await getProject(modduloProjectId, session.uid);
-    if (modduloProject) {
-      const modduloRef = adminDb.collection("moddulo_projects").doc(modduloProjectId);
-      const pestelRef = adminDb.collection("pestel_projects").doc(doc.id);
-      try {
-        await adminDb.runTransaction(async (tx): Promise<void> => {
-          const modSnap = await tx.get(modduloRef);
-          const pesSnap = await tx.get(pestelRef);
-          if (!modSnap.exists || !pesSnap.exists) return;
-          const mod = modSnap.data() as {
-            deletedAt?: unknown;
-            collaborators?: Array<{ uid?: string }>;
-            phases?: { exploracion?: { linkedSource?: { sourceId?: string; kind?: string } } };
-          };
-          const pes = pesSnap.data() as { userId?: string; modduloProjectId?: string };
-          if (mod.deletedAt || !mod.collaborators?.some((c) => c.uid === session.uid)) return;
-          if (pes.userId !== session.uid || pes.modduloProjectId !== modduloProjectId) return;
-          const ls = mod.phases?.exploracion?.linkedSource;
-          if (ls?.sourceId) return;
-          if (ls?.kind && ls.kind !== "T22") return;
-          tx.update(modduloRef, {
-            "phases.exploracion.linkedSource.sourceId": doc.id,
-            "phases.exploracion.linkedSource.kind": "T22",
-            "phases.exploracion.linkedSource.componente": "centinela",
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        });
-      } catch (err) {
-        // Non-fatal: still return the found project to the client. Etiqueta fija para medir en los
-        // logs cuándo se puede retirar el repair (como el respaldo por índice de 7a).
-        console.warn("[find-linked-pestel][repair] no se pudo completar el vínculo:", err);
-      }
-    }
     return NextResponse.json({
       found: true,
       sourceId: doc.id,
       currentStage: doc.data().currentStage ?? 3,
+      ...(esArchivado(doc.data()) ? { archivado: true } : {}),
     });
   }
 

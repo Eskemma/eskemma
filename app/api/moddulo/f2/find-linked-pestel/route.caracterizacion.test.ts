@@ -29,22 +29,7 @@ beforeEach(() => {
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: UID } as never);
 });
 
-describe("find-linked-pestel — caracterización (código anterior)", () => {
-  it("el repair escribe EXACTAMENTE los 3 campos de linkedSource y updatedAt", async () => {
-    mockDb.reset({
-      "pestel_projects/pest1": { userId: UID, modduloProjectId: "m1", currentStage: 5 },
-      "moddulo_projects/m1": moddulo,
-    });
-    await GET(req("moddulo_project_id=m1"));
-    const repair = mockDb.updates().filter((u) => u.path === "moddulo_projects/m1" && "phases.exploracion.linkedSource.sourceId" in u.data);
-    expect(repair).toHaveLength(1);
-    expect(repair[0].data).toEqual({
-      "phases.exploracion.linkedSource.sourceId": "pest1",
-      "phases.exploracion.linkedSource.kind": "T22",
-      "phases.exploracion.linkedSource.componente": "centinela",
-      updatedAt: "SERVER_TIMESTAMP",
-    });
-  });
+describe("find-linked-pestel — caracterización (lo que NO cambia en T5)", () => {
 
   it("modo moddulo_project_id: responde {found, sourceId, currentStage} (currentStage por defecto 3)", async () => {
     mockDb.reset({ "pestel_projects/pest1": { userId: UID, modduloProjectId: "m1" }, "moddulo_projects/m1": moddulo });

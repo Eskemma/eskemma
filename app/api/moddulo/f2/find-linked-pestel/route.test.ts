@@ -33,27 +33,7 @@ beforeEach(() => {
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: UID } as never);
 });
 
-describe("find-linked-pestel — modo 1 (repair): guard de propiedad/papelera", () => {
-  it("con un proyecto Moddulo propio y activo, sí repara el linkedSource", async () => {
-    mockAdminDb.reset({
-      "pestel_projects/pest1": { userId: UID, modduloProjectId: "m1", currentStage: 5 },
-      "moddulo_projects/m1": {
-        userId: UID,
-        collaborators: [{ uid: UID, role: "owner" }],
-        phases: { exploracion: {} },
-      },
-    });
-    const res = await GET(req("moddulo_project_id=m1"));
-    const json = await res.json();
-    expect(json).toMatchObject({ found: true, sourceId: "pest1" });
-    // Nota: el mock de adminDb no expande paths con puntos como campos anidados
-    // (a diferencia de Firestore real) — guarda la clave literal con puntos.
-    expect(
-      (mockAdminDb.snapshot()["moddulo_projects/m1"] as Record<string, unknown>)[
-        "phases.exploracion.linkedSource.sourceId"
-      ]
-    ).toBe("pest1");
-  });
+describe("find-linked-pestel — modo 1 (T5: sin repair): papelera/propiedad", () => {
 
   it("con el proyecto Moddulo en papelera, encuentra el lado PESTEL pero NO escribe el repair", async () => {
     mockAdminDb.reset({

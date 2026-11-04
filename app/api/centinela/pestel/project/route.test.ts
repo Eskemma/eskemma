@@ -105,7 +105,7 @@ describe("POST /api/centinela/pestel/project", () => {
     expect(mockAdminDb.collection).not.toHaveBeenCalled();
   });
 
-  it("responde 201 y vincula con un modduloProjectId propio (camino feliz)", async () => {
+  it("responde 201 y deja el pendiente en el back-link con un modduloProjectId propio (camino feliz)", async () => {
     mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
     mockGetProject.mockResolvedValue({} as unknown as ModduloProject);
     mockAdminDb.reset({ [`moddulo_projects/${MODDULO_ID}`]: { phases: { exploracion: {} } } });
@@ -120,11 +120,8 @@ describe("POST /api/centinela/pestel/project", () => {
       userId: UID,
       modduloProjectId: MODDULO_ID,
     });
-    expect(estado[`moddulo_projects/${MODDULO_ID}`]).toMatchObject({
-      "phases.exploracion.linkedSource.sourceId": json.projectId,
-      "phases.exploracion.linkedSource.kind": "T22",
-      "phases.exploracion.linkedSource.componente": "centinela",
-    });
+    // T5 (INVERTIDA a propósito): el POST ya NO escribe en el Moddulo; el pendiente vive solo en el back-link.
+    expect(estado[`moddulo_projects/${MODDULO_ID}`]).toEqual({ phases: { exploracion: {} } });
   });
 
   it("responde 200 con el proyecto existente (dedup) si el modduloProjectId propio ya tiene un pestel_project del usuario", async () => {

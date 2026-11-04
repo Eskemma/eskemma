@@ -8,6 +8,8 @@
 // otras variables. En ese caso se abre el proyecto existente y se le dice al usuario, con un aviso
 // `?aviso=<código>` de lista cerrada (el valor de la URL nunca se pinta).
 
+import { MENSAJE_FASE_CERRADA_REEMPLAZO } from "@/lib/moddulo/guardadoHonesto";
+
 export type PlanTrasCrear = {
   /** Solo un proyecto recién creado (201) recibe las variables del asistente. */
   guardarVariables: boolean;
@@ -16,8 +18,9 @@ export type PlanTrasCrear = {
 };
 
 export const AVISOS_ASISTENTE = {
+  // T5: con el vínculo pendiente el PESTEL existente puede no tener aún ningún análisis, así que el texto ya no lo afirma.
   pestel_existente:
-    "Este proyecto ya tenía un análisis PESTEL; se abrió ese. Las variables que elegiste no se guardaron.",
+    "Este proyecto ya tenía un proyecto de Centinela vinculado; se abrió ese. Las variables que elegiste no se guardaron.",
 } as const;
 export type CodigoAvisoAsistente = keyof typeof AVISOS_ASISTENTE;
 
@@ -44,4 +47,15 @@ export function rutaProyectoExistente(
   const etapa = typeof currentStage === "number" ? currentStage : 0;
   const base = `/centinela/pestel/${projectId}/${etapa >= 5 ? "analisis" : "datos"}`;
   return aviso ? `${base}?aviso=${aviso}` : base;
+}
+
+/**
+ * T5: texto de un rechazo de `POST /pestel/project` (ya no hay modal de reemplazo). Se muestra en el error del
+ * asistente; cada texto nombra un camino que existe en la pantalla de Moddulo F2.
+ */
+export function textoRechazoCrear(status: number, cuerpo: { error?: string; message?: string }): string {
+  if (status === 409 && cuerpo.error === "fase_cerrada") return MENSAJE_FASE_CERRADA_REEMPLAZO;
+  if (cuerpo.message && /\s/.test(cuerpo.message)) return cuerpo.message;
+  if (status === 404) return "No se encontró el proyecto de Moddulo; puede que ya no exista.";
+  return "No se pudo crear el proyecto. Intenta de nuevo.";
 }

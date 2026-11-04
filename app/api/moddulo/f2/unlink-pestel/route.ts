@@ -16,6 +16,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
+import { MENSAJE_PENDIENTE_CAMBIO, MENSAJE_PENDIENTE_NO_ENCONTRADO } from "@/lib/moddulo/textosVinculo";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string; confirmar?: unknown; huella?: unknown };
+  let body: { projectId?: string; confirmar?: unknown; huella?: unknown; pestelProjectId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest) {
     | "no_encontrado"
     | "no_vinculado"
     | "fase_cerrada"
+    | "pendiente_ok"
+    | "pendiente_no_encontrado"
+    | "estado_cambio"
     | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
   const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoDesvinculo> => {
     const snap = await tx.get(proyectoRef);
@@ -60,6 +64,46 @@ export async function POST(request: NextRequest) {
     // F2 closed = read-only (same 409 as the other M1 writers).
     if (exploracionCerrada(exploracion)) return "fase_cerrada";
     const linkedSource = exploracion?.linkedSource;
+
+    // T5 — CANCELAR UN VÍNCULO PENDIENTE (sin H15: no se pierde ningún análisis de F2). Aplica cuando el cuerpo trae
+    // `pestelProjectId` y el Moddulo NO tiene un análisis de Centinela importado:
+    //  · (b) forma nueva: solo el back-link `pestel_projects.modduloProjectId`;
+    //  · (a) forma antigua: un `linkedSource` T22 con `sourceId` pero sin `sourceAnalysisId` (la ventana N6, o
+    //    `createProject` sin análisis).
+    // El id del cuerpo NUNCA se confía por sí solo: el back-link solo se borra si el PESTEL es del usuario y apunta
+    // a ESTE Moddulo; el `linkedSource` solo se limpia si es la forma (a) y su `sourceId` es ese mismo id. Dentro de
+    // la transacción también se verifica que el usuario sea colaborador del Moddulo (mismo criterio de `getProject`,
+    // el de las demás rutas de F2).
+    const pestelIdCuerpo = typeof body.pestelProjectId === "string" && body.pestelProjectId.trim() ? body.pestelProjectId.trim() : null;
+    const importado = linkedSource?.kind === "T22" && !!linkedSource.sourceAnalysisId;
+    if (pestelIdCuerpo) {
+      if (!snap.data()?.collaborators?.some((c: { uid?: string }) => c.uid === session.uid)) return "no_encontrado";
+      if (importado) return "estado_cambio";
+      const pestelRef = adminDb.collection("pestel_projects").doc(pestelIdCuerpo);
+      const pestelSnap = await tx.get(pestelRef);
+      const backlinkValido = pestelSnap.exists && pestelSnap.data()?.userId === session.uid && pestelSnap.data()?.modduloProjectId === projectId;
+      const formaAntigua = linkedSource?.kind === "T22" && linkedSource.sourceId === pestelIdCuerpo;
+      if (!backlinkValido && !formaAntigua) return "pendiente_no_encontrado";
+      if (backlinkValido) {
+        tx.update(pestelRef, { modduloProjectId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() });
+      }
+      if (formaAntigua) {
+        const conMapa = !!linkedSource.payload && typeof linkedSource.payload === "object" && Object.keys(linkedSource.payload).length > 0;
+        if (conMapa) {
+          // Mezcla de la ventana N6 sobre un express: se devuelve su forma original (el mapa no se toca).
+          tx.update(proyectoRef, {
+            "phases.exploracion.linkedSource.kind": "express",
+            "phases.exploracion.linkedSource.componente": "moddulo",
+            "phases.exploracion.linkedSource.sourceId": projectId,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.update(proyectoRef, { "phases.exploracion.linkedSource": FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() });
+        }
+      }
+      return "pendiente_ok";
+    }
+
     // kind !== "T22" cubre tanto "sin vínculo" como "vínculo express" — el
     // express no tiene fuente de Centinela que desvincular (su sourceId es
     // el propio ID del proyecto Moddulo, no un pestel_projects real).
@@ -107,6 +151,13 @@ export async function POST(request: NextRequest) {
 
   if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
   if (resultado === "fase_cerrada") return respuestaFaseCerrada();
+  if (resultado === "pendiente_ok") return NextResponse.json({ ok: true, pendienteCancelado: true }, { status: 200 });
+  if (resultado === "pendiente_no_encontrado") {
+    return NextResponse.json({ error: "pendiente_no_encontrado", message: MENSAJE_PENDIENTE_NO_ENCONTRADO }, { status: 400 });
+  }
+  if (resultado === "estado_cambio") {
+    return NextResponse.json({ error: "estado_cambio", message: MENSAJE_PENDIENTE_CAMBIO }, { status: 409 });
+  }
   if (resultado === "no_encontrado") {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }

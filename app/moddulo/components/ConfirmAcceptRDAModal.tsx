@@ -2,8 +2,8 @@
 
 // app/moddulo/components/ConfirmAcceptRDAModal.tsx
 // Confirmación explícita antes de marcar un RDAItem "activo" como
-// "aceptado" (condición del proyecto) — mismo patrón visual que
-// ConfirmReplacePestelModal.tsx, agregando useFocusTrap/useEscapeKey
+// "aceptado" (condición del proyecto) — patrón visual del antiguo
+// ConfirmReplacePestelModal (retirado en T5), agregando useFocusTrap/useEscapeKey
 // (regla de accesibilidad ya documentada en CLAUDE.md, aplicada aquí en
 // el modal nuevo).
 
