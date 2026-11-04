@@ -482,15 +482,19 @@ export const TEXTO_CAUTELA_RECARGA =
 
 // ── Kebab ─────────────────────────────────────────────────────────────────────
 
-export function opcionesKebabM1(i: { kind: string | null; estado: EstadoM1 | null; f2Cerrada: boolean }) {
+export function opcionesKebabM1(i: { kind: string | null; estado: EstadoM1 | null; f2Cerrada: boolean; vinculo?: "sin_pestel" | "pendiente" | "vinculado" }) {
   // F2 closed = read-only: nothing that replaces or edits the analysis is offered (the server refuses it
   // too: 409 fase_cerrada).
   const abierta = !i.f2Cerrada;
+  // T5: con un vínculo PENDIENTE no se ofrece «Analizar con PESTEL» (ya hay un proyecto PESTEL en preparación) ni
+  // «Vincular con análisis independiente» (`link-moddulo` lo rechazaría con moddulo_con_pendiente: hay que cancelar el
+  // pendiente primero) ni «Vincular de nuevo».
+  const pendiente = i.vinculo === "pendiente";
   const o = {
     nuevoAnalisis: abierta,
-    vincularIndependiente: abierta,
-    analizarConPestel: abierta,
-    vincularDeNuevo: abierta,
+    vincularIndependiente: abierta && !pendiente,
+    analizarConPestel: abierta && !pendiente,
+    vincularDeNuevo: abierta && !pendiente,
     editarNarrativas: i.estado === "aprobado" && abierta && i.kind !== "T22",
   };
   return { ...o, hayOpciones: Object.values(o).some(Boolean) };

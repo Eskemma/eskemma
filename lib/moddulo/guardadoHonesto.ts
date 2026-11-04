@@ -8,7 +8,7 @@
 // Out of scope on purpose: authorship, dates, roles (Grupo 2 / H03 / H-M7).
 
 import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
-
+import { MENSAJE_PENDIENTE_CAMBIO, MENSAJE_PENDIENTE_NO_ENCONTRADO } from "./textosVinculo";
 /** F2 closed = read-only: generate-m1-express, import-pestel and link-moddulo answer 409 `fase_cerrada`. */
 export const MENSAJE_FASE_CERRADA_REEMPLAZO = "La Fase 2 está cerrada: no se puede reemplazar el análisis. No se guardó nada.";
 
@@ -513,7 +513,12 @@ const TEXTOS_SIMPLES: Record<
     especifico: (r) =>
       r.status === 400 && r.codigo === "not_linked"
         ? "Este proyecto ya no está vinculado a ningún análisis de Centinela PESTEL; puede que ya se haya desvinculado. Recarga la página para verificar."
-        : null,
+        : // T5: cancelar un vínculo PENDIENTE (mismo texto que el servidor).
+          r.status === 400 && r.codigo === "pendiente_no_encontrado"
+          ? MENSAJE_PENDIENTE_NO_ENCONTRADO
+          : r.status === 409 && r.codigo === "estado_cambio"
+            ? MENSAJE_PENDIENTE_CAMBIO
+            : null,
   },
   // 6c. POST of an analyst chain: the form keeps what the user typed on any failure.
   agregar_cadena_impacto: {

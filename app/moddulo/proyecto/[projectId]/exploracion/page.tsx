@@ -15,7 +15,7 @@ import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { dimensionEditada, aFecha, elegirMapaParaCriterios } from "@/lib/moddulo/m1Aprobacion";
 import { requiereConfirmacionM1, type EstadoParaImpactoM1 } from "@/lib/moddulo/impactoM1";
 import { LIMITE_ABORTAR_S, MENSAJE_ESPERA_EXCEDIDA } from "@/lib/moddulo/esperaMotores";
-import { estadoImpactoDesdePantalla, mensajeRechazoVincularCentinela, textoModalM1 } from "@/lib/moddulo/textosModalM1";
+import { estadoImpactoDesdePantalla, mensajeRechazoVincularCentinela, textoModalM1, textoModalPendiente } from "@/lib/moddulo/textosModalM1";
 import {
   ROTULO_CONFIANZA_IA,
   mensajeAreaMotores,
@@ -64,6 +64,8 @@ import { decidirAvisoXpcto, diffsXpctoDeProyecto } from "@/lib/moddulo/avisoXpct
 import { decidirAvisoOrigen } from "@/lib/moddulo/avisoOrigen";
 import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
 import { AvisoOrigenPestel } from "./components/AvisoOrigenPestel";
+import { PendientePestel } from "./components/PendientePestel";
+import { resolverVinculoPestel } from "@/lib/moddulo/resolverVinculoPestel";
 import { BOTON_INVITACION_F1, debeInvitarCompletarF1, TEXTO_INVITACION_F1 } from "@/lib/moddulo/invitacionF1";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
 import { useFocusTrap } from "@/app/hooks/useFocusTrap";
@@ -308,6 +310,16 @@ export default function ExploracionPage() {
   const [pestlVia, setPestlVia] = useState<"pestel" | null>(null);
   // ID del proyecto PESTEL vinculado (si ya exportó desde Centinela)
   const [pestProjectId, setPestProjectId] = useState<string | null>(null);
+  // T5: proyecto PESTEL EN PREPARACIÓN (vínculo pendiente: aún sin análisis importado). Distinto de `pestProjectId`,
+  // que solo existe con un análisis importado; la pantalla de «vinculado» se sigue leyendo de `pestProjectId`.
+  const [pestPendienteId, setPestPendienteId] = useState<string | null>(null);
+  const [pendienteArchivado, setPendienteArchivado] = useState(false);
+  const [pendienteHuerfano, setPendienteHuerfano] = useState(false);
+  // Destino de «Regresar a PESTEL»: el proyecto con análisis importado o, si no, el pendiente (si todavía existe).
+  const pestDestinoId = pestProjectId ?? (pestPendienteId && !pendienteHuerfano ? pestPendienteId : null);
+  const [showCancelPendiente, setShowCancelPendiente] = useState(false);
+  const [cancelPendienteError, setCancelPendienteError] = useState<string | null>(null);
+  const [isCancelandoPendiente, setIsCancelandoPendiente] = useState(false);
   // ID del análisis PESTEL vinculado (para resolver pestProjectId cuando falta)
   const [pestAnalysisId, setPestAnalysisId] = useState<string | null>(null);
   // currentStage del proyecto PESTEL — always fetched fresh, never cached
@@ -445,7 +457,9 @@ export default function ExploracionPage() {
         // Cargar referencia al proyecto PESTEL vinculado — kind "T22" es el
         // único que representa un vínculo real de Centinela (express también
         // puebla linkedSource, pero su sourceId es el propio proyecto Moddulo).
-        const savedPestProjectId = savedLinkedSource?.kind === "T22" ? savedLinkedSource.sourceId : undefined;
+        // T5: el estado del vínculo sale de un resolver puro (vinculado / pendiente / sin PESTEL).
+        const vinculoInicial = resolverVinculoPestel({ linkedSource: savedLinkedSource, backlinkId: null });
+        const savedPestProjectId = vinculoInicial.estado === "vinculado" ? vinculoInicial.pestProjectId ?? undefined : undefined;
         const savedPestAnalysisId = savedLinkedSource?.sourceAnalysisId;
         const savedLastUnlinked = p.phases?.exploracion?.lastUnlinkedLinkedSource?.sourceAnalysisId;
         if (savedLastUnlinked) setLastUnlinkedPestAnalysisId(savedLastUnlinked as string);
@@ -466,21 +480,41 @@ export default function ExploracionPage() {
             })
             .catch(() => { /* non-fatal — button falls back to /datos */ })
             .finally(() => setPestStageLoading(false));
-        } else if (savedPestAnalysisId || savedMapa) {
+        } else if (vinculoInicial.estado === "pendiente") {
+          // T5: forma antigua del pendiente (T22 sin análisis: la ventana N6 o `createProject` sin análisis). El id sale
+          // del `linkedSource`; se pide la etapa y si el proyecto de Centinela sigue existiendo (found:false = ya no).
+          setPestPendienteId(vinculoInicial.pestPendienteId);
+          setPestlVia("pestel");
+          setPestStageLoading(true);
+          fetch(`/api/moddulo/f2/find-linked-pestel?pestel_project_id=${vinculoInicial.pestPendienteId}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data: { found: boolean; currentStage?: number; archivado?: boolean } | null) => {
+              if (data && !data.found) setPendienteHuerfano(true);
+              if (data?.found) { setPestCurrentStage(data.currentStage ?? 3); setPendienteArchivado(!!data.archivado); }
+            })
+            .catch(() => { /* non-fatal — sin etapa, el enlace va a /datos */ })
+            .finally(() => setPestStageLoading(false));
+        } else if (savedPestAnalysisId) {
           // Proyecto vinculado antes de que se guardara pestProjectId
           setPestlVia("pestel");
         } else {
-          // Fallback: check Centinela side in case write-back failed
+          // T5: sin análisis de Centinela importado (ningún vínculo, o un M1 express con o sin mapa): ¿hay un proyecto
+          // PESTEL en preparación? El pendiente vive solo en el back-link; esta consulta es de solo lectura.
+          if (savedMapa) setPestlVia("pestel");
+          setPestStageLoading(true);
           fetch(`/api/moddulo/f2/find-linked-pestel?moddulo_project_id=${projectId}`)
             .then((r) => r.ok ? r.json() : null)
-            .then((data: { found: boolean; sourceId?: string; currentStage?: number } | null) => {
+            .then((data: { found: boolean; sourceId?: string; currentStage?: number; archivado?: boolean } | null) => {
               if (data?.found && data.sourceId) {
-                setPestProjectId(data.sourceId);
+                const v = resolverVinculoPestel({ linkedSource: savedLinkedSource, backlinkId: data.sourceId });
+                setPestPendienteId(v.pestPendienteId);
                 setPestlVia("pestel");
                 setPestCurrentStage(data.currentStage ?? 3);
+                setPendienteArchivado(!!data.archivado);
               }
             })
-            .catch(() => { /* non-fatal */ });
+            .catch(() => { /* non-fatal */ })
+            .finally(() => setPestStageLoading(false));
         }
 
         // A1 — Ocultar landing si ya inició la fase
@@ -559,6 +593,10 @@ export default function ExploracionPage() {
           setPestlVia("pestel");
         }
         setPestAnalysisId(pestAnalysisId);
+        // T5: con un análisis importado ya no hay un vínculo pendiente.
+        setPestPendienteId(null);
+        setPendienteHuerfano(false);
+        setPendienteArchivado(false);
         if (data.idempotente === true) {
           if (window.location.search.includes("pest_analysis_id")) {
             const url = new URL(window.location.href);
@@ -1279,6 +1317,39 @@ export default function ExploracionPage() {
       setIsUnlinkingPestel(false);
     }
   }, [projectId, pestAnalysisId, unlinkServidor]);
+
+  // T5 — CANCELAR UN VÍNCULO PENDIENTE: sin H15 (no se pierde ningún análisis de F2). El servidor verifica permisos y
+  // propiedad dentro de su transacción; el id solo viaja como pista. Un fallo deja el modal abierto con su texto.
+  const handleCancelarPendiente = useCallback(async () => {
+    if (!pestPendienteId) return;
+    setIsCancelandoPendiente(true);
+    setCancelPendienteError(null);
+    try {
+      const { resp } = await leerRespuestaGuardado(() =>
+        fetch("/api/moddulo/f2/unlink-pestel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId, pestelProjectId: pestPendienteId }),
+        })
+      );
+      const decision = decidirResultadoGuardado("desvincular_pestel", resp);
+      if (!decision.exito) {
+        setCancelPendienteError(decision.mensajeError);
+        return;
+      }
+      setShowCancelPendiente(false);
+      setPestPendienteId(null);
+      setPendienteHuerfano(false);
+      setPendienteArchivado(false);
+      setPestCurrentStage(null);
+      // Sin análisis importado ni mapa, el proyecto vuelve a «sin PESTEL»; con un mapa express se queda como estaba.
+      if (!mapaPESTEL) setPestlVia(null);
+      void refrescarM1Ref.current();
+    } finally {
+      setIsCancelandoPendiente(false);
+    }
+  }, [projectId, pestPendienteId, mapaPESTEL]);
 
   // Deshace una desvinculación: re-vincula con el MISMO análisis de
   // Centinela del que se desvinculó (no uno nuevo). Si el usuario generó un
@@ -2125,19 +2196,21 @@ export default function ExploracionPage() {
                     {subtituloAreaMotores(m1.estado, m1.f2Cerrada)}
                   </p>
                 </div>
-                {pestlVia === "pestel" && pestProjectId && (
+                {pestlVia === "pestel" && (pestProjectId || (pestPendienteId && !pendienteHuerfano)) && (
                   <div className="shrink-0 flex items-center gap-2">
                     <button
-                      onClick={() => router.push(`/centinela/pestel/${pestProjectId}/analisis`)}
+                      onClick={() => router.push(pestProjectId ? `/centinela/pestel/${pestProjectId}/analisis` : `/centinela/pestel/${pestPendienteId}/${pestCurrentStage !== null && pestCurrentStage >= 5 ? "analisis" : "datos"}`)}
                       className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
                     >
                       Regresar a PESTEL →
                     </button>
-                    <span className="flex items-center gap-0.5">
+                    {pestProjectId && (<span className="flex items-center gap-0.5">
                       <button
                         onClick={() => void pedirDesvincular()}
-                        disabled={isUnlinkingPestel || verificandoAccion !== null}
-                        className="px-3 py-1.5 text-black-eske/50 dark:text-[#9AAEBE] text-xs font-medium hover:underline disabled:opacity-50"
+                        // Fase 2 cerrada: el servidor siempre responde fase_cerrada, así que el botón se apaga con su motivo.
+                        disabled={isUnlinkingPestel || verificandoAccion !== null || m1.f2Cerrada}
+                        title={m1.f2Cerrada ? "La fase está cerrada" : undefined}
+                        className="px-3 py-1.5 text-black-eske/50 dark:text-[#9AAEBE] text-xs font-medium hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
                       >
                         {isUnlinkingPestel ? "Desvinculando…" : verificandoAccion === "desvincular" ? "Verificando…" : "Desvincular"}
                       </button>
@@ -2145,7 +2218,7 @@ export default function ExploracionPage() {
                         content="Rompe el vínculo de este proyecto con el análisis de Centinela PESTEL. El escaneo PESTEL actual (M1) y las secciones M2-M5 ya aprobadas se borran. Podrás regenerar vía el flujo express de Moddulo, o restaurar este mismo vínculo después."
                         placement="left"
                       />
-                    </span>
+                    </span>)}
                   </div>
                 )}
               </div>
@@ -2380,18 +2453,18 @@ export default function ExploracionPage() {
               {(dvs === null || pestlVia === "pestel") && mode !== "editing" && (
                 <div className="shrink-0 flex justify-end">
                   <button
-                    onClick={pestlVia === "pestel" && pestProjectId
+                    onClick={pestlVia === "pestel" && pestDestinoId
                       ? () => {
                           const dest = pestCurrentStage !== null && pestCurrentStage >= 5
-                            ? `/centinela/pestel/${pestProjectId}/analisis`
-                            : `/centinela/pestel/${pestProjectId}/datos`;
+                            ? `/centinela/pestel/${pestDestinoId}/analisis`
+                            : `/centinela/pestel/${pestDestinoId}/datos`;
                           router.push(dest);
                         }
                       : handleAbrirPESTEL}
-                    disabled={!!(pestlVia === "pestel" && pestProjectId && pestStageLoading)}
+                    disabled={!!(pestlVia === "pestel" && pestDestinoId && pestStageLoading)}
                     className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {pestlVia === "pestel" && pestProjectId
+                    {pestlVia === "pestel" && pestDestinoId
                       ? pestStageLoading ? <span className="text-red-eske">Cargando…</span> : "Regresar a PESTEL →"
                       : "Abrir PESTEL"}
                   </button>
@@ -2414,6 +2487,12 @@ export default function ExploracionPage() {
             mapaPESTEL={mapaPESTEL}
             isAnalyzing={isExpressAnalyzing}
             pestProjectId={pestProjectId}
+            pestPendienteId={pestPendienteId}
+            pendienteArchivado={pendienteArchivado}
+            pendienteHuerfano={pendienteHuerfano}
+            pestCurrentStage={pestCurrentStage}
+            cancelandoPendiente={isCancelandoPendiente}
+            onCancelarPendiente={() => { setCancelPendienteError(null); setShowCancelPendiente(true); }}
             onNuevoAnalisis={pestProjectId === null ? solicitarNuevoAnalisis : undefined}
             verificando={verificandoAccion !== null}
             onEditarNarrativas={() => void m1.pedirReabrir()}
@@ -2470,6 +2549,19 @@ export default function ExploracionPage() {
           ocupado={isUnlinkingPestel}
           onCancelar={() => { setShowConfirmUnlink(false); setUnlinkError(null); setUnlinkServidor(null); }}
           onConfirmar={handleUnlinkPestel}
+        />
+      )}
+
+      {/* T5: cancelar el vínculo pendiente (sin H15) */}
+      {showCancelPendiente && (
+        <ModalM1
+          texto={textoModalPendiente({ archivado: pendienteArchivado, huerfano: pendienteHuerfano })}
+          aviso={null}
+          error={cancelPendienteError}
+          ocultarCierre={false}
+          ocupado={isCancelandoPendiente}
+          onCancelar={() => { setShowCancelPendiente(false); setCancelPendienteError(null); }}
+          onConfirmar={() => void handleCancelarPendiente()}
         />
       )}
 
@@ -2569,6 +2661,7 @@ function SkeletonDimension() {
 function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
   isAnalyzing = false, onNuevoAnalisis, verificando = false, pestProjectId,
+  pestPendienteId = null, pendienteArchivado = false, pendienteHuerfano = false, pestCurrentStage = null, cancelandoPendiente = false, onCancelarPendiente,
   lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL,
   esMexico, webElectoralData, webElectoralLoading,
   onEditarNarrativas, m1, motoresGenerados, generandoMotores, onReintentarGeneracion,
@@ -2586,6 +2679,13 @@ function ExplorationFormPanel({
   /** A server check («what would be lost?») is running: the actions that start one are off. */
   verificando?: boolean;
   pestProjectId?: string | null;
+  /** T5: proyecto PESTEL en preparación (vínculo pendiente, sin análisis importado). */
+  pestPendienteId?: string | null;
+  pendienteArchivado?: boolean;
+  pendienteHuerfano?: boolean;
+  pestCurrentStage?: number | null;
+  cancelandoPendiente?: boolean;
+  onCancelarPendiente?: () => void;
   lastUnlinkedPestAnalysisId?: string | null;
   onRelinkPestel?: () => void;
   isRelinkingPestel?: boolean;
@@ -2632,7 +2732,7 @@ function ExplorationFormPanel({
     lapizRefs.current[dimParaFoco]?.focus();
     consumirFoco();
   }, [dimParaFoco, consumirFoco]);
-  const kebabM1 = opcionesKebabM1({ kind: m1.kind, estado: m1.estado, f2Cerrada: m1.f2Cerrada });
+  const kebabM1 = opcionesKebabM1({ kind: m1.kind, estado: m1.estado, f2Cerrada: m1.f2Cerrada, vinculo: pestProjectId ? "vinculado" : pestPendienteId ? "pendiente" : "sin_pestel" });
   const pie = pieM1({
     estado: m1.estado,
     f2Cerrada: m1.f2Cerrada,
@@ -2773,6 +2873,19 @@ function ExplorationFormPanel({
           <span className="text-xs text-black-eske-20 dark:text-[#6D8294]">Auto-rellena via chat</span>
         )}
       </div>
+
+      {/* T5: vínculo PENDIENTE con Centinela (proyecto PESTEL en preparación, aún sin importar) */}
+      {!pestProjectId && pestPendienteId && onCancelarPendiente && (
+        <PendientePestel
+          pestelId={pestPendienteId}
+          etapa={pestCurrentStage}
+          archivado={pendienteArchivado}
+          huerfano={pendienteHuerfano}
+          f2Cerrada={m1.f2Cerrada}
+          cancelando={cancelandoPendiente}
+          onCancelar={onCancelarPendiente}
+        />
+      )}
 
       {/* Tabs de secciones */}
       <div className="shrink-0 flex overflow-x-auto border-b border-gray-eske-20 dark:border-white/10 bg-white-eske dark:bg-[#18324A]">

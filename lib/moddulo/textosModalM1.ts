@@ -140,3 +140,19 @@ export function mensajeRechazoVincularCentinela(resp: { status: number; codigo?:
     ? MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES
     : null;
 }
+
+/** T5: confirmación corta de «Cancelar vínculo pendiente» (sin H15: no se pierde ningún análisis de F2). */
+export function textoModalPendiente(o: { archivado?: boolean; huerfano?: boolean } = {}): TextoModalM1 {
+  return {
+    titulo: "¿Cancelar el vínculo pendiente con Centinela?",
+    intro: [
+      o.huerfano
+        ? "El proyecto de Centinela vinculado ya no existe. Se quitará el vínculo de este proyecto."
+        : "Se quitará el vínculo de este proyecto con su proyecto de Centinela PESTEL. El proyecto de Centinela y sus datos se conservan; ningún análisis de la Fase 2 se pierde.",
+    ],
+    lineas: [],
+    cierre: null,
+    cancelar: "No, mantenerlo",
+    confirmar: "Cancelar vínculo",
+  };
+}
