@@ -65,6 +65,7 @@ import { decidirAvisoOrigen } from "@/lib/moddulo/avisoOrigen";
 import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
 import { AvisoOrigenPestel } from "./components/AvisoOrigenPestel";
 import { PendientePestel } from "./components/PendientePestel";
+import { decidirAvisoSalida, requiereAvisoSalida, textoModalSalida, urlConsultaSalida, TIEMPO_MAXIMO_SALIDA_MS, TEXTO_VERIFICANDO_SALIDA, type DecisionSalida, type RespuestaSalida } from "@/lib/moddulo/avisoSalida";
 import { resolverVinculoPestel } from "@/lib/moddulo/resolverVinculoPestel";
 import { BOTON_INVITACION_F1, debeInvitarCompletarF1, TEXTO_INVITACION_F1 } from "@/lib/moddulo/invitacionF1";
 import { useM1Revision, type M1Revision } from "./useM1Revision";
@@ -1318,6 +1319,37 @@ export default function ExploracionPage() {
     }
   }, [projectId, pestAnalysisId, unlinkServidor]);
 
+  // T5b — AVISO AL SALIR hacia Centinela (pendiente o sin PESTEL). Una consulta de solo lectura (`salida=1`: 2 lecturas,
+  // 0 escrituras) dice si algo se reemplazaría al volver con un análisis. Sin nada que perder, o con la fase cerrada,
+  // navega directo; si falla o excede el tiempo máximo, avisa «no se pudo verificar» y deja continuar. Una sola
+  // consulta a la vez: mientras corre, las salidas quedan deshabilitadas y `verificandoSalidaRef` ignora el doble clic.
+  const [verificandoSalida, setVerificandoSalida] = useState(false);
+  const verificandoSalidaRef = useRef(false);
+  const [modalSalida, setModalSalida] = useState<{ decision: Extract<DecisionSalida, { tipo: "avisar" | "no_verificable" }>; destino: () => void } | null>(null);
+  const salirHaciaCentinela = useCallback(async (destino: () => void) => {
+    if (verificandoSalidaRef.current) return;
+    if (!requiereAvisoSalida({ f2Cerrada: m1.f2Cerrada, tieneAnalisisImportado: !!pestProjectId })) { destino(); return; }
+    verificandoSalidaRef.current = true;
+    setVerificandoSalida(true);
+    const ctrl = new AbortController();
+    const reloj = setTimeout(() => ctrl.abort(), TIEMPO_MAXIMO_SALIDA_MS);
+    let resp: RespuestaSalida;
+    try {
+      const r = await fetch(urlConsultaSalida(projectId), { credentials: "include", signal: ctrl.signal });
+      resp = { tipo: "respuesta", ok: r.ok, cuerpo: await r.json().catch(() => null) };
+    } catch {
+      resp = ctrl.signal.aborted ? { tipo: "tiempo_agotado" } : { tipo: "error" };
+    } finally {
+      clearTimeout(reloj);
+      verificandoSalidaRef.current = false;
+      setVerificandoSalida(false);
+    }
+    const d = decidirAvisoSalida(resp, m1.f2Cerrada);
+    if (d.tipo === "navegar") destino();
+    else setModalSalida({ decision: d, destino });
+  }, [projectId, pestProjectId, m1.f2Cerrada]);
+  const irAPestelConAviso = () => void salirHaciaCentinela(handleAbrirPESTEL);
+
   // T5 — CANCELAR UN VÍNCULO PENDIENTE: sin H15 (no se pierde ningún análisis de F2). El servidor verifica permisos y
   // propiedad dentro de su transacción; el id solo viaja como pista. Un fallo deja el modal abierto con su texto.
   const handleCancelarPendiente = useCallback(async () => {
@@ -2199,10 +2231,14 @@ export default function ExploracionPage() {
                 {pestlVia === "pestel" && (pestProjectId || (pestPendienteId && !pendienteHuerfano)) && (
                   <div className="shrink-0 flex items-center gap-2">
                     <button
-                      onClick={() => router.push(pestProjectId ? `/centinela/pestel/${pestProjectId}/analisis` : `/centinela/pestel/${pestPendienteId}/${pestCurrentStage !== null && pestCurrentStage >= 5 ? "analisis" : "datos"}`)}
-                      className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors"
+                      onClick={() => {
+                        const dest = pestProjectId ? `/centinela/pestel/${pestProjectId}/analisis` : `/centinela/pestel/${pestPendienteId}/${pestCurrentStage !== null && pestCurrentStage >= 5 ? "analisis" : "datos"}`;
+                        void salirHaciaCentinela(() => router.push(dest));
+                      }}
+                      disabled={verificandoSalida}
+                      className="px-3 py-1.5 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Regresar a PESTEL →
+                      {verificandoSalida ? TEXTO_VERIFICANDO_SALIDA : "Regresar a PESTEL →"}
                     </button>
                     {pestProjectId && (<span className="flex items-center gap-0.5">
                       <button
@@ -2458,15 +2494,17 @@ export default function ExploracionPage() {
                           const dest = pestCurrentStage !== null && pestCurrentStage >= 5
                             ? `/centinela/pestel/${pestDestinoId}/analisis`
                             : `/centinela/pestel/${pestDestinoId}/datos`;
-                          router.push(dest);
+                          void salirHaciaCentinela(() => router.push(dest));
                         }
-                      : handleAbrirPESTEL}
-                    disabled={!!(pestlVia === "pestel" && pestDestinoId && pestStageLoading)}
+                      : irAPestelConAviso}
+                    disabled={verificandoSalida || !!(pestlVia === "pestel" && pestDestinoId && pestStageLoading)}
                     className="px-3 py-2 border border-bluegreen-eske-60 text-bluegreen-eske-60 dark:border-blue-eske-20 dark:text-blue-eske-20 rounded-lg text-xs font-semibold hover:bg-bluegreen-eske/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {pestlVia === "pestel" && pestDestinoId
-                      ? pestStageLoading ? <span className="text-red-eske">Cargando…</span> : "Regresar a PESTEL →"
-                      : "Abrir PESTEL"}
+                    {verificandoSalida
+                      ? TEXTO_VERIFICANDO_SALIDA
+                      : pestlVia === "pestel" && pestDestinoId
+                        ? pestStageLoading ? <span className="text-red-eske">Cargando…</span> : "Regresar a PESTEL →"
+                        : "Abrir PESTEL"}
                   </button>
                 </div>
               )}
@@ -2504,7 +2542,9 @@ export default function ExploracionPage() {
             onRelinkPestel={handleRelinkPestel}
             isRelinkingPestel={isRelinkingPestel}
             onLinkExisting={() => setShowLinkExistingPicker(true)}
-            onAnalizarConPESTEL={handleAbrirPESTEL}
+            onAnalizarConPESTEL={irAPestelConAviso}
+            verificandoSalida={verificandoSalida}
+            onIrACentinela={(destino) => void salirHaciaCentinela(() => router.push(destino))}
             esMexico={esMexico}
             webElectoralData={webElectoralData}
             webElectoralLoading={webElectoralLoading}
@@ -2549,6 +2589,19 @@ export default function ExploracionPage() {
           ocupado={isUnlinkingPestel}
           onCancelar={() => { setShowConfirmUnlink(false); setUnlinkError(null); setUnlinkServidor(null); }}
           onConfirmar={handleUnlinkPestel}
+        />
+      )}
+
+      {/* T5b: aviso al salir hacia Centinela (solo con algo que reemplazar, o si no se pudo verificar) */}
+      {modalSalida && (
+        <ModalM1
+          texto={textoModalSalida(modalSalida.decision)}
+          aviso={null}
+          error={null}
+          ocultarCierre={false}
+          ocupado={false}
+          onCancelar={() => setModalSalida(null)}
+          onConfirmar={() => { const d = modalSalida.destino; setModalSalida(null); d(); }}
         />
       )}
 
@@ -2662,7 +2715,7 @@ function ExplorationFormPanel({
   form, onChange, activeSection, onSectionChange, readOnly, projectType, sefixData, mapaPESTEL,
   isAnalyzing = false, onNuevoAnalisis, verificando = false, pestProjectId,
   pestPendienteId = null, pendienteArchivado = false, pendienteHuerfano = false, pestCurrentStage = null, cancelandoPendiente = false, onCancelarPendiente,
-  lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL,
+  lastUnlinkedPestAnalysisId, onRelinkPestel, isRelinkingPestel, onLinkExisting, onAnalizarConPESTEL, verificandoSalida = false, onIrACentinela,
   esMexico, webElectoralData, webElectoralLoading,
   onEditarNarrativas, m1, motoresGenerados, generandoMotores, onReintentarGeneracion,
 }: {
@@ -2691,6 +2744,9 @@ function ExplorationFormPanel({
   isRelinkingPestel?: boolean;
   onLinkExisting?: () => void;
   onAnalizarConPESTEL?: () => void;
+  /** T5b: una verificación previa a salir hacia Centinela está en curso. */
+  verificandoSalida?: boolean;
+  onIrACentinela?: (destino: string) => void;
   esMexico: boolean;
   webElectoralData: WebContextResult | null;
   webElectoralLoading: boolean;
@@ -2884,6 +2940,8 @@ function ExplorationFormPanel({
           f2Cerrada={m1.f2Cerrada}
           cancelando={cancelandoPendiente}
           onCancelar={onCancelarPendiente}
+          verificandoSalida={verificandoSalida}
+          onIrACentinela={onIrACentinela}
         />
       )}
 

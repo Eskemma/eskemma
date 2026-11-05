@@ -10,6 +10,8 @@ import type { Timestamp } from "firebase-admin/firestore";
 import { clasificarAsimetrias } from "@/lib/centinela/pestel/asimetriasVinculo";
 import { verificarOrigen } from "@/lib/centinela/pestel/verificarOrigen";
 import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
+import { calcularSalida, type SalidaAviso } from "@/lib/moddulo/lineasAvisoSalida";
+import type { ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 
 /** Un proyecto PESTEL archivado (o con `deletedAt`, que hoy ninguno tiene) sigue existiendo pero no es un destino «vivo». */
 function esArchivado(d: { status?: unknown; deletedAt?: unknown } | undefined): boolean {
@@ -72,13 +74,20 @@ export async function GET(request: NextRequest) {
       .where("userId", "==", session.uid)
       .get();
 
+    // T5b (opt-in `salida=1`): además de las asimetrías, el estado de lo que se reemplazaría al volver con un análisis
+    // (solo estado y rótulos de líneas). El MISMO `getAll` con la máscara ampliada: 2 lecturas en total, 0 escrituras.
+    const salidaPedida = searchParams.get("salida") === "1";
+    let salida: SalidaAviso | undefined = salidaPedida ? { estado: "no_verificable" } : undefined;
+
     // Best-effort: un fallo de lectura aquí nunca afecta la respuesta.
     try {
       const [modSnap] = await adminDb.getAll(adminDb.collection("moddulo_projects").doc(modduloProjectId), {
-        fieldMask: ["collaborators", "deletedAt", "phases.exploracion.linkedSource.kind", "phases.exploracion.linkedSource.sourceId", "phases.exploracion.linkedSource.sourceAnalysisId"],
+        fieldMask: ["collaborators", "deletedAt", "phases.exploracion.linkedSource.kind", "phases.exploracion.linkedSource.sourceId", "phases.exploracion.linkedSource.sourceAnalysisId",
+          ...(salidaPedida ? ["phases.exploracion.status", "phases.exploracion.linkedSource.payload", "phases.exploracion.m1", "phases.exploracion.dvs", "phases.exploracion.draftDVS", "phases.exploracion.motorAprobaciones"] : [])],
       });
       const mod = modSnap?.exists ? (modSnap.data() as { collaborators?: Array<{ uid?: string }>; deletedAt?: unknown; phases?: { exploracion?: { linkedSource?: { kind?: string; sourceId?: string; sourceAnalysisId?: string } } } }) : undefined;
       if (mod && !mod.deletedAt && mod.collaborators?.some((c) => c.uid === session.uid)) {
+        if (salidaPedida) salida = calcularSalida(mod.phases?.exploracion as ExploracionParaM1 | undefined);
         for (const a of clasificarAsimetrias({ modduloId: modduloProjectId, linkedSource: mod.phases?.exploracion?.linkedSource, backlinks: snap.docs.map((d) => d.id) })) {
           console.warn(`[find-linked-pestel][asimetria] ${a.tipo} moddulo=${a.modduloId} pestel=${a.pestelIds.join(",")}`);
         }
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (snap.empty) {
-      return NextResponse.json({ found: false });
+      return NextResponse.json({ found: false, ...(salida ? { salida } : {}) });
     }
 
     // Sort in memory: most recent first (handles duplicate edge case without requiring a composite index)
@@ -103,6 +112,7 @@ export async function GET(request: NextRequest) {
       sourceId: doc.id,
       currentStage: doc.data().currentStage ?? 3,
       ...(esArchivado(doc.data()) ? { archivado: true } : {}),
+      ...(salida ? { salida } : {}),
     });
   }
 

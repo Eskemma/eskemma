@@ -2,6 +2,7 @@
 // lleva a Centinela (si el proyecto existe) y permite cancelar el vínculo; con la Fase 2 cerrada la cancelación
 // queda deshabilitada con su motivo (el servidor también la rechaza: 409 fase_cerrada).
 import Link from "next/link";
+import { debeInterceptarClic, TEXTO_VERIFICANDO_SALIDA } from "@/lib/moddulo/avisoSalida";
 
 export const TEXTO_PENDIENTE = "Análisis PESTEL en preparación en Centinela; aún no se importa.";
 export const TEXTO_PENDIENTE_ARCHIVADO = "Análisis PESTEL en preparación en Centinela (el proyecto está archivado); aún no se importa.";
@@ -10,7 +11,7 @@ export const TEXTO_PENDIENTE_CERRADA = "la fase está cerrada: no se puede impor
 export const TOOLTIP_FASE_CERRADA = "La fase está cerrada";
 
 export function PendientePestel({
-  pestelId, etapa, archivado, huerfano, f2Cerrada, cancelando, onCancelar,
+  pestelId, etapa, archivado, huerfano, f2Cerrada, cancelando, onCancelar, verificandoSalida = false, onIrACentinela,
 }: {
   pestelId: string;
   etapa: number | null;
@@ -19,6 +20,10 @@ export function PendientePestel({
   f2Cerrada: boolean;
   cancelando: boolean;
   onCancelar: () => void;
+  /** T5b: la verificación previa a salir está en curso (el enlace queda inactivo, sin doble clic). */
+  verificandoSalida?: boolean;
+  /** T5b: si se pasa, el clic primario sin modificadores pasa por el aviso al salir; con modificadores es el del <Link>. */
+  onIrACentinela?: (destino: string) => void;
 }) {
   const texto = huerfano ? TEXTO_PENDIENTE_HUERFANO : archivado ? TEXTO_PENDIENTE_ARCHIVADO : TEXTO_PENDIENTE;
   const destino = `/centinela/pestel/${pestelId}/${etapa !== null && etapa >= 5 ? "analisis" : "datos"}`;
@@ -33,8 +38,16 @@ export function PendientePestel({
         {!huerfano && (
           <>
             {" "}
-            <Link href={destino} className="font-medium text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 whitespace-nowrap focus-visible:outline focus-visible:outline-2">
-              Ir a Centinela →
+            <Link
+              href={destino}
+              aria-disabled={verificandoSalida || undefined}
+              onClick={(e) => {
+                if (!onIrACentinela) return;
+                if (verificandoSalida) { e.preventDefault(); return; }
+                if (debeInterceptarClic(e)) { e.preventDefault(); onIrACentinela(destino); }
+              }}
+              className="font-medium text-bluegreen-eske dark:text-blue-eske-20 underline underline-offset-2 whitespace-nowrap focus-visible:outline focus-visible:outline-2">
+              {verificandoSalida ? TEXTO_VERIFICANDO_SALIDA : "Ir a Centinela →"}
             </Link>
           </>
         )}
