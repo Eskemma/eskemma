@@ -289,18 +289,16 @@ service cloud.firestore {
     }
 
     // ========== PESTEL: Análisis V2 ==========
-    // Written by Cloud Functions (Admin SDK). Readable/updatable by owner.
+    // Written ONLY by Cloud Functions and API routes (Admin SDK, which ignores these rules). Readable by the owner.
+    // The client never writes this collection (verified: no web-SDK writer exists), so `update` is closed: bias
+    // acknowledgement (E5), adjustments, approval (E6), informes and the rest go through the routes, which enforce
+    // their own checks (422 on unreviewed biases, justification under 50% confidence, approval withdrawal).
+    // Before 26-11-05 this was `hasAny([...])`: any write touching ONE of six keys could also change `userId`,
+    // `dimensions`, `informes`... The guard test lib/firestore/reglasPestelAnalyses.test.ts pins this block.
     match /pestel_analyses/{analysisId} {
       allow read: if request.auth != null
         && resource.data.userId == request.auth.uid;
-      // Allow updating: bias acknowledgement (E5), human adjustments (E6), approval (E6)
-      allow update: if request.auth != null
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data)
-             .affectedKeys().hasAny([
-               "biasAlerts", "status", "updatedAt",
-               "adjustments", "approvedAt", "approvedBy"
-             ]);
+      allow update: if false;
       allow create, delete: if false;
     }
 
