@@ -1,8 +1,8 @@
 # Bitácora de hallazgos candidatos — Documento de Patrones Reutilizables
 
-**Versión:** 11
-**Última actualización:** 2026-11-02
-**Propósito:** Registrar, a medida que avanzamos en la nivelación del sistema contra los 9 Principios Rectores de Eskemma (Grupos 1, 2 y 3) y en las series de correcciones que de ahí se derivan, los hallazgos que podrían convertirse en patrones reutilizables, principios reforzados, o advertencias de diseño para el documento final. Esta bitácora se actualiza al cierre de cada ronda y se versiona (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11...) hasta que se retome la redacción del documento de patrones reutilizables, momento en el que su contenido se integra y esta bitácora se da por cerrada.
+**Versión:** 12
+**Última actualización:** 2026-11-05
+**Propósito:** Registrar, a medida que avanzamos en la nivelación del sistema contra los 9 Principios Rectores de Eskemma (Grupos 1, 2 y 3) y en las series de correcciones que de ahí se derivan, los hallazgos que podrían convertirse en patrones reutilizables, principios reforzados, o advertencias de diseño para el documento final. Esta bitácora se actualiza al cierre de cada ronda y se versiona (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12...) hasta que se retome la redacción del documento de patrones reutilizables, momento en el que su contenido se integra y esta bitácora se da por cerrada.
 
 **Cómo leer cada entrada:**
 - **Hallazgo:** qué se encontró, en una frase.
@@ -818,9 +818,9 @@ Nota: la cifra 2619 que circuló durante la ronda para el commit 1 del paso 7 er
 
 ---
 
-## Origen: Ronda PESTEL → Moddulo F2-Exploración, Bloque 2 — app PESTEL de Centinela ↔ Moddulo F2 (2026-10-23 a 2026-11-02)
+## Origen: Ronda PESTEL → Moddulo F2-Exploración, Bloque 2 — app PESTEL de Centinela ↔ Moddulo F2 (2026-10-23 a 2026-11-05)
 
-**Alcance de este bloque.** La app PESTEL de Centinela es la fuente de verdad del análisis; Moddulo F2 lo recibe (importación) y lo aprueba (M1). Flujo acordado con Raúl: el usuario ajusta en Centinela, reexporta y reaprueba en Moddulo; no hay retorno de ajustes de Moddulo hacia Centinela. Se trabaja por tandas, en este orden: **T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8**. Estado a 2026-11-02: T0, 1a, T2 y T6 construidas, verificadas y commiteadas por Raúl; **T3 en planeación** (Code); T4, T5, T7 y T8 pendientes.
+**Alcance de este bloque.** La app PESTEL de Centinela es la fuente de verdad del análisis; Moddulo F2 lo recibe (importación) y lo aprueba (M1). Flujo acordado con Raúl: el usuario ajusta en Centinela, reexporta y reaprueba en Moddulo; no hay retorno de ajustes de Moddulo hacia Centinela. Se trabaja por tandas, en este orden: **T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8**. Estado a 2026-11-05 (v12): T0, 1a, T2, T6, T3, T4 y T5 (5a y 5b) construidas, verificadas en navegador y commiteadas por Raúl; el parche de reglas de Firestore de `pestel_analyses`, commiteado y desplegado; **T7 y T8 pendientes**.
 
 **Decisiones de producto registradas (D1 a D8 y posteriores, resumen):**
 - Centinela es la fuente de verdad; el mensaje de F2 ante un conflicto de vínculo es pertinente por esa razón.
@@ -829,7 +829,10 @@ Nota: la cifra 2619 que circuló durante la ronda para el commit 1 del paso 7 er
 - El vínculo pendiente vive solo en el back-link `pestel_projects.modduloProjectId`; un PESTEL solo puede estar vinculado a un Moddulo existente (la papelera cuenta como vinculado).
 - Retiro de `export-to-moddulo` con 410 y contador `retiros_rutas/export-to-moddulo` (solo total y fecha, sin uid; los 401 en un campo aparte). Se medirá con Vercel Pro (Hobby conserva 1 hora de registros; Pro, 1 día) y el retiro definitivo llega 30 días después (N5, T8).
 - Convención de color de avisos: marrón en modo claro y amarillo en oscuro (ver H60).
-- Regla de Firestore `hasAny → hasOnly` en `firestore.rules:297-303`: va en un commit aparte y el despliegue lo hace Raúl.
+- (v12) Regla de Firestore de `pestel_analyses`: se decidió la **opción B** (cerrar por completo la escritura del cliente, `allow update: if false`) en lugar de `hasAny → hasOnly`; commit aparte (`7db4a2a`) y despliegue hecho por Raúl el 2026-11-05 (ver H68).
+- (v12) El aviso de origen de un análisis vinculado describe un estado y por eso **no se descarta** (T4, H64); un aviso antes de una acción (salir hacia Centinela) es cortesía y se puede saltar: la protección real es el candado H15 del servidor al importar (T5b, H66).
+- (v12) El pendiente se puede **cancelar** desde la franja del pendiente y con la Fase 2 cerrada «Desvincular» y «Cancelar vínculo pendiente» quedan deshabilitados (T5a, H65).
+- (v12) Cerrar la escritura directa del navegador no quita decisiones al usuario: cada acción de la pantalla (reconocer un sesgo, ajustar, aprobar) pasa por una ruta del servidor que fija autor, fecha y condiciones; lo que se cierra es poder aprobar o ajustar saltándose la app (aclaración de producto de Raúl, H68).
 
 **Tabla de commits y de suite (Bloque 2):**
 
@@ -842,8 +845,16 @@ Nota: la cifra 2619 que circuló durante la ronda para el commit 1 del paso 7 er
 | Reloj | Fecha fija en `expressPrompt.test.ts` con `vi.setSystemTime` (H61) | `96f2d27` | 2759/2759 |
 | T6-8 | Ajustar un análisis aprobado retira la aprobación (H58) + presentación | `6d20b9b` | 2750 |
 | T6-9a | Aprobar con confianza < 50 exige justificación (H59) + presentación | `28b08c6` | 2759 |
+| T3 | Los ajustes humanos de la matriz viajan a F2 (`ajuste` por dimensión, precedencia y atribución en el prompt, trazabilidad); señales sin fuente, fecha ni confianza inventadas (H63) | `86998dc` y `4743ffe` | 2813 |
+| T4 | Huella de origen y aviso de cambio del análisis vinculado; reimportar con otro contenido pasa por el candado H15 (H64) | `4e4321e` (4a) y `4d6e006` (4b) | 2906 |
+| T5a | El vínculo pendiente vive solo en el back-link de PESTEL; se puede cancelar; no se vincula otro encima (H65) | `a8f55c5` (commit 5, servidor) y `45deddb` (commit 6, pantalla) | 2970 |
+| T5b-7 | Aviso al salir hacia Centinela de lo que se reemplazaría al volver con un análisis (H66) | `21e4f9b` | 2999 |
+| T5b-8 | F2 dice por qué no se pudo importar un análisis: textos, franja de error, «Vincular de nuevo» (H67) | `e513ec7` | 3012 |
+| Reglas | `pestel_analyses` sin escritura de cliente, opción B (H68) | `7db4a2a` | 3018 |
 
 Nota: la suite sube a 2759 con T6 completo; antes del arreglo del reloj, 5 pruebas fallaban en HEAD limpio por la fecha del sistema (2754/2759). Conteo de rutas de `CLAUDE.md`: línea 1113, valor 151 (sin rutas nuevas en T2 ni T6).
+
+Nota (v12): la suite pasa de 2759 a 3018 con T3, T4, T5 y el parche de reglas; el conteo de rutas sigue en 151 (T5b añadió un parámetro opt-in a una ruta existente, no una ruta) y `CLAUDE.md` pesa 675 315 bytes. Cada parche se entregó con tamaño, `git apply --cached --check` en orden, `CLAUDE.md` ≥ 650 000 bytes y pocas líneas cambiadas (ver lecciones, incidente de T3).
 
 ### H54 — El flujo real de Centinela no es el que el diagnóstico (ni las guías de verificación) suponían
 
@@ -934,23 +945,111 @@ Nota: la suite sube a 2759 con T6 completo; antes del arreglo del reloj, 5 prueb
 - **Nota para el documento final:** **Una verificación que escribe en la base real solo se hace con un script que (a) crea documentos nuevos marcados, (b) simula primero, (c) respalda, (d) limpia comprobando la marca de cada uno y (e) cuenta antes y después.** Si el entorno local apunta a datos reales, esto se pregunta antes de autorizar escrituras. Los scripts viven en una ruta persistente fuera del repo.
 
 
-### Hallazgos del diagnóstico de la ronda (N1 a N14) y su estado a 2026-11-02 (actualizado en v11)
+### H63 — Los ajustes humanos de la matriz no viajaban a F2
 
-Los números y las evidencias vienen del diagnóstico de solo lectura de la ronda. En v10 se confirmaron con Code (con archivo y línea) los estados de N6, N9, N10, N12 y N14.
+- **Hallazgo (N3 parcial, H-P2, N7):** Los ajustes que el analista hace en Centinela (clasificación original → ajustada, con justificación) no llegaban a Moddulo F2: el M1 aprobado y los motores M2–M5 trabajaban sobre la clasificación original, y F2 mostraba una nota que decía que no los incluía. Además, el traspaso de señales (`toF2Senal`) fabricaba nivel de confianza, fuente y fecha cuando el dato no existía.
+- **Principio(s):** Principios 1, 4 y 7; Integridad de datos e IA; conecta con H03, H47 y H58.
+- **Estado:** **Corregido (T3, `86998dc` y `4743ffe`; suite 2759 → 2813).**
+  - *Modelo:* `F2DimensionPESTEL.ajuste?` = `{clasificacionOriginal, clasificacionAjustada, justificacion, ajustadoEn?, posiciones?}`, sin `ajustadoPor` y omitido si no hay ajuste. Lo arma `lib/centinela/pestel/transformToMapaPESTEL.ts` a partir de los `adjustments` del análisis.
+  - *Prompts:* el ajuste se serializa en el prompt; la frase de precedencia (`PRECEDENCIA_PESTL_AJUSTE`, en `lib/ai/phases/prompts.ts`) solo aparece cuando `hayAjustes`, con una cláusula de atribución («según el ajuste del analista») y los hechos de la justificación se atribuyen al analista y no se presentan como dato verificado. La trazabilidad del Reporte F2 dice «incluye N ajustes del analista hechos en Centinela».
+  - *Pantalla:* la tarjeta de la dimensión muestra la clasificación ajustada y un desplegable accesible «Ver el ajuste» (el tooltip nativo `title` no apareció en la verificación y la justificación era ilegible); la narrativa se rotula «(previa al ajuste)». La nota de Centinela «Moddulo F2 todavía no incluye tus ajustes» era **falsa para proyectos ya importados**; se sustituyó por una nota derivada del dato (`ajustesSinReflejar.ts`, `ajustesSinReflejarEnF2`, con `?ajustesImportados=1`).
+  - *N7:* `fuente`, `fechaCorte` y `nivelConfianza` de `F2Senal` pasan a ser opcionales y no se inventan.
+  - *Verificación:* en navegador con datos de prueba marcados (ver H62 y H69) y con llamadas reales a Claude en dos versiones del prompt (la segunda con la cláusula de atribución).
+- **Observaciones del motor (registradas, sin corregir):** el hecho de la justificación puede presentarse como dato en los motores; el ajuste puede propagarse a más dimensiones que la ajustada; una señal sin fuente podría recibir una atribución de fuente inventada. Se miden con una llamada real cada vez que se cambie el prompt (una sola corrida no aísla el efecto).
+- **¿Patrón o caso aislado?:** Patrón (familia de H58 y H47).
+- **Nota para el documento final:** **Lo que una persona ajusta aguas arriba viaja con lo aprobado, atribuido al analista y con su justificación, y el motor sabe que es un juicio humano y no un dato;** la serialización del prompt dice quién afirma qué, y lo que no se conoce se omite en lugar de inventarse.
+
+### H64 — Un vínculo no sabía si su origen había cambiado
+
+- **Hallazgo:** Un Moddulo vinculado a un análisis de Centinela no podía saber si ese análisis había cambiado después de la importación (nuevos ajustes o una versión nueva): el vínculo guardaba el contenido, no la huella de su origen. Reimportar el mismo análisis era idempotente aunque su contenido hubiera cambiado.
+- **Principio(s):** Principios 1 y 4; Arquitectura de datos; Ciclo de vida de recursos; conecta con H50 y H58.
+- **Estado:** **Corregido (T4, `4e4321e` y `4d6e006`; suite 2813 → 2906).**
+  - *Huella de origen v:1:* sha256 de una serialización estable sobre `dimensions` y `adjustments` del análisis crudo, guardada en `linkedSource.huellaFuente`. El cliente no calcula huellas. Módulos puros: `contenidoOrigen.ts`, `huellaOrigen.ts`, `estadoOrigen.ts`, `avisoOrigen.ts` y `verificarOrigen.ts`.
+  - *Estados:* `igual`, `cambio_contenido`, `version_nueva` y `no_verificable`. La verificación es opt-in (`verificar=1` en `find-linked-pestel`), para que cada lectura no pague el costo.
+  - *Reimportar:* el mismo análisis con otra huella (o sin huella y con ajustes sin reflejar) deja de ser idempotente y pasa por el candado H15 (409 con `motivo: "analisis_cambio"`).
+  - *Contrato:* prueba de contrato de los escritores de `pestel_analyses` (capas A y B, lista cerrada en `lib/centinela/pestel/escritoresDeAnalisis.ts`), para que un escritor nuevo obligue a decidir si altera la huella.
+  - *Pantalla:* franja de origen (`AvisoOrigenPestel`) **no descartable**: describe un estado, y un estado no se cierra con un botón (decisión de producto de Raúl).
+- **Incidente de proceso:** Code describió un botón «Cerrar» en la franja de origen que la pantalla no tenía; la causa no se determinó (posible compilación vieja). Se quitó el botón y el estado de descarte y se repitió la verificación.
+- **Límites declarados:** el aviso de «versión nueva» solo está cubierto por pruebas (verlo exige dos análisis del mismo proyecto); sin emulador de Firestore.
+- **¿Patrón o caso aislado?:** Patrón (dependencia aguas arriba por huella, ver H50).
+- **Nota para el documento final:** **Un vínculo guarda la huella de su origen y el estado (igual, cambiado, versión nueva, no verificable) se deriva en el servidor al comparar;** la pantalla lo describe sin dejar que se descarte, y reimportar algo distinto nunca es una operación silenciosa.
+
+### H65 — El vínculo pendiente se escribía a medias en dos documentos
+
+- **Hallazgo (N6):** Al crear un PESTEL desde F2, el servidor escribía en el Moddulo un `linkedSource` de tipo T22 con el id nuevo mientras el payload seguía siendo el Express (ventana de procedencia mixta). Había además un «repair» en `find-linked-pestel`, un modal de reemplazo (`ConfirmReplacePestelModal`) con un texto falso («los motores M2–M5 se regenerarán») y dos caminos que podían vincular otro PESTEL a un Moddulo que ya tenía uno en espera.
+- **Principio(s):** Principios 1 y 4; Ciclo de vida de recursos; Arquitectura de datos; conecta con H37 y H56.
+- **Estado:** **Corregido (T5a, `a8f55c5` servidor y `45deddb` pantalla; suite 2906 → 2970).**
+  - *Un dato, un lugar:* el pendiente vive solo en el back-link `pestel_projects.modduloProjectId`. Resolver puro `lib/moddulo/resolverVinculoPestel.ts` → `sin_pestel` / `pendiente` / `vinculado` (un T22 sin `sourceAnalysisId` se lee como pendiente).
+  - *Servidor:* `POST /pestel/project` en transacción única, sin escribir en el Moddulo (dedup con 200; rechaza con `fase_cerrada`). `unlink-pestel` funciona en modo pendiente (comprueba usuario, PESTEL propio, back-link a ESTE Moddulo y fase). `link-moddulo` y `vinculoUnico` rechazan con 409 `moddulo_con_pendiente`. Se eliminó el repair de `find-linked-pestel` y se retiraron `ConfirmReplacePestelModal` y `pendingReplace`. Se cubren la papelera, el archivado y el huérfano.
+  - *Pantalla:* franja del pendiente (`PendientePestel`) con «Ir a Centinela →» y «Cancelar vínculo pendiente»; con la Fase 2 cerrada, «Desvincular» y «Cancelar» quedan deshabilitados.
+- **Límites declarados:** dos pestañas simultáneas podrían crear dos pendientes (sin emulador de Firestore la carrera no se prueba).
+- **¿Patrón o caso aislado?:** Patrón («un recurso, un dueño», H56).
+- **Nota para el documento final:** **Un estado transitorio vive en un solo documento y la pantalla lo deriva con una función pura; no se refleja a medias en otro,** y las acciones que lo cambian se rechazan con un código estable mientras exista.
+
+### H66 — Salir hacia Centinela sin saber qué se perdería al volver
+
+- **Hallazgo:** Quien salía de un Moddulo con Express aprobado, motores aprobados o ediciones no sabía que, al volver con un análisis, el import los reemplazaría. El candado H15 lo pide, pero hasta el momento de importar.
+- **Principio(s):** Principio 4; Ciclo de vida de recursos; categoría «confirmación de impacto» (H15).
+- **Estado:** **Corregido (T5b, commit 7, `21e4f9b`; suite 2970 → 2999).**
+  - *Servidor:* parámetro opt-in `salida=1` en `find-linked-pestel`: 2 lecturas y 0 escrituras, sin `getProject` (que escribe `lastAccessedAt`) y sin ruta nueva (151). La respuesta lleva solo `estado` y `lineas` (rótulos del candado H15), nunca contenido del mapa, de la copia aprobada ni del reporte. Helper `lineasAvisoSalida`, módulo puro `lib/moddulo/avisoSalida.ts`.
+  - *Pantalla:* modal «Antes de ir a Centinela» con «Si al volver importas un análisis, esto se reemplazaría:» y la lista. Mientras consulta, el control dice «Verificando el estado del proyecto…» (tope de 8 s); si la consulta falla, «No se pudo verificar el estado actual…» con «Continuar a Centinela» (nunca bloquea). Pasan por el aviso «Ir a Centinela →», «Regresar a PESTEL →» (en pendiente) y «Abrir PESTEL» / «Analizar con PESTEL»; solo se intercepta el clic primario sin teclas modificadoras (`debeInterceptarClic`).
+  - *No avisa* con la Fase 2 cerrada, con análisis ya importado (vinculado, donde T4 ya avisa) ni cuando no hay nada que reemplazar.
+- **Decisión:** el aviso es cortesía (una pestaña nueva lo salta); la protección real es el candado H15 del servidor al importar.
+- **¿Patrón o caso aislado?:** Patrón (H15, ahora también al salir).
+- **Nota para el documento final:** **Avisar antes de salir lo que se perderá al volver, con una consulta barata y acotada que nunca bloquea y que declara su peso;** la protección real se queda en el servidor, y el aviso se omite cuando no hay nada que decir.
+
+### H67 — El rechazo de un import automático se callaba
+
+- **Hallazgo:** Los rechazos del import automático (`?pest_analysis_id=`) y de «Vincular de nuevo» (`pestel_already_linked`, `moddulo_con_pendiente`, fallos de red) no se mostraban: el efecto de la página y `handleRelinkPestel` atendían el conflicto y descartaban el resto en silencio. El 409 de fase cerrada aparecía en el panel «Análisis no completado… Reintentar análisis express», que no corresponde a un import. F2 no tenía texto propio para `pestel_already_linked`.
+- **Principio(s):** Principios 1 y 4; Diseño visual; familia «la pantalla no afirma lo que el servidor no confirmó» (H17).
+- **Estado:** **Corregido (T5b, commit 8, `e513ec7`; suite 2999 → 3012).**
+  - *Textos* en `lib/moddulo/textosVinculo.ts`, ninguno con «contacta soporte» (la prueba de escaneo de T2 los cubre) y cada uno con un control que existe: «Regresar a Moddulo F2 con resultados» y «Cancelar vínculo pendiente». Se les añade «No se importó nada.». El texto del servidor de `pestel_already_linked` no cambia (lo comparte `link-moddulo`).
+  - *Decisión:* `decidirConfirmacionImport` tiene ramas explícitas para los dos códigos y `decidirFranjaImport` reutiliza la decisión. Franja `role="alert"` en el encabezado: red o 5xx con «Reintentar» y «Cerrar»; 4xx solo con «Cerrar». «Cerrar» quita `pest_analysis_id` de la URL (`urlAlCancelarImport`). Contraste medido: 5.95:1 y 6.23:1 en claro; 5.39:1 y 6.47:1 en oscuro.
+  - *Guarda* (`lib/moddulo/controlImportAuto.ts`): una sola llamada en vuelo, el id queda marcado tras un fallo o un conflicto y «Cerrar» lo ignora aunque el router tarde en sacar el parámetro.
+  - *Cambio no pedido, anunciado:* se quitó `setExpressError(MENSAJE_FASE_CERRADA_REEMPLAZO)` de `importPestel`; el texto de fase cerrada sale ahora en la franja o en el modal (escenario 18 lo verificó).
+  - *Verificado en navegador:* ya vinculado (15), con pendiente (16), «Vincular de nuevo» con rechazo (17), fase cerrada (18), fallo de red con la petición bloqueada y el texto de «ya vinculado» dentro del modal de confirmación.
+- **Hallazgo menor (sin corregir):** el efecto C7b (`import-pestel` con `pestAnalysisId` y sin `pestProjectId` ni mapa) sigue descartando fallos que no son conflicto; es código defensivo sin camino real hoy (los 3 T22 reales guardan `sourceId`) y queda anotado para retirarlo o cubrirlo.
+- **¿Patrón o caso aislado?:** Patrón (familia H17; variante «rechazo de un proceso automático»).
+- **Nota para el documento final:** **Cada código de rechazo del servidor tiene en pantalla un texto que dice qué pasó, que nada cambió y qué hacer, con un control que existe;** un fallo de conexión se distingue de un rechazo y solo el primero ofrece reintentar. Un proceso automático que se dispara por la URL no se repite tras cerrarlo.
+
+### H68 — La regla de `pestel_analyses` permitía forjar campos aunque «cerraba» seis
+
+- **Hallazgo:** La regla de update de `pestel_analyses` (`firestore.rules`, bloque de ~l.293 a 303) usaba `affectedKeys().hasAny([...seis claves])`: bastaba que la escritura tocara una de las seis para que el dueño, con el SDK web, cambiara también `userId`, `dimensions`, `informes`, etc. Aun convertida en lista cerrada con `hasOnly`, el dueño habría podido escribir desde el navegador `status`, `approvedAt`, `approvedBy`, `adjustments` y `biasAlerts`, saltándose lo que hacen las rutas: el 422 de sesgos sin revisar, la justificación con confianza < 50 (H59), el retiro de la aprobación al ajustar (H58) y la autoría de `approvedBy`. Es integridad de sus propios datos, no una fuga entre usuarios.
+- **Principio(s):** Seguridad; Integridad de datos e IA; Principio 4 (la aprobación es un acto que el sistema registra).
+- **Estado:** **Corregido (`7db4a2a`, suite 3018; desplegado por Raúl el 2026-11-05).**
+  - Raúl eligió la **opción B**: `allow update: if false`, con `read` solo del dueño y `create` y `delete` cerrados. Se probó el inventario: **0 escritores de cliente** en `pestel_analyses` (todo pasa por rutas `/api/centinela/pestel/**`, Cloud Functions y scripts con Admin SDK, que ignoran las reglas).
+  - Guarda estática `lib/firestore/reglasPestelAnalyses.test.ts` (6 pruebas, sin depender de espacios ni comentarios; rechaza `hasAny`, la variante `hasOnly` de las seis claves, un write suelto, un read abierto y un bloque duplicado o ausente) y una fila en el Historial de `CLAUDE.md`.
+  - *Despliegue:* se comparó el texto publicado en la consola con el del repo (solo difería el salto de línea final), se validó con `firebase deploy --only firestore:rules --project eskemma-3c4c3 --dry-run`, se publicó con el mismo comando sin `--dry-run` y se hizo un humo posterior con lo que el SDK web sí usa (iniciar y cerrar sesión, perfil, blog y lectura de Centinela y F2). Reversa preparada: `git checkout e513ec7 -- firestore.rules` y el mismo despliegue.
+- **Límites declarados:** sin emulador de Firestore (Java 17; se necesita 21 o más) la guarda prueba el texto y la compilación, no la evaluación de `affectedKeys` sobre escrituras concretas; lo cubre el inventario de escritores. El humo de Centinela y F2 solo comprueba que nada alrededor se rompió (esas rutas usan Admin SDK).
+- **Pendiente, siguiente commit con el mismo método (diagnóstico de Code):** `pestel_projects` (el dueño puede reescribir `userId` o el back-link `modduloProjectId`; la más valiosa desde T5), `pestel_configs` (legado), `pestel_data_sources` (el dueño puede crear fuentes con el `projectId` de otro proyecto), `pestel_variable_configs` (la lectura compara dos ids propios y no verifica dueño, y los documentos no guardan `userId`) y `pestel_alerts` (ya con `hasOnly(["readAt"])`; prioridad baja). Ningún cliente del SDK web escribe estas colecciones.
+- **¿Patrón o caso aislado?:** Patrón (reglas de update por denylist en otras colecciones `pestel_*`).
+- **Nota para el documento final:** **Una regla de update es una lista cerrada o está cerrada: una denylist deja pasar cualquier campo mientras se toque uno permitido.** Los campos que solo un servidor debe fijar (estado, autor y fecha de aprobación) no se abren al cliente. Una guarda estática vigila que no se reabra; sin emulador, el despliegue compara lo publicado con el repo, valida con `--dry-run`, hace un humo posterior con lo que sí usa el SDK web y deja la reversa a un comando.
+
+### H69 — Los scripts de datos de prueba: protección de ids, duplicados y conteo (extiende H62)
+
+- **Hallazgo:** En T5 y T5b el script de datos de prueba mostró tres defectos: (i) la protección de ids de `--limpiar` trató como reales al Moddulo y al PESTEL que la propia app creó dentro de los de prueba (el mismo tipo de error que el primer `--limpiar` de T6): falló del lado seguro y no borró nada de más; (ii) el script puede crear el mismo lote dos veces sin avisar (T5b quedó duplicado: 14 documentos de más, detectados por la diferencia de cifras 34 / 18 / 148 frente a 27 / 13 / 146 y por la simulación de limpieza); (iii) el contador de la simulación no incluye los documentos adoptados que anuncia aparte («también se borraría»: 16 frente a 17 reales).
+- **Principio(s):** Seguridad; Proceso de desarrollo.
+- **Estado:** (i) **corregido**: el descubrimiento de protegidos adopta lo que crea la app solo con cuatro condiciones juntas (el PESTEL es del mismo uid, su vínculo apunta a un Moddulo de prueba del lote, se creó después del inicio del lote y no tiene análisis) y una autoprueba aborta si algún id real deja de estar protegido; (ii) y (iii) **pendientes**. La limpieza de ambas copias de T5b se hizo con el respaldo y las cifras reales volvieron a 142 / 6 / 17.
+- **¿Patrón o caso aislado?:** Patrón (se repitió en T5 y T5b).
+- **Nota para el documento final:** **Un script de datos de prueba es idempotente por lote (rechaza o reutiliza lo ya creado), su simulación de limpieza imprime la lista y el total real, y el conteo antes y después revela lo que el operador no recordaba haber hecho.** La protección de datos reales no se relaja: lo que crea la app dentro de los datos de prueba se adopta con reglas explícitas y una autoprueba.
+
+### Hallazgos del diagnóstico de la ronda (N1 a N14) y su estado a 2026-11-05 (actualizado en v12)
+
+Los números y las evidencias vienen del diagnóstico de solo lectura de la ronda. En v10 se confirmaron con Code (con archivo y línea) los estados de N6, N9, N10, N12 y N14. En v12 se actualizan N3, N6, N7 y N11.
 
 | # | Hallazgo | Estado |
 |---|---|---|
 | N1 | `REVIEWED` se asigna al crear el análisis (confianza ≥ 50) sin revisión humana; solo `APPROVED` es decisión explícita (`generateFeed.ts:544-545`; 89 de 142) | Pendiente (Bloque 2, H-X; requiere despliegue de una Cloud Function). La señal «insuficiente» ya se deriva de la confianza (H59), no del estado |
 | N2 | `acknowledge-bias` borra la marca «insuficiente» (PENDING_REVIEW → REVIEWED) y 5 análisis `APPROVED` tienen confianza < 50, incluido el único importado a F2 (39); `approve` sin chequeo de confianza | **Parcial.** Aprobar con confianza < 50 exige justificación con autor y fecha (T6, H59, `28b08c6`); los 5 aprobados existentes no se tocan. La justificación aún no llega a F2 (T7) |
-| N3 | `adjust` no mira el estado: permite ajustar un análisis aprobado sin invalidar la aprobación (8 aprobados con ajustes, 6 cambian clasificación) | **Parcial.** Ajustar un aprobado retira la aprobación con constancia (T6, H58, `6d20b9b`). Falta que los ajustes viajen a F2 (T3) |
+| N3 | `adjust` no mira el estado: permite ajustar un análisis aprobado sin invalidar la aprobación (8 aprobados con ajustes, 6 cambian clasificación) | **Corregido.** Ajustar un aprobado retira la aprobación con constancia (T6, H58, `6d20b9b`) y los ajustes viajan a F2 con atribución (T3, H63, `86998dc` y `4743ffe`) |
 | N4 | `link-moddulo`: el «upgrade express → Centinela» no es alcanzable con datos reales (el express guarda como `sourceId` su propio Moddulo, 6 de 6; la prueba siembra un `sourceId` irreal) | **Corregido** (T2-1c, `ac207f9`; H55 y H56) |
 | N5 | `export-to-moddulo` sin llamadores; escribe `linkedSource` sin payload ni reinicio | **En proceso:** retiro con 410 y contador (T8); se mide con Vercel Pro y se elimina 30 días después |
-| N6 | Ventana de procedencia mixta: tras crear el PESTEL desde F2 el Moddulo dice T22 con `sourceId` nuevo pero el payload sigue siendo el Express (`app/api/centinela/pestel/project/route.ts:196-215`, sin tocar desde 26-09-18) | **Abierto** (Bloque 4 / ronda H16; el vínculo pendiente vive solo en el back-link, T3). Efecto añadido por la ronda: `origenDeAnalisis(kind)` dice «Centinela» durante esa ventana, y las recomendaciones por origen del paso 7 (H52) podrían mostrar el origen equivocado |
-| N7 | `toF2Senal` fabrica `nivelConfianza: "medio"` y vacíos en fuente y fecha; 14 de 200 señales sin fuente | Mitigado (ver H47); origen pendiente (T7) |
+| N6 | Ventana de procedencia mixta: tras crear el PESTEL desde F2 el Moddulo dice T22 con `sourceId` nuevo pero el payload sigue siendo el Express (`app/api/centinela/pestel/project/route.ts:196-215`, sin tocar desde 26-09-18) | **Corregido** (T5a, H65, `a8f55c5` y `45deddb`): el POST ya no escribe en el Moddulo; el pendiente vive solo en el back-link y el Moddulo conserva su origen hasta que se importa un análisis. Queda cubierto el efecto sobre `origenDeAnalisis(kind)` y los textos por origen de H52 (Bloque 4: confirmar) |
+| N7 | `toF2Senal` fabrica `nivelConfianza: "medio"` y vacíos en fuente y fecha; 14 de 200 señales sin fuente | **Parcial.** `fuente`, `fechaCorte` y `nivelConfianza` de `F2Senal` son opcionales y no se inventan (T3, H63); falta T7 (que lleguen completos a F2) y la observación del motor sobre atribución de fuente |
 | N8 | Los motores no recibían fecha ni confianza (solo fuente, 3 por tipo, 140 caracteres) | Corregido el recorte (H46); fecha y confianza deliberadamente no se emiten |
 | N9 | El auto-regenerado de borrador sobrescribe ediciones manuales y aprobaciones sin confirmación | **Cerrado** (pasos 3 y 4): `generarDraftDVS` solo se llama desde botones, el reintento y el hook tras aprobar; el efecto automático ya no existe; reemplazar un borrador pasa por la confirmación de «Nuevo análisis» (candado H15) |
 | N10 | `import-pestel` no mira F2 cerrada y el análisis finalizado no avisa de divergencia con el M1 | **Cerrado**: `import-pestel` responde `fase_cerrada` dentro de la transacción (paso 3); la divergencia la señala `dvsDeOtroAnalisis` y la etiqueta amarilla (H50, `05c7982`) |
-| N11 | «Regresar a Moddulo F2» y el botón de E5 envían el análisis más reciente sin mirar su estado | Pendiente (T5, H-P1 como gate de origen; incluye el texto propio en F2 para `pestel_already_linked`) |
+| N11 | «Regresar a Moddulo F2» y el botón de E5 envían el análisis más reciente sin mirar su estado | **Parcial.** Texto propio en F2 para `pestel_already_linked` y `moddulo_con_pendiente` hecho (T5b, H67, `e513ec7`). El gate de origen de H-P1 sobre el análisis más reciente sigue por confirmar (T7) |
 | N12 | `regenerate-m5` mezcla vintages (M1 vigente + M3/M4 del borrador viejo); el `generate-dvs` legado lee el análisis en vivo, no el snapshot | **Mitad cerrada, mitad abierta.** Cerrada: `regenerate-m5` pasa por la compuerta y su escritura final valida la huella capturada. **Residual abierto:** la ruta legada de `generate-dvs` lee `pestel_analyses` en vivo (solo corre si no hay payload); se retira en un paso aparte antes de la Beta, **con medición previa** de cuántos proyectos la usan. `regenerate-m5` sigue sin llamador en la pantalla |
 | N13 | El M1 no tiene paso de aprobación en F2 | Corregido (H38) |
 | N14 | Deriva de documentación: `CLAUDE.md` citaba specs inexistentes (`00_contexto_metodologico.md`, `data_model.md`) y el modelo del ajuste humano difiere entre las specs 00, 05 y 06 y el código | **Parcial.** Corregidas las referencias en el paso 8 (H53). **Sigue abierta** la divergencia del modelo del ajuste humano entre las specs 00, 05 y 06 y el código (Documentación viva) |
@@ -963,6 +1062,12 @@ Los números y las evidencias vienen del diagnóstico de solo lectura de la rond
 - **H23 (v11):** el barrido de contraste continúa; los avisos de T6 están corregidos (H60) y quedan `BiasCheckPanel`, la insignia «Aprobado», la barra de etapas y la pestaña activa en oscuro.
 - **H30 y H36:** siguen diferidas al Bloque 3 (adenda de investigación con Reporte F3 emitido) y al Bloque 4 (reapertura con dependencias).
 - **Familia «la pantalla no afirma lo que el servidor no confirmó»:** variantes nuevas de esta ronda: autorización (H40), generación (H45), estado derivado (H43) y proceso en curso (H49). Misma regla común.
+- **(v12) H15:** `ConfirmReplacePestelModal` y `pendingReplace` se retiraron (T5a, H65); reimportar un análisis con contenido distinto pasa por el candado con 409 `analisis_cambio` (T4, H64); y el aviso antes de salir hacia Centinela (T5b, H66) anticipa lo que el candado pedirá al importar. Siguen pendientes M3 y M4 de F1/F2, M7, M17, F3 y H-F1.
+- **(v12) H16:** **En curso (Bloque 2 casi completo; faltan T7 y T8).** H-P2 (los ajustes humanos de la matriz viajan) quedó corregido en T3 (H63). Siguen en T7: la justificación con confianza < 50 y las señales completas hasta F2 (H-P3, N2, N7), el gate de origen de H-P1 y la semántica de estados de PESTEL (H-X).
+- **(v12) H56:** F2 ya tiene texto propio para `pestel_already_linked` y para `moddulo_con_pendiente` (H67); el selector de Centinela sigue remitiendo a F2 para confirmar un reemplazo.
+- **(v12) H58:** la nota «Moddulo F2 todavía no incluye tus ajustes» se sustituyó en T3 por una derivada del dato (H63); el aviso de «versión más nueva» sigue cubierto solo por pruebas.
+- **(v12) H62:** los defectos de los scripts de datos de prueba de T5 y T5b se registran en H69.
+- **(v12) Familia «la pantalla no afirma lo que el servidor no confirmó»:** variantes nuevas: rechazo de un proceso automático (H67) y origen verificable por huella (H64).
 
 ### Hallazgos menores de la ronda (sin entrada propia)
 
@@ -976,6 +1081,11 @@ Los números y las evidencias vienen del diagnóstico de solo lectura de la rond
 - **Un commit previo con contenido mezclado:** `4fe2d93` contiene la pantalla de 3b y su rótulo no lo dice; no se reescribe.
 - **Datos externos, hallazgos sueltos:** series de INEGI con `ErrorCode 100`, CONAPO con 301 y arranque en frío lento de Fontana en F3-2.
 - **Pendiente de producto:** la confianza de la IA junto a una clasificación editada por el usuario (H48); `categoriasEditadas` es un conteo, no una lista.
+- **(v12) Tooltip nativo de un control deshabilitado:** el atributo `title` tarda unos segundos en aparecer; aceptado (los controles deshabilitados explican su razón con texto visible cuando importa).
+- **(v12) Aviso del asistente «Nuevo PESTEL» («ya tenía un proyecto de Centinela vinculado»):** aparece tras recorrer el asistente dos veces; es el comportamiento esperado.
+- **(v12) Colecciones `pestel_*` con reglas amplias:** `pestel_projects`, `pestel_configs` y `pestel_data_sources` permiten update del dueño sin lista de campos; `pestel_variable_configs` lee sin verificar dueño; `pestel_alerts` ya está cerrada con `hasOnly(["readAt"])` y tiene una regla anidada `/{userId}/items/{id}` sin escritores (H68).
+- **(v12) Un incidente de PESTEL en `scripts/` de Code:** el contador de la simulación de limpieza no suma los documentos «adoptados» que anuncia aparte (H69).
+- **(v12) Tabla de estados de `CLAUDE.md`:** decía «botón inferior» cuando, con mapa, «Regresar a PESTEL →» va en la barra «Análisis por motores»; corregida en T5a.
 
 ### Pendientes de operación (lista previa a la Beta)
 
@@ -989,12 +1099,18 @@ Los números y las evidencias vienen del diagnóstico de solo lectura de la rond
 - **Retirar el camino legado de `generate-dvs`** (lee `pestel_analyses` en vivo, solo si no hay payload; N12 residual) en un paso aparte, **midiendo antes** cuántos proyectos lo usan.
 - **Ajuste 4g:** normalizar la comparación de `diffXpcto` (recortar, colapsar espacios, NFC) para que una diferencia invisible no produzca un aviso «A → A». Raúl cree que ya se resolvió y verificó en navegador; **por confirmar** en la próxima ejecución antes de cerrarlo.
 - **Bloque 4, entradas nuevas de la ronda:** revisar `elegirMapaParaCriterios` frente a `m1-reopen` (H52); la pregunta de producto sobre el criterio 8 con una dimensión NEUTRAL deliberada; el efecto de N6 en los textos por origen.
-- **Regla de Firestore** (`firestore.rules:297-303`): cambiar `hasAny` por `hasOnly` en un commit aparte; el despliegue lo hace Raúl.
+- ~~**Regla de Firestore** de `pestel_analyses`~~ **Hecho en v12 (`7db4a2a`, desplegada el 2026-11-05, opción B; ver H68).** **Pendiente:** un commit siguiente, con el mismo método (una guarda estática por colección, `--dry-run`, comparación de lo publicado con el repo, humo posterior y reversa), para las demás colecciones `pestel_*`: primero `pestel_projects`, luego `pestel_data_sources`, `pestel_configs` y la lectura de `pestel_variable_configs`.
 - **Ronda de contraste** (continuación de H23): `BiasCheckPanel`, insignia «Aprobado», barra de etapas, pestaña activa en oscuro.
-- **Texto propio en F2 para `pestel_already_linked`** (T5); la nota de F2 «todavía no incluye tus ajustes» se retira en T3.
+- ~~**Texto propio en F2 para `pestel_already_linked`**~~ **Hecho (T5b, `e513ec7`; H67).** ~~La nota de F2 «todavía no incluye tus ajustes»~~ **Sustituida en T3 por una nota derivada del dato (H63).**
 - **Aviso de «versión más nueva»** (H58): solo cubierto por pruebas unitarias; verlo en navegador exige dos análisis del mismo proyecto.
 - **Retiro definitivo de `export-to-moddulo`:** tras pasar a Vercel Pro y medir el contador durante 30 días (T8).
 - **Pruebas manuales aún sin hacer:** el escenario original del aviso de XPCTO de punta a punta (importar, llenar F1, aprobar y generar la primera vez), y el caso de fase cerrada del 4d (cubierto solo por pruebas unitarias).
+- **(v12) Scripts de datos de prueba** (H69): idempotencia por lote (rechazar o reutilizar lo ya creado) y total real, con los adoptados incluidos, en la simulación de limpieza.
+- **(v12) Observaciones del motor tras T3** (H63): que el hecho de una justificación no se presente como dato; que el ajuste no se propague a dimensiones no ajustadas; que no se atribuya fuente a una señal sin fuente. Se miden con una llamada real cuando se toque el prompt.
+- **(v12) Efecto C7b** (H67): código defensivo sin camino real; decidir si se retira o se cubre con una prueba.
+- **(v12) Carreras entre pestañas** (H65): dos pestañas pueden crear dos pendientes; y el modal «Reemplazar» ante una vinculación hecha en otra pestaña solo se verificó en el texto que sale dentro del modal, no en la carrera misma (sin emulador).
+- **(v12) Aviso de «versión nueva»** (H58 y H64): sigue cubierto solo por pruebas; verlo exige dos análisis del mismo proyecto.
+- **(v12) T7:** «Regresar» y «Editar en Centinela», la nota de confianza y el viaje a F2 de la justificación con confianza < 50 y de las señales completas (N2, N7). **T8:** retiro de `export-to-moddulo` con 410 y el contador `retiros_rutas/export-to-moddulo`, y el prompt de F2 para las vías A/B.
 
 ### Lecciones de proceso (ronda PESTEL → F2)
 
@@ -1017,6 +1133,14 @@ Los números y las evidencias vienen del diagnóstico de solo lectura de la rond
 - **(v11) `/private/tmp` se vacía:** los parches y scripts viven en una ruta persistente fuera del repo (`eskemma-local/t6/`, `eskemma-local/t3/`). Los comandos se entregan completos, con solo el dato personal (uid) por completar.
 - **(v11) Las pruebas con fecha fija se rompen con el calendario:** se fija el reloj (H61).
 - **(v11) Un defecto de presentación puede no ser del commit que lo muestra:** el contraste dependía del fondo real y no del blanco asumido; se mide y se separa lo que es de la tanda de lo que no (H60).
+- **(v12) La verificación en navegador descubrió lo que las pruebas no cubren:** el botón «Cerrar» que Code describió y la pantalla no tenía (T4), el tooltip que no aparecía y la justificación ilegible (T3), la nota de Centinela falsa para proyectos ya importados (T3) y los textos de las franjas (T5b). Antes de verificar se reinicia el servidor de desarrollo para no probar una compilación vieja.
+- **(v12) Las guías de verificación volvieron a asumir lo que la persona no tenía:** T3 supuso un PESTEL sin vincular cuando ya estaba vinculado; T5 listó un escenario con un destino que ya se había cancelado; el escenario 7 de T5 no se podía ver porque «Vincular a proyecto existente» solo aparece con un análisis cargado (se creó el 7b). Las cifras esperadas de un script se declaran por ese script (en T3 se dieron las de T6 por error). La guía parte de los datos y de los controles que la persona tiene, y se confirma leyendo el código.
+- **(v12) Un archivo vaciado por accidente se detecta con las pruebas y con tamaños:** en T3, Code vació `CLAUDE.md` al regenerar un parche; lo detectaron 7 pruebas del guard de anclas y se reconstruyó (658 086 bytes, +5/−3 líneas). Desde entonces cada parche lleva su tamaño, `git apply --cached --check` en orden, `CLAUDE.md` ≥ 650 000 bytes y pocas líneas cambiadas, sin archivos en 0 bytes ni `deleted file mode` no intencional, y nunca se escribe un archivo sin leerlo.
+- **(v12) Cómo probar lo que depende de la red o de un gesto:** para un fallo de red se bloquea la petición concreta desde DevTools («Block request URL»), no se usa «Offline» (la página no cargaría); para el clic con tecla modificadora en Mac se usa **Cmd**, porque Ctrl+clic abre el menú contextual, que no ejecuta el código que decide si interceptar el clic.
+- **(v12) Los scripts de datos de prueba también fallan y los conteos lo revelan:** el recuento de la simulación frente al contador real (34 / 18 / 148 frente a 27 / 13 / 146) mostró un lote duplicado que nadie recordaba haber creado (H69); la protección de ids falló dos veces del lado seguro.
+- **(v12) Un cambio de reglas sin emulador:** se compara lo publicado con el repo antes de desplegar (el despliegue publica el archivo completo, también lo que no se tocó), se valida con `--dry-run`, se hace un humo posterior con lo que el SDK web sí usa (no con lo que pasa por Admin SDK, que daría igual con o sin el cambio) y se deja la reversa a un comando.
+- **(v12) Cuando Code propone algo más seguro que lo acordado, lo presenta con su razón y la decide la persona:** la opción B de las reglas (cerrar por completo) nació del diagnóstico de Code y se aprobó aparte; la pregunta de producto («¿no quita decisiones al usuario?») se contestó separando la capa de producto de la capa de acceso (H68).
+- **(v12) Los cambios no pedidos se anuncian y se verifican:** el retiro de `setExpressError` en el commit 8 se anunció y obtuvo un escenario propio (18). Un aviso que describe un estado no se descarta; un aviso antes de una acción es cortesía y la protección está en el servidor.
 
 ### Síntesis: patrones candidatos de la ronda y su uso en componentes, apps y artefactos nuevos
 
@@ -1049,6 +1173,13 @@ Esta tabla no sustituye a las entradas: indica qué se desprende de la ronda par
 | Contraste medido contra el fondo real | Ratios declarados sobre el fondo compuesto con los hex reales; convención por modo (marrón en claro, amarillo en oscuro) y token de texto aparte | H60 (y H23) | Diseño visual |
 | Pruebas independientes del calendario | Todo resultado que depende de la fecha fija el reloj | H61 | Proceso de desarrollo |
 | Verificación segura en base real | Script que crea datos marcados, simula, respalda, limpia comprobando la marca y cuenta antes y después | H62 | Seguridad; Proceso de desarrollo |
+| Los ajustes humanos viajan con lo aprobado y se atribuyen | Lo que una persona ajusta aguas arriba llega al proceso siguiente atribuido al analista y con su justificación; el motor sabe que es un juicio humano; lo desconocido se omite, no se inventa | H63 (y H58, H47) | Integridad de datos e IA |
+| Un vínculo guarda la huella de su origen | El estado (igual, cambiado, versión nueva, no verificable) se deriva en el servidor al comparar; el aviso describe un estado y no se descarta; reimportar algo distinto pasa por el candado | H64 (y H50) | Integridad de datos e IA; Arquitectura de datos |
+| Un estado transitorio, un solo documento | El pendiente vive en un solo lugar y la pantalla lo deriva con una función pura; las acciones que lo cambian se rechazan con un código estable mientras exista | H65 (y H56) | Ciclo de vida de recursos; Arquitectura de datos |
+| Aviso antes de salir, protección en el servidor | Una consulta barata, acotada y declarada en peso avisa lo que se perdería; nunca bloquea; la protección real es el candado del servidor | H66 (y H15) | Ciclo de vida de recursos; Diseño visual |
+| Cada rechazo con su texto y su siguiente paso | Cada código de rechazo tiene un texto que dice qué pasó, que nada cambió y qué control usar; un fallo de red se distingue de un rechazo y solo él ofrece reintentar; un proceso disparado por la URL no se repite tras cerrarlo | H67 (y H17, H40) | Integridad de datos e IA; Diseño visual |
+| Reglas de update cerradas, sin denylist | Una regla de update es una lista cerrada o está cerrada; los campos que solo un servidor fija no se abren al cliente; una guarda estática vigila el texto; sin emulador se compara lo publicado, se valida con `--dry-run` y se hace un humo posterior | H68 | Seguridad |
+| Scripts de datos de prueba idempotentes | Idempotencia por lote, simulación con el total real, adopción de lo que crea la app con reglas explícitas y autoprueba de protegidos; conteo antes y después | H62 y H69 | Seguridad; Proceso de desarrollo |
 | Ciclo de trabajo | Diagnóstico → plan → revisión crítica → construcción → verificación en navegador → commit; caracterización primero, prueba en negativo, límites declarados, un commit por tema | Lecciones de proceso | Proceso de desarrollo |
 
 ---
@@ -1090,13 +1221,13 @@ Estos quedaron señalados por Code como "no verificado" durante la auditoría de
 7. ~~Cierre de la serie de guardado honesto.~~ **Cerrada con 7b-6b** (ver el cuadro de cierre antes del Grupo 3).
 8. **Ronda 7b-7 (propia):** atomicidad de `canal1/entregar` y `canal3/vincular` (2 o 3 escrituras no atómicas).
 9. ~~Ronda de confirmación de impacto (H15), empezando por M8.~~ **Hecha para M8 y H-M3 (commits 1 a 4, 2026-10-08 y 2026-10-09).** Quedan los demás casos de H15 (M3 y M4 de F1/F2, M7, M17, P2, H-P4, `unlink-pestel`, F3 y H-F1) y la confirmación de «regenerar síntesis o veredicto» cuando exista el botón.
-10. **En curso (v10; ver la sección «ronda PESTEL → Moddulo F2»; Bloque 1 completo con sus pasos 1 a 8, `d7cb7cd`; quedan el ajuste 4g y los Bloques 2, 3 y 4):** PESTEL a Moddulo (H16, H-P1, H-P2, H-P3), con el requisito de diseño de la **actualización controlada de lo derivado en F3** (ver H30), que incluye la **adenda de investigación con Reporte emitido** (ver H36), la decisión sobre H-M3b y el retiro de los bloqueos provisionales. **v11: Bloque 2 (Centinela PESTEL ↔ Moddulo F2) en curso por tandas T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8. Hechas T0, 1a, T2 y T6 (ver H54 a H62). Siguiente: T3 (los ajustes humanos viajan a F2; vínculo pendiente solo en el back-link; planeación de Code en curso), luego T4, T5, T7 y T8.**
+10. **En curso (v10; ver la sección «ronda PESTEL → Moddulo F2»; Bloque 1 completo con sus pasos 1 a 8, `d7cb7cd`; quedan el ajuste 4g y los Bloques 2, 3 y 4):** PESTEL a Moddulo (H16, H-P1, H-P2, H-P3), con el requisito de diseño de la **actualización controlada de lo derivado en F3** (ver H30), que incluye la **adenda de investigación con Reporte emitido** (ver H36), la decisión sobre H-M3b y el retiro de los bloqueos provisionales. **v12: Bloque 2 (Centinela PESTEL ↔ Moddulo F2) por tandas T0 → T1 → T2 → T6 → T3 → T4 → T5 → T7 → T8. Hechas T0, 1a, T2, T6, T3, T4 y T5 (5a y 5b) y el parche de reglas de `pestel_analyses` (ver H54 a H69). Siguiente: T7 («Regresar», «Editar en Centinela», nota de confianza y el viaje a F2 de la justificación y de las señales completas) y T8 (retiro de `export-to-moddulo` con 410 y contador, y el prompt de F2 para las vías A/B). Después, un commit de reglas para las demás colecciones `pestel_*` (H68), antes del Bloque 3.**
 11. Grupo 2: trazabilidad (H01), aprobación con autoría y fecha (H03, incluida la sobrescritura de fecha y autor al re-aprobar), antigüedad (H04), distinción IA/institucional (H05), versionado con `changelog.ts` (H06, H08, y la unificación de `dvsVersiones`), resolución geográfica (H07). Una ronda por principio. La fecha de finalización visible del análisis (H31) va junto con H04.
 12. Sefix (H26), ronda propia con helper común de lectura.
 13. Ronda de auth: `RegisterModal`/`setUserRole` (#3 de la auditoría ampliada de H25).
 14. Documento de patrones reutilizables, con esta bitácora como insumo.
 
-Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-eske-70` en oscuro, la insignia «Archivado» en oscuro, el kebab de Fontana, `ConfirmUnlinkPestelModal` sin Escape ni trampa de foco, la configuración de ESLint de la raíz, la idea del test ratchet, el job de reporte en vuelo y la unificación 403/404 de las rutas de PESTEL. Se añaden en v9 (y siguen vigentes en v10): el ajuste 4g (normalizar la comparación de diferencias del XPCTO), el barrido de colores de proceso y error, el marcador de «generación en curso» en el servidor, la confianza de la IA junto a una clasificación editada por el usuario y el modal viejo de `centinela/pestel/nuevo`.
+Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-eske-70` en oscuro, la insignia «Archivado» en oscuro, el kebab de Fontana, `ConfirmUnlinkPestelModal` sin Escape ni trampa de foco, la configuración de ESLint de la raíz, la idea del test ratchet, el job de reporte en vuelo y la unificación 403/404 de las rutas de PESTEL. Se añaden en v9 (y siguen vigentes en v10): el ajuste 4g (normalizar la comparación de diferencias del XPCTO), el barrido de colores de proceso y error, el marcador de «generación en curso» en el servidor, la confianza de la IA junto a una clasificación editada por el usuario y el modal viejo de `centinela/pestel/nuevo` (este último se retiró en T5a, v12). Se añaden en v12: las reglas de las demás colecciones `pestel_*` (H68), la idempotencia de los scripts de datos de prueba (H69), las observaciones del motor tras T3 (H63) y el efecto C7b (H67).
 
 ---
 
@@ -1115,3 +1246,5 @@ Pendientes menores sin ronda propia: H-M2, H-M4, H-M6, P7, H-M7, el token `red-e
 - **v10 (2026-10-22):** Cierre del Bloque 1 de la ronda PESTEL → Moddulo F2-Exploración con el paso 7 (commits `8428583` y `c3b4890`) y el paso 8 (`d7cb7cd`). Nuevas entradas H51 (línea de trazabilidad del Reporte F2 y de sus descargas, con el defecto de diseño hallado en la revisión previa a la verificación), H52 (criterios del cierre sobre la copia aprobada y recomendaciones por origen, con la incidencia de `app/api`) y H53 (deriva de documentación, contrato estable y manifest ampliado). La tabla de commits y de suite pasa a hashes reales (se elimina «deducido» y «por registrar»; la cifra del commit 1 del paso 7 es 2632, no 2619), la tabla N1 a N14 actualiza N6, N9, N10, N12 y N14 con la evidencia de Code, y se añaden pendientes previos a la Beta (retiro del camino legado de `generate-dvs` con medición previa, ajuste 4g, entradas del Bloque 4), lecciones de proceso, tres filas a la síntesis de patrones y la agenda actualizada. Se corrige el dato de la v8 sobre 7b-6b («pendiente de commit»): ya está en `0e24f86`. Siguiente: Bloque 2 (Centinela PESTEL).
 
 - **v11 (2026-11-02):** Avance del Bloque 2 de la ronda (app PESTEL de Centinela ↔ Moddulo F2): tandas T0, 1a, T2 y T6 construidas, verificadas y commiteadas (`dc9ff80`, `16d9a95`, `983a44f`, `ac207f9`, `96f2d27`, `6d20b9b`, `28b08c6`; suite 2687 → 2759). Nueva sección «Origen: Bloque 2» con las decisiones D1 a D8 y posteriores, la tabla de commits y las entradas H54 a H62 (flujo real de Centinela frente al diagnóstico, afirmaciones falsas ocultas por pruebas con datos irreales, unicidad del vínculo y upgrade Express→Centinela, asistente que pisaba variables, retiro de aprobación al ajustar, justificación al aprobar con confianza < 50, contraste de avisos, pruebas con fecha fija y verificación segura en base real). La tabla N1 a N14 actualiza N1 a N7 y N11; se añaden pendientes previos a la Beta (regla de Firestore `hasOnly`, ronda de contraste, texto de `pestel_already_linked`, retiro de `export-to-moddulo`, 4g por confirmar), lecciones de proceso, siete filas a la síntesis de patrones y la agenda actualizada. Siguiente: T3.
+
+- **v12 (2026-11-05):** Cierre de las tandas T3, T4 y T5 (5a y 5b) del Bloque 2 de la ronda PESTEL → Moddulo F2 y del parche de reglas de Firestore de `pestel_analyses`. Commits: T3 `86998dc` y `4743ffe`; T4 `4e4321e` y `4d6e006`; T5a `a8f55c5` y `45deddb`; T5b `21e4f9b` y `e513ec7`; reglas `7db4a2a` (desplegadas el 2026-11-05); suite 2759 → 3018; 151 rutas; `CLAUDE.md` 675 315 bytes. Nuevas entradas H63 a H69 (ajustes humanos que viajan a F2 y señales sin datos inventados; huella de origen y avisos de cambio; vínculo pendiente en un solo documento; aviso al salir hacia Centinela; textos y franja de error del import; regla de `pestel_analyses` cerrada con el diagnóstico de las demás colecciones `pestel_*`; defectos de los scripts de datos de prueba). La tabla N1 a N14 actualiza N3, N6, N7 y N11; las decisiones de producto suman el aviso no descartable, la cancelación del pendiente, la opción B de las reglas y la aclaración de que cerrar la escritura del navegador protege la decisión del usuario; los pendientes previos a la Beta cambian (hecho el texto propio de F2 y la regla de `pestel_analyses`; se suman las reglas de las demás colecciones, los scripts de pruebas, las observaciones del motor, el efecto C7b, las carreras entre pestañas, T7 y T8); se añaden lecciones de proceso, siete filas a la síntesis de patrones y la agenda actualizada. Siguiente: T7 y T8, y el commit de reglas de las demás colecciones `pestel_*`.
