@@ -33,3 +33,19 @@ export const MENSAJE_PENDIENTE_CAMBIO =
 /** T5: no hay nada pendiente que cancelar (ya se canceló o nunca existió). */
 export const MENSAJE_PENDIENTE_NO_ENCONTRADO =
   "Este proyecto no tiene un vínculo pendiente con Centinela. Recarga la página para ver el estado actual.";
+
+/**
+ * T5b: el import (automático al volver de Centinela, «Vincular de nuevo» o el modal de confirmación) fue rechazado
+ * porque el proyecto de Centinela de ese análisis YA está vinculado a OTRO Moddulo. El control que nombra existe en
+ * `ModduloButton` (rama vinculado) del análisis en Centinela. El texto del servidor (`pestel_already_linked`) NO cambia:
+ * lo comparte `link-moddulo`; este se mapea en el cliente. Sin la frase «No se importó nada.» (la agrega quien lo muestra).
+ */
+export const MENSAJE_F2_IMPORT_YA_VINCULADO =
+  "Ese análisis de Centinela ya está vinculado a otro proyecto de Moddulo. Ve a Centinela y usa «Regresar a Moddulo F2 con resultados» para ir al proyecto al que sí está vinculado.";
+
+/**
+ * T5b: el import fue rechazado porque ESTE Moddulo ya tiene un análisis de Centinela en preparación (pendiente). El
+ * control existe en esta misma pantalla: «Cancelar vínculo pendiente» (franja del panel «Análisis PESTEL» y su menú).
+ */
+export const MENSAJE_F2_IMPORT_CON_PENDIENTE =
+  "Este proyecto ya tiene un análisis de Centinela en preparación. Usa «Cancelar vínculo pendiente», en el panel «Análisis PESTEL», si quieres importar otro.";

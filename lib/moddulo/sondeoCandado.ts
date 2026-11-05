@@ -10,6 +10,7 @@
 
 import { MENSAJE_FASE_CERRADA_REEMPLAZO, type RespuestaGuardado } from "./guardadoHonesto";
 import { clasificarFallo, TEXTO_SESION } from "./textosAcceso";
+import { MENSAJE_F2_IMPORT_CON_PENDIENTE, MENSAJE_F2_IMPORT_YA_VINCULADO } from "./textosVinculo";
 
 export type AccionSondeo = "nuevo_analisis" | "desvincular";
 
@@ -157,6 +158,14 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
       };
     }
     if (resp.codigo === "fase_cerrada") return { tipo: "error", mensaje: MENSAJE_FASE_CERRADA_REEMPLAZO, reintentable: false };
+    // T5b: los dos rechazos de unicidad del vínculo, con el texto de F2 (el del servidor de `pestel_already_linked` se
+    // comparte con `link-moddulo` y no cambia) y el control que existe para salir de cada uno.
+    if (resp.codigo === "pestel_already_linked") {
+      return { tipo: "error", mensaje: `${MENSAJE_F2_IMPORT_YA_VINCULADO} No se importó nada.`, reintentable: false };
+    }
+    if (resp.codigo === "moddulo_con_pendiente") {
+      return { tipo: "error", mensaje: `${MENSAJE_F2_IMPORT_CON_PENDIENTE} No se importó nada.`, reintentable: false };
+    }
   }
   // Any other 4xx: the server wrote nothing. Show its own readable text (never a bare code).
   const propio = [datos.message, datos.mensaje, datos.error].find((x): x is string => typeof x === "string" && /\s/.test(x.trim()));
@@ -169,4 +178,22 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
         ? "No se encontró el análisis o el proyecto; puede que ya no exista."
         : "El servidor rechazó la importación.");
   return { tipo: "error", mensaje: `${base} No se importó nada.`, reintentable: false };
+}
+
+// ── T5b: la franja de error del import (automático y «Vincular de nuevo») ────────────────────────────────────
+
+export interface FranjaImport {
+  mensaje: string;
+  /** Red, 5xx o respuesta inválida: pudo haberse importado, se ofrece «Reintentar». Un 4xx no escribió nada: no. */
+  reintentable: boolean;
+}
+
+/**
+ * What the header strip says when an import that is NOT asking for a confirmation failed. It reuses the modal's own
+ * decision (one wording per failure); `reconfirmar` never reaches it (the callers open the modal for those), but if it
+ * did the strip would show the notice and offer no retry.
+ */
+export function decidirFranjaImport(resp: RespuestaGuardado, datos: Record<string, unknown> = {}): FranjaImport {
+  const d = decidirConfirmacionImport(resp, datos);
+  return d.tipo === "error" ? { mensaje: d.mensaje, reintentable: d.reintentable } : { mensaje: d.aviso, reintentable: false };
 }

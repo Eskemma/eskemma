@@ -9,7 +9,6 @@ import {
   esRespuestaVigente,
   urlTrasCierre,
   type RespuestaGuardado,
-  MENSAJE_FASE_CERRADA_REEMPLAZO,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { dimensionEditada, aFecha, elegirMapaParaCriterios } from "@/lib/moddulo/m1Aprobacion";
@@ -58,7 +57,8 @@ import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
-import { decidirConfirmacionImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
+import { decidirConfirmacionImport, decidirFranjaImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
+import { crearControlImportAuto } from "@/lib/moddulo/controlImportAuto";
 import { debeEnviar } from "@/lib/moddulo/textosAcceso";
 import { decidirAvisoXpcto, diffsXpctoDeProyecto } from "@/lib/moddulo/avisoXpcto";
 import { decidirAvisoOrigen } from "@/lib/moddulo/avisoOrigen";
@@ -338,6 +338,11 @@ export default function ExploracionPage() {
   const [origenRefresco, setOrigenRefresco] = useState(0);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [errorReplace, setErrorReplace] = useState<string | null>(null);
+  // T5b: franja de error del import que NO pide confirmación (automático por la URL y «Vincular de nuevo»), y la guarda
+  // del efecto C7 (un solo vuelo; un id que falló no se reintenta solo; tras «Cerrar» el efecto calla para ese id).
+  const [errorImport, setErrorImport] = useState<{ mensaje: string; reintentable: boolean; pestAnalysisId: string; fuente: "sync" | "relink" } | null>(null);
+  const [importando, setImportando] = useState(false);
+  const controlImportRef = useRef(crearControlImportAuto());
   // The failed import left the result unknown: the modal must not also promise «tu análisis actual se conserva».
   const [errorReplaceAmbiguo, setErrorReplaceAmbiguo] = useState(false);
 
@@ -559,7 +564,7 @@ export default function ExploracionPage() {
           // F2 closed is not a source conflict: it must not offer «confirm replace».
           const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown; motivo?: unknown };
           if (cuerpo.error === "fase_cerrada") {
-            setExpressError(MENSAJE_FASE_CERRADA_REEMPLAZO);
+            // T5b: el texto lo muestra la franja (o el modal); ya no se reutiliza el panel «Análisis no completado».
             return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: 409, codigo: "fase_cerrada" }, datos: cuerpo as Record<string, unknown> } };
           }
           // `conflict` (another source), `reemplazo_requiere_confirmacion` and `reemplazo_huella_vencida` are
@@ -635,6 +640,31 @@ export default function ExploracionPage() {
     [projectId, router]
   );
 
+  // T5b — Un intento del import automático (efecto C7 y «Reintentar» de la franja). Un conflicto abre el modal de
+  // confirmación; cualquier otro fallo va a la franja de error (antes se descartaba en silencio); un éxito la limpia.
+  const lanzarImportAuto = useCallback(async (pestId: string) => {
+    const control = controlImportRef.current;
+    if (!control.comenzar()) return;
+    setImportando(true);
+    setErrorImport(null);
+    try {
+      const result = await importPestel(pestId);
+      if (!result.ok && result.conflict) {
+        control.terminar(pestId, false); // el modal decide; el efecto no vuelve a abrirlo
+        setPendingReplaceConfirm({ pestAnalysisId: pestId, source: "sync", huella: null, aviso: null, ...result.confirmar });
+        return;
+      }
+      if (!result.ok && result.fallo) {
+        control.terminar(pestId, false);
+        setErrorImport({ ...decidirFranjaImport(result.fallo.resp, result.fallo.datos), pestAnalysisId: pestId, fuente: "sync" });
+        return;
+      }
+      control.terminar(pestId, result.ok);
+    } finally {
+      setImportando(false);
+    }
+  }, [importPestel]);
+
   // C7 — Auto-import PESTEL al regresar con pest_analysis_id en URL.
   // Se re-dispara cuando el pestId de la URL difiere del ya importado —
   // cubre el caso de regreso tras regenerar el análisis en Centinela
@@ -650,12 +680,10 @@ export default function ExploracionPage() {
     // T4: ya NO se salta cuando es el mismo análisis: puede haber cambiado en Centinela (el servidor responde 200
     // idempotente si no cambió, o pide la confirmación H15 si cambió). Un import exitoso o cancelado quita el parámetro.
 
-    importPestel(pestId).then((result) => {
-      if (!result.ok && result.conflict) {
-        setPendingReplaceConfirm({ pestAnalysisId: pestId, source: "sync", huella: null, aviso: null, ...result.confirmar });
-      }
-    });
-  }, [isLoaded, projectId, mapaPESTEL, pestAnalysisId, importPestel]);
+    // T5b: la guarda decide (sin id, con un vuelo en curso o con este id ya fallido/cerrado el efecto calla).
+    if (!controlImportRef.current.puedeDispararAuto(pestId)) return;
+    void lanzarImportAuto(pestId);
+  }, [isLoaded, projectId, mapaPESTEL, pestAnalysisId, lanzarImportAuto]);
 
   // T4 — Tras un import exitoso se vuelve a verificar el origen (la carga inicial ya lo trajo con la llamada de
   // `currentStage`). Un fallo de red o de lectura no afirma nada: sin aviso.
@@ -1392,14 +1420,33 @@ export default function ExploracionPage() {
     if (!lastUnlinkedPestAnalysisId) return;
     setIsRelinkingPestel(true);
     try {
+      setErrorImport(null);
       const result = await importPestel(lastUnlinkedPestAnalysisId);
       if (!result.ok && result.conflict) {
         setPendingReplaceConfirm({ pestAnalysisId: lastUnlinkedPestAnalysisId, source: "relink", huella: null, aviso: null, ...result.confirmar });
+      } else if (!result.ok && result.fallo) {
+        // T5b: antes este fallo se descartaba en silencio.
+        setErrorImport({ ...decidirFranjaImport(result.fallo.resp, result.fallo.datos), pestAnalysisId: lastUnlinkedPestAnalysisId, fuente: "relink" });
       }
     } finally {
       setIsRelinkingPestel(false);
     }
   }, [lastUnlinkedPestAnalysisId, importPestel]);
+
+  // T5b — «Reintentar» y «Cerrar» de la franja. Reintentar usa el mismo camino de cada origen (la guarda impide dos
+  // vuelos); Cerrar quita `pest_analysis_id` de la URL (el automático) para que F5 no repita y deja callado al efecto.
+  const reintentarImport = useCallback(() => {
+    if (!errorImport) return;
+    if (errorImport.fuente === "sync") void lanzarImportAuto(errorImport.pestAnalysisId);
+    else void handleRelinkPestel();
+  }, [errorImport, lanzarImportAuto, handleRelinkPestel]);
+  const cerrarErrorImport = useCallback(() => {
+    if (!errorImport) return;
+    controlImportRef.current.cerrar(errorImport.pestAnalysisId);
+    const limpia = urlAlCancelarImport(errorImport.fuente, window.location.href);
+    if (limpia) router.replace(limpia, { scroll: false });
+    setErrorImport(null);
+  }, [errorImport, router]);
 
   // Confirma el reemplazo tras un 409 de import-pestel (mapaPESTEL de otra
   // fuente) — reintenta con confirmReplace: true.
@@ -2043,6 +2090,21 @@ export default function ExploracionPage() {
                 </button>
               )}
               <button type="button" onClick={() => setErrorSondeo(null)} className="font-semibold hover:underline">Cerrar</button>
+            </span>
+          </div>
+        )}
+        {/* T5b: el import que no pudo hacerse (al volver de Centinela o «Vincular de nuevo»). Mismo markup y colores que la
+            franja de arriba; role=alert. Con red/5xx ofrece «Reintentar»; un 4xx no escribió nada y solo se puede cerrar. */}
+        {errorImport !== null && (
+          <div role="alert" className="mt-2 flex items-start justify-between gap-3 rounded-lg border border-red-eske/30 bg-red-eske/10 px-3 py-2 text-xs text-red-eske-60 dark:text-red-eske-10">
+            <span className="min-w-0">{errorImport.mensaje}</span>
+            <span className="shrink-0 flex items-center gap-3">
+              {errorImport.reintentable && (
+                <button type="button" onClick={reintentarImport} disabled={importando || isRelinkingPestel} className="font-semibold hover:underline disabled:opacity-50 disabled:no-underline">
+                  {importando || isRelinkingPestel ? "Reintentando…" : "Reintentar"}
+                </button>
+              )}
+              <button type="button" onClick={cerrarErrorImport} className="font-semibold hover:underline">Cerrar</button>
             </span>
           </div>
         )}
