@@ -67,6 +67,14 @@ export default function ModalM1({ texto, aviso, error, ocupado = false, ocultarC
                 {texto.lineas.map((l, i) => <li key={i}>{l}</li>)}
               </ul>
             )}
+            {texto.avisos && texto.avisos.items.length > 0 && (
+              <>
+                <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-3">{texto.avisos.intro}</p>
+                <ul className="mt-1 list-disc pl-5 space-y-1 text-sm text-brown-eske-80 dark:text-yellow-eske">
+                  {texto.avisos.items.map((l, i) => <li key={i}>{l}</li>)}
+                </ul>
+              </>
+            )}
             {texto.cierre && !ocultarCierre && <p className="text-sm text-black-eske-10 dark:text-[#C7D6E0] mt-2">{texto.cierre}</p>}
           </div>
         </div>

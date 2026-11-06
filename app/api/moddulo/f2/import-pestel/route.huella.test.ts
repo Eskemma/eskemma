@@ -56,7 +56,7 @@ function moddulo(opts: { huella?: { v: number; h: string } | null; adjustments?:
 /** El análisis a1 tal como está AHORA en Centinela. */
 function sembrar(exp: Record<string, unknown>, analisis: { adjustments?: unknown[]; dimensions?: unknown[] } = {}) {
   db.reset({
-    "pestel_analyses/a1": { projectId: "pest1", dimensions: clon(analisis.dimensions ?? DIMENSIONES_EJEMPLO), adjustments: clon(analisis.adjustments ?? AJUSTES_EJEMPLO) },
+    "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: clon(analisis.dimensions ?? DIMENSIONES_EJEMPLO), adjustments: clon(analisis.adjustments ?? AJUSTES_EJEMPLO) },
     "pestel_projects/pest1": { userId: "u1", modduloProjectId: "p1" },
     [P]: { phases: { exploracion: exp } },
   });
@@ -128,7 +128,7 @@ describe("import-pestel — el MISMO análisis (T4)", () => {
     const exp = moddulo({ huella: huellaDe(), aprobado: true });
     sembrar(exp);
     db.reset({
-      "pestel_analyses/a2": { projectId: "pest1", dimensions: clon(DIMENSIONES_EJEMPLO), adjustments: [] },
+      "pestel_analyses/a2": { status: "APPROVED", projectId: "pest1", dimensions: clon(DIMENSIONES_EJEMPLO), adjustments: [] },
       "pestel_projects/pest1": { userId: "u1", modduloProjectId: "p1" },
       [P]: { phases: { exploracion: exp } },
     });

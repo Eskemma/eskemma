@@ -30,7 +30,7 @@ const proyecto = (exploracion: Record<string, unknown> = {}) => ({ id: "p1", xpc
 const sembrar = (exploracion: Record<string, unknown> = {}) => {
   vi.mocked(getProject).mockResolvedValue(proyecto(exploracion) as never);
   db.reset({
-    "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
+    "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] },
     "pestel_projects/pest1": { userId: "u1" },
     "moddulo_projects/p1": { phases: { exploracion } },
   });
@@ -39,7 +39,7 @@ const sembrar = (exploracion: Record<string, unknown> = {}) => {
 beforeEach(() => {
   vi.clearAllMocks();
   db.reset({
-    "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
+    "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] },
     "pestel_projects/pest1": { userId: "u1" },
   });
   vi.mocked(getSessionFromRequest).mockResolvedValue({ uid: "u1" } as never);

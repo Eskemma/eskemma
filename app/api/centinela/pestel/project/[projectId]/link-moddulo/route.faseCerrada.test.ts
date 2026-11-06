@@ -20,7 +20,7 @@ const mockDb = adminDb as unknown as ReturnType<typeof createMockAdminDb>;
 const ctx = { params: Promise.resolve({ projectId: "pest1" }) };
 const req = (cuerpo: unknown) => new Request("http://local/x", { method: "POST", body: JSON.stringify(cuerpo) }) as never;
 const NAC = { nivel: "nacional", nombre: "México" };
-const ANALISIS = { projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", dimensions: [] };
+const ANALISIS = { status: "APPROVED", projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", dimensions: [] };
 const pestel = (extra: Record<string, unknown> = {}) => ({ userId: "u1", tipo: "electoral", territorio: NAC, ...extra });
 const moddulo = (extra: Record<string, unknown> = {}) => ({
   name: "M",

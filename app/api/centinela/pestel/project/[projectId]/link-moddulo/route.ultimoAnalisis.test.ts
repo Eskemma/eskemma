@@ -22,7 +22,7 @@ const mockDb = adminDb as unknown as ReturnType<typeof createMockAdminDb>;
 const ctx = { params: Promise.resolve({ projectId: "pest1" }) };
 const req = () => new Request("http://local/x", { method: "POST", body: JSON.stringify({ modduloProjectId: "m1" }) }) as never;
 const NAC = { nivel: "nacional", nombre: "México" };
-const an = (extra: Record<string, unknown> = {}) => ({ projectId: "pest1", dimensions: [], ...extra });
+const an = (extra: Record<string, unknown> = {}) => ({ status: "APPROVED", projectId: "pest1", dimensions: [], ...extra });
 
 function sembrar(analisis: Record<string, Record<string, unknown>>) {
   const docs: Record<string, unknown> = {
@@ -61,9 +61,20 @@ describe("link-moddulo — qué análisis elige (misma regla que latest-analysis
     expect(await elegido()).toBe("b");
   });
 
-  it("si ninguno es vigente, toma el más reciente de todos", async () => {
+  // INVERTIDA A PROPÓSITO en T7 C2 (antes: «201 con el más reciente»): un análisis con `vigente: false` ahora pide
+  // confirmación de origen (409, razón no_vigente con la fecha del análisis elegido). La regla de elección no cambia:
+  // confirmado con la huella que devolvió el servidor, vincula con el más reciente de todos.
+  it("si ninguno es vigente, toma el más reciente de todos (ahora tras confirmar el origen)", async () => {
     sembrar({ a: an({ vigente: false, analyzedAt: "2026-01-01T00:00:00Z" }), b: an({ vigente: false, analyzedAt: "2026-05-01T00:00:00Z" }) });
-    expect(await elegido()).toBe("b");
+    const pide = await POST(req(), ctx);
+    expect(pide.status).toBe(409);
+    const cuerpo = await pide.json();
+    expect(cuerpo.error).toBe("origen_requiere_confirmacion");
+    expect(cuerpo.razones).toEqual([{ tipo: "no_vigente", fechaAnalisis: "2026-05-01T00:00:00.000Z" }]);
+    expect(mockDb.updates()).toHaveLength(0);
+    const r = await POST(new Request("http://local/x", { method: "POST", body: JSON.stringify({ modduloProjectId: "m1", confirmarOrigen: true, huellaOrigen: cuerpo.huella }) }) as never, ctx);
+    expect(r.status).toBe(201);
+    expect((await r.json()).sourceAnalysisId).toBe("b");
   });
 
   it("`vigente` ausente cuenta como vigente (solo `false` lo excluye)", async () => {

@@ -26,7 +26,7 @@ const inicial = {
   "pestel_projects/pest1": { userId: "u1", tipo: "electoral", territorio: NAC },
   "moddulo_projects/m1": moddulo(),
   "moddulo_projects/m2": moddulo(),
-  "pestel_analyses/a1": { projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", dimensions: [] },
+  "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", dimensions: [] },
 };
 
 beforeEach(() => {

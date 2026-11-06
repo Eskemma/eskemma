@@ -385,6 +385,7 @@ export default function AnalisisPage() {
                 project={project}
                 projectId={projectId}
                 analysisId={analysis.id}
+                analysis={analysis}
                 onLinked={loadProject}
               />
             </div>

@@ -22,6 +22,7 @@ import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
 import { elegirUltimoAnalisis } from "@/lib/centinela/pestel/ultimoAnalisis";
+import { decidirCandadoOrigen, leerVigenteParaGate, respuestaCandadoOrigen, type DecisionCandadoOrigen } from "@/lib/centinela/pestel/candadoOrigen";
 interface RouteContext {
   params: Promise<{ projectId: string }>;
 }
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const { projectId } = await context.params;
 
-  let body: { modduloProjectId?: string; forceLink?: boolean; confirmar?: unknown; huella?: unknown };
+  let body: { modduloProjectId?: string; forceLink?: boolean; confirmar?: unknown; huella?: unknown; confirmarOrigen?: unknown; huellaOrigen?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -150,6 +151,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
     console.error("[link-moddulo] error buscando análisis para projectId:", projectId, err);
   }
 
+  // T7 C2 — gate de origen (H-P1): CONFIRMA, no bloquea. Misma función fuera y dentro de la transacción. Orden de
+  // rechazos: fase cerrada → candado H15 → gate de origen. Fuera solo se evalúa cuando la transacción no tomaría antes
+  // una rama idempotente o de conflicto (mismo análisis o mapa de otra versión ya importado) y cuando el candado H15
+  // no va a pedir su propia confirmación (en ese caso responde primero, dentro de la transacción).
+  const linkedPrevio = explorarPhase?.linkedSource as { payload?: unknown; sourceAnalysisId?: string } | undefined;
+  if (latestAnalysisId && latestAnalysisData && !(linkedPrevio?.payload && linkedPrevio.sourceAnalysisId)) {
+    const vigenteFuera = await leerVigenteParaGate((q) => q.get(), adminDb, latestAnalysisData, { tolerarFallo: true });
+    const origenFuera = decidirCandadoOrigen({ ...latestAnalysisData, id: latestAnalysisId }, vigenteFuera, { confirmarOrigen: body.confirmarOrigen, huellaOrigen: body.huellaOrigen });
+    const h15Fuera = decidirCandadoM1Servidor(modduloProject.phases?.exploracion, "vincular", { confirmar: body.confirmar, huella: body.huella });
+    if (origenFuera.accion !== "continuar" && h15Fuera.accion === "continuar") return respuestaCandadoOrigen(origenFuera);
+  }
+
   // Write MapaPESTEL to Moddulo project (if analysis available)
   const linkedSource: LinkedSourceRef<MapaPESTEL> = {
     kind: "T22",
@@ -197,6 +210,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     | "mapa_ya_importado"
     | "mismo_analisis"
     | "fase_cerrada"
+    | "analisis_no_encontrado"
+    | { origen: Exclude<DecisionCandadoOrigen, { accion: "continuar" }> }
     | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
 
   const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoVinculo> => {
@@ -244,13 +259,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
     if (candado.accion !== "continuar") return { candado };
 
+    // Gate de origen: se relee el análisis (y, si no es vigente, el vigente) aquí, antes de cualquier escritura.
+    if (latestAnalysisId) {
+      const analisisTx = await tx.get(adminDb.collection("pestel_analyses").doc(latestAnalysisId));
+      if (!analisisTx.exists) return "analisis_no_encontrado";
+      const datosTx = analisisTx.data() as Record<string, unknown>;
+      const vigenteTx = await leerVigenteParaGate((q) => tx.get(q), adminDb, datosTx, { tolerarFallo: false });
+      const og = decidirCandadoOrigen({ ...datosTx, id: latestAnalysisId }, vigenteTx, { confirmarOrigen: body.confirmarOrigen, huellaOrigen: body.huellaOrigen });
+      if (og.accion !== "continuar") return { origen: og };
+    }
+
     tx.update(modduloRef, updatePayload);
     // Write back to PESTEL project
     tx.update(pestelRef, { modduloProjectId, updatedAt: FieldValue.serverTimestamp() });
     return "ok";
   });
 
-  if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
+  if (typeof resultado === "object") return "origen" in resultado ? respuestaCandadoOrigen(resultado.origen) : respuestaCandadoM1(resultado.candado);
   switch (resultado) {
     case "pestel_no_encontrado":
       return NextResponse.json({ error: "Proyecto PESTEL no encontrado" }, { status: 404 });
@@ -260,6 +285,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ modduloProjectId }, { status: 200 });
     case "fase_cerrada":
       return respuestaFaseCerrada();
+    case "analisis_no_encontrado":
+      return NextResponse.json({ error: "Análisis PESTEL no encontrado" }, { status: 404 });
     case "pestel_ya_vinculado":
       return NextResponse.json(
         { error: "pestel_already_linked", message: "Este proyecto PESTEL ya está vinculado a otro proyecto de Moddulo." },

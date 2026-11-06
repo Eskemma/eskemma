@@ -49,3 +49,24 @@ export const MENSAJE_F2_IMPORT_YA_VINCULADO =
  */
 export const MENSAJE_F2_IMPORT_CON_PENDIENTE =
   "Este proyecto ya tiene un análisis de Centinela en preparación. Usa «Cancelar vínculo pendiente», en el panel «Análisis PESTEL», si quieres importar otro.";
+
+// ── T7 C2: el gate de origen (H-P1). Las frases que dicen QUÉ control resuelve cada razón. Los controles existen:
+// «Finalizar interpretación» y «Marcar como revisado» están en Interpretación (Centinela); «Regresar a Moddulo F2 con
+// resultados» es el botón de Centinela con el proyecto ya vinculado. El armado con fechas y conteos reales está en
+// `lib/centinela/pestel/textosOrigen.ts`; aquí viven las frases fijas, sin huecos y sin remitir a soporte.
+
+/** El análisis todavía no está aprobado en Centinela. */
+export const MENSAJE_ORIGEN_NO_APROBADO =
+  "Este análisis todavía no está aprobado en Centinela. Puedes aprobarlo en Interpretación con «Finalizar interpretación».";
+
+/** Hay UNA alerta de sesgo sin revisar. */
+export const MENSAJE_ORIGEN_UN_SESGO =
+  "Tiene 1 alerta de sesgo sin revisar. Puedes revisarla en Interpretación con «Marcar como revisado».";
+
+/** Hay varias alertas de sesgo sin revisar (`n` ≥ 2, el conteo real). */
+export const mensajeOrigenSesgos = (n: number): string =>
+  `Tiene ${n} alertas de sesgo sin revisar. Puedes revisarlas en Interpretación con «Marcar como revisado».`;
+
+/** Camino para usar el análisis vigente en lugar del que no lo es. */
+export const CAMINO_ORIGEN_VIGENTE =
+  "Para usar el vigente, ábrelo en Centinela y usa «Regresar a Moddulo F2 con resultados».";

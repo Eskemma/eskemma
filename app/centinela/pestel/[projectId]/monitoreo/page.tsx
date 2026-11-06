@@ -417,6 +417,7 @@ export default function MonitoreoPage() {
             project={project}
             projectId={projectId}
             analysisId={analysis?.id}
+            analysis={analysis}
             onLinked={loadAll}
           />
         </div>

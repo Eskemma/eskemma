@@ -57,7 +57,8 @@ import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
 import ModalM1 from "./components/ModalM1";
-import { decidirConfirmacionImport, decidirFranjaImport, decidirSondeo, urlAlCancelarImport, type AccionSondeo } from "@/lib/moddulo/sondeoCandado";
+import { decidirConfirmacionImport, decidirFranjaImport, decidirSondeo, avisoOrigenVencido, esCodigoOrigen, leerConfirmacionImport, urlAlCancelarImport, type AccionSondeo, type OrigenImport } from "@/lib/moddulo/sondeoCandado";
+import { avisosDeOrigenParaModal } from "@/lib/centinela/pestel/textosOrigen";
 import { crearControlImportAuto } from "@/lib/moddulo/controlImportAuto";
 import { debeEnviar } from "@/lib/moddulo/textosAcceso";
 import { decidirAvisoXpcto, diffsXpctoDeProyecto } from "@/lib/moddulo/avisoXpcto";
@@ -332,7 +333,7 @@ export default function ExploracionPage() {
   // Conflicto detectado por import-pestel (409): mapaPESTEL existente viene
   // de una fuente distinta. Se resuelve con confirmación explícita del
   // usuario antes de reintentar con confirmReplace: true.
-  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio" } | null>(null);
+  const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio"; origen?: OrigenImport } | null>(null);
   // T4: ¿el análisis de Centinela que se importó sigue al día? (se verifica al montar y tras cada import exitoso)
   const [origenPestel, setOrigenPestel] = useState<ResultadoOrigen | null>(null);
   const [origenRefresco, setOrigenRefresco] = useState(0);
@@ -547,7 +548,7 @@ export default function ExploracionPage() {
   // backend rechazó con 409 porque mapaPESTEL viene de otra fuente; el
   // llamador decide si ofrece confirmación (confirmReplace: true) o no.
   const importPestel = useCallback(
-    async (pestAnalysisId: string, confirmacion: { huella: string | null } | null = null): Promise<{ ok: boolean; conflict: boolean; confirmar?: { lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio" }; fallo?: { resp: RespuestaGuardado; datos: Record<string, unknown> } }> => {
+    async (pestAnalysisId: string, confirmacion: { huella: string | null; huellaOrigen?: string | null } | null = null): Promise<{ ok: boolean; conflict: boolean; confirmar?: { lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio"; origen?: OrigenImport }; fallo?: { resp: RespuestaGuardado; datos: Record<string, unknown> } }> => {
       try {
         const r = await fetch("/api/moddulo/f2/import-pestel", {
           method: "POST",
@@ -557,26 +558,33 @@ export default function ExploracionPage() {
           // carries the fingerprint of what the user saw (`confirmReplace` stays for the server's own check).
           body: JSON.stringify({
             projectId, pestAnalysisId,
-            ...(confirmacion ? { confirmReplace: true, confirmar: true, ...(confirmacion.huella ? { huella: confirmacion.huella } : {}) } : {}),
+            // T7 C2: la misma petición confirma también el gate de origen; `huellaOrigen` es el valor OPACO que devolvió
+            // el servidor (el cliente no calcula huellas). Sin él, el servidor responde «vencida» y se muestra lo nuevo.
+            ...(confirmacion ? { confirmReplace: true, confirmar: true, confirmarOrigen: true, ...(confirmacion.huella ? { huella: confirmacion.huella } : {}), ...(confirmacion.huellaOrigen ? { huellaOrigen: confirmacion.huellaOrigen } : {}) } : {}),
           }),
         });
         if (r.status === 409) {
           // F2 closed is not a source conflict: it must not offer «confirm replace».
-          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown; motivo?: unknown };
+          const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown; motivo?: unknown; razones?: unknown; razonesOrigen?: unknown; huellaOrigen?: unknown };
           if (cuerpo.error === "fase_cerrada") {
             // T5b: el texto lo muestra la franja (o el modal); ya no se reutiliza el panel «Análisis no completado».
             return { ok: false, conflict: false, fallo: { resp: { tipo: "respuesta", ok: false, status: 409, codigo: "fase_cerrada" }, datos: cuerpo as Record<string, unknown> } };
           }
           // `conflict` (another source), `reemplazo_requiere_confirmacion` and `reemplazo_huella_vencida` are
           // all «ask the user once, with the server's lines and fingerprint».
-          if (cuerpo.error === "conflict" || cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida") {
+          // T7 C2: el gate de origen (`origen_requiere_confirmacion` / `origen_huella_vencida`) se pregunta igual, una vez.
+          if (cuerpo.error === "conflict" || cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida" || esCodigoOrigen(cuerpo.error)) {
+            const c = leerConfirmacionImport(cuerpo as Record<string, unknown>);
             return {
               ok: false,
               conflict: true,
               confirmar: {
-                lineas: Array.isArray(cuerpo.lineas) && cuerpo.lineas.every((x) => typeof x === "string") ? (cuerpo.lineas as string[]) : undefined,
-                huella: typeof cuerpo.huella === "string" ? cuerpo.huella : null,
-                aviso: cuerpo.error === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se importó nada: revisa lo que se perderá y confirma de nuevo." : null,
+                lineas: c.lineas,
+                huella: c.huella,
+                ...(c.origen ? { origen: c.origen } : {}),
+                aviso: cuerpo.error === "reemplazo_huella_vencida" ? "El estado del análisis cambió. No se importó nada: revisa lo que se perderá y confirma de nuevo."
+                  : cuerpo.error === "origen_huella_vencida" ? avisoOrigenVencido(c.origen)
+                  : null,
                 // T4: el MISMO análisis, con contenido distinto (la pantalla lo dice con su propio texto).
                 ...(cuerpo.motivo === "analisis_cambio" ? { motivo: "analisis_cambio" as const } : {}),
               },
@@ -720,14 +728,10 @@ export default function ExploracionPage() {
         .then(async (r) => {
           if (r.status === 409) {
             // The H15 lock: something exists that this import would replace. Ask once (same modal as C7).
-            const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; lineas?: unknown; huella?: unknown };
-            if (cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida" || cuerpo.error === "conflict") {
-              setPendingReplaceConfirm({
-                pestAnalysisId, source: "sync",
-                lineas: Array.isArray(cuerpo.lineas) && cuerpo.lineas.every((x) => typeof x === "string") ? (cuerpo.lineas as string[]) : undefined,
-                huella: typeof cuerpo.huella === "string" ? cuerpo.huella : null,
-                aviso: null,
-              });
+            const cuerpo = (await r.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+            if (cuerpo.error === "reemplazo_requiere_confirmacion" || cuerpo.error === "reemplazo_huella_vencida" || cuerpo.error === "conflict" || esCodigoOrigen(cuerpo.error)) {
+              const c = leerConfirmacionImport(cuerpo);
+              setPendingReplaceConfirm({ pestAnalysisId, source: "sync", lineas: c.lineas, huella: c.huella, aviso: null, ...(c.origen ? { origen: c.origen } : {}) });
             }
             return;
           }
@@ -1456,7 +1460,7 @@ export default function ExploracionPage() {
     setErrorReplace(null);
     setErrorReplaceAmbiguo(false);
     try {
-      const r = await importPestel(pendingReplaceConfirm.pestAnalysisId, { huella: pendingReplaceConfirm.huella });
+      const r = await importPestel(pendingReplaceConfirm.pestAnalysisId, { huella: pendingReplaceConfirm.huella, huellaOrigen: pendingReplaceConfirm.origen?.huella ?? null });
       // The state changed since the user looked (huella_vencida): keep asking, with the fresh lines.
       if (!r.ok && r.conflict && r.confirmar) {
         setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, ...r.confirmar });
@@ -1466,7 +1470,7 @@ export default function ExploracionPage() {
       if (!r.ok && r.fallo) {
         const d = decidirConfirmacionImport(r.fallo.resp, r.fallo.datos);
         if (d.tipo === "reconfirmar") {
-          setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso, motivo: pendingReplaceConfirm.motivo });
+          setPendingReplaceConfirm({ pestAnalysisId: pendingReplaceConfirm.pestAnalysisId, source: pendingReplaceConfirm.source, lineas: d.lineas, huella: d.huella, aviso: d.aviso, motivo: pendingReplaceConfirm.motivo, ...(d.origen ? { origen: d.origen } : {}) });
         } else {
           setErrorReplace(d.mensaje);
           setErrorReplaceAmbiguo(d.reintentable);
@@ -2683,7 +2687,18 @@ export default function ExploracionPage() {
       {/* Modal confirmación reemplazo — mapaPESTEL existente viene de otra fuente */}
       {pendingReplaceConfirm && (
         <ModalM1
-          texto={textoModalM1("vincular", impactoPantalla, { lineasServidor: pendingReplaceConfirm.lineas, origenCambio: pendingReplaceConfirm.motivo === "analisis_cambio" })}
+          texto={textoModalM1("vincular", impactoPantalla, {
+            lineasServidor: pendingReplaceConfirm.lineas,
+            origenCambio: pendingReplaceConfirm.motivo === "analisis_cambio",
+            // T7 C2: las razones reales del gate de origen; sin repetir lo que ya dice el aviso de origen de T4.
+            avisosOrigen: pendingReplaceConfirm.origen
+              ? avisosDeOrigenParaModal(
+                  pendingReplaceConfirm.origen.razones,
+                  origenPestel?.estado,
+                  (() => { const av = decidirAvisoOrigen({ origen: origenPestel, f2Cerrada: false }); return av.tipo === "version_nueva" ? av.texto : null; })()
+                )
+              : undefined,
+          })}
           aviso={pendingReplaceConfirm.aviso}
           error={errorReplace}
           ocultarCierre={errorReplace !== null && errorReplaceAmbiguo}

@@ -24,7 +24,7 @@ const vincular = async (analisis: Record<string, unknown> | null) => {
   db.reset({
     "pestel_projects/pest1": { userId: "u1", tipo: "electoral", territorio: NAC },
     "moddulo_projects/m1": { name: "M", type: "electoral", territorio: NAC, xpcto: { hito: "h" }, phases: { exploracion: {} } },
-    ...(analisis ? { "pestel_analyses/a1": { projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", ...analisis } } : {}),
+    ...(analisis ? { "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", analyzedAt: "2026-10-01T00:00:00Z", ...analisis } } : {}),
   });
   db.atomico(true);
   vi.mocked(getProject).mockImplementation(async (id: string) => (db.snapshot()[`moddulo_projects/${id}`] ?? null) as never);

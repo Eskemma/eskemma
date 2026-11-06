@@ -17,6 +17,7 @@ import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/peste
 import { MENSAJE_CONFLICTO_IMPORT, MENSAJE_MODDULO_CON_PENDIENTE } from "@/lib/moddulo/textosVinculo";
 import { huellaComparable, huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
 import { ajustesDelMapaImportado, ajustesSinReflejarEnF2 } from "@/lib/centinela/pestel/ajustesSinReflejar";
+import { decidirCandadoOrigen, leerVigenteParaGate, respuestaCandadoOrigen, type DecisionCandadoOrigen } from "@/lib/centinela/pestel/candadoOrigen";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { projectId?: string; pestAnalysisId?: string; confirmReplace?: boolean; confirmar?: unknown; huella?: unknown };
+  let body: { projectId?: string; pestAnalysisId?: string; confirmReplace?: boolean; confirmar?: unknown; huella?: unknown; confirmarOrigen?: unknown; huellaOrigen?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -70,6 +71,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sin permisos para este análisis PESTEL" }, { status: 403 });
   }
 
+  // T7 C2 — gate de origen (H-P1): CONFIRMA, no bloquea. Se evalúa con la misma función fuera de la transacción
+  // (para que el 409 no cueste nada) y dentro (contra el estado releído). Orden de rechazos: fase cerrada →
+  // candado H15 → gate de origen. Costo por llamada: 0 lecturas extra con un análisis vigente; con uno no vigente,
+  // +1 consulta aquí y, dentro de la transacción, +1 lectura del análisis y +1 consulta.
+  const vigenteFuera = await leerVigenteParaGate((q) => q.get(), adminDb, analysis, { tolerarFallo: true });
+  const origenFuera = decidirCandadoOrigen({ ...analysis, id: pestAnalysisId }, vigenteFuera, { confirmarOrigen: body.confirmarOrigen, huellaOrigen: body.huellaOrigen });
+  const conOrigen = async (r: NextResponse, og: DecisionCandadoOrigen | undefined, motivo?: string): Promise<NextResponse> => {
+    if (!og && !motivo) return r;
+    const cuerpo = (await r.json()) as Record<string, unknown>;
+    return NextResponse.json(
+      { ...cuerpo, ...(og && og.accion !== "continuar" ? { razonesOrigen: og.razones, huellaOrigen: og.huella } : {}), ...(motivo ? { motivo } : {}) },
+      { status: r.status }
+    );
+  };
+
   // Guard: protect against overwriting mapaPESTEL from a genuinely different
   // source (express, or a different Centinela PESTEL project). Compares
   // pestProjectId — not pestAnalysisId — because Centinela can renew the
@@ -102,14 +118,17 @@ export async function POST(request: NextRequest) {
     if (!sameLinkedProject) {
       if (!confirmReplace && !confirmaConHuella) {
         const d = decidirCandadoM1Servidor(project.phases?.exploracion, "vincular", { confirmar: false, huella: null });
-        return NextResponse.json(
-          {
-            error: "conflict",
-            message: MENSAJE_CONFLICTO_IMPORT,
-            lineas: d.accion === "continuar" ? [] : d.lineas,
-            huella: d.accion === "continuar" ? null : d.huella,
-          },
-          { status: 409 }
+        return conOrigen(
+          NextResponse.json(
+            {
+              error: "conflict",
+              message: MENSAJE_CONFLICTO_IMPORT,
+              lineas: d.accion === "continuar" ? [] : d.lineas,
+              huella: d.accion === "continuar" ? null : d.huella,
+            },
+            { status: 409 }
+          ),
+          origenFuera
         );
       }
       // Usuario confirmó el reemplazo explícitamente — la confirmación con huella se valida abajo.
@@ -127,6 +146,15 @@ export async function POST(request: NextRequest) {
       }
     }
     // Same linked PESTEL project (renewed analysis), o confirmReplace — fall through to re-sync/overwrite.
+  }
+
+  // Gate de origen, fuera de la transacción. Si el candado H15 también pide confirmación, gana (va primero) y su
+  // 409 lleva además las razones de origen: UNA sola confirmación para las dos cosas.
+  if (origenFuera.accion !== "continuar") {
+    const h15Fuera = decidirCandadoM1Servidor(project.phases?.exploracion, "vincular", { confirmar: body.confirmar, huella: body.huella });
+    const motivo = mismoAnalisisCambiado ? "analisis_cambio" : undefined;
+    if (h15Fuera.accion !== "continuar") return conOrigen(respuestaCandadoM1(h15Fuera), origenFuera, motivo);
+    return conOrigen(respuestaCandadoOrigen(origenFuera), undefined, motivo);
   }
 
   const mapaPESTEL: MapaPESTEL = transformToMapaPESTEL(
@@ -159,7 +187,10 @@ export async function POST(request: NextRequest) {
     | "pestel_no_encontrado"
     | "pestel_ya_vinculado"
     | "moddulo_con_pendiente"
-    | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
+    | "analisis_no_encontrado"
+    | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }>; origen?: Exclude<DecisionCandadoOrigen, { accion: "continuar" }> }
+    | { origen: Exclude<DecisionCandadoOrigen, { accion: "continuar" }> };
+  const analysisRef = adminDb.collection("pestel_analyses").doc(pestAnalysisId);
   const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
@@ -181,8 +212,17 @@ export async function POST(request: NextRequest) {
       return plan.codigo === "pestel_no_encontrado" ? "pestel_no_encontrado" : plan.codigo === "moddulo_con_pendiente" ? "moddulo_con_pendiente" : "pestel_ya_vinculado";
     }
 
+    // Gate de origen: se relee el análisis (y, si no es vigente, el vigente) DENTRO de la transacción, antes de
+    // cualquier escritura, y se evalúa con la misma función que fuera.
+    const analisisTx = await tx.get(analysisRef);
+    if (!analisisTx.exists) return "analisis_no_encontrado";
+    const datosTx = analisisTx.data() as Record<string, unknown>;
+    const vigenteTx = await leerVigenteParaGate((q) => tx.get(q), adminDb, datosTx, { tolerarFallo: false });
+    const og = decidirCandadoOrigen({ ...datosTx, id: pestAnalysisId }, vigenteTx, { confirmarOrigen: body.confirmarOrigen, huellaOrigen: body.huellaOrigen });
+
     const d = decidirCandadoM1Servidor(exp, "vincular", { confirmar: body.confirmar, huella: body.huella });
-    if (d.accion !== "continuar") return { candado: d };
+    if (d.accion !== "continuar") return { candado: d, ...(og.accion !== "continuar" ? { origen: og } : {}) };
+    if (og.accion !== "continuar") return { origen: og };
     tx.update(ref, {
       "phases.exploracion.linkedSource": linkedSource,
       "phases.exploracion.xpctoSnapshotAtGeneration": JSON.stringify(project.xpcto ?? {}),
@@ -211,11 +251,14 @@ export async function POST(request: NextRequest) {
   }
   if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   if (resultado === "fase_cerrada") return respuestaFaseCerrada();
+  if (resultado === "analisis_no_encontrado") {
+    return NextResponse.json({ error: "Análisis PESTEL no encontrado" }, { status: 404 });
+  }
   if (typeof resultado === "object") {
-    const r = respuestaCandadoM1(resultado.candado);
-    if (!mismoAnalisisCambiado) return r;
     // Mismo análisis, contenido distinto: la pantalla lo dice con su propio texto («cambió», no «otro análisis»).
-    return NextResponse.json({ ...(await r.json()), motivo: "analisis_cambio" }, { status: r.status });
+    const motivo = mismoAnalisisCambiado ? "analisis_cambio" : undefined;
+    if ("candado" in resultado) return conOrigen(respuestaCandadoM1(resultado.candado), resultado.origen, motivo);
+    return conOrigen(respuestaCandadoOrigen(resultado.origen), undefined, motivo);
   }
 
   return NextResponse.json({ linkedSource }, { status: 200 });

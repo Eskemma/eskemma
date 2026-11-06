@@ -1,6 +1,6 @@
 // T7 C1 — precedencia entre el gate («no vigente») y el aviso de origen de T4 («versión nueva»): un solo mensaje.
 import { describe, expect, it } from "vitest";
-import { razonesSinDuplicar, type RazonImportabilidad, type TipoRazon } from "./importabilidad";
+import { decidirImportabilidad, razonesSinDuplicar, type RazonImportabilidad, type TipoRazon } from "./importabilidad";
 import type { EstadoOrigen } from "./estadoOrigen";
 
 const NO_VIGENTE: RazonImportabilidad = { tipo: "no_vigente", fechaAnalisis: "2026-10-01T10:00:00.000Z" };
@@ -10,19 +10,22 @@ const CONF: RazonImportabilidad = { tipo: "confianza_baja", confianza: 39 };
 const tipos = (rs: RazonImportabilidad[]) => rs.map((r) => r.tipo);
 
 describe("razonesSinDuplicar — precedencia con el aviso de origen", () => {
-  it("vínculo existente con version_nueva: el aviso de origen gana y no_vigente se omite", () => {
+  // INVERTIDA A PROPÓSITO en T7 C2 (antes afirmaba `r.nivel === "ok"` tras suprimir): el nivel ya no lo calcula
+  // esta función; lo calcula el gate ANTES de suprimir, y con no_vigente sigue en «aviso».
+  it("vínculo existente con version_nueva: el aviso de origen gana, no_vigente se omite y el gate SIGUE en aviso", () => {
     const r = razonesSinDuplicar([NO_VIGENTE], "version_nueva");
     expect(r.razones).toEqual([]);
     expect(r.omitidas).toEqual(["no_vigente"]);
-    expect(r.nivel).toBe("ok");
+    expect("nivel" in r).toBe(false);
+    const gate = decidirImportabilidad({ id: "a1", status: "APPROVED", vigente: false, analyzedAt: "2026-10-01T10:00:00Z", globalConfidence: 80, biasAlerts: [] });
+    expect(gate.nivel).toBe("aviso"); // calculado con todas las razones, antes de suprimir
   });
 
-  it("PRIMERA importación (sin vínculo: estadoOrigen ausente o null): no_vigente SIGUE apareciendo", () => {
+  it("PRIMERA importación (sin vínculo: estadoOrigen ausente o null): no_vigente SIGUE apareciendo (se quitó la aserción de nivel: ya no es de esta función)", () => {
     for (const origen of [undefined, null]) {
       const r = razonesSinDuplicar([NO_VIGENTE], origen);
       expect(r.razones).toEqual([NO_VIGENTE]);
       expect(r.omitidas).toEqual([]);
-      expect(r.nivel).toBe("aviso");
     }
   });
 
@@ -32,15 +35,21 @@ describe("razonesSinDuplicar — precedencia con el aviso de origen", () => {
     }
   });
 
-  it("version_nueva solo omite no_vigente: las demás razones se conservan y el nivel se recalcula", () => {
+  it("version_nueva solo omite no_vigente: las demás razones se conservan (se quitó la aserción de nivel)", () => {
     const r = razonesSinDuplicar([NO_APROBADO, SESGOS, NO_VIGENTE, CONF], "version_nueva");
     expect(tipos(r.razones)).toEqual(["no_aprobado", "sesgos_sin_revisar", "confianza_baja"]);
     expect(r.omitidas).toEqual(["no_vigente"]);
-    expect(r.nivel).toBe("aviso");
   });
 
-  it("si solo queda la confianza baja tras omitir, el nivel es ok (es informativa)", () => {
-    expect(razonesSinDuplicar([NO_VIGENTE, CONF], "version_nueva").nivel).toBe("ok");
+  // INVERTIDA A PROPÓSITO en T7 C2 (antes: «si solo queda la confianza baja tras omitir, el nivel es ok»): el
+  // nivel se calcula ANTES de suprimir, así que no_vigente + confianza baja sigue pidiendo confirmación.
+  it("si tras omitir solo queda la confianza baja, el gate SIGUE en aviso (el nivel no se recalcula)", () => {
+    const base = { id: "a1", status: "APPROVED", vigente: false, analyzedAt: "2026-10-01T10:00:00Z", globalConfidence: 39, biasAlerts: [] };
+    const gate = decidirImportabilidad(base);
+    expect(gate.nivel).toBe("aviso");
+    const r = razonesSinDuplicar(gate.razones, "version_nueva");
+    expect(tipos(r.razones)).toEqual(["confianza_baja"]);
+    expect(gate.nivel).toBe("aviso");
   });
 });
 

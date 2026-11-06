@@ -17,12 +17,22 @@ function fuentes(dir: string, salida: string[] = []): string[] {
 
 describe("rechazos de vincular: ningún mensaje remite a «contacta soporte»", () => {
   it("los textos de textosVinculo.ts nombran un camino que existe en la pantalla", () => {
-    for (const t of Object.values(textos)) {
+    // T7 C2: el módulo exporta también una función (el conteo de sesgos); se prueba su salida con un conteo real.
+    const todos = Object.values(textos).map((t) => (typeof t === "function" ? t(3) : t)) as string[];
+    expect(todos.length).toBeGreaterThan(8);
+    for (const t of todos) {
+      expect(typeof t).toBe("string");
       expect(t).not.toMatch(/soporte/i);
       expect(t.length).toBeGreaterThan(20);
     }
     expect(textos.MENSAJE_MODDULO_CON_OTRO_PESTEL).toContain("«Desvincular»");
     expect(textos.MENSAJE_MODDULO_OTRA_VERSION).toContain("«Regresar a Moddulo F2 con resultados»");
+    // Gate de origen (T7 C2): cada frase nombra un control que existe.
+    expect(textos.MENSAJE_ORIGEN_NO_APROBADO).toContain("«Finalizar interpretación»");
+    expect(textos.MENSAJE_ORIGEN_UN_SESGO).toContain("«Marcar como revisado»");
+    expect(textos.mensajeOrigenSesgos(3)).toContain("3 alertas");
+    expect(textos.mensajeOrigenSesgos(3)).toContain("«Marcar como revisado»");
+    expect(textos.CAMINO_ORIGEN_VIGENTE).toContain("«Regresar a Moddulo F2 con resultados»");
   });
 
   it("ningún archivo de app/, lib/ ni functions/src contiene la frase", () => {

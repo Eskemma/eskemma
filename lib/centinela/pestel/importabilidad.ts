@@ -88,16 +88,18 @@ export function decidirImportabilidad(analysis: AnalisisParaGate, vigente?: Vige
 }
 
 /**
- * Un solo mensaje por situación. Precedencia: cuando ya existe un vínculo y el aviso de origen de T4 dice
- * `version_nueva`, ese aviso GANA y la razón `no_vigente` del gate se omite (dicen lo mismo). Sin vínculo
- * (`estadoOrigen` ausente: primera importación) o con cualquier otro estado de origen, `no_vigente` se
- * conserva. Además ningún tipo de razón sale dos veces. El nivel se recalcula con lo que queda; `omitidas`
- * dice qué se quitó para que quien llama pueda explicarlo.
+ * Un solo mensaje por situación — afecta SOLO lo que se muestra, nunca el nivel del gate. El `nivel` lo calcula
+ * `decidirImportabilidad` con TODAS las razones, ANTES de suprimir duplicados (decisión de T7 C2: con vínculo,
+ * `version_nueva` y ninguna otra razón el gate sigue en «aviso» y pide confirmación; solo se evita repetir el
+ * mensaje). Precedencia: cuando ya existe un vínculo y el aviso de origen de T4 dice `version_nueva`, ese aviso
+ * GANA y la razón `no_vigente` no se lista (dicen lo mismo). Sin vínculo (`estadoOrigen` ausente: primera
+ * importación) o con cualquier otro estado de origen, `no_vigente` se conserva. Ningún tipo sale dos veces.
+ * `omitidas` dice qué se quitó para que quien llama pueda mostrar en su lugar el texto del aviso de origen.
  */
 export function razonesSinDuplicar(
   razones: readonly RazonImportabilidad[],
   estadoOrigen?: EstadoOrigen | null
-): { razones: RazonImportabilidad[]; nivel: "ok" | "aviso"; omitidas: TipoRazon[] } {
+): { razones: RazonImportabilidad[]; omitidas: TipoRazon[] } {
   const vistas = new Set<TipoRazon>();
   const omitidas: TipoRazon[] = [];
   const resultado: RazonImportabilidad[] = [];
@@ -110,5 +112,5 @@ export function razonesSinDuplicar(
     vistas.add(r.tipo);
     resultado.push(r);
   }
-  return { razones: resultado, nivel: nivelDeRazones(resultado), omitidas };
+  return { razones: resultado, omitidas };
 }

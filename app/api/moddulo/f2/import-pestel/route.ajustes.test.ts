@@ -25,7 +25,7 @@ const ajustes = [
 ];
 const importar = async (analisis: Record<string, unknown>) => {
   db.reset({
-    "pestel_analyses/a1": { projectId: "pest1", ...analisis },
+    "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", ...analisis },
     "pestel_projects/pest1": { userId: "u1" },
     "moddulo_projects/p1": { phases: { exploracion: {} } },
   });

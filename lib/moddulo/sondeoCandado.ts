@@ -11,6 +11,8 @@
 import { MENSAJE_FASE_CERRADA_REEMPLAZO, type RespuestaGuardado } from "./guardadoHonesto";
 import { clasificarFallo, TEXTO_SESION } from "./textosAcceso";
 import { MENSAJE_F2_IMPORT_CON_PENDIENTE, MENSAJE_F2_IMPORT_YA_VINCULADO } from "./textosVinculo";
+import { AVISO_ORIGEN_VENCIDO_IMPORT, AVISO_ORIGEN_VENCIDO_SIN_RAZONES, leerRazonesOrigen } from "@/lib/centinela/pestel/textosOrigen";
+import type { RazonImportabilidad } from "@/lib/centinela/pestel/importabilidad";
 
 export type AccionSondeo = "nuevo_analisis" | "desvincular";
 
@@ -124,9 +126,40 @@ export function urlAlCancelarImport(source: "relink" | "sync", href: string): st
 
 // ── Confirming the import (modal «vincular») ──────────────────────────────────
 
+/** T7 C2: lo que el servidor mostró del gate de origen; la huella es OPACA para el cliente (solo la devuelve). */
+export interface OrigenImport {
+  razones: RazonImportabilidad[];
+  huella: string | null;
+}
+
+/** El aviso de «el estado cambió, no se importó nada» del gate de origen: con razones nombra el botón que se ve en el modal. */
+export const avisoOrigenVencido = (origen: OrigenImport | undefined): string => (origen ? AVISO_ORIGEN_VENCIDO_IMPORT : AVISO_ORIGEN_VENCIDO_SIN_RAZONES);
+
+export const CODIGOS_ORIGEN = ["origen_requiere_confirmacion", "origen_huella_vencida"] as const;
+export const esCodigoOrigen = (c: unknown): boolean => c === CODIGOS_ORIGEN[0] || c === CODIGOS_ORIGEN[1];
+
+/**
+ * Lee de un 409 de import-pestel todo lo que el modal necesita. Dos formas: (1) el gate de origen solo
+ * (`origen_requiere_confirmacion` / `origen_huella_vencida`: `razones` + `huella` son del GATE y no hay líneas de
+ * pérdida), (2) el candado H15 o `conflict`, que pueden traer además `razonesOrigen` + `huellaOrigen` (una sola
+ * confirmación). La huella H15 y la de origen nunca se mezclan.
+ */
+export function leerConfirmacionImport(datos: Record<string, unknown>): { lineas: string[] | undefined; huella: string | null; origen?: OrigenImport } {
+  if (esCodigoOrigen(datos.error)) {
+    const razones = leerRazonesOrigen(datos.razones);
+    return { lineas: lineasDe(datos) ?? [], huella: null, ...(razones ? { origen: { razones, huella: typeof datos.huella === "string" ? datos.huella : null } } : {}) };
+  }
+  const razones = leerRazonesOrigen(datos.razonesOrigen);
+  return {
+    lineas: lineasDe(datos),
+    huella: typeof datos.huella === "string" ? datos.huella : null,
+    ...(razones ? { origen: { razones, huella: typeof datos.huellaOrigen === "string" ? datos.huellaOrigen : null } } : {}),
+  };
+}
+
 export type DecisionConfirmacionImport =
   /** The state changed since the user looked: keep the modal open with the fresh lines and fingerprint. */
-  | { tipo: "reconfirmar"; lineas: string[] | undefined; huella: string | null; aviso: string }
+  | { tipo: "reconfirmar"; lineas: string[] | undefined; huella: string | null; aviso: string; origen?: OrigenImport }
   /** Keep the modal open and show the message; `reintentable` means «Confirmar» may be pressed again. */
   | { tipo: "error"; mensaje: string; reintentable: boolean };
 
@@ -150,11 +183,24 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
   }
   if (resp.status === 409) {
     if (resp.codigo === "conflict" || resp.codigo === "reemplazo_requiere_confirmacion" || resp.codigo === "reemplazo_huella_vencida") {
+      const c = leerConfirmacionImport(datos);
       return {
         tipo: "reconfirmar",
-        lineas: lineasDe(datos),
-        huella: typeof datos.huella === "string" ? datos.huella : null,
+        lineas: c.lineas,
+        huella: c.huella,
+        ...(c.origen ? { origen: c.origen } : {}),
         aviso: "El estado del análisis cambió. No se importó nada: revisa lo que se perderá y confirma de nuevo.",
+      };
+    }
+    // T7 C2: el gate de origen. Dentro del modal siempre es «reconfirmar»: nunca se cierra sin decir por qué.
+    if (esCodigoOrigen(resp.codigo)) {
+      const c = leerConfirmacionImport({ ...datos, error: resp.codigo });
+      return {
+        tipo: "reconfirmar",
+        lineas: c.lineas,
+        huella: c.huella,
+        ...(c.origen ? { origen: c.origen } : {}),
+        aviso: avisoOrigenVencido(c.origen),
       };
     }
     if (resp.codigo === "fase_cerrada") return { tipo: "error", mensaje: MENSAJE_FASE_CERRADA_REEMPLAZO, reintentable: false };

@@ -6,6 +6,8 @@
 // When already linked, shows "Regresar a Moddulo F2 con resultados".
 
 import { MENSAJE_MODDULO_CON_OTRO_PESTEL } from "@/lib/moddulo/textosVinculo";
+import { decidirImportabilidad, type AnalisisParaGate, type RazonImportabilidad } from "@/lib/centinela/pestel/importabilidad";
+import { AVISO_ORIGEN_VENCIDO_VINCULO, CONFIRMAR_ORIGEN, INTRO_CONFIRMAR_ORIGEN, TITULO_CONFIRMAR_ORIGEN, leerRazonesOrigen, notaDeImportacion, textosDeRazones } from "@/lib/centinela/pestel/textosOrigen";
 import { mensajeRechazoVincularCentinela } from "@/lib/moddulo/textosModalM1";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -19,6 +21,37 @@ const TIPO_LABELS: Record<string, string> = {
   legislativo: "Legislativo",
   ciudadano: "Ciudadano",
 };
+
+// ==========================================
+// NOTA DE ORIGEN (T7 C2) — la misma razón que verá F2 al importar
+// ==========================================
+
+/**
+ * Lo que F2 va a decir al importar este análisis (aprobación, sesgos sin revisar, versión vigente, confianza baja),
+ * redactado por la misma función pura que usa el modal de F2 y el selector. Solo informa: no bloquea nada, y la
+ * confianza baja sola se muestra como dato, no como advertencia.
+ */
+function NotaImportacion({ analysis }: { analysis: AnalisisParaGate | null | undefined }) {
+  if (!analysis) return null;
+  const nota = notaDeImportacion(decidirImportabilidad(analysis).razones);
+  if (!nota) return null;
+  const aviso = nota.tono === "aviso";
+  return (
+    <div
+      role="note"
+      className={`max-w-md text-xs leading-snug rounded-lg px-3 py-2 text-left ${
+        aviso
+          ? "bg-brown-eske-60/10 border border-brown-eske-60/50 text-brown-eske-80 dark:bg-yellow-eske/10 dark:border-yellow-eske/30 dark:text-yellow-eske"
+          : "text-black-eske-20 dark:text-[#9AAEBE]"
+      }`}
+    >
+      {aviso && <p className="font-semibold mb-1">Al importarlo, Moddulo F2 te pedirá confirmar:</p>}
+      <ul className={aviso ? "list-disc pl-4 space-y-1" : "space-y-1"}>
+        {nota.lineas.map((l, i) => <li key={i}>{l}</li>)}
+      </ul>
+    </div>
+  );
+}
 
 // ==========================================
 // PICKER MODAL
@@ -49,6 +82,9 @@ function PickerModal({
   const [confirmTarget, setConfirmTarget] = useState<PickerProject | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  // T7 C2: el servidor pidió confirmar el ORIGEN del análisis (aprobación, sesgos, versión). La huella es opaca:
+  // el cliente solo la devuelve.
+  const [origenPend, setOrigenPend] = useState<{ target: PickerProject; force: boolean; razones: RazonImportabilidad[]; huella: string; aviso: string | null } | null>(null);
 
   // Load Moddulo projects on mount
   useEffect(() => {
@@ -79,7 +115,7 @@ function PickerModal({
     })();
   }, [pestelProject]);
 
-  async function doLink(target: PickerProject, force: boolean) {
+  async function doLink(target: PickerProject, force: boolean, huellaOrigen: string | null = null) {
     setLinking(true);
     setLinkError(null);
     try {
@@ -89,7 +125,7 @@ function PickerModal({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ modduloProjectId: target.id, forceLink: force }),
+          body: JSON.stringify({ modduloProjectId: target.id, forceLink: force, ...(huellaOrigen ? { confirmarOrigen: true, huellaOrigen } : {}) }),
         }
       );
 
@@ -107,7 +143,16 @@ function PickerModal({
         return;
       }
 
-      const err = (await res.json()) as { error?: string; message?: string };
+      const err = (await res.json()) as { error?: string; message?: string; razones?: unknown; huella?: unknown };
+      // T7 C2: el gate de origen pide confirmación (no bloquea). Mismo texto que el modal de F2.
+      const razonesOrigen = leerRazonesOrigen(err.razones);
+      if (res.status === 409 && (err.error === "origen_requiere_confirmacion" || err.error === "origen_huella_vencida") && razonesOrigen && typeof err.huella === "string") {
+        setOrigenPend({
+          target, force, razones: razonesOrigen, huella: err.huella,
+          aviso: err.error === "origen_huella_vencida" ? AVISO_ORIGEN_VENCIDO_VINCULO : null,
+        });
+        return;
+      }
       // The Moddulo project has edits or an approval on its M1: the server refuses (409 asking for a
       // confirmation) and this screen has no confirmation step — the message sends the user to
       // Moddulo. The server emits that 409 from commit 4 of the M1 review; until then it never fires.
@@ -128,6 +173,7 @@ function PickerModal({
       setConfirmTarget(null);
     }
   }
+  // Tras una confirmación de origen exitosa o un cierre, el estado se limpia al cerrar el selector (onClose).
 
   function handleSelect(target: PickerProject) {
     if (!target.tipoOk) return;
@@ -163,8 +209,44 @@ function PickerModal({
           </button>
         </div>
 
+        {/* T7 C2 — confirmación del ORIGEN del análisis (el servidor la pidió) */}
+        {origenPend && (
+          <div className="p-5 flex flex-col gap-4">
+            <h4 className="font-semibold text-sm text-black-eske dark:text-[#EAF2F8]">{TITULO_CONFIRMAR_ORIGEN}</h4>
+            {origenPend.aviso && (
+              <p role="status" className="text-sm rounded-lg px-3 py-2 bg-yellow-eske/10 border border-yellow-eske/30 text-brown-eske-60 dark:text-yellow-eske">{origenPend.aviso}</p>
+            )}
+            <div className="text-sm leading-snug text-black-eske-10 dark:text-[#C7D6E0]">
+              <p>{INTRO_CONFIRMAR_ORIGEN}</p>
+              <ul className="mt-1 list-disc pl-5 space-y-1 text-brown-eske-80 dark:text-yellow-eske">
+                {textosDeRazones(origenPend.razones).map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
+            </div>
+            {linkError && <p role="alert" className="text-sm text-red-eske-60 dark:text-red-eske-10">{linkError}</p>}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setOrigenPend(null); setLinkError(null); }}
+                disabled={linking}
+                className="px-4 py-2 text-sm font-medium text-black-eske-20 dark:text-[#9AAEBE] hover:text-black-eske transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => doLink(origenPend.target, origenPend.force, origenPend.huella)}
+                disabled={linking}
+                className="px-4 py-2 text-sm font-medium bg-orange-eske-60 text-white-eske rounded-lg hover:bg-orange-eske-70 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {linking && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {CONFIRMAR_ORIGEN}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Confirmation step */}
-        {confirmTarget && (
+        {!origenPend && confirmTarget && (
           <div className="p-5 flex flex-col gap-4">
             <div className="flex gap-2.5 p-3 rounded-lg bg-yellow-eske/10 border border-yellow-eske/30 text-sm leading-snug text-yellow-eske-80 dark:text-yellow-eske/90">
               <svg className="shrink-0 mt-0.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -206,7 +288,7 @@ function PickerModal({
         )}
 
         {/* Project list */}
-        {!confirmTarget && (
+        {!confirmTarget && !origenPend && (
           <div className="overflow-y-auto flex-1 p-2">
             {loading && (
               <div className="flex justify-center py-8">
@@ -288,11 +370,14 @@ export default function ModduloButton({
   project,
   projectId,
   analysisId,
+  analysis,
   onLinked,
 }: {
   project: PESTELProject | null;
   projectId: string;
   analysisId: string | undefined;
+  /** T7 C2: el análisis en pantalla; con él se muestra junto al botón lo que F2 pedirá confirmar. */
+  analysis?: AnalisisParaGate | null;
   onLinked?: () => void;
 }) {
   const router = useRouter();
@@ -306,15 +391,18 @@ export default function ModduloButton({
       analysisId ? `?pest_analysis_id=${analysisId}` : ""
     }`;
     return (
-      <button
-        type="button"
-        onClick={() => router.push(href)}
-        className="px-5 py-2.5 border border-bluegreen-eske text-bluegreen-eske
-          rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/10
-          transition-colors"
-      >
-        Regresar a Moddulo F2 con resultados
-      </button>
+      <div className="flex flex-col items-end gap-2">
+        <NotaImportacion analysis={analysis} />
+        <button
+          type="button"
+          onClick={() => router.push(href)}
+          className="px-5 py-2.5 border border-bluegreen-eske text-bluegreen-eske
+            rounded-lg text-sm font-semibold hover:bg-bluegreen-eske/10
+            transition-colors"
+        >
+          Regresar a Moddulo F2 con resultados
+        </button>
+      </div>
     );
   }
 
@@ -330,6 +418,7 @@ export default function ModduloButton({
   return (
     <>
       <div className="flex flex-col items-end gap-1.5">
+        <NotaImportacion analysis={analysis} />
         <button
           type="button"
           onClick={() => router.push(`/moddulo/proyecto/nuevo?${params.toString()}`)}

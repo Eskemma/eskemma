@@ -13,6 +13,7 @@ import {
 } from "./impactoM1";
 import type { EstadoM1 } from "./m1Aprobacion";
 import { MENSAJE_FASE_CERRADA_REEMPLAZO } from "./guardadoHonesto";
+import { CONFIRMAR_ORIGEN, INTRO_CONFIRMAR_ORIGEN, TITULO_CONFIRMAR_ORIGEN } from "@/lib/centinela/pestel/textosOrigen";
 
 export interface TextoModalM1 {
   titulo: string;
@@ -24,6 +25,8 @@ export interface TextoModalM1 {
   cierre: string | null;
   confirmar: string;
   cancelar: string;
+  /** T7 C2: lo que el gate de origen dice del análisis que se va a importar (ya redactado; puede faltar). */
+  avisos?: { intro: string; items: string[] };
 }
 
 export interface OpcionesModalM1 {
@@ -33,6 +36,8 @@ export interface OpcionesModalM1 {
   lineasServidor?: string[];
   /** T4: el análisis que se importa es el MISMO que ya estaba, pero su contenido cambió en Centinela. */
   origenCambio?: boolean;
+  /** T7 C2: las razones del gate de origen, ya redactadas y sin duplicar el aviso de origen (`avisosDeOrigenParaModal`). */
+  avisosOrigen?: string[];
 }
 
 export const MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES =
@@ -40,6 +45,25 @@ export const MENSAJE_VINCULAR_CENTINELA_CON_EDICIONES =
 
 /** Modal for "Nuevo análisis ↺", "Vincular con análisis independiente", "Editar narrativas" and "Desvincular". */
 export function textoModalM1(accion: AccionM1, e: EstadoParaImpactoM1, o: OpcionesModalM1 = {}): TextoModalM1 {
+  const texto = textoBaseModalM1(accion, e, o);
+  const avisos = o.avisosOrigen ?? [];
+  if (accion !== "vincular" || avisos.length === 0) return texto;
+  const bloque = { intro: INTRO_CONFIRMAR_ORIGEN, items: avisos };
+  // Solo el gate de origen (nada que perder por el reemplazo): el modal pregunta por el origen, no por un reemplazo.
+  if (texto.lineas.length === 0 && !o.origenCambio) {
+    return {
+      ...texto,
+      titulo: TITULO_CONFIRMAR_ORIGEN,
+      intro: [o.nombre ? `Se importará «${o.nombre}» en este proyecto.` : "Se importará el análisis de Centinela en este proyecto."],
+      cierre: null,
+      confirmar: CONFIRMAR_ORIGEN,
+      avisos: bloque,
+    };
+  }
+  return { ...texto, confirmar: CONFIRMAR_ORIGEN, avisos: bloque };
+}
+
+function textoBaseModalM1(accion: AccionM1, e: EstadoParaImpactoM1, o: OpcionesModalM1): TextoModalM1 {
   const lineas = o.lineasServidor ?? lineasImpactoM1(e, accion);
   const hayAlgoQueConservar = e.hayPayload; // there is a current analysis that survives a failure
   const base = { lineas, cancelar: "Cancelar" };

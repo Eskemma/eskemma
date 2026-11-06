@@ -28,7 +28,7 @@ const llamar = async (cuerpo: Record<string, unknown> = {}) => {
 const sembrar = (exploracion: Record<string, unknown>) => {
   vi.mocked(getProject).mockResolvedValue({ id: "p1", xpcto: { hito: "h" }, phases: { exploracion } } as never);
   db.reset({
-    "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
+    "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] },
     "pestel_projects/pest1": { userId: "u1" },
     [P]: { phases: { exploracion } },
   });
@@ -117,7 +117,7 @@ describe("import-pestel — una sola confirmación", () => {
 
   it("[carrera] la lectura previa ve un proyecto limpio pero al escribir ya hay un M1 aprobado: 409 y cero escrituras", async () => {
     sembrar({});
-    db.reset({ "pestel_analyses/a1": { projectId: "pest1", dimensions: [] }, "pestel_projects/pest1": { userId: "u1" }, [P]: { phases: { exploracion: expressCargado() } } });
+    db.reset({ "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] }, "pestel_projects/pest1": { userId: "u1" }, [P]: { phases: { exploracion: expressCargado() } } });
     db.atomico(true);
     const r = await llamar();
     expect(r.status).toBe(409);
@@ -127,7 +127,7 @@ describe("import-pestel — una sola confirmación", () => {
 
   it("[carrera] la Fase 2 se cierra entre la lectura previa y la transacción: 409 fase_cerrada y cero escrituras", async () => {
     sembrar({});
-    db.reset({ "pestel_analyses/a1": { projectId: "pest1", dimensions: [] }, "pestel_projects/pest1": { userId: "u1" }, [P]: { phases: { exploracion: { status: "completed" } } } });
+    db.reset({ "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] }, "pestel_projects/pest1": { userId: "u1" }, [P]: { phases: { exploracion: { status: "completed" } } } });
     db.atomico(true);
     expect((await llamar()).cuerpo).toEqual({ error: "fase_cerrada" });
     expect(escribio()).toBe(false);

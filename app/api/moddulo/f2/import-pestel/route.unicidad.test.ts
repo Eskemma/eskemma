@@ -30,8 +30,8 @@ const conProyectos = () =>
     return (d ? { id, xpcto: {}, phases: d.phases ?? {} } : null) as never;
   });
 const base = (extra: Record<string, unknown> = {}) => ({
-  "pestel_analyses/a1": { projectId: "pest1", dimensions: [] },
-  "pestel_analyses/a2": { projectId: "pest2", dimensions: [] },
+  "pestel_analyses/a1": { status: "APPROVED", projectId: "pest1", dimensions: [] },
+  "pestel_analyses/a2": { status: "APPROVED", projectId: "pest2", dimensions: [] },
   "pestel_projects/pest1": { userId: "u1" },
   "pestel_projects/pest2": { userId: "u1" },
   "moddulo_projects/p1": { phases: { exploracion: {} } },

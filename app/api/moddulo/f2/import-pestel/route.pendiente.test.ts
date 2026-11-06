@@ -23,8 +23,8 @@ const llamar = async (pestAnalysisId: string) => {
 };
 const sembrar = () => {
   db.reset({
-    "pestel_analyses/anA": { projectId: "pestA", dimensions: [], adjustments: [] },
-    "pestel_analyses/anB": { projectId: "pestB", dimensions: [], adjustments: [] },
+    "pestel_analyses/anA": { status: "APPROVED", projectId: "pestA", dimensions: [], adjustments: [] },
+    "pestel_analyses/anB": { status: "APPROVED", projectId: "pestB", dimensions: [], adjustments: [] },
     "pestel_projects/pestA": { userId: "u1", modduloProjectId: "m1" }, // el PENDIENTE de este Moddulo
     "pestel_projects/pestB": { userId: "u1" },
     "moddulo_projects/m1": { phases: { exploracion: {} } },
