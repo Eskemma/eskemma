@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
+import { elegirUltimoAnalisis } from "@/lib/centinela/pestel/ultimoAnalisis";
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -52,19 +53,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     analyzedAt: d.data().analyzedAt,
   }));
 
-  // Prefer vigente:true; among those take the most recent
-  const getSeconds = (doc: AnalysisDoc): number => {
-    const v = doc.analyzedAt;
-    if (!v) return 0;
-    if (typeof v === "object" && "_seconds" in v) return v._seconds;
-    return new Date(v as string).getTime() / 1000;
-  };
-
-  const vigentes = docs.filter((d) => d.vigente !== false);
-  const pool = vigentes.length > 0 ? vigentes : docs;
-  pool.sort((a, b) => getSeconds(b) - getSeconds(a));
-
-  const latest = pool[0];
+  // Prefer vigente:true; among those take the most recent (T7 C1: one shared rule)
+  const latest = elegirUltimoAnalisis(docs, (d) => d) as AnalysisDoc;
   return NextResponse.json({
     analysisId: latest.id,
     analyzedAt: latest.analyzedAt ?? null,

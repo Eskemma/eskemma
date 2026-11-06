@@ -21,6 +21,7 @@ import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } 
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
+import { elegirUltimoAnalisis } from "@/lib/centinela/pestel/ultimoAnalisis";
 interface RouteContext {
   params: Promise<{ projectId: string }>;
 }
@@ -138,17 +139,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .get();
 
     if (!analysesSnap.empty) {
-      const getSeconds = (d: FirebaseFirestore.DocumentSnapshot): number => {
-        const v = d.data()?.analyzedAt;
-        if (!v) return 0;
-        if (typeof v === "object" && "_seconds" in v) return (v as { _seconds: number })._seconds;
-        return new Date(v as string).getTime() / 1000;
-      };
-      const vigentes = analysesSnap.docs.filter((d) => d.data().vigente !== false);
-      const pool = vigentes.length > 0 ? vigentes : analysesSnap.docs;
-      pool.sort((a, b) => getSeconds(b) - getSeconds(a));
-      latestAnalysisId = pool[0].id;
-      latestAnalysisData = pool[0].data() as Record<string, unknown>;
+      // T7 C1: la regla del último análisis es una sola (ultimoAnalisis.ts), la misma de latest-analysis.
+      const elegido = elegirUltimoAnalisis(analysesSnap.docs, (d) => d.data());
+      if (elegido) {
+        latestAnalysisId = elegido.id;
+        latestAnalysisData = elegido.data() as Record<string, unknown>;
+      }
     }
   } catch (err) {
     console.error("[link-moddulo] error buscando análisis para projectId:", projectId, err);
