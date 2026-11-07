@@ -138,8 +138,8 @@ describe("import-pestel — el MISMO análisis (T4)", () => {
     expect(r.cuerpo.motivo).toBeUndefined();
   });
 
-  it("huella con otra versión de la regla (v:2): se trata como sin huella, no como «cambió»", async () => {
-    const exp = moddulo({ huella: { v: 2, h: "xx" } });
+  it("huella con una versión de la regla que no conocemos (v:3): se trata como sin huella, no como «cambió»", async () => {
+    const exp = moddulo({ huella: { v: 3, h: "xx" } });
     sembrar(exp);
     const r = await llamar();
     expect(r.status).toBe(200);

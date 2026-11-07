@@ -9,11 +9,12 @@ import { dimensionEditada, elegirMapaParaCriterios, estadoM1, totalDimensiones, 
 import { huellaMapaPESTEL } from "./m1Huella";
 import type { EstadoParaImpactoM1 } from "./impactoM1";
 import { lineaTrazabilidadPestel, lineaTrazabilidadReporte } from "./pantallaM1";
+import { anexarNotaALinea } from "@/lib/centinela/pestel/notaAprobacion";
 
 /** The slice of `phases.exploracion` this module reads (the raw document, or getProject's view). */
 export interface ExploracionParaM1 {
   status?: string;
-  linkedSource?: { kind?: string; payload?: unknown };
+  linkedSource?: { kind?: string; payload?: unknown; sourceAnalysisId?: string; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown };
   m1?: M1Datos;
   dvs?: unknown;
   draftDVS?: unknown;
@@ -103,24 +104,26 @@ export interface ResumenM1Cliente {
 
 export function resumenM1ParaCliente(exp: ExploracionParaM1 | undefined): ResumenM1Cliente {
   const a = analizarM1(exp);
+  // T7 C3: la nota de aprobación del analista se agrega a la línea (solo un análisis de Centinela importado; derivado del dato).
+  const conNota = (linea: string | null) => anexarNotaALinea(linea, exp?.linkedSource);
   const dvsDeOtroAnalisis = !a.cerrada && a.estado.dvsDeOtroAnalisis;
   return {
     estado: a.estado.estado,
     aprobacionValida: a.estado.aprobacionValida,
     motoresSinGenerar: a.estado.motoresSinGenerar,
     dvsDeOtroAnalisis,
-    trazabilidad: lineaTrazabilidadReporte({
+    trazabilidad: conNota(lineaTrazabilidadReporte({
       estado: a.estado.estado,
       aprobacionValida: a.estado.aprobacionValida,
       aprobacion: a.m1?.aprobacion,
       hayDvs: a.impacto.hayDvs,
       dvsDeOtroAnalisis,
-    }),
-    trazabilidadPestel: lineaTrazabilidadPestel({
+    })),
+    trazabilidadPestel: conNota(lineaTrazabilidadPestel({
       estado: a.estado.estado,
       aprobacionValida: a.estado.aprobacionValida,
       aprobacion: a.m1?.aprobacion,
-    }),
+    })),
     borradorGuardado: a.impacto.hayBorrador,
     huella: a.huellaPayload,
     kind: a.kind,

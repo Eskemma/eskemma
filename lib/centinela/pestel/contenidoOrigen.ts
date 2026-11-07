@@ -14,16 +14,26 @@
 // análisis, como en la transformación): dimensionCode, originalClassification, newClassification,
 // justification recortada y adjustedAt (como ISO, igual que `ajustadoEn`: F2 lo muestra).
 //
-// NO ENTRA: status, vigente, version, analyzedAt, approvedAt/By, aprobacion* (estado de revisión, no contenido);
+// v2 (T7 C3) agrega la NOTA DE APROBACIÓN (`notaAprobacion.ts`: confianza + justificación recortada, solo si el análisis
+// está APPROVED con confianza baja); la fecha de la aprobación no entra. v1 no la incluye.
+//
+// NO ENTRA: status, vigente, version, analyzedAt, approvedAt/By, aprobacion* salvo la nota de v2 (estado de revisión);
 // biasAlerts, impactChains, informes (F2 no los usa); globalConfidence (F2 no la importa; la nota de confianza
-// baja es de T7); trend, intensity, mainSignal (F2 no los lee); adjustedBy y updatedAt; originalPosition y
+// baja entra solo como la nota de v2); trend, intensity, mainSignal (F2 no los lee); adjustedBy y updatedAt; originalPosition y
 // newPosition (ninguna pantalla ni prompt las lee).
 //
 // Cambiar esta regla exige subir VERSION_HUELLA_ORIGEN (una prueba fija un hash literal).
 
 import { aMillis } from "./aprobacion";
+import { notaParaHuella, type NotaAprobacion } from "./notaAprobacion";
 
-export const VERSION_HUELLA_ORIGEN = 1;
+/**
+ * Versión VIGENTE de la regla (la que se guarda al importar). La regla v1 sigue viva para COMPARAR las importaciones
+ * hechas con ella (`VERSIONES_COMPARABLES`): una importación v1 se compara con la regla v1 —sin la nota de aprobación—
+ * y nunca aparece como «cambió» por la nota.
+ */
+export const VERSION_HUELLA_ORIGEN = 2;
+export const VERSIONES_COMPARABLES: readonly number[] = [1, 2];
 
 type SenalCruda = {
   descripcion?: string;
@@ -95,7 +105,8 @@ function normalizarAjuste(adj: AjusteCrudo): Record<string, unknown> {
 /** Objeto canónico del contenido de un análisis para F2 (se serializa con `serializacionEstable` y se hashea). */
 export function contenidoDeOrigen(
   dimensions: DimensionCruda[] | null | undefined,
-  adjustments: AjusteCrudo[] | null | undefined
+  adjustments: AjusteCrudo[] | null | undefined,
+  opts?: { version?: number; nota?: NotaAprobacion | null }
 ): Record<string, unknown> {
   const dims = [...(dimensions ?? [])].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
   const codigos = new Set(dims.map((d) => d.code));
@@ -115,7 +126,8 @@ export function contenidoDeOrigen(
     if (a?.dimensionCode && codigos.has(a.dimensionCode)) ultimo.set(a.dimensionCode, a);
   }
   const ajustes = [...ultimo.keys()].sort().map((c) => normalizarAjuste(ultimo.get(c)!));
-  return { dimensiones, ajustes };
+  const nota = (opts?.version ?? VERSION_HUELLA_ORIGEN) >= 2 ? notaParaHuella(opts?.nota) : null;
+  return { dimensiones, ajustes, ...(nota ? { nota } : {}) };
 }
 
 /**

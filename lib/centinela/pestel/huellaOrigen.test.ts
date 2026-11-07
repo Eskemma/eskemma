@@ -10,14 +10,40 @@ import type { F2DimensionPESTEL, F2Senal, AjusteAnalistaF2 } from "@/types/moddu
 const clon = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 const h = (d: unknown, a: unknown) => huellaDeOrigen(d as DimensionCruda[], a as AjusteCrudo[]).h;
 const BASE = h(DIMENSIONES_EJEMPLO, AJUSTES_EJEMPLO);
+const HASH_V2_SIN_NOTA = "c11748ac1ef77c7142f806796858121391eee8cb8e3871cb5ca45fdf60d38b4c";
+const HASH_V2_CON_NOTA = "93dd61cb47ae75cc3f3d5397038427f32d583c3db578287f8f162f338f0a534a";
 
 describe("huellaDeOrigen — estabilidad y versión", () => {
-  it("HASH LITERAL de un análisis de ejemplo: si cambia, cambió la regla y hay que subir VERSION_HUELLA_ORIGEN", () => {
-    expect(VERSION_HUELLA_ORIGEN).toBe(1);
-    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never)).toEqual({
+  it("HASH LITERAL v1 (T7 C3: la regla v1 NO cambió; las importaciones v1 se siguen comparando con ella)", () => {
+    // El mismo literal que fijó T4. Se verificó verde ANTES de tocar `contenidoOrigen.ts` (con el código de 6e39852).
+    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { version: 1 })).toEqual({
       v: 1,
       h: "e231635ea703d9ff82e7f6ef44233b41cfb0720852fd3b81d76685977c86cfb0",
     });
+    // v1 ignora la nota por completo: pasarla no cambia nada.
+    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { version: 1, nota: { confianza: 39, justificacion: "x" } }).h).toBe(
+      "e231635ea703d9ff82e7f6ef44233b41cfb0720852fd3b81d76685977c86cfb0"
+    );
+  });
+
+  it("HASH LITERAL v2 (vigente): si cambia, cambió la regla y hay que subir VERSION_HUELLA_ORIGEN", () => {
+    expect(VERSION_HUELLA_ORIGEN).toBe(2);
+    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never)).toEqual({ v: 2, h: HASH_V2_SIN_NOTA });
+    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: { confianza: 39, justificacion: "Se aprueba con reservas." } })).toEqual({
+      v: 2,
+      h: HASH_V2_CON_NOTA,
+    });
+  });
+
+  it("v2: la nota entra (confianza y justificación recortada); la fecha de aprobación no; sin nota = hash sin nota", () => {
+    const n = (x: object) => huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: x as never }).h;
+    const base = n({ confianza: 39, justificacion: "Se aprueba con reservas." });
+    expect(n({ confianza: 39, justificacion: "  Se aprueba con reservas.\n", aprobadoEn: "2026-11-06T00:00:00.000Z" })).toBe(base);
+    expect(n({ confianza: 38, justificacion: "Se aprueba con reservas." })).not.toBe(base);
+    expect(n({ confianza: 39, justificacion: "Otra." })).not.toBe(base);
+    expect(n({ confianza: 39 })).not.toBe(base);
+    expect(n({ confianza: 39 })).not.toBe(h(DIMENSIONES_EJEMPLO, AJUSTES_EJEMPLO));
+    expect(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: null }).h).toBe(h(DIMENSIONES_EJEMPLO, AJUSTES_EJEMPLO));
   });
 
   it("no depende del orden de las dimensiones ni de las claves; sí del orden de las señales", () => {
@@ -36,9 +62,10 @@ describe("huellaDeOrigen — estabilidad y versión", () => {
     expect(h(DIMENSIONES_EJEMPLO, [...AJUSTES_EJEMPLO, { dimensionCode: "ZZ", newClassification: "NEUTRAL", justification: "x" }])).toBe(BASE);
   });
 
-  it("huellaComparable: solo con la versión vigente de la regla y un hash no vacío", () => {
+  it("huellaComparable: v1 y v2 (las que sabemos calcular) con un hash no vacío; otra versión, no", () => {
     expect(huellaComparable({ v: 1, h: "abc" })).toBe(true);
-    expect(huellaComparable({ v: 2, h: "abc" })).toBe(false);
+    expect(huellaComparable({ v: 2, h: "abc" })).toBe(true);
+    expect(huellaComparable({ v: 3, h: "abc" })).toBe(false);
     expect(huellaComparable({ v: 1, h: "" })).toBe(false);
     expect(huellaComparable(undefined)).toBe(false);
     expect(huellaComparable(null)).toBe(false);

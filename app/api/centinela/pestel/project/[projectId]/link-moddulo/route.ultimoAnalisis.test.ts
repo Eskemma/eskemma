@@ -104,6 +104,6 @@ describe("link-moddulo — qué análisis elige (misma regla que latest-analysis
     const ls = mockDb.updates().find((u) => u.path === "moddulo_projects/m1")?.data["phases.exploracion.linkedSource"] as { sourceAnalysisId: string; payload: Record<string, unknown>; huellaFuente: { v: number; h: string } };
     expect(ls.sourceAnalysisId).toBe("nuevo");
     expect(Object.keys(ls.payload)).toEqual(["E"]);
-    expect(ls.huellaFuente.v).toBe(1);
+    expect(ls.huellaFuente.v).toBe(2); // T7 C3: la importación nueva siempre es v2
   });
 });

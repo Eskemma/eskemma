@@ -39,7 +39,18 @@ describe("decidirImportabilidad — tabla de estados", () => {
   it("confianza baja SOLA (aprobado) es informativa: nivel ok pero con la razón para que viaje la nota", () => {
     const r = decidirImportabilidad({ ...base, globalConfidence: 39 });
     expect(r.nivel).toBe("ok");
-    expect(r.razones).toEqual([{ tipo: "confianza_baja", confianza: 39 }]);
+    // T7 C3: `base` está APROBADO y sin justificación guardada → la razón lo dice (no insinúa una nota).
+    expect(r.razones).toEqual([{ tipo: "confianza_baja", confianza: 39, nota: "sin_justificacion" }]);
+  });
+
+  it("T7 C3: con justificación guardada la razón dice con_justificacion; sin aprobar no lleva `nota`", () => {
+    const con = decidirImportabilidad({ ...base, globalConfidence: 39, aprobacionJustificacion: "  Se aprueba con reservas documentadas.  " });
+    expect(con.razones).toEqual([{ tipo: "confianza_baja", confianza: 39, nota: "con_justificacion" }]);
+    const vacia = decidirImportabilidad({ ...base, globalConfidence: 39, aprobacionJustificacion: "   " });
+    expect(vacia.razones).toEqual([{ tipo: "confianza_baja", confianza: 39, nota: "sin_justificacion" }]);
+    const sinAprobar = decidirImportabilidad({ ...base, status: "REVIEWED", globalConfidence: 39, aprobacionJustificacion: "x".repeat(30) });
+    expect(sinAprobar.razones.find((r) => r.tipo === "confianza_baja")).toEqual({ tipo: "confianza_baja", confianza: 39 });
+    expect(con.nivel).toBe("ok");
   });
 
   it("confianza baja + no aprobado: avisa y lista ambas, en orden fijo", () => {

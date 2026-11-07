@@ -137,3 +137,23 @@ describe("avisos de «huella vencida» (el estado cambió entre lo que se vio y 
     expect(selector).toContain("{CONFIRMAR_ORIGEN}");
   });
 });
+
+describe("confianza_baja — texto según la nota (T7 C3)", () => {
+  const base = "La confianza global del análisis es de 39 %, por debajo del 50 % recomendado.";
+  it("sin `nota` (no está aprobado): el texto de siempre, sin prometer ni negar justificación", () => {
+    expect(textoRazon({ tipo: "confianza_baja", confianza: 39 })).toBe(base);
+  });
+  it("aprobado CON justificación: dice que la incluye", () => {
+    expect(textoRazon({ tipo: "confianza_baja", confianza: 39, nota: "con_justificacion" })).toBe(`${base} Se aprobó con confianza baja; incluye la justificación del analista.`);
+  });
+  it("aprobado SIN justificación registrada: lo dice, no insinúa una nota", () => {
+    const t = textoRazon({ tipo: "confianza_baja", confianza: 39, nota: "sin_justificacion" });
+    expect(t).toBe(`${base} Se aprobó con confianza baja; no hay justificación registrada.`);
+    expect(t).not.toContain("incluye la justificación");
+  });
+  it("leerRazonesOrigen acepta las dos formas de `nota` y rechaza cualquier otra", () => {
+    expect(leerRazonesOrigen([{ tipo: "confianza_baja", confianza: 39, nota: "con_justificacion" }])).toHaveLength(1);
+    expect(leerRazonesOrigen([{ tipo: "confianza_baja", confianza: 39 }])).toHaveLength(1);
+    expect(leerRazonesOrigen([{ tipo: "confianza_baja", confianza: 39, nota: "x" }])).toBeUndefined();
+  });
+});

@@ -53,6 +53,8 @@ import ModduloChat from "@/app/moddulo/components/ModduloChat";
 import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionReview";
 import DVSView from "./components/DVSView";
 import AjusteAnalista from "./components/AjusteAnalista";
+import NotaAprobacionOrigen from "./components/NotaAprobacionOrigen";
+import { leerNotaGuardada, type NotaAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
 import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
@@ -336,6 +338,11 @@ export default function ExploracionPage() {
   const [pendingReplaceConfirm, setPendingReplaceConfirm] = useState<{ pestAnalysisId: string; source: "relink" | "sync"; lineas?: string[]; huella: string | null; aviso: string | null; motivo?: "analisis_cambio"; origen?: OrigenImport } | null>(null);
   // T4: ¿el análisis de Centinela que se importó sigue al día? (se verifica al montar y tras cada import exitoso)
   const [origenPestel, setOrigenPestel] = useState<ResultadoOrigen | null>(null);
+  // T7 C3: nota de aprobación que el analista dejó en Centinela al importar (v2) y versión de la huella de la importación.
+  const [notaOrigen, setNotaOrigen] = useState<{ v: number | null; nota: NotaAprobacion | null } | null>(null);
+  const aplicarNotaOrigen = (ls: { kind?: string; sourceAnalysisId?: string; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown; payload?: unknown } | undefined) =>
+    // Solo un análisis de Centinela importado (T22 con análisis): un M1 express no tiene nota que mostrar ni «no disponible».
+    setNotaOrigen(ls?.payload && ls.kind === "T22" && ls.sourceAnalysisId ? { v: typeof ls.huellaFuente?.v === "number" ? ls.huellaFuente.v : null, nota: leerNotaGuardada(ls.aprobacionOrigen) } : null);
   const [origenRefresco, setOrigenRefresco] = useState(0);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [errorReplace, setErrorReplace] = useState<string | null>(null);
@@ -413,6 +420,7 @@ export default function ExploracionPage() {
         // Read mapaPESTEL first — needed to decide showReporte default
         const savedLinkedSource = p.phases?.exploracion?.linkedSource;
         const savedMapa = savedLinkedSource?.payload;
+        aplicarNotaOrigen(savedLinkedSource);
 
         // Cargar DVS si existe
         const savedDvs = p.phases?.exploracion?.dvs;
@@ -600,8 +608,9 @@ export default function ExploracionPage() {
         const data = await r.json();
         // T4: «idempotente» = el servidor no escribió nada (el análisis no cambió). Solo se limpia el parámetro de la
         // URL: reiniciar aprobaciones de motores o releer el M1 describiría un cambio que no ocurrió.
-        const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
+        const linkedSource = data.linkedSource as { sourceId?: string; kind?: string; sourceAnalysisId?: string; payload?: MapaPESTEL; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown } | undefined;
         if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
+        if (linkedSource?.payload) aplicarNotaOrigen(linkedSource);
         if (linkedSource?.sourceId) {
           setPestProjectId(linkedSource.sourceId);
           setPestlVia("pestel");
@@ -737,9 +746,10 @@ export default function ExploracionPage() {
           }
           if (!r.ok) return;
           const data = await r.json();
-          const linkedSource = data.linkedSource as { sourceId?: string; payload?: MapaPESTEL } | undefined;
+          const linkedSource = data.linkedSource as { sourceId?: string; kind?: string; sourceAnalysisId?: string; payload?: MapaPESTEL; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown } | undefined;
           if (linkedSource?.sourceId) setPestProjectId(linkedSource.sourceId);
           if (linkedSource?.payload) setMapaPESTEL(linkedSource.payload);
+          if (linkedSource?.payload) aplicarNotaOrigen(linkedSource);
           void refrescarM1Ref.current();
         })
         .catch((err) => console.error("[C7b] import-pestel falló para pestAnalysisId:", pestAnalysisId, err));
@@ -1338,6 +1348,7 @@ export default function ExploracionPage() {
       setPestlVia(null);
       setPestProjectId(null);
       setOrigenPestel(null); // T4: sin vínculo no hay origen que verificar
+      setNotaOrigen(null);
       setPestAnalysisId(null);
       setMapaPESTEL(null);
       setXpctoStaleChanges([]);
@@ -2327,6 +2338,8 @@ export default function ExploracionPage() {
               {/* T4: una decisión pura (lib/moddulo/avisoOrigen): nada con la fase cerrada ni si no se pudo verificar.
                   Sin descarte: describe un estado del proyecto y se quita al actualizar el análisis. */}
               <AvisoOrigenPestel aviso={decidirAvisoOrigen({ origen: origenPestel, f2Cerrada: m1.f2Cerrada })} pestProjectId={pestProjectId} />
+              {/* T7 C3: la nota de aprobación del analista (confianza baja); importaciones anteriores: «no disponible». */}
+              {notaOrigen && mapaPESTEL && <NotaAprobacionOrigen v={notaOrigen.v} nota={notaOrigen.nota} />}
               {xpctoStaleChanges.length > 0 && (() => {
                 // One pure decision (lib/moddulo/avisoXpcto): a Centinela M1 never depends on the XPCTO, an empty XPCTO
                 // at import is not stale, no notice in a closed phase (provisional until Bloque 4) or while the M1 is

@@ -4,16 +4,18 @@
 //
 //  - nada si la Fase 2 está cerrada (no se puede importar: contención provisional hasta el Bloque 4),
 //  - nada si no se pudo verificar (importaciones anteriores a T4, origen ajeno o ilegible: nunca se dice «cambió»),
-//  - «versión más nueva» o «el análisis cambió» según el estado.
+//  - «versión más nueva», «el análisis cambió» o «la nota de aprobación cambió» según el estado.
 
 import type { ResultadoOrigen } from "@/lib/centinela/pestel/estadoOrigen";
 
 export type AvisoOrigen =
   | { tipo: "ninguno" }
   | { tipo: "version_nueva"; texto: string }
-  | { tipo: "cambio_contenido"; texto: string };
+  | { tipo: "cambio_contenido"; texto: string }
+  | { tipo: "cambio_nota"; texto: string };
 
-const ACCION = "Para actualizar, abre Centinela y regresa a Moddulo F2.";
+// T7 C3: nombra el botón que existe en Centinela (con el proyecto vinculado) para volver a F2 con el análisis al día.
+export const ACCION = "Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados».";
 
 function etiquetaVersion(version?: number, fecha?: string): string {
   const f = fecha ? new Date(fecha).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null;
@@ -36,6 +38,13 @@ export function decidirAvisoOrigen(i: { origen: ResultadoOrigen | null | undefin
     return {
       tipo: "cambio_contenido",
       texto: `El análisis PESTEL de origen${imp} cambió después de importarlo (por ejemplo, por un ajuste del analista). Lo que ves aquí es la versión importada. ${ACCION}`,
+    };
+  }
+  if (o.estado === "cambio_nota") {
+    const imp = o.importada?.version != null ? ` (v${o.importada.version})` : "";
+    return {
+      tipo: "cambio_nota",
+      texto: `La nota de aprobación del análisis PESTEL de origen${imp} cambió o se retiró después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. ${ACCION}`,
     };
   }
   return { tipo: "ninguno" };

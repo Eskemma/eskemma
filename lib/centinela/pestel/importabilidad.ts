@@ -17,6 +17,7 @@
 
 import { aMillis, confianzaInsuficiente } from "./aprobacion";
 import type { EstadoOrigen } from "./estadoOrigen";
+import { notaDeAprobacion } from "./notaAprobacion";
 
 export interface AnalisisParaGate {
   id?: string;
@@ -25,6 +26,8 @@ export interface AnalisisParaGate {
   analyzedAt?: unknown;
   globalConfidence?: unknown;
   biasAlerts?: unknown;
+  aprobacionJustificacion?: unknown;
+  approvedAt?: unknown;
 }
 
 /** El análisis vigente del proyecto, si se pudo consultar. Ausente/null = no existe o no se consultó. */
@@ -37,7 +40,8 @@ export type RazonImportabilidad =
   | { tipo: "no_aprobado"; status?: string }
   | { tipo: "sesgos_sin_revisar"; cantidad: number }
   | { tipo: "no_vigente"; fechaAnalisis?: string; fechaVigente?: string }
-  | { tipo: "confianza_baja"; confianza: number };
+  // `nota` (T7 C3): solo si el análisis está APPROVED; dice si su aprobación guardó la justificación del analista.
+  | { tipo: "confianza_baja"; confianza: number; nota?: "con_justificacion" | "sin_justificacion" };
 
 export type TipoRazon = RazonImportabilidad["tipo"];
 
@@ -81,7 +85,12 @@ export function decidirImportabilidad(analysis: AnalisisParaGate, vigente?: Vige
   }
 
   if (confianzaInsuficiente(analysis.globalConfidence)) {
-    razones.push({ tipo: "confianza_baja", confianza: analysis.globalConfidence as number });
+    const nota = notaDeAprobacion(analysis);
+    razones.push({
+      tipo: "confianza_baja",
+      confianza: analysis.globalConfidence as number,
+      ...(nota ? { nota: nota.justificacion ? ("con_justificacion" as const) : ("sin_justificacion" as const) } : {}),
+    });
   }
 
   return { nivel: nivelDeRazones(razones), razones };

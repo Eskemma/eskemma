@@ -19,3 +19,13 @@ describe("AvisoOrigenPestel", () => {
     expect(renderToStaticMarkup(<AvisoOrigenPestel aviso={{ tipo: "cambio_contenido", texto: "x" }} pestProjectId={null} />)).not.toContain("href=");
   });
 });
+
+describe("AvisoOrigenPestel — cambio_nota (T7 C3)", () => {
+  it("se pinta como los demás avisos y tampoco se puede descartar", () => {
+    const h = renderToStaticMarkup(<AvisoOrigenPestel aviso={{ tipo: "cambio_nota", texto: "La nota de aprobación cambió." }} pestProjectId="pest1" />);
+    expect(h).toContain('role="status"');
+    expect(h).toContain("La nota de aprobación cambió.");
+    expect(h).not.toContain("<button");
+    expect(h).not.toMatch(/Cerrar|Descartar|Ocultar/);
+  });
+});

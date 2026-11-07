@@ -34,12 +34,33 @@ describe("decidirEstadoOrigen", () => {
   });
   it("sin huella guardada o con otra versión de la regla → no_verificable, NUNCA cambio_contenido", () => {
     expect(decidirEstadoOrigen(d({ huellaGuardada: undefined, huellaActual: { v: 1, h: "zzz" } }))).toMatchObject({ estado: "no_verificable", razon: "sin_huella" });
-    expect(decidirEstadoOrigen(d({ huellaGuardada: { v: 2, h: "aaa" }, huellaActual: { v: 1, h: "zzz" } })).estado).toBe("no_verificable");
+    expect(decidirEstadoOrigen(d({ huellaGuardada: { v: 3, h: "aaa" }, huellaActual: { v: 1, h: "zzz" } })).estado).toBe("no_verificable");
     expect(decidirEstadoOrigen(d({ huellaGuardada: null })).estado).toBe("no_verificable");
   });
   it("origen ilegible → no_verificable (Olmos 2 y similares: sin huella y sin versión nueva)", () => {
     expect(decidirEstadoOrigen(d({ importado: null })).razon).toBe("origen_no_disponible");
     expect(decidirEstadoOrigen(d({ huellaActual: null })).razon).toBe("origen_no_disponible");
     expect(decidirEstadoOrigen(d({ huellaGuardada: undefined })).estado).toBe("no_verificable");
+  });
+});
+
+describe("decidirEstadoOrigen — cambio_nota (T7 C3)", () => {
+  const G2 = { v: 2, h: "g2" };
+  const base = (extra: Partial<DatosOrigen> = {}) => d({ huellaGuardada: G2, huellaActual: { v: 2, h: "otra" }, huellaActualConNotaGuardada: G2, ...extra });
+  it("v2, el contenido es el mismo pero la nota cambió → cambio_nota", () => {
+    expect(decidirEstadoOrigen(base())).toMatchObject({ estado: "cambio_nota" });
+  });
+  it("v2 y también cambió el contenido → cambio_contenido (gana: un ajuste que retira la aprobación se ve como cambio de contenido)", () => {
+    expect(decidirEstadoOrigen(base({ huellaActualConNotaGuardada: { v: 2, h: "tampoco" } })).estado).toBe("cambio_contenido");
+    expect(decidirEstadoOrigen(base({ huellaActualConNotaGuardada: null })).estado).toBe("cambio_contenido");
+  });
+  it("v2 igual → igual; version_nueva gana sobre cambio_nota", () => {
+    expect(decidirEstadoOrigen(base({ huellaActual: G2 })).estado).toBe("igual");
+    expect(decidirEstadoOrigen(base({ vigente: { id: "a2", version: 2, analizadoEn: "2026-10-05T00:00:00.000Z" } })).estado).toBe("version_nueva");
+  });
+  it("una importación v1 NUNCA es cambio_nota, aunque llegue la huella con la nota guardada", () => {
+    const v1 = decidirEstadoOrigen(d({ huellaGuardada: { v: 1, h: "aaa" }, huellaActual: { v: 1, h: "bbb" }, huellaActualConNotaGuardada: { v: 1, h: "aaa" } }));
+    expect(v1.estado).toBe("cambio_contenido");
+    expect(decidirEstadoOrigen(d({ huellaGuardada: { v: 1, h: "aaa" }, huellaActual: { v: 1, h: "aaa" } })).estado).toBe("igual");
   });
 });

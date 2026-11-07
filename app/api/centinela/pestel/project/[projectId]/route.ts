@@ -9,6 +9,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getPestelProjectPropio } from "@/lib/centinela/pestel/projectPropio";
 import { FieldValue } from "firebase-admin/firestore";
 import { ajustesDelMapaImportado, type MapaImportadoResumen } from "@/lib/centinela/pestel/ajustesSinReflejar";
+import { leerNotaGuardada, type NotaAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
 import type { PESTELProject, TipoProyecto, Territorio, PESTELProjectStatus } from "@/types/pestel.types";
 
 interface RouteContext {
@@ -32,15 +33,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
   // nueva. `null` = no se pudo saber (sin acceso, en papelera o inexistente): la pantalla no afirma nada.
   if (request.nextUrl.searchParams.get("ajustesImportados") === "1" && project.modduloProjectId) {
     let importado: MapaImportadoResumen | null = null;
+    // T7 C3: la nota de aprobación que F2 importó y la versión de su huella (misma lectura del Moddulo: 0 lecturas extra).
+    let notaImportada: { v: number | null; nota: NotaAprobacion | null; sourceAnalysisId: string | null } | null = null;
     try {
       const snap = await adminDb.collection("moddulo_projects").doc(project.modduloProjectId).get();
       const d = snap.exists ? snap.data() : undefined;
       const colabora = !!d?.collaborators?.some((c: { uid?: string }) => c.uid === session.uid);
-      if (d && !d.deletedAt && colabora) importado = ajustesDelMapaImportado(d.phases?.exploracion?.linkedSource?.payload);
+      if (d && !d.deletedAt && colabora) {
+        const ls = d.phases?.exploracion?.linkedSource;
+        importado = ajustesDelMapaImportado(ls?.payload);
+        notaImportada = { v: typeof ls?.huellaFuente?.v === "number" ? ls.huellaFuente.v : null, nota: leerNotaGuardada(ls?.aprobacionOrigen), sourceAnalysisId: typeof ls?.sourceAnalysisId === "string" ? ls.sourceAnalysisId : null };
+      }
     } catch {
       importado = null;
+      notaImportada = null;
     }
-    return NextResponse.json({ project, importado });
+    return NextResponse.json({ project, importado, notaImportada });
   }
 
   return NextResponse.json({ project });

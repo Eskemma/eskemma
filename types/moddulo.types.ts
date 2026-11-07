@@ -21,6 +21,12 @@ export interface LinkedSourceRef<TPayload = unknown> {
    * verificables»: nunca se les dice que cambiaron). `v` es la versión de la regla de qué cuenta como contenido.
    */
   huellaFuente?: { v: number; h: string };
+  /**
+   * T7 C3: nota de aprobación del analista al importar (aprobó el análisis con confianza global < 50). Hermano del
+   * payload: NO es parte del mapa ni de ningún prompt; solo pantalla y descargas. Se omite si no hay (nunca
+   * `undefined`/`null`). Solo las importaciones con huella v2 la tienen; las anteriores no la adquieren nunca.
+   */
+  aprobacionOrigen?: { confianza: number; justificacion?: string; aprobadoEn?: string };
 }
 
 // ==========================================

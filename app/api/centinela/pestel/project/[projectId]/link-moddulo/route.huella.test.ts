@@ -55,3 +55,18 @@ describe("link-moddulo — huellaFuente (T4)", () => {
     expect(Object.prototype.hasOwnProperty.call(r.linked, "payload")).toBe(false);
   });
 });
+
+describe("link-moddulo — nota de aprobación y huella v2 (T7 C3)", () => {
+  const NOTA = { confianza: 39, justificacion: "Se aprueba con reservas documentadas." };
+  it("aprobado con confianza baja: huella v2 con la nota y aprobacionOrigen junto al mapa", async () => {
+    const r = await vincular({ dimensions: DIMENSIONES_EJEMPLO, adjustments: AJUSTES_EJEMPLO, globalConfidence: 39, aprobacionJustificacion: NOTA.justificacion, approvedAt: "2026-10-20T15:30:00.000Z" });
+    expect(r.status).toBe(201);
+    expect(r.linked?.huellaFuente).toEqual(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: NOTA }));
+    expect(r.linked?.aprobacionOrigen).toEqual({ ...NOTA, aprobadoEn: "2026-10-20T15:30:00.000Z" });
+  });
+  it("aprobado con confianza suficiente: la clave aprobacionOrigen no existe (ni undefined ni null)", async () => {
+    const r = await vincular({ dimensions: DIMENSIONES_EJEMPLO, adjustments: AJUSTES_EJEMPLO, globalConfidence: 80 });
+    expect(r.linked?.huellaFuente).toEqual(huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never));
+    expect(Object.prototype.hasOwnProperty.call(r.linked, "aprobacionOrigen")).toBe(false);
+  });
+});

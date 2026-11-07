@@ -49,7 +49,8 @@ describe("verificarOrigen", () => {
     expect(f.lecturas()).toBe(3);
     const masks = (f.llamadas.getAll as Array<{ fieldMask: string[] }>).map((o) => o.fieldMask.join(" "));
     expect(masks.join(" ")).not.toContain("informes");
-    expect(masks[1]).toBe("projectId dimensions adjustments version analyzedAt");
+    // T7 C3: la nota se calcula con los MISMOS campos leídos (status, confianza, justificación, fecha): 0 lecturas extra.
+    expect(masks[1]).toBe("projectId dimensions adjustments version analyzedAt status globalConfidence aprobacionJustificacion approvedAt");
     expect(f.llamadas.select).toEqual([["version", "analyzedAt"]]);
   });
 
@@ -97,5 +98,47 @@ describe("verificarOrigen", () => {
   it("el análisis importado ya no existe → no_verificable", async () => {
     const f = falsoDb({ "moddulo_projects/m1": mod() }, vig1);
     expect(await verificarOrigen(f.db, P)).toEqual({ estado: "no_verificable", razon: "origen_no_disponible" });
+  });
+});
+
+describe("verificarOrigen — nota de aprobación (T7 C3)", () => {
+  const V1_LITERAL = { v: 1, h: "e231635ea703d9ff82e7f6ef44233b41cfb0720852fd3b81d76685977c86cfb0" };
+  const NOTA = { confianza: 39, justificacion: "Se aprueba con reservas documentadas." };
+  const APROBADO_39 = { status: "APPROVED", globalConfidence: 39, aprobacionJustificacion: NOTA.justificacion, approvedAt: "2026-10-20T00:00:00.000Z" };
+  const h2 = (nota: object | null) => huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: nota as never });
+  const estado = async (linked: Record<string, unknown>, an: Record<string, unknown>) =>
+    (await verificarOrigen(falsoDb({ "moddulo_projects/m1": mod(linked), "pestel_analyses/a1": analisis(an) }, vig1).db, P)).estado;
+
+  it("los T22 reales con huella v1 (hash literal de T4) se comparan con la regla v1: «igual», aunque el análisis ahora esté APROBADO con confianza 39 y justificación (la nota no los toca)", async () => {
+    expect(await estado({ huellaFuente: V1_LITERAL }, APROBADO_39)).toBe("igual");
+    expect(await estado({ huellaFuente: V1_LITERAL }, { ...APROBADO_39, aprobacionJustificacion: "Otra distinta, ya aprobada de nuevo." })).toBe("igual");
+    expect(await estado({ huellaFuente: V1_LITERAL }, { status: "REVIEWED", globalConfidence: 39 })).toBe("igual");
+  });
+  it("v1 sigue detectando un cambio de CONTENIDO (como en T4)", async () => {
+    expect(await estado({ huellaFuente: V1_LITERAL }, { adjustments: [] })).toBe("cambio_contenido");
+  });
+  it("v2 con la nota importada igual a la actual → igual", async () => {
+    expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, APROBADO_39)).toBe("igual");
+  });
+  it("v2 importado SIN nota y el analista aprueba después con confianza baja → cambio_nota (la acción real: «Finalizar interpretación»)", async () => {
+    expect(await estado({ huellaFuente: h2(null) }, APROBADO_39)).toBe("cambio_nota");
+  });
+  it("v2 con nota y se vuelve a aprobar con OTRA justificación → cambio_nota", async () => {
+    expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { ...APROBADO_39, aprobacionJustificacion: "Otra justificación distinta." })).toBe("cambio_nota");
+  });
+  it("v2 con nota y la aprobación se retira SIN tocar el contenido → cambio_nota (la nota se retiró)", async () => {
+    expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { status: "REVIEWED", globalConfidence: 39 })).toBe("cambio_nota");
+  });
+  it("v2 con nota y un ajuste (que retira la aprobación Y cambia el contenido) → cambio_contenido, no cambio_nota", async () => {
+    expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { status: "REVIEWED", globalConfidence: 39, adjustments: [] })).toBe("cambio_contenido");
+  });
+  it("sin huella (importación previa a T4) sigue siendo no_verificable, con o sin nota en el análisis", async () => {
+    const f = falsoDb({ "moddulo_projects/m1": mod({ huellaFuente: undefined }), "pestel_analyses/a1": analisis(APROBADO_39) }, vig1);
+    expect(await verificarOrigen(f.db, P)).toMatchObject({ estado: "no_verificable", razon: "sin_huella" });
+  });
+  it("lecturas: las mismas 3 de siempre (la nota sale de los campos que ya se leen)", async () => {
+    const f = falsoDb({ "moddulo_projects/m1": mod({ huellaFuente: h2(null) }), "pestel_analyses/a1": analisis(APROBADO_39) }, vig1);
+    await verificarOrigen(f.db, P);
+    expect(f.lecturas()).toBe(3);
   });
 });

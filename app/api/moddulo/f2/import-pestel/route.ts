@@ -16,6 +16,7 @@ import { transformToMapaPESTEL, type RawDimension, type RawAdjustment } from "@/
 import { aplicarVinculoUnico, prepararVinculoUnico } from "@/lib/centinela/pestel/vinculoUnico";
 import { MENSAJE_CONFLICTO_IMPORT, MENSAJE_MODDULO_CON_PENDIENTE } from "@/lib/moddulo/textosVinculo";
 import { huellaComparable, huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
+import { notaDeAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
 import { ajustesDelMapaImportado, ajustesSinReflejarEnF2 } from "@/lib/centinela/pestel/ajustesSinReflejar";
 import { decidirCandadoOrigen, leerVigenteParaGate, respuestaCandadoOrigen, type DecisionCandadoOrigen } from "@/lib/centinela/pestel/candadoOrigen";
 
@@ -108,7 +109,10 @@ export async function POST(request: NextRequest) {
   // request with `confirmar` + `huella` is the explicit confirmation (it also satisfies `confirmReplace`).
   const confirmaConHuella = body.confirmar === true && typeof body.huella === "string";
   // T4: huella del CONTENIDO del análisis de origen tal como está ahora (se guarda al importar).
-  const huellaActual = huellaDeOrigen(analysis.dimensions, analysis.adjustments);
+  // T7 C3: la importación NUEVA siempre es v2 (contenido + nota de aprobación); para COMPARAR una importación existente se
+  // usa la regla de la versión en que se hizo (una v1 se compara sin la nota y nunca adquiere la nota por reimportar).
+  const nota = notaDeAprobacion(analysis);
+  const huellaActual = huellaDeOrigen(analysis.dimensions, analysis.adjustments, { nota });
   // El MISMO análisis ya importado pero con contenido distinto (p. ej. el analista lo ajustó en Centinela) NO es
   // idempotente: se re-sincroniza por el mismo camino y con el mismo candado H15 que cualquier reemplazo.
   let mismoAnalisisCambiado = false;
@@ -138,7 +142,7 @@ export async function POST(request: NextRequest) {
       // criterio de la nota de T3 en Centinela). Si nada cambió: idempotente, como siempre.
       const guardada = existingLinkedSource?.huellaFuente;
       mismoAnalisisCambiado = huellaComparable(guardada)
-        ? guardada.h !== huellaActual.h
+        ? guardada.h !== huellaDeOrigen(analysis.dimensions, analysis.adjustments, { version: guardada.v, nota: guardada.v === 2 ? nota : null }).h
         : ajustesSinReflejarEnF2(analysis.adjustments, ajustesDelMapaImportado(existingMapa)).length > 0;
       if (!mismoAnalisisCambiado) {
         // `idempotente`: nada se escribió ni cambió; la pantalla no debe reiniciar su estado (T4).
@@ -170,6 +174,7 @@ export async function POST(request: NextRequest) {
     sourceAnalysisId: pestAnalysisId,
     payload: mapaPESTEL,
     huellaFuente: huellaActual,
+    ...(nota ? { aprobacionOrigen: nota } : {}),
   };
 
   // Save to Moddulo project. The imported M1 is a NEW M1 in draft (m1Escritura.ts): the user reviews and

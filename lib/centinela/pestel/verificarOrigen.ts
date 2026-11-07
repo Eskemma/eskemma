@@ -9,7 +9,8 @@
 // de otro proyecto devuelve `no_verificable` SIN id, versión ni fecha.
 
 import type { Firestore } from "firebase-admin/firestore";
-import { huellaDeOrigen } from "./huellaOrigen";
+import { huellaComparable, huellaDeOrigen } from "./huellaOrigen";
+import { leerNotaGuardada, notaDeAprobacion } from "./notaAprobacion";
 import { decidirEstadoOrigen, type ResultadoOrigen } from "./estadoOrigen";
 
 export async function verificarOrigen(
@@ -19,17 +20,17 @@ export async function verificarOrigen(
   if (p.pestelUserId !== p.uid) return { estado: "no_verificable", razon: "origen_ajeno" };
 
   const [modSnap] = await db.getAll(db.collection("moddulo_projects").doc(p.modduloProjectId), {
-    fieldMask: ["collaborators", "deletedAt", "phases.exploracion.linkedSource.kind", "phases.exploracion.linkedSource.sourceId", "phases.exploracion.linkedSource.sourceAnalysisId", "phases.exploracion.linkedSource.huellaFuente"],
+    fieldMask: ["collaborators", "deletedAt", "phases.exploracion.linkedSource.kind", "phases.exploracion.linkedSource.sourceId", "phases.exploracion.linkedSource.sourceAnalysisId", "phases.exploracion.linkedSource.huellaFuente", "phases.exploracion.linkedSource.aprobacionOrigen"],
   });
   const mod = modSnap?.exists ? (modSnap.data() as Record<string, any> | undefined) : undefined;
   const colabora = !!mod?.collaborators?.some((c: { uid?: string }) => c.uid === p.uid);
-  const ls = mod?.phases?.exploracion?.linkedSource as { kind?: string; sourceId?: string; sourceAnalysisId?: string; huellaFuente?: unknown } | undefined;
+  const ls = mod?.phases?.exploracion?.linkedSource as { kind?: string; sourceId?: string; sourceAnalysisId?: string; huellaFuente?: unknown; aprobacionOrigen?: unknown } | undefined;
   if (!mod || mod.deletedAt || !colabora || ls?.kind !== "T22" || ls.sourceId !== p.pestelProjectId || !ls.sourceAnalysisId) {
     return { estado: "no_verificable", razon: "sin_vinculo" };
   }
 
   const [anSnap] = await db.getAll(db.collection("pestel_analyses").doc(ls.sourceAnalysisId), {
-    fieldMask: ["projectId", "dimensions", "adjustments", "version", "analyzedAt"],
+    fieldMask: ["projectId", "dimensions", "adjustments", "version", "analyzedAt", "status", "globalConfidence", "aprobacionJustificacion", "approvedAt"],
   });
   const an = anSnap?.exists ? (anSnap.data() as Record<string, any> | undefined) : undefined;
   if (!an) return { estado: "no_verificable", razon: "origen_no_disponible" };
@@ -44,9 +45,17 @@ export async function verificarOrigen(
   const v = vigSnap.docs[0];
   const vd = v?.data() as { version?: number; analyzedAt?: unknown } | undefined;
 
+  // T7 C3: se compara con la regla de la versión en que se importó (v1 → sin nota; nunca «cambió» por la nota).
+  const guardada = ls.huellaFuente as { v?: unknown; h?: unknown } | undefined;
+  const version = huellaComparable(guardada) ? guardada.v : undefined;
+  const nota = version === 2 ? notaDeAprobacion(an) : null;
+  const huellaActual = huellaDeOrigen(an.dimensions, an.adjustments, { version, nota });
+  const huellaActualConNotaGuardada = version === 2 ? huellaDeOrigen(an.dimensions, an.adjustments, { version, nota: leerNotaGuardada(ls.aprobacionOrigen) }) : null;
+
   return decidirEstadoOrigen({
-    huellaGuardada: ls.huellaFuente as { v?: unknown; h?: unknown } | undefined,
-    huellaActual: huellaDeOrigen(an.dimensions, an.adjustments),
+    huellaGuardada: guardada,
+    huellaActual,
+    huellaActualConNotaGuardada,
     importado: { id: ls.sourceAnalysisId, version: an.version, analizadoEn: an.analyzedAt },
     vigente: v ? { id: v.id, version: vd?.version, analizadoEn: vd?.analyzedAt } : null,
   });

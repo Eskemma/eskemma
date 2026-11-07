@@ -21,6 +21,7 @@ import { compararTerritorios, esTipoCompatible, explicarTerritorioApproximate } 
 import type { Territorio } from "@/types/pestel.types";
 import type { MapaPESTEL, LinkedSourceRef } from "@/types/moddulo.types";
 import { huellaDeOrigen } from "@/lib/centinela/pestel/huellaOrigen";
+import { notaDeAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
 import { elegirUltimoAnalisis } from "@/lib/centinela/pestel/ultimoAnalisis";
 import { decidirCandadoOrigen, leerVigenteParaGate, respuestaCandadoOrigen, type DecisionCandadoOrigen } from "@/lib/centinela/pestel/candadoOrigen";
 interface RouteContext {
@@ -180,7 +181,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
     linkedSource.sourceAnalysisId = latestAnalysisId;
     linkedSource.payload = mapaPESTEL;
-    linkedSource.huellaFuente = huellaDeOrigen(latestAnalysisData.dimensions as never, latestAnalysisData.adjustments as never);
+    // T7 C3: huella v2 (contenido + nota de aprobación) y la nota como hermano de `linkedSource` (omitida si no hay).
+    const nota = notaDeAprobacion(latestAnalysisData as never);
+    linkedSource.huellaFuente = huellaDeOrigen(latestAnalysisData.dimensions as never, latestAnalysisData.adjustments as never, { nota });
+    if (nota) linkedSource.aprobacionOrigen = nota;
     updatePayload["phases.exploracion.xpctoSnapshotAtGeneration"] = JSON.stringify(modduloProject.xpcto ?? {});
     // M1 puede estar reemplazando uno de origen express (upgrade): el M1 vinculado es un M1 NUEVO en
     // borrador (m1Escritura.ts) y el borrador de motores y las aprobaciones hechos contra el anterior

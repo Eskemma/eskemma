@@ -17,7 +17,8 @@ describe("decidirCandadoOrigen", () => {
   it("la confianza baja SOLA no pide confirmación: continúa y devuelve la razón para informar", () => {
     const d = decidirCandadoOrigen({ ...APROBADO, globalConfidence: 39 }, null, SIN);
     expect(d.accion).toBe("continuar");
-    expect(d.razones).toEqual([{ tipo: "confianza_baja", confianza: 39 }]);
+    // T7 C3: APROBADO sin justificación guardada → la razón dice que no hay justificación registrada.
+    expect(d.razones).toEqual([{ tipo: "confianza_baja", confianza: 39, nota: "sin_justificacion" }]);
   });
 
   it("pendiente sin confirmar → requiere_confirmacion con razones y huella", () => {

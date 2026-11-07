@@ -35,8 +35,13 @@ export function textoRazon(r: RazonImportabilidad): string {
       const resto = vigente ? `ya no es el vigente: hay uno más reciente (del ${vigente}).` : "ya no es el vigente del proyecto.";
       return `${sujeto} ${resto} ${CAMINO_ORIGEN_VIGENTE}`;
     }
-    case "confianza_baja":
-      return `La confianza global del análisis es de ${Math.round(r.confianza)} %, por debajo del ${UMBRAL_CONFIANZA} % recomendado.`;
+    case "confianza_baja": {
+      const base = `La confianza global del análisis es de ${Math.round(r.confianza)} %, por debajo del ${UMBRAL_CONFIANZA} % recomendado.`;
+      // T7 C3: solo se dice que viaja la justificación cuando existe; sin ella se dice que no hay (sin insinuar una nota).
+      if (r.nota === "con_justificacion") return `${base} Se aprobó con confianza baja; incluye la justificación del analista.`;
+      if (r.nota === "sin_justificacion") return `${base} Se aprobó con confianza baja; no hay justificación registrada.`;
+      return base;
+    }
   }
 }
 
@@ -81,6 +86,7 @@ export function leerRazonesOrigen(x: unknown): RazonImportabilidad[] | undefined
     const o = r as Record<string, unknown>;
     if (o.tipo === "sesgos_sin_revisar" && typeof o.cantidad !== "number") return undefined;
     if (o.tipo === "confianza_baja" && typeof o.confianza !== "number") return undefined;
+    if (o.tipo === "confianza_baja" && o.nota !== undefined && o.nota !== "con_justificacion" && o.nota !== "sin_justificacion") return undefined;
     salida.push(r as RazonImportabilidad);
   }
   return salida;
