@@ -50,6 +50,17 @@ describe("decidirEstadoOrigen — cambio_nota (T7 C3)", () => {
   it("v2, el contenido es el mismo pero la nota cambió → cambio_nota", () => {
     expect(decidirEstadoOrigen(base())).toMatchObject({ estado: "cambio_nota" });
   });
+  it.each<[string, boolean, boolean, string]>([
+    ["el vínculo no tenía nota y el análisis ahora sí", false, true, "agregada"],
+    ["las dos existen y difieren", true, true, "cambiada"],
+    ["el vínculo tenía nota y el análisis ya no", true, false, "retirada"],
+  ])("variante: %s → %s", (_n, guardada, actual, esperado) => {
+    expect(decidirEstadoOrigen(base({ hayNotaGuardada: guardada, hayNotaActual: actual })).cambioNota).toBe(esperado);
+  });
+  it("el campo cambioNota solo existe con cambio_nota", () => {
+    expect(decidirEstadoOrigen(base({ huellaActual: G2 })).cambioNota).toBeUndefined();
+    expect(decidirEstadoOrigen(base({ huellaActualConNotaGuardada: null })).cambioNota).toBeUndefined();
+  });
   it("v2 y también cambió el contenido → cambio_contenido (gana: un ajuste que retira la aprobación se ve como cambio de contenido)", () => {
     expect(decidirEstadoOrigen(base({ huellaActualConNotaGuardada: { v: 2, h: "tampoco" } })).estado).toBe("cambio_contenido");
     expect(decidirEstadoOrigen(base({ huellaActualConNotaGuardada: null })).estado).toBe("cambio_contenido");

@@ -13,6 +13,7 @@ import { clasificarFallo, TEXTO_SESION } from "./textosAcceso";
 import { MENSAJE_F2_IMPORT_CON_PENDIENTE, MENSAJE_F2_IMPORT_YA_VINCULADO } from "./textosVinculo";
 import { AVISO_ORIGEN_VENCIDO_IMPORT, AVISO_ORIGEN_VENCIDO_SIN_RAZONES, leerRazonesOrigen } from "@/lib/centinela/pestel/textosOrigen";
 import type { RazonImportabilidad } from "@/lib/centinela/pestel/importabilidad";
+import { unirFrases } from "./unirFrases";
 
 export type AccionSondeo = "nuevo_analisis" | "desvincular";
 
@@ -207,10 +208,10 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
     // T5b: los dos rechazos de unicidad del vínculo, con el texto de F2 (el del servidor de `pestel_already_linked` se
     // comparte con `link-moddulo` y no cambia) y el control que existe para salir de cada uno.
     if (resp.codigo === "pestel_already_linked") {
-      return { tipo: "error", mensaje: `${MENSAJE_F2_IMPORT_YA_VINCULADO} No se importó nada.`, reintentable: false };
+      return { tipo: "error", mensaje: unirFrases(MENSAJE_F2_IMPORT_YA_VINCULADO, "No se importó nada."), reintentable: false };
     }
     if (resp.codigo === "moddulo_con_pendiente") {
-      return { tipo: "error", mensaje: `${MENSAJE_F2_IMPORT_CON_PENDIENTE} No se importó nada.`, reintentable: false };
+      return { tipo: "error", mensaje: unirFrases(MENSAJE_F2_IMPORT_CON_PENDIENTE, "No se importó nada."), reintentable: false };
     }
   }
   // Any other 4xx: the server wrote nothing. Show its own readable text (never a bare code).
@@ -223,7 +224,7 @@ export function decidirConfirmacionImport(resp: RespuestaGuardado, datos: Record
       : resp.status === 404
         ? "No se encontró el análisis o el proyecto; puede que ya no exista."
         : "El servidor rechazó la importación.");
-  return { tipo: "error", mensaje: `${base} No se importó nada.`, reintentable: false };
+  return { tipo: "error", mensaje: unirFrases(base, "No se importó nada."), reintentable: false };
 }
 
 // ── T5b: la franja de error del import (automático y «Vincular de nuevo») ────────────────────────────────────

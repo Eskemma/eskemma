@@ -41,11 +41,16 @@ export function decidirAvisoOrigen(i: { origen: ResultadoOrigen | null | undefin
     };
   }
   if (o.estado === "cambio_nota") {
-    const imp = o.importada?.version != null ? ` (v${o.importada.version})` : "";
-    return {
-      tipo: "cambio_nota",
-      texto: `La nota de aprobación del análisis PESTEL de origen${imp} cambió o se retiró después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. ${ACCION}`,
-    };
+    // T7 C3b: tres textos según lo que pasó con la nota (agregada / cambiada / retirada). «versión N» (no «vN»): se
+    // armoniza con los textos de T4 en C4+C5. Sin versión legible, se dice sin ella.
+    const ver = o.importada?.version != null ? ` (versión ${o.importada.version})` : "";
+    const texto =
+      o.cambioNota === "agregada"
+        ? `El análisis PESTEL de origen${ver} tiene ahora una nota de aprobación del analista (aprobado con confianza baja) que este proyecto no incluye. ${ACCION}`
+        : o.cambioNota === "retirada"
+        ? `La nota de aprobación del análisis PESTEL de origen${ver} se retiró después de importarlo. Lo que ves aquí es la nota importada, que ya no está vigente. ${ACCION}`
+        : `La nota de aprobación del análisis PESTEL de origen${ver} cambió después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. ${ACCION}`;
+    return { tipo: "cambio_nota", texto };
   }
   return { tipo: "ninguno" };
 }

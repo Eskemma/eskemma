@@ -50,12 +50,15 @@ export async function verificarOrigen(
   const version = huellaComparable(guardada) ? guardada.v : undefined;
   const nota = version === 2 ? notaDeAprobacion(an) : null;
   const huellaActual = huellaDeOrigen(an.dimensions, an.adjustments, { version, nota });
-  const huellaActualConNotaGuardada = version === 2 ? huellaDeOrigen(an.dimensions, an.adjustments, { version, nota: leerNotaGuardada(ls.aprobacionOrigen) }) : null;
+  const notaGuardada = leerNotaGuardada(ls.aprobacionOrigen);
+  const huellaActualConNotaGuardada = version === 2 ? huellaDeOrigen(an.dimensions, an.adjustments, { version, nota: notaGuardada }) : null;
 
   return decidirEstadoOrigen({
     huellaGuardada: guardada,
     huellaActual,
     huellaActualConNotaGuardada,
+    hayNotaGuardada: !!notaGuardada,
+    hayNotaActual: !!nota,
     importado: { id: ls.sourceAnalysisId, version: an.version, analizadoEn: an.analyzedAt },
     vigente: v ? { id: v.id, version: vd?.version, analizadoEn: vd?.analyzedAt } : null,
   });

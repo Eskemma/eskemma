@@ -54,7 +54,7 @@ import PhaseTransitionReview from "@/app/moddulo/components/PhaseTransitionRevie
 import DVSView from "./components/DVSView";
 import AjusteAnalista from "./components/AjusteAnalista";
 import NotaAprobacionOrigen from "./components/NotaAprobacionOrigen";
-import { leerNotaGuardada, type NotaAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
+import { notaOrigenDe, type NotaAprobacion } from "@/lib/centinela/pestel/notaAprobacion";
 import SenalesGrupo from "./components/SenalesGrupo";
 import MotoresSequentialView from "./components/MotoresSequentialView";
 import M1Pie from "./components/M1Pie";
@@ -340,9 +340,7 @@ export default function ExploracionPage() {
   const [origenPestel, setOrigenPestel] = useState<ResultadoOrigen | null>(null);
   // T7 C3: nota de aprobación que el analista dejó en Centinela al importar (v2) y versión de la huella de la importación.
   const [notaOrigen, setNotaOrigen] = useState<{ v: number | null; nota: NotaAprobacion | null } | null>(null);
-  const aplicarNotaOrigen = (ls: { kind?: string; sourceAnalysisId?: string; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown; payload?: unknown } | undefined) =>
-    // Solo un análisis de Centinela importado (T22 con análisis): un M1 express no tiene nota que mostrar ni «no disponible».
-    setNotaOrigen(ls?.payload && ls.kind === "T22" && ls.sourceAnalysisId ? { v: typeof ls.huellaFuente?.v === "number" ? ls.huellaFuente.v : null, nota: leerNotaGuardada(ls.aprobacionOrigen) } : null);
+  const aplicarNotaOrigen = (ls: Parameters<typeof notaOrigenDe>[0]) => setNotaOrigen(notaOrigenDe(ls));
   const [origenRefresco, setOrigenRefresco] = useState(0);
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [errorReplace, setErrorReplace] = useState<string | null>(null);

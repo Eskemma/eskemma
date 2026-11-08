@@ -108,6 +108,8 @@ describe("verificarOrigen — nota de aprobación (T7 C3)", () => {
   const h2 = (nota: object | null) => huellaDeOrigen(DIMENSIONES_EJEMPLO as never, AJUSTES_EJEMPLO as never, { nota: nota as never });
   const estado = async (linked: Record<string, unknown>, an: Record<string, unknown>) =>
     (await verificarOrigen(falsoDb({ "moddulo_projects/m1": mod(linked), "pestel_analyses/a1": analisis(an) }, vig1).db, P)).estado;
+  const cambio = async (linked: Record<string, unknown>, an: Record<string, unknown>) =>
+    (await verificarOrigen(falsoDb({ "moddulo_projects/m1": mod(linked), "pestel_analyses/a1": analisis(an) }, vig1).db, P)).cambioNota;
 
   it("los T22 reales con huella v1 (hash literal de T4) se comparan con la regla v1: «igual», aunque el análisis ahora esté APROBADO con confianza 39 y justificación (la nota no los toca)", async () => {
     expect(await estado({ huellaFuente: V1_LITERAL }, APROBADO_39)).toBe("igual");
@@ -128,6 +130,12 @@ describe("verificarOrigen — nota de aprobación (T7 C3)", () => {
   });
   it("v2 con nota y la aprobación se retira SIN tocar el contenido → cambio_nota (la nota se retiró)", async () => {
     expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { status: "REVIEWED", globalConfidence: 39 })).toBe("cambio_nota");
+  });
+  it("variante de cambio_nota derivada del dato: agregada / cambiada / retirada (T7 C3b)", async () => {
+    expect(await cambio({ huellaFuente: h2(null) }, APROBADO_39)).toBe("agregada");
+    expect(await cambio({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { ...APROBADO_39, aprobacionJustificacion: "Otra justificación distinta." })).toBe("cambiada");
+    expect(await cambio({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { status: "REVIEWED", globalConfidence: 39 })).toBe("retirada");
+    expect(await cambio({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, APROBADO_39)).toBeUndefined();
   });
   it("v2 con nota y un ajuste (que retira la aprobación Y cambia el contenido) → cambio_contenido, no cambio_nota", async () => {
     expect(await estado({ huellaFuente: h2(NOTA), aprobacionOrigen: NOTA }, { status: "REVIEWED", globalConfidence: 39, adjustments: [] })).toBe("cambio_contenido");

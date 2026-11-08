@@ -32,18 +32,39 @@ describe("decidirAvisoOrigen", () => {
   });
 });
 
-describe("decidirAvisoOrigen — cambio_nota y el botón nombrado (T7 C3)", () => {
-  const nota: ResultadoOrigen = { estado: "cambio_nota", importada: { version: 1, fecha: "2026-10-01T00:00:00.000Z" } };
-  it("dice que la nota de aprobación cambió o se retiró y nombra el botón de Centinela", () => {
-    const a = decidirAvisoOrigen({ origen: nota, f2Cerrada: false });
+describe("decidirAvisoOrigen — cambio_nota: tres textos y el botón nombrado (T7 C3 / C3b)", () => {
+  const caso = (cambioNota?: "agregada" | "cambiada" | "retirada", version: number | null = 1): ResultadoOrigen => ({
+    estado: "cambio_nota", ...(cambioNota ? { cambioNota } : {}), importada: { ...(version != null ? { version } : {}), fecha: "2026-10-01T00:00:00.000Z" },
+  });
+  const texto = (o: ResultadoOrigen) => {
+    const a = decidirAvisoOrigen({ origen: o, f2Cerrada: false });
     expect(a.tipo).toBe("cambio_nota");
     if (a.tipo === "ninguno") throw new Error("debía avisar");
-    expect(a.texto).toBe(
-      "La nota de aprobación del análisis PESTEL de origen (v1) cambió o se retiró después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
+    return a.texto;
+  };
+  it("agregada: no afirma secuencia ni habla de «nota importada» (no la hay)", () => {
+    const t = texto(caso("agregada"));
+    expect(t).toBe(
+      "El análisis PESTEL de origen (versión 1) tiene ahora una nota de aprobación del analista (aprobado con confianza baja) que este proyecto no incluye. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
+    );
+    expect(t).not.toMatch(/después de importarlo|nota importada|se retiró/);
+  });
+  it("cambiada: dice que cambió y que lo que se ve es la nota importada", () => {
+    expect(texto(caso("cambiada"))).toBe(
+      "La nota de aprobación del análisis PESTEL de origen (versión 1) cambió después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
     );
   });
+  it("retirada (NO se alcanza desde la UI: retirar la aprobación es ajustar y eso cambia el contenido; solo prueba unitaria)", () => {
+    expect(texto(caso("retirada"))).toBe(
+      "La nota de aprobación del análisis PESTEL de origen (versión 1) se retiró después de importarlo. Lo que ves aquí es la nota importada, que ya no está vigente. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
+    );
+  });
+  it("sin versión legible se dice sin ella; sin variante (dato antiguo) cae al texto de «cambiada»", () => {
+    expect(texto(caso("agregada", null))).toContain("El análisis PESTEL de origen tiene ahora una nota");
+    expect(texto(caso(undefined))).toContain("cambió después de importarlo");
+  });
   it("nada con la Fase 2 cerrada (como los demás); el texto del cambio de contenido también nombra el botón", () => {
-    expect(decidirAvisoOrigen({ origen: nota, f2Cerrada: true })).toEqual({ tipo: "ninguno" });
+    expect(decidirAvisoOrigen({ origen: caso("agregada"), f2Cerrada: true })).toEqual({ tipo: "ninguno" });
     const c = decidirAvisoOrigen({ origen: { estado: "cambio_contenido", importada: { version: 1 } }, f2Cerrada: false });
     if (c.tipo === "ninguno") throw new Error("debía avisar");
     expect(c.texto).toContain("abre Centinela y usa «Regresar a Moddulo F2 con resultados»");

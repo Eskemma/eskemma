@@ -142,3 +142,16 @@ export function anexarNotaALinea(
   const f = fraseNotaParaTrazabilidad(ls);
   return f ? `${linea} ${f}` : linea;
 }
+
+/**
+ * Lo que F2 muestra de la nota a partir del `linkedSource` GUARDADO (o de la respuesta del import, que es el mismo
+ * objeto): null si no es un análisis de Centinela importado (un M1 express no tiene nota ni «no disponible»); si lo es,
+ * la versión de su huella y la nota (null si el vínculo no la guardó). Nunca arrastra la nota de otro vínculo: solo lee
+ * el objeto que recibe.
+ */
+export function notaOrigenDe(
+  ls: { kind?: string; sourceAnalysisId?: string; huellaFuente?: { v?: unknown }; aprobacionOrigen?: unknown; payload?: unknown } | null | undefined
+): { v: number | null; nota: NotaAprobacion | null } | null {
+  if (!ls?.payload || ls.kind !== "T22" || !ls.sourceAnalysisId) return null;
+  return { v: typeof ls.huellaFuente?.v === "number" ? ls.huellaFuente.v : null, nota: leerNotaGuardada(ls.aprobacionOrigen) };
+}

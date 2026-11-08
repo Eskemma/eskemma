@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import type { PESTELProject } from "@/types/pestel.types";
 import type { ModduloProject } from "@/types/moddulo.types";
 import { checkTerritoryMatch, compararTerritorios, explicarTerritorioApproximate, type TerritoryMatch } from "@/lib/moddulo/linkCompatibility";
+import AvisoNotaSinReflejarF2 from "./AvisoNotaSinReflejarF2";
 
 const TIPO_LABELS: Record<string, string> = {
   electoral: "Electoral",
@@ -393,6 +394,8 @@ export default function ModduloButton({
     return (
       <div className="flex flex-col items-end gap-2">
         <NotaImportacion analysis={analysis} />
+        {/* T7 C3b: si el análisis tiene una nota de aprobación que F2 aún no incluye, aquí está la acción que la lleva. */}
+        <AvisoNotaSinReflejarF2 projectId={projectId} moddulo={project.modduloProjectId} analysis={analysis} />
         <button
           type="button"
           onClick={() => router.push(href)}

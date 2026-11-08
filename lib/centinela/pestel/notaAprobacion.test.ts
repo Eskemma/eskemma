@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   anexarNotaALinea, fraseNotaParaTrazabilidad, importacionConNota, leerNotaGuardada, notaDeAprobacion, notaEquivalente,
-  notaParaHuella, notaSinReflejarEnF2, textoNotaAprobacion, TEXTO_NOTA_NO_DISPONIBLE, TEXTO_NOTA_SIN_REFLEJAR_F2,
+  notaOrigenDe, notaParaHuella, notaSinReflejarEnF2, textoNotaAprobacion, TEXTO_NOTA_NO_DISPONIBLE, TEXTO_NOTA_SIN_REFLEJAR_F2,
 } from "./notaAprobacion";
 import { huellaDeOrigen } from "./huellaOrigen";
 import { AJUSTES_EJEMPLO, DIMENSIONES_EJEMPLO } from "./__fixtures__/analisisEjemplo";
@@ -137,5 +137,28 @@ describe("notaSinReflejarEnF2 — el aviso de Centinela solo si es accionable", 
   it("el texto del aviso nombra el botón que existe y dónde está", () => {
     expect(TEXTO_NOTA_SIN_REFLEJAR_F2).toContain("«Regresar a Moddulo F2 con resultados»");
     expect(TEXTO_NOTA_SIN_REFLEJAR_F2).toContain("Análisis o Monitoreo");
+  });
+});
+
+describe("notaOrigenDe — lo que F2 muestra sale SOLO del linkedSource que recibe (sin arrastre)", () => {
+  const A = { kind: "T22", sourceAnalysisId: "a", payload: {}, huellaFuente: { v: 2 }, aprobacionOrigen: { confianza: 39, justificacion: "Justificación de A." } };
+  it("el vínculo de A trae su nota", () => {
+    expect(notaOrigenDe(A)).toEqual({ v: 2, nota: { confianza: 39, justificacion: "Justificación de A." } });
+  });
+  it("tras desvincular e importar B (39 SIN justificación): la nota es la de B, nunca la de A", () => {
+    const B = { kind: "T22", sourceAnalysisId: "b", payload: {}, huellaFuente: { v: 2 }, aprobacionOrigen: { confianza: 39, aprobadoEn: "2026-11-04T19:14:20.619Z" } };
+    const r = notaOrigenDe(B)!;
+    expect(r.nota).toEqual({ confianza: 39, aprobadoEn: "2026-11-04T19:14:20.619Z" });
+    expect(JSON.stringify(r)).not.toContain("Justificación de A");
+    expect(textoNotaAprobacion({ v: r.v ?? undefined }, r.nota)!.tipo).toBe("sin_justificacion");
+  });
+  it("v2 sin nota → nota null; v1 o sin huella → v null/1 con nota null; sin análisis o express → null (nada que mostrar)", () => {
+    expect(notaOrigenDe({ ...A, aprobacionOrigen: undefined })).toEqual({ v: 2, nota: null });
+    expect(notaOrigenDe({ ...A, huellaFuente: { v: 1 }, aprobacionOrigen: undefined })).toEqual({ v: 1, nota: null });
+    expect(notaOrigenDe({ ...A, huellaFuente: undefined, aprobacionOrigen: undefined })).toEqual({ v: null, nota: null });
+    expect(notaOrigenDe({ ...A, sourceAnalysisId: undefined })).toBeNull();
+    expect(notaOrigenDe({ ...A, kind: "express" })).toBeNull();
+    expect(notaOrigenDe({ ...A, payload: undefined })).toBeNull();
+    expect(notaOrigenDe(undefined)).toBeNull();
   });
 });

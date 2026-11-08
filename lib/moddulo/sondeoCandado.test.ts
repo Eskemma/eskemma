@@ -96,7 +96,7 @@ describe("decidirConfirmacionImport — el modal no se cierra en silencio", () =
   });
   it("4xx con texto del servidor: lo muestra y dice que no se importó nada; sin reintento", () => {
     const d = decidirConfirmacionImport(r(403), { error: "Sin permisos para este análisis PESTEL" });
-    expect(d).toEqual({ tipo: "error", mensaje: "Sin permisos para este análisis PESTEL No se importó nada.", reintentable: false });
+    expect(d).toEqual({ tipo: "error", mensaje: "Sin permisos para este análisis PESTEL. No se importó nada." /* T7 C3b: antes fijaba las dos frases pegadas */, reintentable: false });
     expect(decidirConfirmacionImport(r(404), { message: "Análisis PESTEL no encontrado." })).toMatchObject({ mensaje: "Análisis PESTEL no encontrado. No se importó nada." });
   });
   it("4xx con solo un código (sin texto legible): texto propio por status, nunca el código crudo", () => {

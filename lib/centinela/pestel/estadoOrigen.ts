@@ -28,8 +28,12 @@ export type RazonNoVerificable =
   | "error_lectura";
 
 /** Lo que se le entrega al cliente: sin ids ni contenido, solo número de versión y fecha. */
+export type CambioNota = "agregada" | "cambiada" | "retirada";
+
 export interface ResultadoOrigen {
   estado: EstadoOrigen;
+  /** Solo con `estado === "cambio_nota"` (T7 C3b): qué pasó con la nota. Sin contenido ni ids. */
+  cambioNota?: CambioNota;
   razon?: RazonNoVerificable;
   importada?: { version?: number; fecha?: string };
   vigente?: { version?: number; fecha?: string };
@@ -44,6 +48,9 @@ export interface DatosOrigen {
   huellaActual: { v: number; h: string } | null;
   /** v2: la misma huella pero con la nota GUARDADA en lugar de la actual (solo para distinguir `cambio_nota`). */
   huellaActualConNotaGuardada?: { v: number; h: string } | null;
+  /** T7 C3b: ¿el vínculo guardó una nota? ¿el análisis tiene una nota ahora? (solo para decir QUÉ cambió en `cambio_nota`). */
+  hayNotaGuardada?: boolean;
+  hayNotaActual?: boolean;
   importado: { id: string; version?: number; analizadoEn?: unknown } | null;
   vigente: { id: string; version?: number; analizadoEn?: unknown } | null;
 }
@@ -69,6 +76,10 @@ export function decidirEstadoOrigen(d: DatosOrigen): ResultadoOrigen {
   if (!huellaComparable(d.huellaGuardada)) return { estado: "no_verificable", razon: "sin_huella", importada };
   if (!d.huellaActual) return { estado: "no_verificable", razon: "origen_no_disponible", importada };
   if (d.huellaGuardada.h === d.huellaActual.h) return { estado: "igual", importada };
-  if (d.huellaGuardada.v === 2 && d.huellaActualConNotaGuardada?.h === d.huellaGuardada.h) return { estado: "cambio_nota", importada };
+  if (d.huellaGuardada.v === 2 && d.huellaActualConNotaGuardada?.h === d.huellaGuardada.h) {
+    // Agregada: el vínculo no tenía nota y ahora sí; retirada: tenía y ya no; cambiada: las dos existen y difieren.
+    const cambioNota: CambioNota = !d.hayNotaGuardada ? "agregada" : !d.hayNotaActual ? "retirada" : "cambiada";
+    return { estado: "cambio_nota", cambioNota, importada };
+  }
   return { estado: "cambio_contenido", importada };
 }
