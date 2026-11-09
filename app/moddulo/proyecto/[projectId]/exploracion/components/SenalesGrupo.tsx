@@ -8,6 +8,7 @@
 // date like «2026-10» or «sin fecha» is never split inside.
 
 import type { F2DimensionPESTEL } from "@/types/moddulo.types";
+import { fechaLegible, fuenteLegible, nivelLegible } from "@/lib/pestel/senalCampos";
 
 type Senal = F2DimensionPESTEL["senalesFavorables"][number];
 
@@ -33,19 +34,23 @@ const CONFIANZA: Record<string, string> = {
 const CONFIANZA_OTRA = "bg-gray-eske-10 text-black-eske-20 dark:bg-white/10 dark:text-[#C7D6E0]";
 
 export function PieSenal({ s }: { s: Senal }) {
+  // T7 C4: lo ausente (incluido el literal «sin fecha» y un nivel desconocido) no se pinta; pasa por `senalCampos`.
+  const fuente = fuenteLegible(s);
+  const fecha = fechaLegible(s);
+  const nivel = nivelLegible(s);
   return (
     <div className="space-y-1 text-xs text-black-eske-20 dark:text-[#9AAEBE]" data-pie-senal>
-      {s.fuente && <p className="break-words">{s.fuente}</p>}
+      {fuente && <p className="break-words">{fuente}</p>}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        {s.fechaCorte && <span className="whitespace-nowrap">{s.fechaCorte}</span>}
+        {fecha && <span className="whitespace-nowrap">{fecha}</span>}
         {s.origenInternacional && (
           <span className="whitespace-nowrap px-1.5 py-0.5 bg-bluegreen-eske-10 text-bluegreen-eske-70 rounded text-xs dark:bg-bluegreen-eske/20 dark:text-blue-eske-20">
             Intl.
           </span>
         )}
-        {s.nivelConfianza && (
-          <span className={`whitespace-nowrap px-1.5 py-0.5 rounded text-xs ${CONFIANZA[s.nivelConfianza] ?? CONFIANZA_OTRA}`}>
-            {s.nivelConfianza}
+        {nivel && (
+          <span className={`whitespace-nowrap px-1.5 py-0.5 rounded text-xs ${CONFIANZA[nivel] ?? CONFIANZA_OTRA}`}>
+            {nivel}
           </span>
         )}
       </div>

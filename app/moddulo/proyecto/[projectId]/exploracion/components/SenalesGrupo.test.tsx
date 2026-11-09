@@ -24,8 +24,8 @@ describe("PieSenal", () => {
     expect(fila.indexOf("2026-10")).toBeLessThan(fila.indexOf("medio"));
     expect(h.indexOf("Fuente: PNUD")).toBeLessThan(h.indexOf("2026-10"));
   });
-  it("«sin fecha» y las fechas largas tampoco se parten", () => {
-    expect(html({ fechaCorte: "sin fecha" })).toContain('<span class="whitespace-nowrap">sin fecha</span>');
+  it("las fechas largas tampoco se parten (T7 C4: «sin fecha» ya no se pinta, ver senalCampos)", () => {
+    expect(html({ fechaCorte: "sin fecha" })).not.toContain("sin fecha");
     expect(html({ fechaCorte: "2025-12-25" })).toContain('<span class="whitespace-nowrap">2025-12-25</span>');
   });
   it("la fuente más corta y una fuente vacía no dejan bloques huecos", () => {

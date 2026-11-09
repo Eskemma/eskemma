@@ -49,6 +49,25 @@ contradicen la percepción ciudadana. Los análisis deben ser auditables
 para que el equipo político pueda cuestionar las fuentes y tomar
 decisiones informadas sobre qué datos priorizar.
 
+## Estado actual de `AnalysisStatus` y contrato de una señal (T7 C4)
+
+**`AnalysisStatus` (comportamiento actual del código, no diseño).** `REVIEWED` hoy se escribe cuando se reconocen todas
+las alertas de sesgo (`acknowledge-bias`), sin que haya habido revisión humana de las dimensiones: es una marca de la
+mecánica de sesgos, no una aprobación (pendiente N1 de la bitácora: separar ambos significados). La aprobación humana
+es `APPROVED` (`POST /approve`: responde 422 con sesgos sin revisar y exige una justificación si la confianza global es
+menor a 50). Un ajuste del analista sobre un análisis `APPROVED` lo regresa a `REVIEWED` y deja constancia
+(`aprobacionRetirada`).
+
+**Contrato de una señal** (`senalesFavorables | senalesAdversas | senalesInciertas`: `descripcion`, `fuente`,
+`fechaCorte`, `nivelConfianza`):
+
+- Fuente y fecha de corte son la trazabilidad que exige esta metodología. Si faltan, la señal sigue existiendo, pero se
+  dice que faltan («fuente no registrada», «fecha no registrada»): nunca se rellenan, deducen ni inventan.
+- Ausente = vacío, solo espacios o, en la fecha, el literal «sin fecha» (lo escribe el modelo cuando la fuente no trae
+  período). Se trata como ausente al mostrar y serializar (`lib/pestel/senalCampos.ts`); lo guardado no se altera.
+- El nivel de confianza es informativo: no es criterio de suficiencia y un nivel ausente nunca se interpreta como
+  «bajo». En Express casi siempre es «medio» por el ejemplo del prompt, así que no mide confianza real.
+
 ## El contexto latinoamericano que PESTEL debe respetar
 
 - Volatilidad política extrema: el contexto cambia rápido.
@@ -111,7 +130,8 @@ type PestlAnalysis = {
 type AnalysisStatus =
   | 'PROCESSING'        // Etapa 5 en curso
   | 'PENDING_REVIEW'    // Etapa 5 completa, esperando Etapa 6
-  | 'REVIEWED'          // Etapa 6 completa
+  | 'REVIEWED'          // Comportamiento actual: se escribe al reconocer TODAS las alertas de sesgo (ver nota)
+  | 'APPROVED'          // Aprobación humana explícita (POST /approve); es lo que el resto del sistema exige
   | 'REPORTS_GENERATED' // Etapa 7 completa
   | 'MONITORING';       // Etapa 8 activa
 

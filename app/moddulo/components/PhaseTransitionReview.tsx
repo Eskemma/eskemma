@@ -179,6 +179,11 @@ export default function PhaseTransitionReview({
                           : "text-black-eske dark:text-[#C5D8E8]"
                     }`}>
                       {c.descripcion}
+                      {!c.satisfecho && c.detalle && (
+                        <span className="block mt-0.5 text-black-eske-20 dark:text-[#9AAEBE]" data-detalle-criterio>
+                          {c.detalle}
+                        </span>
+                      )}
                     </span>
                   </div>
                 ))}

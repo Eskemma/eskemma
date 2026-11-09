@@ -76,8 +76,8 @@ const baseCtx = {
 describe("buildReportPrompt — señales verificadas como insumo", () => {
   it("technical: incluye señales de las 6 dimensiones con instrucción de usarlas", () => {
     const { userPrompt } = buildReportPrompt("technical", baseCtx);
-    expect(userPrompt).toContain("SEÑALES VERIFICADAS");
-    expect(userPrompt).toContain("Usa estas señales verificadas");
+    expect(userPrompt).toContain("SEÑALES DEL ANÁLISIS");
+    expect(userPrompt).toContain("Usa estas señales en tu análisis");
     expect(userPrompt).toContain("Acuerdo político favorable");
     expect(userPrompt).toContain("Riesgo regulatorio alto");
     expect(userPrompt).toContain("Fuente: DOF, 2026-08");
@@ -85,9 +85,9 @@ describe("buildReportPrompt — señales verificadas como insumo", () => {
 
   it("executive: incluye las señales como contexto de fondo, sin exigir enumerarlas", () => {
     const { userPrompt } = buildReportPrompt("executive", baseCtx);
-    expect(userPrompt).toContain("SEÑALES VERIFICADAS");
+    expect(userPrompt).toContain("SEÑALES DEL ANÁLISIS");
     expect(userPrompt).toContain("contexto de fondo");
-    expect(userPrompt).not.toContain("Usa estas señales verificadas");
+    expect(userPrompt).not.toContain("Usa estas señales en tu análisis");
   });
 
   it("foda: mismo criterio que executive (contexto de fondo)", () => {
@@ -117,7 +117,7 @@ describe("buildReportPrompt — señales verificadas como insumo", () => {
       ...baseCtx,
       analysis: sinSenales,
     });
-    expect(userPrompt).not.toContain("SEÑALES VERIFICADAS");
+    expect(userPrompt).not.toContain("SEÑALES DEL ANÁLISIS");
   });
 });
 
@@ -163,7 +163,7 @@ describe("buildReportPrompt — 5º formato insights_por_tipo (spec 07)", () => 
     });
     // electoral → prioritarias: P, S, L (dimensionPriority.ts)
     expect(userPrompt).toContain("Político, Social, Legal");
-    expect(userPrompt).toContain("Usa estas señales verificadas");
+    expect(userPrompt).toContain("Usa estas señales en tu análisis");
     expect(userPrompt).toContain("Acuerdo político favorable");
   });
 

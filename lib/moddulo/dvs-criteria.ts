@@ -2,6 +2,7 @@
 // Los 10 criterios de suficiencia del DVS F2, en el orden canónico de la metodología.
 
 import type { DVSF2, MapaPESTEL, ProjectType, RDAItem } from "@/types/moddulo.types";
+import { contarCarencias } from "@/lib/pestel/senalCampos";
 import { DIMENSION_PRIORITY_BY_TYPE, type DimensionCode } from "@/lib/moddulo/dimensionPriority";
 
 export interface CriterioDVS {
@@ -9,6 +10,8 @@ export interface CriterioDVS {
   descripcion: string;
   satisfecho: boolean;
   severidad: "bloqueante" | "advertencia";
+  /** T7 C4: motivo real cuando no se cumple, con conteos (solo el criterio de trazabilidad; se calcula al evaluar, no se guarda). */
+  detalle?: string;
 }
 
 // Rutas de resolución por criterio — mismo patrón que DEFICIENCIAS en
@@ -54,7 +57,7 @@ const CRITERIO_DVS_DESCRIPCIONES: Record<string, string> = {
   "pesos-tipo-proyecto":
     "Pesos por tipo de proyecto — ¿Las dimensiones prioritarias corresponden al tipo de proyecto definido en el Propósito (F1)?",
   "trazabilidad-hallazgos":
-    "Trazabilidad de hallazgos — ¿Cada señal indica fuente, fecha de corte y nivel de confianza?",
+    "Trazabilidad de hallazgos — ¿Cada señal indica su fuente y su fecha de corte?",
   "aprobacion-usuario":
     "Aprobación del usuario — ¿El usuario ha revisado el Reporte F2 - Exploratorio y el Programa de Investigación Profunda (PIP) y decidido continuar a F3?",
 };
@@ -92,7 +95,10 @@ function recomendacionDependienteDelOrigen(id: string, origen: OrigenAnalisisPES
     return `El análisis aprobado debe tener al menos una señal en cada una de las 6 dimensiones. Las señales no se editan en la revisión del análisis: ${accion}.`;
   }
   if (id === "trazabilidad-hallazgos") {
-    return `Cada señal del análisis aprobado debe citar su fuente y su fecha de corte. Las señales no se editan en la revisión del análisis: ${accion}.`;
+    const nota = origen !== "express"
+      ? " En Centinela, una señal puede quedar «sin fecha» cuando su fuente no publica el período; un análisis nuevo no siempre lo corrige."
+      : "";
+    return `Cada señal del análisis aprobado debe citar su fuente y su fecha de corte. Las señales no se editan en la revisión del análisis: ${accion}.${nota}`;
   }
   if (id === "pesos-tipo-proyecto") {
     const aceptar = "si dejaste una dimensión en Neutral a propósito, puedes aceptar esta advertencia como condición del proyecto";
@@ -113,6 +119,23 @@ function recomendacionDependienteDelOrigen(id: string, origen: OrigenAnalisisPES
  */
 export function getRecomendacionDVS(id: string, origen?: OrigenAnalisisPESTEL): string | undefined {
   return recomendacionDependienteDelOrigen(id, origen) ?? RECOMENDACIONES_DVS[id];
+}
+
+/** Criterio 9 (informativo): cada señal indica su fuente y su fecha de corte; «sin fecha» y vacío cuentan como ausentes. El nivel NO entra. */
+function trazabilidad(mapaPESTEL: MapaPESTEL | undefined, dvs: DVSF2): CriterioDVS {
+  const base = { id: "trazabilidad-hallazgos", descripcion: CRITERIO_DVS_DESCRIPCIONES["trazabilidad-hallazgos"], severidad: "advertencia" as const };
+  // Si hay mapaPESTEL, se verifican las señales; si no, que el contraste tenga señales.
+  if (!mapaPESTEL) return { ...base, satisfecho: dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1) };
+  const senales = Object.values(mapaPESTEL).flatMap((d) =>
+    d === undefined ? [] : [...(d.senalesFavorables ?? []), ...(d.senalesAdversas ?? []), ...(d.senalesInciertas ?? [])]
+  );
+  const c = contarCarencias(senales);
+  if (c.incompletas === 0) return { ...base, satisfecho: true };
+  return {
+    ...base,
+    satisfecho: false,
+    detalle: `${c.incompletas} de ${c.total} señales sin fuente o sin fecha de corte (${c.sinFuente} sin fuente, ${c.sinFecha} sin fecha de corte).`,
+  };
 }
 
 export function evaluarCriteriosDVS(
@@ -225,20 +248,7 @@ export function evaluarCriteriosDVS(
           : dvs.contrasteXPCTO.filter((c) => c.veredicto !== "coherente").length >= 2,
       severidad: "advertencia",
     },
-    {
-      id: "trazabilidad-hallazgos",
-      descripcion: CRITERIO_DVS_DESCRIPCIONES["trazabilidad-hallazgos"],
-      // Si hay mapaPESTEL, verificar campos de trazabilidad en señales; si no, verificar que el contraste tenga señales
-      satisfecho: mapaPESTEL
-        ? Object.values(mapaPESTEL).every((d) =>
-            d === undefined ||
-            [...(d.senalesFavorables ?? []), ...(d.senalesAdversas ?? []), ...(d.senalesInciertas ?? [])].every(
-              (s) => (s.fuente ?? "").trim().length > 0 && (s.fechaCorte ?? "").trim().length > 0
-            )
-          )
-        : dvs.contrasteXPCTO.every((c) => c.senalesPESTEL.length >= 1),
-      severidad: "advertencia",
-    },
+    trazabilidad(mapaPESTEL, dvs),
 
     // ── 10: bloqueante ────────────────────────────────────────────────────
     {

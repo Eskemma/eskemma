@@ -1,5 +1,6 @@
 "use client";
 
+import { PieSenalCentinela } from "./PieSenalCentinela";
 import { confianzaInsuficiente } from "@/lib/centinela/pestel/aprobacion";
 import { useState } from "react";
 import InfoTooltip from "@/app/components/ui/InfoTooltip";
@@ -629,24 +630,7 @@ function SignalGroup({
           {senales.map((s, i) => (
             <li key={i} className="px-4 py-3 bg-white-eske dark:bg-[#112230]">
               <p className="text-sm text-black-eske dark:text-[#C7D6E0]">{s.descripcion}</p>
-              <p className="text-xs text-gray-eske-60 dark:text-[#9AAEBE] mt-1">
-                {s.fuente}
-                {s.fechaCorte ? ` · ${s.fechaCorte}` : ""}
-                {" · "}
-                <span className={[
-                  s.nivelConfianza === "alto" ? "text-green-eske"
-                    : s.nivelConfianza === "medio"
-                      ? "text-brown-eske-60 dark:text-yellow-eske-60"
-                    : "text-red-eske",
-                ].join("")}>
-                  confianza {
-                    s.nivelConfianza === "alto" ? "alta"
-                      : s.nivelConfianza === "medio" ? "media"
-                      : "baja"
-                  }
-                </span>
-                {s.origenInternacional && " · internacional"}
-              </p>
+              <PieSenalCentinela s={s} />
             </li>
           ))}
         </ul>

@@ -6,6 +6,7 @@
 // camino) — secciones/dimensiones faltantes se marcan explícitamente en vez
 // de fallar o imprimirse vacías en silencio.
 
+import { fechaLegible, fuenteLegible } from "@/lib/pestel/senalCampos";
 import type {
   ChatMessage,
   XPCTO,
@@ -166,7 +167,7 @@ function formatSenales(label: string, senales: { descripcion: string; fuente?: s
   if (!senales || senales.length === 0) return [];
   const out = [`**${label}:**`];
   for (const s of senales) {
-    const meta = [s.fuente, s.fechaCorte].filter(Boolean).join(", ");
+    const meta = [fuenteLegible(s), fechaLegible(s)].filter(Boolean).join(", ");
     out.push(`- ${s.descripcion}${meta ? ` _(Fuente: ${meta})_` : ""}`);
   }
   out.push("");

@@ -2,6 +2,7 @@
 // Constructs the Claude prompts for the 5 E7 report formats.
 // No external dependencies — pure string builders.
 
+import { FECHA_NO_REGISTRADA, FUENTE_NO_REGISTRADA, fechaLegible, fuenteLegible, nivelLegible } from "@/lib/pestel/senalCampos";
 import type {
   PestlAnalysisV2,
   DimensionAnalysis,
@@ -134,22 +135,34 @@ function buildSenalesBlock(
 
   if (lines.length === 0) return "";
 
+  // T7 C4 (ajuste del prompt tras la medición real): la cita va aparte de la confianza (antes iban juntas entre paréntesis y
+  // el modelo copiaba «; confianza …» dentro de la cita), un marcador por pieza ausente, las fechas tal cual y sin notas de método.
+  const reglasCita =
+    `Cada señal trae su «cita:» ya armada: cuando la uses, cópiala tal cual, con el formato (Fuente: nombre, fecha). ` +
+    `Si falta una pieza, la cita ya dice «${FUENTE_NO_REGISTRADA}» o «${FECHA_NO_REGISTRADA}»: déjala así, un marcador por pieza ausente, ` +
+    `con el nombre real de la fuente y las fechas tal como vienen (nunca dos fechas unidas por «y» en una misma cita; si apoyas una idea en dos señales, cita cada una por separado). ` +
+    `La confianza es solo contexto para ti: no la repitas dentro de la cita. ` +
+    `No inventes ni deduzcas lo que falta, y no agregues notas sobre cómo tratas las señales ni sobre tu método.`;
   const instruccion =
     mode === "mandatory"
-      ? "Usa estas señales verificadas en tu análisis y cítalas con su fuente y fecha."
-      : "Estas señales son contexto de fondo — cítalas solo si aportan sin alargar el formato ni volverlo más técnico de lo que debe ser.";
+      ? `Usa estas señales en tu análisis. ${reglasCita}`
+      : `Estas señales son contexto de fondo — úsalas solo si aportan sin alargar el formato ni volverlo más técnico de lo que debe ser. Si citas una: ${reglasCita}`;
 
-  return `\n\n== SEÑALES VERIFICADAS (con fuente y fecha) ==\n${instruccion}\n${lines.join("\n")}`;
+  return `\n\n== SEÑALES DEL ANÁLISIS (con la fuente y fecha que registra cada una) ==\n${instruccion}\n${lines.join("\n")}`;
 }
 
 function formatSenalesGrupo(etiqueta: string, senales: Senal[]): string {
   return (
     `  ${etiqueta}:\n` +
     senales
-      .map(
-        (s) =>
-          `    - ${s.descripcion} (Fuente: ${s.fuente}, ${s.fechaCorte}; confianza ${s.nivelConfianza})`
-      )
+      .map((s) => {
+        // T7 C4 (N7): lo que falta se dice con un texto fijo, nunca vacío ni con «sin fecha» como si fuera fecha.
+        const fuente = fuenteLegible(s);
+        const fecha = fechaLegible(s) ?? FECHA_NO_REGISTRADA;
+        const nivel = nivelLegible(s);
+        const cita = fuente ? `Fuente: ${fuente}, ${fecha}` : `${FUENTE_NO_REGISTRADA}, ${fecha}`;
+        return `    - ${s.descripcion} → cita: (${cita})${nivel ? ` · confianza: ${nivel}` : ""}`;
+      })
       .join("\n")
   );
 }
