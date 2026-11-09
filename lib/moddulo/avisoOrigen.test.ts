@@ -10,8 +10,8 @@ describe("decidirAvisoOrigen", () => {
     const a = decidirAvisoOrigen({ origen: nueva, f2Cerrada: false });
     expect(a.tipo).toBe("version_nueva");
     if (a.tipo !== "ninguno") {
-      expect(a.texto).toContain("Hay una versión más nueva del análisis PESTEL (v2, 9 de octubre de 2026)");
-      expect(a.texto).toContain("Este proyecto usa v1.");
+      expect(a.texto).toContain("Hay una versión más nueva del análisis PESTEL (versión 2, 9 de octubre de 2026)");
+      expect(a.texto).toContain("Este proyecto usa la versión 1.");
       expect(a.texto).toContain("abre Centinela y usa «Regresar a Moddulo F2 con resultados»");
     }
   });
@@ -49,9 +49,9 @@ describe("decidirAvisoOrigen — cambio_nota: tres textos y el botón nombrado (
     );
     expect(t).not.toMatch(/después de importarlo|nota importada|se retiró/);
   });
-  it("cambiada: dice que cambió y que lo que se ve es la nota importada", () => {
+  it("cambiada (C5): dice que cambió y que lo que se ve es la nota importada, SIN el ejemplo de «volver a aprobarlo» (la pantalla no lo ofrece)", () => {
     expect(texto(caso("cambiada"))).toBe(
-      "La nota de aprobación del análisis PESTEL de origen (versión 1) cambió después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
+      "La nota de aprobación del análisis PESTEL de origen (versión 1) cambió después de importarlo. Lo que ves aquí es la nota importada. Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados»."
     );
   });
   it("retirada (NO se alcanza desde la UI: retirar la aprobación es ajustar y eso cambia el contenido; solo prueba unitaria)", () => {

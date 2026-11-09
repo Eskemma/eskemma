@@ -11,6 +11,7 @@
 // El único acceso directo a `lib/` es al registry (lookup de metadatos:
 // nombre, definición, naturaleza por nivel, agregacionPlural.tipo).
 
+import { unirFrases } from "@/lib/moddulo/unirFrases";
 import { nombreEstadoDisplay } from "@/lib/geo/estados";
 import { cabeceraDeDistrito } from "@/lib/geo/candidatosGeo";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -1512,7 +1513,8 @@ async function generarSerieTemporal(
   if (data.colapsoNivel) {
     const donde = data.entregaNivel === "estatal" ? `estatal (${data.estado})` : "nacional";
     return reject(
-      `${String(data.motivo ?? "Ese indicador no tiene serie a nivel municipal.")} No se generó ninguna gráfica. ` +
+      // T7 C5: el motivo viene del servidor; si no termina en puntuación, `unirFrases` lo cierra antes de la frase fija.
+      `${unirFrases(String(data.motivo ?? "Ese indicador no tiene serie a nivel municipal."), "No se generó ninguna gráfica.")} ` +
         `Aclárale al usuario que de este indicador solo hay serie ${donde} y pregúntale si quiere esa, o si prefiere un indicador con serie por municipio.`
     );
   }

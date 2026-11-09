@@ -17,9 +17,14 @@ export type AvisoOrigen =
 // T7 C3: nombra el botón que existe en Centinela (con el proyecto vinculado) para volver a F2 con el análisis al día.
 export const ACCION = "Para actualizar, abre Centinela y usa «Regresar a Moddulo F2 con resultados».";
 
+/** T7 C5: «versión N» (antes los avisos de T4 decían «vN» y los de C3b «versión N»). Una sola función para todos. */
+export function etiquetaVersionTexto(version: number): string {
+  return `versión ${version}`;
+}
+
 function etiquetaVersion(version?: number, fecha?: string): string {
   const f = fecha ? new Date(fecha).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null;
-  return [version != null ? `v${version}` : null, f].filter(Boolean).join(", ");
+  return [version != null ? etiquetaVersionTexto(version) : null, f].filter(Boolean).join(", ");
 }
 
 export function decidirAvisoOrigen(i: { origen: ResultadoOrigen | null | undefined; f2Cerrada: boolean }): AvisoOrigen {
@@ -27,29 +32,28 @@ export function decidirAvisoOrigen(i: { origen: ResultadoOrigen | null | undefin
   const o = i.origen;
   if (o.estado === "version_nueva") {
     const nueva = etiquetaVersion(o.vigente?.version, o.vigente?.fecha);
-    const actual = o.importada?.version != null ? `v${o.importada.version}` : "una versión anterior";
+    const actual = o.importada?.version != null ? `la ${etiquetaVersionTexto(o.importada.version)}` : "una versión anterior";
     return {
       tipo: "version_nueva",
       texto: `Hay una versión más nueva del análisis PESTEL${nueva ? ` (${nueva})` : ""}. Este proyecto usa ${actual}. ${ACCION}`,
     };
   }
   if (o.estado === "cambio_contenido") {
-    const imp = o.importada?.version != null ? ` (v${o.importada.version})` : "";
+    const imp = o.importada?.version != null ? ` (${etiquetaVersionTexto(o.importada.version)})` : "";
     return {
       tipo: "cambio_contenido",
       texto: `El análisis PESTEL de origen${imp} cambió después de importarlo (por ejemplo, por un ajuste del analista). Lo que ves aquí es la versión importada. ${ACCION}`,
     };
   }
   if (o.estado === "cambio_nota") {
-    // T7 C3b: tres textos según lo que pasó con la nota (agregada / cambiada / retirada). «versión N» (no «vN»): se
-    // armoniza con los textos de T4 en C4+C5. Sin versión legible, se dice sin ella.
-    const ver = o.importada?.version != null ? ` (versión ${o.importada.version})` : "";
+    // T7 C3b: tres textos según lo que pasó con la nota (agregada / cambiada / retirada). «versión N» (`etiquetaVersionTexto`), igual que los textos de T4 desde C5. Sin versión legible, se dice sin ella.
+    const ver = o.importada?.version != null ? ` (${etiquetaVersionTexto(o.importada.version)})` : "";
     const texto =
       o.cambioNota === "agregada"
         ? `El análisis PESTEL de origen${ver} tiene ahora una nota de aprobación del analista (aprobado con confianza baja) que este proyecto no incluye. ${ACCION}`
         : o.cambioNota === "retirada"
         ? `La nota de aprobación del análisis PESTEL de origen${ver} se retiró después de importarlo. Lo que ves aquí es la nota importada, que ya no está vigente. ${ACCION}`
-        : `La nota de aprobación del análisis PESTEL de origen${ver} cambió después de importarlo, por ejemplo al volver a aprobarlo con otra justificación. Lo que ves aquí es la nota importada. ${ACCION}`;
+        : `La nota de aprobación del análisis PESTEL de origen${ver} cambió después de importarlo. Lo que ves aquí es la nota importada. ${ACCION}`;
     return { tipo: "cambio_nota", texto };
   }
   return { tipo: "ninguno" };

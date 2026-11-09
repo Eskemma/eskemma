@@ -12,6 +12,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { huellaComparable, huellaDeOrigen } from "./huellaOrigen";
 import { leerNotaGuardada, notaDeAprobacion } from "./notaAprobacion";
 import { decidirEstadoOrigen, type ResultadoOrigen } from "./estadoOrigen";
+import { elegirUltimoAnalisis } from "./ultimoAnalisis";
 
 export async function verificarOrigen(
   db: Pick<Firestore, "getAll" | "collection">,
@@ -42,7 +43,9 @@ export async function verificarOrigen(
     .where("vigente", "==", true)
     .select("version", "analyzedAt")
     .get();
-  const v = vigSnap.docs[0];
+  // T7 C5: si por un dato anómalo hay varios `vigente == true`, «el» vigente es el de `analyzedAt` más reciente (la misma regla
+  // que E5 y link-moddulo); antes era `docs[0]`, el orden arbitrario de Firestore. En los datos reales hay uno por proyecto.
+  const v = elegirUltimoAnalisis(vigSnap.docs, (d) => ({ vigente: true, analyzedAt: (d.data() as { analyzedAt?: unknown }).analyzedAt }));
   const vd = v?.data() as { version?: number; analyzedAt?: unknown } | undefined;
 
   // T7 C3: se compara con la regla de la versión en que se importó (v1 → sin nota; nunca «cambió» por la nota).

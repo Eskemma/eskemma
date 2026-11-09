@@ -68,7 +68,7 @@ describe("los controles que nombran los textos existen en el código", () => {
 });
 
 describe("avisosDeOrigenParaModal — un solo mensaje por situación", () => {
-  const AVISO_T4 = "Hay una versión más nueva del análisis PESTEL (v3, 2 de noviembre de 2026). Este proyecto usa v2.";
+  const AVISO_T4 = "Hay una versión más nueva del análisis PESTEL (versión 3, 2 de noviembre de 2026). Este proyecto usa la versión 2.";
   const NO_VIGENTE: RazonImportabilidad = { tipo: "no_vigente", fechaAnalisis: "2026-10-01T10:00:00.000Z" };
 
   it("sin vínculo (primera importación) no_vigente se dice con su propio texto", () => {
