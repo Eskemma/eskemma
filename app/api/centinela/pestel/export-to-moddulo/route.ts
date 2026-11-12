@@ -1,82 +1,48 @@
 // app/api/centinela/pestel/export-to-moddulo/route.ts
-// POST { analysisId, modduloProjectId? }
-// Links a PESTEL analysis to a Moddulo project so F2 (Exploración)
-// can consume it. Optionally updates the Moddulo project with the
-// pestAnalysisId reference.
+// RETIRED (T8a). It answered POST { analysisId, modduloProjectId? } and wrote linkedSource by sub-paths, without a
+// payload and without resetting M1. Nothing in the repo called it (bitácora N5). It now answers 410 and counts the
+// calls in retiros_rutas/export-to-moddulo (total, sinSesion, ultimaLlamada: no uid, no IP, no payload).
+// The 410 does not read the body and does not depend on the counter: a failed write never changes the response.
+// The counter is written inside after(), so the response does not wait for Firestore.
+// Final deletion of this route is a later, separate cut (after 30 days of measurement).
 
-import { type NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/server/auth-helpers";
+import { after, type NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
-import type { PestlAnalysisV2 } from "@/types/pestel.types";
+import { getSessionFromRequest } from "@/lib/server/auth-helpers";
+import {
+  RETIRO_COLECCION,
+  RETIRO_EXPORT_TO_MODDULO,
+  MENSAJE_RETIRO_EXPORT_TO_MODDULO,
+  camposContador,
+  crearLimitador,
+  cuerpoRetiro,
+} from "@/lib/centinela/pestel/retiroRuta";
+
+const limitador = crearLimitador(1000);
 
 export async function POST(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  let body: { analysisId?: string; modduloProjectId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
-  const { analysisId, modduloProjectId } = body;
-
-  if (!analysisId) {
-    return NextResponse.json(
-      { error: "analysisId es requerido" },
-      { status: 400 }
-    );
-  }
-
-  // Fetch analysis and verify ownership via its parent project
-  const analysisSnap = await adminDb
-    .collection("pestel_analyses")
-    .doc(analysisId)
-    .get();
-
-  if (!analysisSnap.exists) {
-    return NextResponse.json({ error: "Análisis no encontrado" }, { status: 404 });
-  }
-
-  const analysis = { id: analysisSnap.id, ...analysisSnap.data() } as PestlAnalysisV2 & { id: string };
-
-  const projectSnap = await adminDb
-    .collection("pestel_projects")
-    .doc(analysis.projectId)
-    .get();
-
-  if (!projectSnap.exists || projectSnap.data()?.userId !== session.uid) {
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
-  }
-
-  // If a Moddulo project is specified, attach the pestAnalysisId to F2
-  if (modduloProjectId) {
-    const modduloSnap = await adminDb
-      .collection("moddulo_projects")
-      .doc(modduloProjectId)
-      .get();
-
-    // Papelera (26-09-28): un proyecto en papelera se trata igual que uno inexistente.
-    if (!modduloSnap.exists || modduloSnap.data()?.userId !== session.uid || modduloSnap.data()?.deletedAt) {
-      return NextResponse.json(
-        { error: "Proyecto Moddulo no encontrado o sin permisos" },
-        { status: 404 }
-      );
+  after(async () => {
+    let pendiente: { total: number; sinSesion: number } | null = null;
+    try {
+      // Without a cookie there is no read at all; with one, a single session check (never the body).
+      const session = await getSessionFromRequest(request).catch(() => null);
+      pendiente = limitador.registrar(!session);
+      if (!pendiente) return;
+      await adminDb
+        .collection(RETIRO_COLECCION)
+        .doc(RETIRO_EXPORT_TO_MODDULO)
+        .set(
+          camposContador(pendiente, {
+            increment: (n) => FieldValue.increment(n),
+            ahora: FieldValue.serverTimestamp(),
+          }),
+          { merge: true }
+        );
+    } catch {
+      if (pendiente) limitador.devolver(pendiente);
+      console.warn("[retiro-ruta][export-to-moddulo] no se pudo actualizar el contador");
     }
-
-    await adminDb.collection("moddulo_projects").doc(modduloProjectId).update({
-      "phases.exploracion.linkedSource.kind": "T22",
-      "phases.exploracion.linkedSource.componente": "centinela",
-      "phases.exploracion.linkedSource.sourceId": analysis.projectId,
-      "phases.exploracion.linkedSource.sourceAnalysisId": analysisId,
-    });
-
-    const redirectUrl = `/moddulo/proyecto/${modduloProjectId}/exploracion?pest_analysis_id=${analysisId}`;
-    return NextResponse.json({ sourceAnalysisId: analysisId, redirectUrl }, { status: 200 });
-  }
-
-  return NextResponse.json({ sourceAnalysisId: analysisId }, { status: 200 });
+  });
+  return NextResponse.json(cuerpoRetiro(MENSAJE_RETIRO_EXPORT_TO_MODDULO), { status: 410 });
 }

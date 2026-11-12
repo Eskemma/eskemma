@@ -90,9 +90,4 @@ export const ESCRITORES_DE_ANALISIS: EscritorDeAnalisis[] = [
     toca: [],
     nota: "Lee el análisis; escribe moddulo_projects y pestel_projects.",
   },
-  {
-    archivo: "app/api/centinela/pestel/export-to-moddulo/route.ts",
-    toca: [],
-    nota: "Lee el análisis; escribe moddulo_projects.",
-  },
 ];
