@@ -54,6 +54,46 @@ const FRASE_F2_ANTES =
 const FRASE_F2_AHORA =
   "Si el prompt incluye el bloque «TERRITORIO DEL PROYECTO», ese es el territorio: úsalo tal cual. Solo si NO existe ese bloque, infiere el país, estado o territorio a partir del XPCTO (sujeto, hito, contexto del proyecto).";
 
+
+// T8b: bloque de las dos vías de F2 (literales PROPIOS del test: no se importan de prompts.ts). Solo cambia `exploracion`.
+const VIAS_F2_ANTES = `LAS DOS VÍAS PARA EL ANÁLISIS DE F2:
+1. Análisis de contexto express: el sistema genera el mapa PEST-L completo a partir del XPCTO y los documentos disponibles. El consultor no necesita construirlo en el chat.
+2. App PESTEL en Centinela: análisis estructurado con variables, fuentes e informes. El resultado se importa a F2 automáticamente.
+
+INTEGRACIÓN BIDIRECCIONAL F2 ↔ PESTEL:
+- F2 → PESTEL: El botón "Abrir PESTEL" (en la barra de esta pantalla) lanza un proyecto PESTEL pre-llenado. Los documentos compartidos en F2 se cargan automáticamente en la Etapa de Datos de PESTEL.
+- PESTEL → F2: Un análisis completado en PESTEL se importa a F2 con las 6 dimensiones como señales tripartitas.
+`;
+const VIAS_F2_AHORA = `LAS DOS VÍAS PARA EL ANÁLISIS DE F2:
+1. Análisis de contexto express: el sistema genera el mapa PEST-L completo a partir del XPCTO y los documentos disponibles. El consultor no necesita construirlo en el chat.
+2. App PESTEL en Centinela: análisis estructurado con variables, fuentes e informes. Su resultado no llega solo a F2: se trae desde Centinela.
+
+CÓMO SE CONECTAN F2 Y LA APP PESTEL:
+- Empezar: (a) sin análisis, botón "Abrir PESTEL" debajo del chat; (b) con un análisis express ya hecho, menú ⋮ → "Analizar con PESTEL"; (c) con un análisis importado o un proyecto PESTEL en preparación (creado desde aquí y aún sin importar), "Regresar a PESTEL →" en la barra "Análisis por motores" (y debajo del chat si se ve el estado de chat).
+- Documentos: los que el consultor comparta aquí se cargan en la etapa de Datos de PESTEL la primera vez que abre esa etapa; los que comparta después no se agregan solos.
+- Traer el análisis a F2: en Centinela, botón "Regresar a Moddulo F2 con resultados". Si el análisis no está aprobado, tiene sesgos sin revisar o ya no es el vigente, se pide confirmación antes de importarlo.
+- F1-Propósito: con un análisis importado y F1 sin completar, F2 muestra una invitación con el botón "Ir a F1-Propósito →". No bloquea, pero sin F1 el contraste con el XPCTO queda genérico.
+- Ajustes: un análisis de Centinela se ajusta en Centinela y se vuelve a importar; lo que se edite en F2 no regresa a Centinela. El análisis express se edita aquí ("Editar narrativas" con el análisis aprobado, o "Nuevo análisis").
+- Nunca digas que algo se importa automáticamente ni inventes nombres de botones.
+`;
+const B_F2_ANTES = `B) Si el consultor dice que quiere usar la App PESTEL (frases como "quiero usar PESTEL", "prefiero Centinela", "¿cómo abro el análisis?", "quiero el análisis estructurado", o cualquier variante que indique preferencia por la app):
+   → Responde en máximo 3 oraciones:
+     1. Confirma la elección.
+     2. Indica que debe hacer clic en "Abrir PESTEL" en la barra de botones de esta pantalla.
+     3. Si compartió documentos, confirma que se cargarán automáticamente en el proyecto PESTEL.
+   → NO construyas el PEST-L en el chat cuando el consultor eligió la App PESTEL.
+   Ejemplo: "Perfecto. Haz clic en 'Abrir PESTEL' en la barra de esta pantalla para configurar el análisis. Los documentos que compartiste se cargarán automáticamente en la Etapa de Datos del proyecto PESTEL."
+`;
+const B_F2_AHORA = `B) Si el consultor dice que quiere usar la App PESTEL (frases como "quiero usar PESTEL", "prefiero Centinela", "¿cómo abro el análisis?", "quiero el análisis estructurado", o cualquier variante que indique preferencia por la app):
+   → Responde en máximo 3 oraciones:
+     1. Confirma la elección.
+     2. Indica cómo abrirla: botón "Abrir PESTEL" debajo del chat; si ya hay un análisis express hecho, menú ⋮ → "Analizar con PESTEL"; si ya hay uno de Centinela, "Regresar a PESTEL →".
+     3. Si compartió documentos, confirma que se cargarán en la etapa de Datos del proyecto PESTEL al abrirla.
+   → NO construyas el PEST-L en el chat cuando el consultor eligió la App PESTEL.
+   Ejemplo: "Perfecto. Haz clic en 'Abrir PESTEL' debajo del chat para configurar el análisis. Los documentos que compartiste se cargarán en la etapa de Datos del proyecto PESTEL cuando la abras."
+`;
+const f2Ahora = (t: string) => t.replace(FRASE_F2_ANTES, FRASE_F2_AHORA).replace(VIAS_F2_ANTES, VIAS_F2_AHORA).replace(B_F2_ANTES, B_F2_AHORA);
+
 const TERR: Territorio = {
   nivel: "distrito_federal",
   nombre: "PROGRESO",
@@ -71,12 +111,12 @@ describe("Paso 4a — el bloque de territorio no desplaza la guía de ninguna fa
 
   it.each(PHASE_ORDER)("fase %s: SIN territorio el prompt es idéntico byte a byte al anterior", (fase) => {
     const antes = baseline.sinContexto[fase as keyof typeof baseline.sinContexto];
-    const esperado = fase === "exploracion" ? antes.replace(FRASE_F2_ANTES, FRASE_F2_AHORA) : antes;
+    const esperado = fase === "exploracion" ? f2Ahora(antes) : antes;
     expect(getPhaseSystemPrompt(fase)).toBe(esperado);
     expect(getPhaseSystemPrompt(fase, undefined, undefined, null)).toBe(esperado);
     const conCtx = baseline.conContexto[fase as keyof typeof baseline.conContexto];
     expect(getPhaseSystemPrompt(fase, { campo: "valor" }, { hito: "h", sujeto: "s" })).toBe(
-      fase === "exploracion" ? conCtx.replace(FRASE_F2_ANTES, FRASE_F2_AHORA) : conCtx
+      fase === "exploracion" ? f2Ahora(conCtx) : conCtx
     );
   });
 
