@@ -365,6 +365,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ========== Retiro de rutas: contadores de llamadas (T8a) ==========
+    // retiros_rutas/{ruta} = { total, sinSesion, ultimaLlamada }. Solo Admin SDK (la ruta retirada lo escribe y se lee
+    // desde la consola de Firestore). Cerrado al cliente de forma explícita aunque la denegación por defecto ya lo haría.
+    match /retiros_rutas/{ruta} {
+      allow read, write: if false;
+    }
+
     // ========== FONTANA: Sesiones (T10) ==========
     // Colección raíz, no anidada bajo moddulo_projects — una sesión puede
     // existir sin proyecto (escenarios b/c de uso independiente). uid es
