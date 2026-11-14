@@ -70,7 +70,7 @@ export function buildReportPrompt(
       const senalesBlock = buildSenalesBlock(analysis.dimensions, "mandatory");
       return {
         systemPrompt: SYSTEM_CONSULTANT,
-        userPrompt: `${base}${senalesBlock}\n\n${TECHNICAL_INSTRUCTIONS}`,
+        userPrompt: `${base}${senalesBlock}\n\n${buildAlertasSesgoBlock(analysis.biasAlerts)}\n\n${TECHNICAL_INSTRUCTIONS}`,
         maxTokens: 6000,
       };
     }
@@ -168,6 +168,20 @@ function formatSenalesGrupo(etiqueta: string, senales: Senal[]): string {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Alertas de sesgo (solo Técnico, H75 / B1): la sección 5 del Técnico necesita los datos reales de las alertas; antes no
+// llegaban al prompt y el modelo no podía citarlas. Siempre se emite el bloque (con «Sin alertas…» si no hay) para que la
+// sección 5 no tenga que inferirlas.
+// ─────────────────────────────────────────────────────────────
+
+function buildAlertasSesgoBlock(alertas: PestlAnalysisV2["biasAlerts"] | undefined): string {
+  const titulo = "== ALERTAS DE SESGO DEL ANÁLISIS ==";
+  if (!alertas || alertas.length === 0) return `${titulo}\nSin alertas de sesgo registradas.`;
+  return `${titulo}\n${alertas
+    .map((a) => `- ${a.type}: ${a.description} (${a.acknowledgedAt ? "reconocida" : "pendiente de revisión"})`)
+    .join("\n")}`;
+}
+
+// ─────────────────────────────────────────────────────────────
 // System prompt
 // ─────────────────────────────────────────────────────────────
 
@@ -258,20 +272,31 @@ Estructura obligatoria:
 Estilo: claro, directo, sin tecnicismos. Cada implicación estratégica debe ser accionable.`;
 }
 
-const TECHNICAL_INSTRUCTIONS = `== INSTRUCCIONES: REPORTE TÉCNICO COMPLETO ==
+// H75 / B1 (26-11-13): el Técnico es CONDENSADO y con presupuesto por sección. Antes pedía «extensión: sin límite» y la
+// narrativa completa por dimensión: con max_tokens 12000 seguía cortado y no llegaba a las secciones 5 y 6. Texto medido con el
+// modelo real (2 rondas; prompt-tecnico-b1-r2): 3 738 tokens, 77 s, las 6 secciones y la justificación del ajuste copiada tal cual.
+// Las secciones 5 y 6 son obligatorias y se recorta la 2 antes que ellas. Qué pierde respecto del anterior: la narrativa íntegra y
+// el inventario completo de señales por dimensión (siguen en la pantalla de análisis y en los demás formatos).
+const TECHNICAL_INSTRUCTIONS = `== INSTRUCCIONES: REPORTE TÉCNICO ==
 Audiencia: equipo interno de análisis político.
-Extensión: sin límite (cubre todo el contenido).
 Formato: Markdown con encabezados ##.
+Extensión TOTAL: máximo ~2 500 palabras. Es un tope, no una meta: cada sección tiene su presupuesto.
 
-Estructura obligatoria:
-1. ## Ficha metodológica (tipo de proyecto, territorio, fecha, versión, metodología PESTEL)
-2. ## Análisis por dimensión (para cada dimensión: señal principal, narrativa completa, tendencia, intensidad, fuentes)
-3. ## Cadenas de impacto transversal
-4. ## Scorecard ponderado (tabla completa con pesos y scores)
-5. ## Alertas de sesgo y limitaciones del análisis
-6. ## Ajustes del analista (si los hay, documenta cada uno con su justificación)
+Escribe las 6 secciones, en este orden y con estos encabezados. Las secciones 5 y 6 son OBLIGATORIAS y van completas:
+si vas a pasarte de la extensión, recorta la sección 2, nunca la 5 ni la 6.
 
-Incluye notas metodológicas sobre el nivel de confianza y las fuentes cuando sea relevante.`;
+1. ## Ficha metodológica — hasta 150 palabras, en viñetas: tipo de proyecto, territorio, fecha, versión, confianza global y metodología PESTEL.
+2. ## Análisis por dimensión — SECCIÓN ELÁSTICA. Un subapartado por cada una de las 6 dimensiones, de hasta 230 palabras cada uno:
+   - una línea con clasificación · tendencia · intensidad · confianza;
+   - la lectura en un párrafo de hasta 90 palabras: condensa la narrativa (hallazgo, causa principal e implicación); NO la copies completa;
+   - hasta 3 señales clave (prioriza las adversas y las que tienen fuente registrada), cada una en una línea con su cita tal como viene.
+   No listes todas las señales ni repitas por separado la «señal principal» y la narrativa.
+3. ## Cadenas de impacto transversal — hasta 300 palabras: una línea por cadena (dimensiones → nivel de riesgo → efecto y recomendación en una frase cada uno), sin repetir lo de la sección 2.
+4. ## Scorecard ponderado — la tabla completa (dimensión, clasificación, confianza, peso, score), el score global y una frase.
+5. ## Alertas de sesgo y limitaciones del análisis — hasta 250 palabras: cada alerta de sesgo listada más abajo con una frase sobre qué implica para la lectura, y de 3 a 5 limitaciones concretas (confianza global, señales sin fuente o sin fecha registrada, cobertura). Solo con datos presentes en el contexto.
+6. ## Ajustes del analista — hasta 120 palabras: por cada ajuste, su dimensión, el cambio de clasificación y la justificación del analista COPIADA TEXTUALMENTE entre comillas, sin ampliarla, parafrasearla ni agregarle interpretación; si no hay ajustes, una sola línea: «Sin ajustes del analista registrados.»
+
+No agregues secciones ni un resumen final.`;
 
 const FODA_INSTRUCTIONS = `== INSTRUCCIONES: SÍNTESIS FODA-LISTA ==
 Extrae del análisis PESTEL las oportunidades y amenazas para alimentar un análisis FODA posterior.

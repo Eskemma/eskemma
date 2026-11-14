@@ -67,8 +67,8 @@ const FORMAT_OPTIONS: {
   },
   {
     id: "technical",
-    label: "Técnico completo",
-    description: "Metodología + fuentes + narrativas",
+    label: "Técnico",
+    description: "Metodología, fuentes y análisis condensado",
     borderClass: "border-l-4 border-b-2 border-green-eske",
   },
   {
