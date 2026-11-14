@@ -8,7 +8,13 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { buildReportPrompt, type ReportFormat } from "@/lib/pestel/reportPrompts";
-import { MARCA_INFORME_NO_GUARDADO, construirInforme } from "@/lib/pestel/informesSync";
+import {
+  MARCA_INFORME_CORTADO,
+  MARCA_INFORME_FIN,
+  MARCA_INFORME_NO_GUARDADO,
+  clasificarCortePorLongitud,
+  construirInforme,
+} from "@/lib/pestel/informesSync";
 import {
   esErrorDocumentoLleno,
   evaluarTamanoDocumento,
@@ -28,7 +34,8 @@ async function persistInforme(
   format: ReportFormat,
   text: string,
   analysis: PestlAnalysisV2,
-  variableConfigs: PestlDimensionConfig[]
+  variableConfigs: PestlDimensionConfig[],
+  stopReason: string | null
 ): Promise<void> {
   const informe = construirInforme({
     id: informeId,
@@ -36,6 +43,7 @@ async function persistInforme(
     texto: text,
     analysis,
     variableConfigs,
+    stopReason,
   });
   // Alerta de tamaño: `analysis` ya trae el documento completo (con sus informes previos).
   // Se evalúa ANTES de escribir, para que el rastro exista aunque la escritura falle.
@@ -164,7 +172,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         }
       };
 
-      let completo = false;
+      // «Recorrido sin excepción»: el for-await terminó sin lanzar. NO significa que el modelo terminó su
+      // respuesta (puede haberse detenido por max_tokens): eso lo dice `stopReason` (H75).
+      let recorridoSinExcepcion = false;
+      // Motivo de parada. Se lee del evento message_delta DENTRO del mismo bucle (no con finalMessage()): no
+      // añade una espera ni una excepción nueva, y si el stream se corta sin ese evento queda null (desconocido).
+      let stopReason: string | null = null;
+      let tokensSalida: number | null = null;
       try {
         for await (const event of stream) {
           if (
@@ -173,9 +187,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
           ) {
             accumulated += event.delta.text;
             enviar(event.delta.text);
+          } else if (event.type === "message_delta") {
+            stopReason = event.delta.stop_reason ?? stopReason;
+            tokensSalida = event.usage?.output_tokens ?? tokensSalida;
           }
         }
-        completo = true;
+        recorridoSinExcepcion = true;
       } catch (err) {
         console.error("[generate-report] stream error:", err);
         if (clienteConectado) {
@@ -190,7 +207,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Un informe interrumpido NO se guarda: quedaría como si fuera completo.
       // Se guarda ANTES de cerrar el stream para que, cuando el cliente vea el
       // fin, el informe ya exista y pueda editarse (PATCH) sin carrera.
-      if (completo && accumulated) {
+      const corte = clasificarCortePorLongitud(stopReason);
+      if (recorridoSinExcepcion && accumulated) {
+        // Mismo vocabulario que generate-m1-express: respuesta_truncada = stop_reason max_tokens.
+        const linea = `[generate-report] formato=${format} stop_reason=${stopReason ?? "desconocido"} output_tokens=${tokensSalida ?? "n/a"}`;
+        if (corte === "cortado") console.warn(`${linea} codigo=respuesta_truncada`);
+        else console.info(linea);
         let guardado = false;
         try {
           await persistInforme(
@@ -199,7 +221,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
             format as ReportFormat,
             accumulated,
             analysisData,
-            variableConfigs
+            variableConfigs,
+            stopReason
           );
           guardado = true;
         } catch (e) {
@@ -211,11 +234,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
           );
         }
         // El usuario debe enterarse: el stream ya mandó sus headers, así que el
-        // aviso viaja como una marca al final del texto (el cliente la separa).
+        // aviso viaja como marcas al final del texto (el cliente las separa). La marca de FIN va SIEMPRE
+        // al final: su ausencia en el cliente significa «interrumpido» (H75).
+        if (corte === "cortado") enviar(MARCA_INFORME_CORTADO);
         if (!guardado) enviar(MARCA_INFORME_NO_GUARDADO);
+        enviar(MARCA_INFORME_FIN);
       }
 
-      if (completo && clienteConectado) {
+      if (recorridoSinExcepcion && clienteConectado) {
         try {
           controller.close();
         } catch {

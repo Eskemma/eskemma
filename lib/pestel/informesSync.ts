@@ -60,6 +60,53 @@ export function extraerEstadoGuardado(acumulado: string): { texto: string; guard
   return { texto: acumulado.slice(0, i), guardado: false };
 }
 
+/**
+ * Marcas de ESTADO que generate-report agrega al final del stream (H75). Todas empiezan por "\n\u001E", que el
+ * modelo no produce. Protocolo: el servidor termina SIEMPRE con MARCA_INFORME_FIN; si el cliente recibe el fin
+ * del stream sin ella (la plataforma cortó la función, la red se rompió), el informe se trata como
+ * INTERRUMPIDO: el texto puede estar incompleto y no se sabe si se guardó.
+ *   · MARCA_INFORME_CORTADO: el modelo se detuvo por longitud (max_tokens): el texto puede estar incompleto.
+ *   · MARCA_INFORME_NO_GUARDADO: (arriba) se generó pero no se pudo guardar. Puede combinarse con CORTADO.
+ */
+export const MARCA_INFORME_CORTADO = "\n\u001EINFORME_CORTADO\u001E";
+export const MARCA_INFORME_FIN = "\n\u001EINFORME_FIN\u001E";
+const INICIO_MARCA = "\n\u001E";
+
+export interface EstadoInforme {
+  /** Texto sin marcas (también recorta una marca a medio llegar, partida entre chunks). */
+  texto: string;
+  guardado: boolean;
+  cortado: boolean;
+  /** Llegó MARCA_INFORME_FIN: el servidor terminó su protocolo. Falso = interrumpido. */
+  finalizado: boolean;
+}
+
+/** Lee el texto acumulado del stream y separa texto y estado. Las banderas solo cuentan con la marca COMPLETA. */
+export function extraerEstadoInforme(acumulado: string): EstadoInforme {
+  const i = acumulado.indexOf(INICIO_MARCA);
+  return {
+    texto: i === -1 ? acumulado : acumulado.slice(0, i),
+    guardado: !acumulado.includes(MARCA_INFORME_NO_GUARDADO),
+    cortado: acumulado.includes(MARCA_INFORME_CORTADO),
+    finalizado: acumulado.includes(MARCA_INFORME_FIN),
+  };
+}
+
+export type CorteInforme = "completo" | "cortado" | "desconocido";
+
+/**
+ * Qué dice el `stop_reason` del modelo sobre si el texto se cortó por LONGITUD.
+ *   · "cortado": max_tokens, o model_context_window_exceeded (está en BetaStopReason del SDK 0.78.0 pero NO en
+ *     el StopReason no-beta; se compara como texto por si la API lo devuelve).
+ *   · "completo": end_turn o stop_sequence (el modelo decidió parar).
+ *   · "desconocido": todo lo demás (null, refusal, tool_use, pause_turn, valores nuevos): NO afirma corte.
+ */
+export function clasificarCortePorLongitud(stopReason: string | null | undefined): CorteInforme {
+  if (stopReason === "max_tokens" || stopReason === "model_context_window_exceeded") return "cortado";
+  if (stopReason === "end_turn" || stopReason === "stop_sequence") return "completo";
+  return "desconocido";
+}
+
 /** Tope de caracteres aceptado por las rutas (generaciones reales: < 30 000). */
 export const MAX_CONTENIDO_INFORME = 200_000;
 
@@ -247,6 +294,8 @@ export function construirInforme(args: {
   variableConfigs: PestlDimensionConfig[];
   origen?: InformeGenerado["origen"];
   generadoEn?: string;
+  /** `stop_reason` del modelo (H75). Sin él (migración desde localStorage) no se escribe ningún campo de corte. */
+  stopReason?: string | null;
 }): InformeGenerado {
   const { analysis, variableConfigs } = args;
   const scorecard = buildScorecard(analysis.dimensions, variableConfigs);
@@ -276,5 +325,7 @@ export function construirInforme(args: {
     datosEstructurados: { scorecard: scorecardItems, mapaPESTEL },
     generadoEn: args.generadoEn ?? new Date().toISOString(),
     ...(args.origen ? { origen: args.origen } : {}),
+    ...(args.stopReason ? { stopReason: args.stopReason } : {}),
+    ...(clasificarCortePorLongitud(args.stopReason) === "cortado" ? { truncado: true } : {}),
   };
 }

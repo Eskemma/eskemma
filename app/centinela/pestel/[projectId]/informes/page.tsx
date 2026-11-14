@@ -20,7 +20,7 @@ import {
   type ReportFormat,
 } from "@/lib/pestel/exportUtils";
 import {
-  extraerEstadoGuardado,
+  extraerEstadoInforme,
   informeVigentePorFormato,
   parsearCacheLocalLegada,
   parsearPendientes,
@@ -121,6 +121,10 @@ export default function InformesPage() {
   >({});
   // formatos cuyo informe se generó pero NO quedó guardado en el servidor
   const [sinGuardar, setSinGuardar] = useState<Partial<Record<ReportFormat, boolean>>>({});
+  // H75: formatos cuyo informe el modelo cortó por longitud (stop_reason) y formatos cuyo stream terminó sin
+  // la marca final del servidor (interrumpido: puede estar incompleto y no se sabe si se guardó).
+  const [cortados, setCortados] = useState<Partial<Record<ReportFormat, boolean>>>({});
+  const [interrumpidos, setInterrumpidos] = useState<Partial<Record<ReportFormat, boolean>>>({});
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoGuardado>("idle");
   const [confirmRegenerar, setConfirmRegenerar] = useState(false);
   const guardadoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,18 +328,22 @@ export default function InformesPage() {
       const textos: Partial<Record<ReportFormat, string>> = {};
       const ids: Partial<Record<ReportFormat, string>> = {};
       const edits: Partial<Record<ReportFormat, boolean>> = {};
+      const cortes: Partial<Record<ReportFormat, boolean>> = {};
       for (const rf of REPORT_FORMATS) {
         const inf = vigentes[rf];
         if (!inf) continue;
         textos[rf] = textoVigente(inf);
         ids[rf] = inf.id;
         if (inf.contenidoEditado !== undefined) edits[rf] = true;
+        // Solo `truncado === true` avisa; un informe sin el campo (anteriores a H75) no afirma nada.
+        if (inf.truncado === true) cortes[rf] = true;
       }
       // Lo que el usuario ya generó/editó en esta sesión mientras cargaba gana
       // sobre lo recién leído del servidor.
       setReportCache((prev) => ({ ...textos, ...prev }));
       setInformeIds((prev) => ({ ...ids, ...prev }));
       setEditados((prev) => ({ ...edits, ...prev }));
+      setCortados((prev) => ({ ...cortes, ...prev }));
       const formatos = REPORT_FORMATS.filter((rf) => textos[rf]);
       if (formatos.length > 0) {
         // el formato más recientemente generado
@@ -410,6 +418,9 @@ export default function InformesPage() {
       return next;
     });
     setEditados((prev) => ({ ...prev, [format]: false }));
+    setCortados((prev) => ({ ...prev, [format]: false }));
+    setInterrumpidos((prev) => ({ ...prev, [format]: false }));
+    let recibioTexto = false;
 
     try {
       const res = await fetch(
@@ -440,15 +451,22 @@ export default function InformesPage() {
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
         accumulated += chunk;
+        recibioTexto = true;
         // Update cache in real-time so the viewer shows streaming text (sin la
         // marca de "no guardado", que solo puede llegar al final)
         setReportCache((prev) => ({
           ...prev,
-          [format]: extraerEstadoGuardado(accumulated).texto,
+          [format]: extraerEstadoInforme(accumulated).texto,
         }));
       }
-      // Si el servidor no pudo guardar el informe, lo avisa con una marca al final.
-      if (extraerEstadoGuardado(accumulated).guardado) {
+      // El servidor termina SIEMPRE con la marca de fin (y, antes, las de «cortado» / «no guardado» si
+      // aplican). Sin la marca de fin el stream se interrumpió (p. ej. la plataforma cortó la función): no
+      // se confirma que el informe se guardó, así que no se usa el id del header.
+      const estado = extraerEstadoInforme(accumulated);
+      if (estado.cortado) setCortados((prev) => ({ ...prev, [format]: true }));
+      if (!estado.finalizado) {
+        setInterrumpidos((prev) => ({ ...prev, [format]: true }));
+      } else if (estado.guardado) {
         if (nuevoInformeId) {
           setInformeIds((prev) => ({ ...prev, [format]: nuevoInformeId }));
         }
@@ -457,6 +475,8 @@ export default function InformesPage() {
         setEstadoGuardado("sin_guardar");
       }
     } catch (err) {
+      // Si el stream se rompió con texto ya mostrado, ese texto queda en pantalla: se marca interrumpido.
+      if (recibioTexto) setInterrumpidos((prev) => ({ ...prev, [format]: true }));
       setGenerateError(
         err instanceof Error ? err.message : "Error al generar el informe."
       );
@@ -695,7 +715,7 @@ export default function InformesPage() {
                     Generando…
                   </span>
                 )}
-                {!generating && activeFormat && (
+                {!generating && activeFormat && !interrumpidos[activeFormat] && (
                   <span className="text-xs font-medium text-black-eske dark:text-[#C7D6E0]">
                     {FORMAT_OPTIONS.find((f) => f.id === activeFormat)?.label}{" "}
                     — listo
@@ -784,6 +804,16 @@ export default function InformesPage() {
               ) : null;
             })()}
 
+            {activeFormat && cortados[activeFormat] && (
+              <p
+                role="status"
+                className="mb-3 text-xs border border-brown-eske-60/50 dark:border-yellow-eske/30 bg-brown-eske-60/10 dark:bg-yellow-eske/10 text-brown-eske-80 dark:text-yellow-eske rounded-lg px-3 py-2"
+              >
+                Este informe se cortó al llegar al límite de longitud y puede estar incompleto. Si lo
+                regeneras, podría cortarse de nuevo.
+              </p>
+            )}
+
             <ReportViewer
               content={currentContent}
               streaming={generating}
@@ -793,7 +823,7 @@ export default function InformesPage() {
         )}
 
         {/* ── Informe sin guardar / sin espacio ── */}
-        {((activeFormat && sinGuardar[activeFormat]) || estadoGuardado === "lleno") && (
+        {((activeFormat && (sinGuardar[activeFormat] || interrumpidos[activeFormat])) || estadoGuardado === "lleno") && (
           <div
             role="alert"
             className="bg-red-eske/10 dark:bg-red-eske/20 border border-red-eske/20 dark:border-red-eske/40 rounded-xl p-4"
@@ -801,12 +831,16 @@ export default function InformesPage() {
             <p className="text-sm text-red-eske-60 dark:text-red-eske-10 font-medium">
               {estadoGuardado === "lleno"
                 ? "Este análisis no admite más cambios guardados"
-                : "El informe se generó, pero no se pudo guardar en tu cuenta"}
+                : activeFormat && interrumpidos[activeFormat]
+                  ? "La generación se interrumpió antes de terminar"
+                  : "El informe se generó, pero no se pudo guardar en tu cuenta"}
             </p>
             <p className="text-sm text-black-eske-40 dark:text-[#C7D6E0] mt-1">
               {estadoGuardado === "lleno"
                 ? "Acumuló demasiados informes y ediciones y alcanzó el límite de espacio. Copia o descarga tu texto ahora para no perderlo, y genera un análisis nuevo para seguir trabajando."
-                : "Si sales de esta página lo perderás. Copia o descarga el texto ahora (los botones de arriba siguen funcionando) y vuelve a generarlo más tarde; cualquier edición que hagas tampoco se guardará."}
+                : activeFormat && interrumpidos[activeFormat]
+                  ? "El texto de arriba puede estar incompleto y no se pudo confirmar que quedó guardado. Recarga la página para ver si se guardó; si no aparece, vuelve a generarlo. Mientras tanto, copia o descarga el texto si lo necesitas; cualquier edición que hagas tampoco se guardará."
+                  : "Si sales de esta página lo perderás. Copia o descarga el texto ahora (los botones de arriba siguen funcionando) y vuelve a generarlo más tarde; cualquier edición que hagas tampoco se guardará."}
             </p>
           </div>
         )}

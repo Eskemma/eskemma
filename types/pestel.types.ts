@@ -251,6 +251,15 @@ export interface InformeGenerado {
    * generación del modelo; `contenidoTexto` es entonces ese texto local.
    */
   origen?: "generado" | "migrado_localstorage";
+  // ── Motivo de parada del modelo (H75) ───────────────────────────────
+  /** `stop_reason` que reportó el modelo al terminar, cuando se conoce. Informes anteriores a H75: ausente. */
+  stopReason?: string;
+  /**
+   * Solo se escribe `true`: el modelo se detuvo por LONGITUD (max_tokens o ventana de contexto), así que el
+   * texto puede estar incompleto. Ausente = no se sabe (informes anteriores a H75, motivo desconocido o un
+   * motivo que no es de longitud): NO significa «completo». Un PATCH de edición lo conserva.
+   */
+  truncado?: boolean;
 }
 
 export interface PestlAnalysisV2 {

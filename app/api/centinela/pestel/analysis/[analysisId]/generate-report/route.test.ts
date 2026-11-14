@@ -39,7 +39,7 @@ vi.mock("@/lib/pestel/reportPrompts", () => ({
 import { adminDb } from "@/lib/firebase-admin";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { POST } from "./route";
-import { MARCA_INFORME_NO_GUARDADO } from "@/lib/pestel/informesSync";
+import { MARCA_INFORME_FIN, MARCA_INFORME_NO_GUARDADO } from "@/lib/pestel/informesSync";
 import { mockSessionPayload } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 
@@ -90,7 +90,7 @@ describe("POST generate-report — persistencia", () => {
     expect(id).toBeTruthy();
 
     const texto = await res.text(); // el stream terminó: ya debe estar guardado
-    expect(texto).toBe("Hola mundo");
+    expect(texto).toBe("Hola mundo" + MARCA_INFORME_FIN); // H75: el stream termina SIEMPRE con la marca de fin
     const guardados = informesGuardados();
     expect(guardados).toHaveLength(1);
     expect(guardados[0]).toMatchObject({
@@ -136,7 +136,7 @@ describe("POST generate-report — persistencia", () => {
     eventos.fallaGuardado = new Error("Firestore caído");
     const res = await llamar();
     const texto = await res.text();
-    expect(texto).toBe("Texto del informe" + MARCA_INFORME_NO_GUARDADO);
+    expect(texto).toBe("Texto del informe" + MARCA_INFORME_NO_GUARDADO + MARCA_INFORME_FIN);
     expect(informesGuardados()).toHaveLength(0);
   });
 
@@ -150,11 +150,11 @@ describe("POST generate-report — persistencia", () => {
     expect(vi.mocked(console.error).mock.calls.some((c) => String(c[0]).includes("documento lleno"))).toBe(true);
   });
 
-  it("guardado normal: sin marca", async () => {
+  it("guardado normal: sin marca de «no guardado» (solo la de fin, H75)", async () => {
     eventos.fuente = async function* () {
       yield delta("ok");
     };
-    expect(await (await llamar()).text()).toBe("ok");
+    expect(await (await llamar()).text()).toBe("ok" + MARCA_INFORME_FIN);
   });
 
   describe("alerta de tamaño del documento", () => {
