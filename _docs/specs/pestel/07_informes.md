@@ -70,6 +70,10 @@ comunicacionales específicas para el tipo de proyecto.
 - Legislativo: por momento legislativo (apertura, debate, votación).
 - Ciudadano: por fase del movimiento (emergencia, consolidación, impacto).
 
+Al recargar la página de informes se conserva el formato abierto (parámetro
+`?formato=` de la URL) si ese formato tiene informe guardado; si no, se abre el
+más recientemente generado. Nunca se genera un informe por abrir la página.
+
 ---
 
 ## Scorecard ponderado

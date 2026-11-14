@@ -20,6 +20,7 @@ import {
   type ReportFormat,
 } from "@/lib/pestel/exportUtils";
 import {
+  elegirFormatoInicial,
   extraerEstadoInforme,
   informeVigentePorFormato,
   parsearCacheLocalLegada,
@@ -27,6 +28,7 @@ import {
   planMigracionLocal,
   reconciliarPendientes,
   textoVigente,
+  urlConFormato,
   REPORT_FORMATS,
   type PendientesPorFormato,
 } from "@/lib/pestel/informesSync";
@@ -129,6 +131,8 @@ export default function InformesPage() {
   const [confirmRegenerar, setConfirmRegenerar] = useState(false);
   const guardadoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeFormat, setActiveFormat] = useState<ReportFormat | null>(null);
+  // H80: el usuario ya eligió un formato (clic o generación). La carga inicial NO lo pisa con su elección por defecto.
+  const formatoElegidoPorUsuario = useRef(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("Copiar");
@@ -344,16 +348,11 @@ export default function InformesPage() {
       setInformeIds((prev) => ({ ...ids, ...prev }));
       setEditados((prev) => ({ ...edits, ...prev }));
       setCortados((prev) => ({ ...cortes, ...prev }));
-      const formatos = REPORT_FORMATS.filter((rf) => textos[rf]);
-      if (formatos.length > 0) {
-        // el formato más recientemente generado
-        const masReciente = formatos.reduce((a, b) =>
-          Date.parse(vigentes[a]!.generadoEn) >= Date.parse(vigentes[b]!.generadoEn)
-            ? a
-            : b
-        );
-        setActiveFormat(masReciente);
-      }
+      // H80: `?formato=` de la URL (se lee UNA vez, aquí) se honra solo si es un formato válido con informe guardado;
+      // si no, el más recientemente generado (la regla de siempre). Nunca dispara una generación. Si el usuario ya
+      // hizo clic en una pestaña mientras cargaba, no se le cambia.
+      const inicial = elegirFormatoInicial(vigentes, new URLSearchParams(window.location.search).get("formato"));
+      if (inicial && !formatoElegidoPorUsuario.current) setActiveFormat(inicial);
     })();
 
     return () => {
@@ -381,17 +380,31 @@ export default function InformesPage() {
   // force=true → always regenerate (Regenerar button)
   // force=false → use cache if available (format tab click)
 
+  // H80: elegir un formato (clic o generación). Deja el formato en la URL (?formato=) SIN agregar una entrada al
+  // historial, para que F5 conserve lo que el usuario tenía abierto.
+  function seleccionarFormato(format: ReportFormat) {
+    formatoElegidoPorUsuario.current = true;
+    setActiveFormat(format);
+    try {
+      window.history.replaceState(window.history.state, "", urlConFormato(window.location.href, format));
+    } catch {
+      // la URL no se pudo actualizar — el formato igual queda seleccionado
+    }
+  }
+
   async function handleGenerate(format: ReportFormat, force = false) {
     if (!analysis?.id) return;
 
-    // If cached and not forced, just switch the active tab
-    if (!force && reportCache[format]) {
-      setActiveFormat(format);
+    // If cached and not forced, just switch the active tab. H80: también si el informe ya está guardado en el análisis
+    // aunque la carga inicial no haya llenado todavía la caché (un clic durante la carga no debe generar uno nuevo).
+    const guardado = informeVigentePorFormato(analysis.informes)[format];
+    if (!force && (reportCache[format] || (guardado && textoVigente(guardado)))) {
+      seleccionarFormato(format);
       setGenerateError(null);
       return;
     }
 
-    setActiveFormat(format);
+    seleccionarFormato(format);
     setGenerateError(null);
     setGenerating(true);
 

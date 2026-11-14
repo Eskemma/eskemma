@@ -135,6 +135,43 @@ export function informeVigentePorFormato(
   return out;
 }
 
+/**
+ * H80 — qué formato muestra la página de informes al cargar.
+ *   · Un formato «tiene informe» si su informe vigente tiene texto (la misma condición que decide qué se pinta).
+ *   · `preferido` (p. ej. el `?formato=` de la URL, que es entrada NO confiable) solo se honra si es un formato válido de
+ *     REPORT_FORMATS Y tiene informe; nunca devuelve un formato sin informe, así que nunca puede disparar una generación.
+ *   · Si no hay preferido válido: el formato con mayor `generadoEn`; en empate, el primero en el orden de REPORT_FORMATS
+ *     (la regla que la página tenía en línea desde 9484a0f, fijada por el oráculo de informesSync.formatoInicial.caracterizacion.test.ts).
+ *   · Sin ningún informe: null.
+ */
+export function elegirFormatoInicial(
+  vigentes: Partial<Record<ReportFormat, InformeGenerado>>,
+  preferido?: unknown
+): ReportFormat | null {
+  const conInforme = REPORT_FORMATS.filter((rf) => {
+    const inf = vigentes[rf];
+    return !!inf && !!textoVigente(inf);
+  });
+  if (conInforme.length === 0) return null;
+  if (typeof preferido === "string") {
+    const valido = conInforme.find((rf) => rf === preferido);
+    if (valido) return valido;
+  }
+  return conInforme.reduce((a, b) =>
+    Date.parse(vigentes[a]!.generadoEn) >= Date.parse(vigentes[b]!.generadoEn) ? a : b
+  );
+}
+
+/**
+ * H80 — misma URL con `?formato=<formato>` (reemplaza el valor si ya estaba y conserva el resto de parámetros y el hash).
+ * Devuelve ruta + búsqueda + hash (lo que espera history.replaceState), sin dominio.
+ */
+export function urlConFormato(href: string, formato: ReportFormat): string {
+  const u = new URL(href, "http://localhost");
+  u.searchParams.set("formato", formato);
+  return `${u.pathname}${u.search}${u.hash}`;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Caché local legada (antes: única copia de las ediciones)
 // ─────────────────────────────────────────────────────────────
