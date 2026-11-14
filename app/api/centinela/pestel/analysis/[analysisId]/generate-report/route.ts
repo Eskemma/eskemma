@@ -53,8 +53,10 @@ async function persistInforme(
   });
 }
 
-// Increase Vercel function timeout for streaming (seconds)
-export const maxDuration = 60;
+// Vercel function timeout for streaming (seconds). 300 es el máximo de Hobby con Fluid compute (H75, B0):
+// medido a ≈ 50 tok/s, 6000 tokens tardan ≈ 118 s y un Insights de 3165 tokens 69 s, así que con 60 s los
+// cinco formatos podían ser cortados por la plataforma (la marca de fin de A lo muestra como «interrumpido»).
+export const maxDuration = 300;
 
 interface RouteContext {
   params: Promise<{ analysisId: string }>;
