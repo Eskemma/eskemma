@@ -140,6 +140,8 @@ describe("POST /api/moddulo/f3/canal3/vincular", () => {
     mockAdminStorage.reset([OWN_PATH]);
     mockGetSessionFromRequest.mockResolvedValue(mockSessionPayload({ uid: UID }));
     mockGetProject.mockResolvedValue({} as unknown as ModduloProject);
+    // 7b-7: la transacción lee el documento del proyecto (antes solo usaba la copia de getProject).
+    mockAdminDb.reset({ [`moddulo_projects/${PROJECT_ID}`]: {} });
     mockExtractTextPerFile.mockResolvedValue("texto extraído");
 
     const res = await POST(buildRequest(bodyBaseValido));

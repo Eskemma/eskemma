@@ -12,12 +12,12 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
-import { getProject } from "@/lib/moddulo/project";
+import { getProject, normalizeTareaPIP, type LegacyTareaPIP } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { extractTextPerFile } from "@/lib/moddulo/attachments";
 import { esStoragePathDeUsuario } from "@/lib/moddulo/storagePathAuth";
-import type { TareaPIP, PIPItem } from "@/types/moddulo.types";
+import type { TareaPIP, PIPItem, ModduloProject, AsignacionCanal } from "@/types/moddulo.types";
 import type { ResultadoCanal1 } from "@/types/f3.types";
 import type { FontanaSesion } from "@/types/fontana.types";
 
@@ -83,57 +83,115 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Asignación de Canal 1 (T10) no encontrada en el tablero" }, { status: 404 });
   }
 
-  const pip = (project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
-  const moduloPIP = pip.find((p) => p.pipItemId === pipItemId)?.pregunta ?? "Resultado de Fontana";
-
   const extractoTexto = await extractTextPerFile({
     nombre: "fontana-contexto.json", tipo: "application/json", url: "", storagePath,
   });
 
-  const resultadoId = sesion.entregaCanal1?.resultadoId ?? crypto.randomUUID();
-  const esReentrega = !!sesion.entregaCanal1?.resultadoId;
+  // 7b-7 (H25): resultado, tablero y entregaCanal1 de la sesión se escriben en UNA transacción
+  // (antes eran 3 escrituras sueltas: si fallaba la 2.ª —p. ej. por un `undefined` que el Admin SDK
+  // rechaza— el resultado ya estaba pisado y la sesión sin actualizar). Las comprobaciones de arriba
+  // se conservan SOLO para ordenar las respuestas; toda decisión que depende del estado vigente
+  // (¿ya hay entrega?, ¿la asignación está aprobada?) se toma DENTRO, sobre lo releído. El callback
+  // no tiene efectos externos (puede reintentarse) y lee todo antes de escribir.
+  const proyectoRef = adminDb.collection("moddulo_projects").doc(projectId);
+  const resultadoIdNuevo = crypto.randomUUID();
   const fechaEntrega = new Date().toISOString();
 
-  const resultado: ResultadoCanal1 = {
-    moduloPIP,
-    origen: { sourceKind: "T10", componente: "centinela", analisisId: resultadoId, fechaEntrega },
-    cobertura: { completa: true },
-    payload: {
-      archivoUrl: storagePath,
-      extractoTexto,
-      ...(reporteStoragePath ? { reporteInterpretativoUrl: reporteStoragePath } : {}),
-    },
-  };
+  const rechazo = (status: number, error: string) => ({ tipo: "rechazo" as const, status, error });
 
-  await adminDb
-    .collection("moddulo_projects")
-    .doc(projectId)
-    .collection("f3Resultados")
-    .doc(resultadoId)
-    .set({ ...resultado, createdAt: FieldValue.serverTimestamp() });
+  const salida = await adminDb.runTransaction(async (tx) => {
+    const sesionTx = await tx.get(sesionRef);
+    const proyectoTx = await tx.get(proyectoRef);
 
-  // Reentrega sobre un resultado que ya había sido aprobado en M2: invalida
-  // esa aprobación anterior (misma lógica que la propagación de staleness
-  // ya usada en el proyecto — el contenido de origen cambió, la aprobación
-  // humana previa no se hereda en silencio) y limpia resultadoId de la
-  // asignación para que vuelva a aparecer como candidata en el picker de M2
-  // (F3ResultadosRecibidos filtra por `!a.resultadoId`).
-  if (esReentrega && asignacion.resultadoId === resultadoId) {
-    const tareasActualizadas = tareas.map((t) => ({
-      pipItemId: t.pipItemId,
-      asignaciones: t.pipItemId !== pipItemId ? t.asignaciones : t.asignaciones.map((a) =>
-        a.asignacionId === asignacion.asignacionId
-          ? { ...a, estado: "en_curso" as const, resultadoId: undefined }
-          : a
-      ),
-    }));
-    await adminDb.collection("moddulo_projects").doc(projectId).update({
-      "phases.investigacion.f3TareasPIP": tareasActualizadas,
-      updatedAt: FieldValue.serverTimestamp(),
+    if (!sesionTx.exists || sesionTx.data()?.uid !== session.uid) {
+      return rechazo(404, "Sesión de Fontana no encontrada");
+    }
+    const sesionActual = sesionTx.data() as FontanaSesion;
+    if (sesionActual.modduloProjectId !== projectId) {
+      return rechazo(404, "La sesión no está vinculada a este proyecto");
+    }
+    const pipItemIdTx = sesionActual.tareaPipIds?.[0];
+    if (!pipItemIdTx) {
+      return rechazo(400, "Esta sesión no corresponde a una tarea del PIP (Escenario a)");
+    }
+
+    const proyectoActual = proyectoTx.data() as
+      | { deletedAt?: unknown; phases?: ModduloProject["phases"] }
+      | undefined;
+    if (!proyectoTx.exists || !proyectoActual || proyectoActual.deletedAt) {
+      return rechazo(404, "Proyecto no encontrado");
+    }
+
+    // Tablero CRUDO normalizado con la misma función que usa getProject (lo escrito es idéntico
+    // al de siempre), no la copia que leyó getProject antes.
+    const tareasTx = ((proyectoActual.phases?.investigacion?.f3TareasPIP ?? []) as LegacyTareaPIP[]).map(
+      normalizeTareaPIP
+    );
+    const tareaTx = tareasTx.find((t) => t.pipItemId === pipItemIdTx);
+    const asignacionTx = tareaTx?.asignaciones.find((a) => a.canal === "canal1" && a.tecnicaId === "T10");
+    if (!tareaTx || !asignacionTx) {
+      return rechazo(404, "Asignación de Canal 1 (T10) no encontrada en el tablero");
+    }
+
+    const pip = (proyectoActual.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
+    const moduloPIP = pip.find((p) => p.pipItemId === pipItemIdTx)?.pregunta ?? "Resultado de Fontana";
+
+    const resultadoId = sesionActual.entregaCanal1?.resultadoId ?? resultadoIdNuevo;
+    const esReentrega = !!sesionActual.entregaCanal1?.resultadoId;
+
+    const resultado: ResultadoCanal1 = {
+      moduloPIP,
+      origen: { sourceKind: "T10", componente: "centinela", analisisId: resultadoId, fechaEntrega },
+      cobertura: { completa: true },
+      payload: {
+        archivoUrl: storagePath,
+        extractoTexto,
+        ...(reporteStoragePath ? { reporteInterpretativoUrl: reporteStoragePath } : {}),
+      },
+    };
+
+    tx.set(proyectoRef.collection("f3Resultados").doc(resultadoId), {
+      ...resultado,
+      createdAt: FieldValue.serverTimestamp(),
     });
+
+    // Reentrega sobre un resultado que ya había sido aprobado en M2: invalida
+    // esa aprobación anterior (misma lógica que la propagación de staleness
+    // ya usada en el proyecto — el contenido de origen cambió, la aprobación
+    // humana previa no se hereda en silencio) y limpia resultadoId de la
+    // asignación para que vuelva a aparecer como candidata en el picker de M2
+    // (F3ResultadosRecibidos filtra por `!a.resultadoId`).
+    // NOTA (7b-7): la semántica NO cambia en este corte (se rediseña en la ronda Fontana ↔ F3);
+    // solo se corrige la FORMA: la clave `resultadoId` se OMITE, nunca se escribe como `undefined`
+    // (el Admin SDK rechaza `undefined` y la entrega daba 500 después de pisar el resultado).
+    if (esReentrega && asignacionTx.resultadoId === resultadoId) {
+      const tareasActualizadas = tareasTx.map((t) => ({
+        pipItemId: t.pipItemId,
+        asignaciones:
+          t.pipItemId !== pipItemIdTx
+            ? t.asignaciones
+            : t.asignaciones.map((a) => (a.asignacionId === asignacionTx.asignacionId ? reiniciarAsignacion(a) : a)),
+      }));
+      tx.update(proyectoRef, {
+        "phases.investigacion.f3TareasPIP": tareasActualizadas,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    tx.update(sesionRef, { entregaCanal1: { fecha: fechaEntrega, resultadoId } });
+
+    return { tipo: "ok" as const, resultadoId };
+  });
+
+  if (salida.tipo === "rechazo") {
+    return NextResponse.json({ error: salida.error }, { status: salida.status });
   }
+  return NextResponse.json({ resultadoId: salida.resultadoId, fecha: fechaEntrega }, { status: 200 });
+}
 
-  await sesionRef.update({ entregaCanal1: { fecha: fechaEntrega, resultadoId } });
-
-  return NextResponse.json({ resultadoId, fecha: fechaEntrega }, { status: 200 });
+// Copia de la asignación en `en_curso` y SIN la clave `resultadoId` (omitida, no `undefined`).
+function reiniciarAsignacion(a: AsignacionCanal): AsignacionCanal {
+  const copia: AsignacionCanal = { ...a, estado: "en_curso" };
+  delete copia.resultadoId;
+  return copia;
 }

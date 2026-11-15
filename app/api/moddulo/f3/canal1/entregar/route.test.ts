@@ -21,7 +21,11 @@ vi.mock("firebase-admin/firestore", () => ({
   FieldValue: { serverTimestamp: () => "SERVER_TIMESTAMP", delete: () => "FIELD_DELETE" },
 }));
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
-vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
+// 7b-7: la ruta normaliza el tablero leído en la transacción con normalizeTareaPIP (real).
+vi.mock("@/lib/moddulo/project", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/moddulo/project")>()),
+  getProject: vi.fn(),
+}));
 vi.mock("@/lib/moddulo/attachments", () => ({ extractTextPerFile: vi.fn() }));
 
 import { adminDb } from "@/lib/firebase-admin";
@@ -130,6 +134,8 @@ describe("POST /api/moddulo/f3/canal1/entregar", () => {
 
   it("responde 200 y crea el resultado con datos propios válidos (camino feliz)", async () => {
     mockAdminDb.reset({
+      // 7b-7: la transacción lee el documento del proyecto (antes solo usaba la copia de getProject).
+      [`moddulo_projects/${PROJECT_ID}`]: projectConAsignacionCanal1,
       [`fontana_sesiones/${SESION_ID}`]: {
         uid: UID,
         modduloProjectId: PROJECT_ID,

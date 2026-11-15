@@ -29,6 +29,50 @@ export function mockSessionPayload(session: MockSessionPayload): SessionPayload 
   return session as unknown as SessionPayload;
 }
 
+// 7b-7 — validación de `undefined` como la del SDK REAL (@google-cloud/firestore 7.x). El Admin SDK
+// rechaza `undefined` en cualquier nivel de un documento salvo que se active `ignoreUndefinedProperties`,
+// y `lib/firebase-admin.ts` no lo activa. El mock permisivo de siempre lo aceptaba, así que un
+// `resultadoId: undefined` pasó todas las pruebas y rompió en producción (N2). Con `rechazarUndefined()`
+// (opt-in) set/update/add (sueltos, en batch y en transacción) lanzan el MISMO mensaje, con la ruta de
+// campo en el mismo formato (segmentos que no son identificadores —claves con puntos, índices de
+// arreglo— entre comillas invertidas). Una prueba de contrato (adminMocks.test.ts) compara este
+// mensaje con el del SDK real para que el mock no se desvíe.
+const SEGMENTO_SIMPLE = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
+const segmentoDeCampo = (s: string) => (SEGMENTO_SIMPLE.test(s) ? s : `\`${s}\``);
+
+function rutaConUndefined(valor: unknown, ruta: string[]): string[] | null {
+  if (valor === undefined) return ruta;
+  if (Array.isArray(valor)) {
+    for (let i = 0; i < valor.length; i++) {
+      const r = rutaConUndefined(valor[i], [...ruta, String(i)]);
+      if (r) return r;
+    }
+    return null;
+  }
+  // Solo objetos planos: los sentinelas de FieldValue y las fechas no se recorren.
+  if (valor !== null && typeof valor === "object" && Object.getPrototypeOf(valor) === Object.prototype) {
+    for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+      const r = rutaConUndefined(v, [...ruta, k]);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+/** Lanza como el SDK real si `data` contiene `undefined` (en cualquier nivel). */
+export function validarSinUndefined(data: unknown, modo: "set" | "update"): void {
+  const ruta = rutaConUndefined(data, []);
+  if (!ruta) return;
+  const campo = ruta.map(segmentoDeCampo).join(".");
+  const detalle = `Cannot use "undefined" as a Firestore value (found in field "${campo}"). If you want to ignore undefined values, enable \`ignoreUndefinedProperties\`.`;
+  if (modo === "update") {
+    throw new Error(
+      `Update() requires either a single JavaScript object or an alternating list of field/value pairs that can be followed by an optional precondition. Value for argument "dataOrField" is not a valid Firestore value. ${detalle}`
+    );
+  }
+  throw new Error(`Value for argument "data" is not a valid Firestore document. ${detalle}`);
+}
+
 export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   let store = new Map<string, unknown>(Object.entries(initialDocs));
   // Bitácora de TODAS las llamadas a update() (ruta del documento + argumento tal cual), para poder
@@ -43,6 +87,10 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   let rutasQueFallan = new Set<string>();
   let modoAtomico = false;
   let actualizacionesEstrictas = false;
+  let rechazaUndefined = false;
+  const chequeaUndefined = (data: unknown, modo: "set" | "update") => {
+    if (rechazaUndefined) validarSinUndefined(data, modo);
+  };
 
   let autoIdCounter = 0;
 
@@ -94,9 +142,11 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         ref,
       })),
       set: vi.fn(async (data: unknown) => {
+        chequeaUndefined(data, "set");
         store.set(path, data);
       }),
       update: vi.fn(async (data: Record<string, unknown>) => {
+        chequeaUndefined(data, "update");
         if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
         if (actualizacionesEstrictas && !store.has(path)) throw new Error(`mock: NOT_FOUND al hacer update() de ${path}`);
         updateLog.push({ path, data });
@@ -193,8 +243,14 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       const buffer: Escritura[] = [];
       const resultado = await fn({
         get: (ref) => ref.get(),
-        set: async (ref, data) => void buffer.push({ tipo: "set", ref, data }),
-        update: async (ref, data) => void buffer.push({ tipo: "update", ref, data }),
+        set: async (ref, data) => {
+          chequeaUndefined(data, "set");
+          buffer.push({ tipo: "set", ref, data });
+        },
+        update: async (ref, data) => {
+          chequeaUndefined(data, "update");
+          buffer.push({ tipo: "update", ref, data });
+        },
         delete: async (ref) => void buffer.push({ tipo: "delete", ref }),
       });
       aplicarLote(buffer);
@@ -205,8 +261,14 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   const batch = vi.fn(() => {
     const buffer: Escritura[] = [];
     return {
-      set: (ref: DocRef, data: unknown) => void buffer.push({ tipo: "set", ref, data }),
-      update: (ref: DocRef, data: Record<string, unknown>) => void buffer.push({ tipo: "update", ref, data }),
+      set: (ref: DocRef, data: unknown) => {
+        chequeaUndefined(data, "set");
+        buffer.push({ tipo: "set", ref, data });
+      },
+      update: (ref: DocRef, data: Record<string, unknown>) => {
+        chequeaUndefined(data, "update");
+        buffer.push({ tipo: "update", ref, data });
+      },
       delete: (ref: DocRef) => void buffer.push({ tipo: "delete", ref }),
       commit: vi.fn(async () => {
         if (batchCommitFalla) {
@@ -232,6 +294,11 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       rutasQueFallan = new Set();
       modoAtomico = false;
       actualizacionesEstrictas = false;
+      rechazaUndefined = false;
+    },
+    /** Opt-in (7b-7): set/update/add rechazan `undefined` con el mensaje del SDK real, como Firestore Admin. */
+    rechazarUndefined(activo = true) {
+      rechazaUndefined = activo;
     },
     /** Opt-in: las transacciones aplican sus escrituras en búfer, todo o nada (7b-1). */
     atomico(activo = true) {
