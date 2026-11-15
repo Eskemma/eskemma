@@ -3,7 +3,9 @@
 // impact-chain, dvsVersiones y escribirF3Condicional).
 
 import { afterAll, describe, expect, it } from "vitest";
-import { Firestore } from "@google-cloud/firestore";
+// C1a: la clase `Firestore` se importa de `firebase-admin/firestore` (ya declarado en package.json), que reexporta la
+// misma de @google-cloud/firestore (una sola copia instalada, 7.11.6): sin depender de un paquete transitivo no declarado.
+import { Firestore } from "firebase-admin/firestore";
 import { createMockAdminDb, validarSinUndefined } from "./adminMocks";
 
 describe("adminMocks — semántica por modo", () => {
@@ -165,5 +167,75 @@ describe("adminMocks — contrato de rechazarUndefined contra el SDK real", () =
     let mock = "";
     try { validarSinUndefined(data, "set"); } catch (e) { mock = (e as Error).message; }
     expect(mock).toBe(mensajeReal(() => real.doc("c/x").set(data)));
+  });
+});
+
+// C1a — `create` (falla si el documento existe) y contadores de lecturas/escrituras/borrados (opt-in, aditivos).
+describe("adminMocks — create y contadores (C1a)", () => {
+  it("create() escribe si no existe y FALLA (ALREADY_EXISTS) si ya existe, sin pisar", async () => {
+    const db = createMockAdminDb({ "c/x": { v: 1 } });
+    await db.collection("c").doc("nuevo").create({ a: 1 });
+    expect(db.snapshot()["c/nuevo"]).toEqual({ a: 1 });
+    await expect(db.collection("c").doc("x").create({ v: 2 })).rejects.toThrow("ALREADY_EXISTS");
+    expect(db.snapshot()["c/x"]).toEqual({ v: 1 });
+  });
+
+  it("tx.create atómico: una colisión no aplica NINGUNA escritura del lote (ni las anteriores)", async () => {
+    const db = createMockAdminDb({ "c/x": { v: 1 } });
+    db.atomico(true);
+    await expect(
+      db.runTransaction(async (tx) => {
+        await tx.create(db.collection("c").doc("a"), { a: 1 });
+        await tx.create(db.collection("c").doc("x"), { v: 2 });
+      })
+    ).rejects.toThrow("ALREADY_EXISTS");
+    expect(db.snapshot()).toEqual({ "c/x": { v: 1 } });
+  });
+
+  it("create dos veces sobre el mismo id DENTRO del mismo lote también colisiona; batch().create existe", async () => {
+    const db = createMockAdminDb();
+    db.atomico(true);
+    await expect(
+      db.runTransaction(async (tx) => {
+        await tx.create(db.collection("c").doc("a"), { a: 1 });
+        await tx.create(db.collection("c").doc("a"), { a: 2 });
+      })
+    ).rejects.toThrow("ALREADY_EXISTS");
+    const lote = db.batch();
+    lote.create(db.collection("c").doc("b") as never, { b: 1 });
+    await lote.commit();
+    expect(db.snapshot()["c/b"]).toEqual({ b: 1 });
+  });
+
+  it("create también rechaza undefined cuando rechazarUndefined está encendido", async () => {
+    const db = createMockAdminDb();
+    db.rechazarUndefined(true);
+    await expect(db.collection("c").doc("x").create({ a: undefined })).rejects.toThrow("undefined");
+  });
+
+  it("contadores: cuentan lecturas de documentos, escrituras (set/update/create) y borrados; reset() los pone en cero", async () => {
+    const db = createMockAdminDb({ "c/x": { v: 1 }, "c/y": { v: 2 } });
+    await db.collection("c").doc("x").get();
+    await db.collection("c").doc("z").create({ z: 1 });
+    await db.collection("c").doc("x").update({ v: 3 });
+    await db.collection("c").doc("y").delete();
+    await db.collection("c").get(); // consulta: cuenta los documentos devueltos (x y z)
+    expect(db.contadores()).toEqual({ lecturas: 3, escrituras: 2, borrados: 1 });
+    db.reset();
+    expect(db.contadores()).toEqual({ lecturas: 0, escrituras: 0, borrados: 0 });
+  });
+
+  it("contadores en transacción atómica: solo cuentan lo APLICADO (un lote fallido no suma)", async () => {
+    const db = createMockAdminDb({ "c/x": { v: 1 } });
+    db.atomico(true);
+    await db.runTransaction(async (tx) => {
+      await tx.get(db.collection("c").doc("x"));
+      await tx.update(db.collection("c").doc("x"), { v: 2 });
+      await tx.create(db.collection("c").doc("n"), { n: 1 });
+      await tx.delete(db.collection("c").doc("x"));
+    });
+    expect(db.contadores()).toEqual({ lecturas: 1, escrituras: 2, borrados: 1 });
+    await expect(db.runTransaction(async (tx) => tx.create(db.collection("c").doc("n"), { n: 2 }))).rejects.toThrow();
+    expect(db.contadores()).toEqual({ lecturas: 1, escrituras: 2, borrados: 1 });
   });
 });

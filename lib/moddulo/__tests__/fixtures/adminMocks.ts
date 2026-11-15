@@ -88,6 +88,10 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   let modoAtomico = false;
   let actualizacionesEstrictas = false;
   let rechazaUndefined = false;
+  // C1a — contadores opt-in (aditivos): lecturas de documentos, escrituras (set/update/create) y borrados efectivamente aplicados.
+  let lecturasN = 0;
+  let escriturasN = 0;
+  let borradosN = 0;
   const chequeaUndefined = (data: unknown, modo: "set" | "update") => {
     if (rechazaUndefined) validarSinUndefined(data, modo);
   };
@@ -99,6 +103,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
     path: string;
     get: () => Promise<{ id: string; exists: boolean; data: () => unknown; ref: DocRef }>;
     set: (data: unknown) => Promise<void>;
+    create: (data: unknown) => Promise<void>;
     update: (data: Record<string, unknown>) => Promise<void>;
     delete: () => Promise<void>;
     collection: (name: string) => ReturnType<typeof collectionRef>;
@@ -106,6 +111,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
 
   type Escritura =
     | { tipo: "set"; ref: DocRef; data: unknown }
+    | { tipo: "create"; ref: DocRef; data: unknown }
     | { tipo: "update"; ref: DocRef; data: Record<string, unknown> }
     | { tipo: "delete"; ref: DocRef };
 
@@ -113,18 +119,30 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   // si una escritura falla —ruta marcada con failUpdateOn, o update() de un documento que no
   // existe (NOT_FOUND real)— no se aplica ninguna. Esto MODELA la garantía; no la demuestra.
   function aplicarLote(escrituras: Escritura[]): void {
+    const creadasEnElLote = new Set<string>();
     for (const e of escrituras) {
       if (rutasQueFallan.has(e.ref.path)) throw new Error(`mock: escritura fallida en ${e.ref.path}`);
       if (e.tipo === "update" && !store.has(e.ref.path)) {
         throw new Error(`mock: NOT_FOUND al hacer update() de ${e.ref.path}`);
       }
+      // create(): falla si el documento ya existe (como Firestore real, ALREADY_EXISTS); todo o nada.
+      if (e.tipo === "create") {
+        if (store.has(e.ref.path) || creadasEnElLote.has(e.ref.path)) {
+          throw new Error(`mock: ALREADY_EXISTS al hacer create() de ${e.ref.path}`);
+        }
+        creadasEnElLote.add(e.ref.path);
+      }
     }
     for (const e of escrituras) {
-      if (e.tipo === "set") store.set(e.ref.path, e.data);
-      else if (e.tipo === "update") {
+      if (e.tipo === "set" || e.tipo === "create") {
+        escriturasN++;
+        store.set(e.ref.path, e.data);
+      } else if (e.tipo === "update") {
+        escriturasN++;
         updateLog.push({ path: e.ref.path, data: e.data });
         store.set(e.ref.path, { ...(store.get(e.ref.path) as object ?? {}), ...e.data });
       } else {
+        borradosN++;
         deleteLog.push(e.ref.path);
         store.delete(e.ref.path);
       }
@@ -135,14 +153,25 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
     const ref: DocRef = {
       id: path.split("/").at(-1) as string,
       path,
-      get: vi.fn(async () => ({
+      get: vi.fn(async () => {
+        lecturasN++;
+        return {
         id: path.split("/").at(-1) as string,
         exists: store.has(path),
         data: () => store.get(path),
         ref,
-      })),
+        };
+      }),
       set: vi.fn(async (data: unknown) => {
         chequeaUndefined(data, "set");
+        escriturasN++;
+        store.set(path, data);
+      }),
+      create: vi.fn(async (data: unknown) => {
+        chequeaUndefined(data, "set");
+        if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
+        if (store.has(path)) throw new Error(`mock: ALREADY_EXISTS al hacer create() de ${path}`);
+        escriturasN++;
         store.set(path, data);
       }),
       update: vi.fn(async (data: Record<string, unknown>) => {
@@ -150,10 +179,12 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
         if (actualizacionesEstrictas && !store.has(path)) throw new Error(`mock: NOT_FOUND al hacer update() de ${path}`);
         updateLog.push({ path, data });
+        escriturasN++;
         store.set(path, { ...(store.get(path) as object ?? {}), ...data });
       }),
       delete: vi.fn(async () => {
         if (rutasQueFallan.has(path)) throw new Error(`mock: escritura fallida en ${path}`);
+        borradosN++;
         deleteLog.push(path);
         store.delete(path);
       }),
@@ -212,6 +243,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
           });
         }
         if (limitN != null) docs = docs.slice(0, limitN);
+        lecturasN += docs.length;
         return { empty: docs.length === 0, docs };
       }),
     };
@@ -228,6 +260,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       fn: (tx: {
         get: (ref: DocRef) => ReturnType<DocRef["get"]>;
         set: (ref: DocRef, data: unknown) => Promise<void>;
+        create: (ref: DocRef, data: unknown) => Promise<void>;
         update: (ref: DocRef, data: Record<string, unknown>) => Promise<void>;
         delete: (ref: DocRef) => Promise<void>;
       }) => Promise<T>
@@ -236,6 +269,7 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         return fn({
           get: (ref) => ref.get(),
           set: (ref, data) => ref.set(data),
+          create: (ref, data) => ref.create(data),
           update: (ref, data) => ref.update(data),
           delete: (ref) => ref.delete(),
         });
@@ -246,6 +280,10 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         set: async (ref, data) => {
           chequeaUndefined(data, "set");
           buffer.push({ tipo: "set", ref, data });
+        },
+        create: async (ref, data) => {
+          chequeaUndefined(data, "set");
+          buffer.push({ tipo: "create", ref, data });
         },
         update: async (ref, data) => {
           chequeaUndefined(data, "update");
@@ -264,6 +302,10 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       set: (ref: DocRef, data: unknown) => {
         chequeaUndefined(data, "set");
         buffer.push({ tipo: "set", ref, data });
+      },
+      create: (ref: DocRef, data: unknown) => {
+        chequeaUndefined(data, "set");
+        buffer.push({ tipo: "create", ref, data });
       },
       update: (ref: DocRef, data: Record<string, unknown>) => {
         chequeaUndefined(data, "update");
@@ -295,6 +337,13 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       modoAtomico = false;
       actualizacionesEstrictas = false;
       rechazaUndefined = false;
+      lecturasN = 0;
+      escriturasN = 0;
+      borradosN = 0;
+    },
+    /** C1a: contadores de lecturas de documentos, escrituras (set/update/create) y borrados aplicados desde el último reset. */
+    contadores(): { lecturas: number; escrituras: number; borrados: number } {
+      return { lecturas: lecturasN, escrituras: escriturasN, borrados: borradosN };
     },
     /** Opt-in (7b-7): set/update/add rechazan `undefined` con el mensaje del SDK real, como Firestore Admin. */
     rechazarUndefined(activo = true) {
