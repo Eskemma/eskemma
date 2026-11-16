@@ -211,7 +211,8 @@ export async function POST(request: NextRequest) {
       punteroCampo: PUNTERO_F3,
       ambito: AMBITO_F3,
       fase: FASE_F3,
-      tipoCambio: "entrega",
+      // «reentrega» si el resultadoId ya existía (mismo criterio que canal1/entregar); en la UI el id es siempre nuevo.
+      tipoCambio: resultadoPrevio ? "reentrega" : "entrega",
       por: session.uid,
       fuente: "usuario",
       artefactos: [

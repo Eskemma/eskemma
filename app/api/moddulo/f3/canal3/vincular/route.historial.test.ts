@@ -126,7 +126,8 @@ describe("vincular — estado previo si el resultadoId YA existía", () => {
     expect(porId[`${nr}__000001`]).toMatchObject({ tipoCambio: "previo_sin_historial", por: null, en: null });
     expect(porId[`${nr}__000001`].aprobacion).toEqual({ aprobado: true, por: null, en: null, notas: "la aprobé" });
     expect((porId[`${nr}__000001`].contenido as Doc).moduloPIP).toBe("viejo");
-    expect(porId[`${nr}__000002`]).toMatchObject({ tipoCambio: "entrega", por: UID });
+    expect(porId[`${nr}__000002`]).toMatchObject({ tipoCambio: "reentrega", por: UID });
+    expect(eventos()[0]).toMatchObject({ tipo: "reentrega" });
     expect(porId[`${nr}__000002`].aprobacion).toBeUndefined();
     // el vivo se reemplaza completo como siempre (sin aprobado ni notas)
     expect((snap()[rutaResultado] as Doc).aprobado).toBeUndefined();
@@ -145,7 +146,7 @@ describe("vincular — estado previo si el resultadoId YA existía", () => {
     expect(deriva).toHaveLength(1);
     expect(deriva[0].id).toBe(`${nr}__000002`);
     expect(deriva[0].contenido).toMatchObject({ compatibilidad: { cambiada: "sin registro" } });
-    expect(versiones().find((x) => x.id === `${nr}__000003`)).toMatchObject({ tipoCambio: "entrega" });
+    expect(versiones().find((x) => x.id === `${nr}__000003`)).toMatchObject({ tipoCambio: "reentrega" });
     expect(eventos().at(-1)?.artefactosConDeriva).toEqual([nr]);
   });
 
