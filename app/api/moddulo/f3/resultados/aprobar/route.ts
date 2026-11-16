@@ -14,6 +14,12 @@ import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject, normalizeTareaPIP } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { aplicarVersion, prepararVersion, type CambioArtefacto } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F3, FASE_F3, PUNTERO_F3, estadoAsignacion, estadoResultado, nombreAsignacion, nombreResultado,
+  selloDeAprobacion, vivoAsignacion, vivoResultado,
+} from "@/lib/moddulo/versionado/artefactosF3";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -51,38 +57,99 @@ export async function POST(request: NextRequest) {
   // función que getProject, así lo escrito es idéntico a lo de siempre ({pipItemId, asignaciones}).
   // El callback puede reintentarse: lee antes de escribir, sin efectos externos; la respuesta se
   // arma afuera. getProject (arriba) queda solo como acceso.
+  // C3a-2: la aprobación (o su retiro) queda en el HISTORIAL unificado en esta misma transacción. El sello
+  // (quién/cuándo/huella) vive SOLO en la versión: el documento vivo del resultado conserva su forma de
+  // siempre ({aprobado, notasUsuario}) porque la síntesis M3 lo serializa completo al modelo. Por eso la ruta
+  // ahora lee SIEMPRE el proyecto (también con aprobado:false): ahí vive el puntero del historial.
   type Resultado = "ok" | "resultado_no_encontrado" | "proyecto_no_encontrado" | "asignacion_no_encontrada";
-  const resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+  let resultado: Resultado;
+  try {
+    resultado = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
     const resultadoSnap = await tx.get(resultadoRef);
-    const proyectoSnap = aprobado ? await tx.get(proyectoRef) : null;
+    const proyectoSnap = await tx.get(proyectoRef);
     if (!resultadoSnap.exists) return "resultado_no_encontrado";
+    // Cambio declarado (C3a-2): con aprobado:false un proyecto ausente o en la papelera AHORA es 404 (antes
+    // se escribía solo el resultado); el puntero del historial no tiene dónde escribirse.
+    if (!proyectoSnap.exists || proyectoSnap.data()?.deletedAt) return "proyecto_no_encontrado";
 
     const escrituraResultado = { aprobado, ...(notasUsuario !== undefined ? { notasUsuario } : {}) };
-    if (!aprobado) {
-      tx.update(resultadoRef, escrituraResultado);
-      return "ok";
+    const resultadoPrevio = resultadoSnap.data() as Record<string, unknown>;
+
+    let tareas: ReturnType<typeof normalizeTareaPIP>[] = [];
+    let asignacionPrevia: ReturnType<typeof normalizeTareaPIP>["asignaciones"][number] | undefined;
+    if (aprobado) {
+      const crudas = proyectoSnap.data()?.phases?.investigacion?.f3TareasPIP;
+      tareas = (Array.isArray(crudas) ? crudas : []).map((t: unknown) => normalizeTareaPIP(t as never));
+      const tarea = tareas.find((t) => t.pipItemId === pipItemId);
+      asignacionPrevia = tarea?.asignaciones.find((a) => a.asignacionId === asignacionId);
+      if (!asignacionPrevia) return "asignacion_no_encontrada";
     }
 
-    if (!proyectoSnap?.exists || proyectoSnap.data()?.deletedAt) return "proyecto_no_encontrado";
-    const crudas = proyectoSnap.data()?.phases?.investigacion?.f3TareasPIP;
-    const tareas = (Array.isArray(crudas) ? crudas : []).map((t: unknown) => normalizeTareaPIP(t as never));
-    const tarea = tareas.find((t) => t.pipItemId === pipItemId);
-    if (!tarea?.asignaciones.some((a) => a.asignacionId === asignacionId)) return "asignacion_no_encontrada";
+    // ---- Historial (las lecturas van ANTES de la primera escritura) ----
+    const resultadoNuevo = { ...resultadoPrevio, ...escrituraResultado };
+    const sello = selloDeAprobacion(resultadoNuevo, session.uid, new Date().toISOString());
+    const artefactos: CambioArtefacto[] = [
+      {
+        artefacto: nombreResultado(resultadoId),
+        ...estadoResultado(resultadoNuevo, sello),
+        vivo: vivoResultado(resultadoNuevo),
+        estadoPrevio: estadoResultado(resultadoPrevio),
+        vivoPrevio: vivoResultado(resultadoPrevio),
+      },
+    ];
+    const asignacionNueva = asignacionPrevia
+      ? { ...asignacionPrevia, estado: "recibido" as const, resultadoId }
+      : undefined;
+    if (asignacionPrevia && asignacionNueva) {
+      artefactos.push({
+        artefacto: nombreAsignacion(asignacionId),
+        ...estadoAsignacion(asignacionNueva),
+        vivo: vivoAsignacion(asignacionNueva),
+        estadoPrevio: estadoAsignacion(asignacionPrevia),
+        vivoPrevio: vivoAsignacion(asignacionPrevia),
+      });
+    }
+    const plan = await prepararVersion(tx, {
+      raiz: proyectoRef,
+      datosRaiz: proyectoSnap.data() as Record<string, unknown> | undefined,
+      punteroCampo: PUNTERO_F3,
+      ambito: AMBITO_F3,
+      fase: FASE_F3,
+      tipoCambio: "ajuste_manual",
+      por: session.uid,
+      fuente: "usuario",
+      // Código interno (no es texto de pantalla): aprobación, retiro de una aprobación previa o rechazo.
+      motivo: aprobado ? "aprobacion" : resultadoPrevio.aprobado === true ? "aprobacion_retirada" : "resultado_rechazado",
+      artefactos,
+    });
+    const versionado = aplicarVersion(tx, plan);
+
+    tx.update(resultadoRef, escrituraResultado);
+    if (!aprobado) {
+      // Solo el puntero: NO se toca `updatedAt` (retirar una aprobación no movía el proyecto en las listas).
+      if (versionado.cambio) tx.update(proyectoRef, versionado.updatesRaiz);
+      return "ok";
+    }
 
     // Payload explícito { pipItemId, asignaciones } — nunca spread (...t).
     const tareasActualizadas = tareas.map((t) => ({
       pipItemId: t.pipItemId,
       asignaciones: t.pipItemId !== pipItemId ? t.asignaciones : t.asignaciones.map((a) =>
-        a.asignacionId === asignacionId ? { ...a, estado: "recibido" as const, resultadoId } : a
+        a.asignacionId === asignacionId ? (asignacionNueva as typeof a) : a
       ),
     }));
-    tx.update(resultadoRef, escrituraResultado);
     tx.update(proyectoRef, {
       "phases.investigacion.f3TareasPIP": tareasActualizadas,
       updatedAt: FieldValue.serverTimestamp(),
+      ...versionado.updatesRaiz,
     });
     return "ok";
-  });
+    });
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F3, ruta: "resultados/aprobar" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   if (resultado === "resultado_no_encontrado") {
     return NextResponse.json({ error: "Resultado no encontrado" }, { status: 404 });

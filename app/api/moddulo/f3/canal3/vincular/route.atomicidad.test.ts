@@ -78,7 +78,8 @@ describe("canal3/vincular — atomicidad", () => {
     const res = await POST(peticion({ fontanaSesionId: SESION_FONTANA }));
     expect(res.status).toBe(200);
     expect(hayResultado()).toBe(true);
-    expect(db.updates()).toHaveLength(0);
+    // C3a-2: ANTES `toHaveLength(0)`. AHORA solo el puntero del historial: el marcador NO se borra (ya no coincidía).
+    expect(db.updates().map((u) => Object.keys(u.data))).toEqual([["phases.investigacion.revision"]]);
   });
 
   it("carrera: el proyecto va a la papelera en el hueco → 404 y NADA se escribe (cambio declarado)", async () => {

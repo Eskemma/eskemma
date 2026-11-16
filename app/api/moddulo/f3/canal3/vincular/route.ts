@@ -17,6 +17,11 @@ import { extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 import type { ModduloProject } from "@/types/moddulo.types";
 import type { MetadatosFuenteExterna, ResultadoFuenteExterna } from "@/types/f3.types";
 import type { CoberturaDeclarada } from "@/types/shared.types";
+import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F3, FASE_F3, PUNTERO_F3, estadoResultado, nombreResultado, vivoResultado,
+} from "@/lib/moddulo/versionado/artefactosF3";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
 interface VincularBody {
   projectId?: string;
@@ -127,8 +132,16 @@ export async function POST(request: NextRequest) {
   const proyectoRef = adminDb.collection("moddulo_projects").doc(projectId);
   const fechaEntrega = new Date().toISOString();
 
-  const salida = await adminDb.runTransaction(async (tx) => {
+  // C3a-2: la vinculación queda en el HISTORIAL unificado en esta misma transacción (primera versión del
+  // resultado externo, tipoCambio «entrega»; si el resultadoId ya existía, su estado previo completo queda en
+  // la versión previa). Un fallo del historial aborta todo y sale como JSON claro.
+  const resultadoRef = proyectoRef.collection("f3Resultados").doc(resultadoId);
+  let salida;
+  try {
+    salida = await adminDb.runTransaction(async (tx) => {
     const proyectoTx = await tx.get(proyectoRef);
+    const resultadoPrevioSnap = await tx.get(resultadoRef);
+    const resultadoPrevio = resultadoPrevioSnap.exists ? (resultadoPrevioSnap.data() as Record<string, unknown>) : undefined;
     const proyectoActual = proyectoTx.data() as
       | (Pick<ModduloProject, "type" | "territorio" | "xpcto"> & {
           deletedAt?: unknown;
@@ -190,21 +203,52 @@ export async function POST(request: NextRequest) {
         : {}),
     };
 
-    tx.set(proyectoRef.collection("f3Resultados").doc(resultadoId), {
+    // ---- Historial (las lecturas van ANTES de la primera escritura) ----
+    const docNuevo = resultado as unknown as Record<string, unknown>;
+    const plan = await prepararVersion(tx, {
+      raiz: proyectoRef,
+      datosRaiz: proyectoTx.data() as Record<string, unknown> | undefined,
+      punteroCampo: PUNTERO_F3,
+      ambito: AMBITO_F3,
+      fase: FASE_F3,
+      tipoCambio: "entrega",
+      por: session.uid,
+      fuente: "usuario",
+      artefactos: [
+        {
+          artefacto: nombreResultado(resultadoId),
+          ...estadoResultado(docNuevo),
+          vivo: vivoResultado(docNuevo),
+          ...(resultadoPrevio ? { estadoPrevio: estadoResultado(resultadoPrevio), vivoPrevio: vivoResultado(resultadoPrevio) } : {}),
+        },
+      ],
+    });
+
+    tx.set(resultadoRef, {
       ...resultado,
       createdAt: FieldValue.serverTimestamp(),
     });
+    const versionado = aplicarVersion(tx, plan);
 
     // El marcador se decide con el documento leído en la transacción, no con la copia de getProject.
     if (fontanaSesionId && proyectoActual.phases?.investigacion?.fontanaPendiente?.sesionId === fontanaSesionId) {
       tx.update(proyectoRef, {
         "phases.investigacion.fontanaPendiente": FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
+        ...versionado.updatesRaiz,
       });
+    } else if (versionado.cambio) {
+      // Solo el puntero del historial: NO se toca `updatedAt` (vincular no movía el proyecto en las listas).
+      tx.update(proyectoRef, versionado.updatesRaiz);
     }
 
     return { tipo: "ok" as const, resultado };
-  });
+    });
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F3, ruta: "canal3/vincular" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   if (salida.tipo === "rechazo") {
     return NextResponse.json(salida.cuerpo, { status: salida.status });

@@ -90,7 +90,7 @@
     {
       "id": "historial-versionado",
       "anchor": "## Historial unificado — `lib/versionado/`",
-      "description": "Sección «Historial unificado» (C1a 26-11-15, C3a-1 26-11-16). Afirma qué rutas usan `lib/versionado/` (hoy `canal1/entregar`) y cuáles todavía no: `paths` incluye las rutas que lo adoptarán (C3a-2, C1b) y el registro de artefactos de F3; cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
+      "description": "Sección «Historial unificado» (C1a 26-11-15, C3a-1 y C3a-2 26-11-16). Afirma qué rutas usan `lib/versionado/` (hoy `canal1/entregar`, `resultados/aprobar` y `canal3/vincular`) y cuáles todavía no: `paths` incluye las rutas de F3 que ya lo usan, las de M1/F2 que lo adoptarán (C1b) y el registro de artefactos de F3; cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
       "paths": [
         "lib/versionado",
         "lib/moddulo/versionado",

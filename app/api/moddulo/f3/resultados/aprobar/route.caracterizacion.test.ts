@@ -95,8 +95,12 @@ describe("resultados/aprobar — caracterización (ruta anterior)", () => {
     const res = await POST(body({ aprobado: false, asignacionId: "no-existe", notasUsuario: "no sirve" }));
     expect(res.status).toBe(200);
     const u = mockDb.updates();
-    expect(u).toHaveLength(1);
+    // C3a-2: ANTES `toHaveLength(1)` (solo el resultado). AHORA 2: el resultado (sin cambios) y un update del
+    // proyecto que lleva SOLO el puntero del historial (sin tablero ni updatedAt).
+    expect(u).toHaveLength(2);
     expect(u[0]).toMatchObject({ path: RES, data: { aprobado: false, notasUsuario: "no sirve" } });
+    expect(u[1].path).toBe(P);
+    expect(Object.keys(u[1].data)).toEqual(["phases.investigacion.revision"]);
   });
 
   it("notasUsuario solo se escribe cuando viene", async () => {

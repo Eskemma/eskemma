@@ -95,10 +95,12 @@ describe("resultados/aprobar — validar antes de escribir y atomicidad", () => 
     expect(mockDb.updates()).toHaveLength(0);
   });
 
-  it("[local] aprobado:false escribe SOLO el resultado y no toca el tablero", async () => {
+  it("[local] aprobado:false no toca el tablero: escribe el resultado y SOLO el puntero del historial en el proyecto", async () => {
     sembrar(tablero("a1"));
     expect((await POST(body({ aprobado: false }))).status).toBe(200);
-    expect(mockDb.updates().map((u) => u.path)).toEqual([RES]);
+    // C3a-2: ANTES `toEqual([RES])`. AHORA además un update del proyecto que lleva solo el puntero (sin tablero ni updatedAt).
+    expect(mockDb.updates().map((u) => u.path)).toEqual([RES, P]);
+    expect(Object.keys(mockDb.updates()[1].data)).toEqual(["phases.investigacion.revision"]);
   });
 
   it("[local] falla la escritura del resultado: nada queda escrito", async () => {

@@ -94,11 +94,14 @@ describe("canal3/vincular — caracterización (comportamiento actual)", () => {
     expect(upd[0].data).toMatchObject({ "phases.investigacion.fontanaPendiente": "FIELD_DELETE", updatedAt: "SERVER_TIMESTAMP" });
   });
 
-  it("marcador que NO coincide, o sin fontanaSesionId: no se toca el proyecto", async () => {
-    sembrar();
-    await POST(peticion({ fontanaSesionId: "otra" }));
-    await POST(peticion());
-    expect(db.updates().filter((u) => u.path === rutaProyecto)).toHaveLength(0);
+  it("marcador que NO coincide, o sin fontanaSesionId: el único update del proyecto es el puntero del historial (sin marcador ni updatedAt)", async () => {
+    // C3a-2: ANTES las dos peticiones seguidas dejaban `toHaveLength(0)` updates del proyecto. AHORA cada una
+    // escribe el puntero (el mock no expande las claves con puntos, así que se resiembra entre peticiones).
+    for (const extra of [{ fontanaSesionId: "otra" }, {}]) {
+      sembrar();
+      await POST(peticion(extra));
+      expect(db.updates().filter((u) => u.path === rutaProyecto).map((u) => Object.keys(u.data))).toEqual([["phases.investigacion.revision"]]);
+    }
   });
 
   it("proyecto SIN territorio (mock permisivo): 200 y el resultado queda sin snapshot de territorio", async () => {

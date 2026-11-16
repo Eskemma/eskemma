@@ -19,6 +19,7 @@
 
 import type { AsignacionCanal } from "@/types/moddulo.types";
 import type { EstadoArtefacto } from "@/lib/versionado/tipos";
+import { huellaContenido } from "@/lib/versionado/huella";
 
 export const AMBITO_F3 = "moddulo";
 export const FASE_F3 = "investigacion";
@@ -91,4 +92,13 @@ export function estadoAsignacion(a: AsignacionCanal): EstadoArtefacto {
 /** Proyección viva de una asignación: la asignación completa más `esquema`. */
 export function vivoAsignacion(a: AsignacionCanal): unknown {
   return { esquema: ESQUEMA_F3, ...sinClaves(a as unknown as DocVivo, []) };
+}
+
+/**
+ * Sello de una aprobación (C3a-2): quién, cuándo y huella del CONTENIDO aprobado. SOLO se escribe en la versión.
+ * `en` es un valor CONCRETO (ISO 8601), nunca un `FieldValue.serverTimestamp()`: entra en la tupla del artefacto
+ * y en su huella, y un marcador de servidor no se puede serializar de forma estable ni comparar.
+ */
+export function selloDeAprobacion(docResultado: DocVivo, por: string, enIso: string): SelloAprobacion {
+  return { por, en: enIso, huella: huellaContenido(estadoResultado(docResultado).contenido) };
 }

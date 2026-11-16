@@ -7,14 +7,25 @@ import type { createMockAdminDb } from "./adminMocks";
 
 type Db = ReturnType<typeof createMockAdminDb>;
 
-/** Expande la clave literal `phases.investigacion.revision` del documento del proyecto al objeto anidado. */
+/**
+ * Expande TODAS las claves con puntos del documento (p. ej. `phases.investigacion.revision` y
+ * `phases.investigacion.f3TareasPIP`) al objeto anidado, como lo deja Firestore real: el mock guarda las claves
+ * de un `update()` literales. (C3a-1 solo expandía el puntero; con rutas que además escriben el tablero —aprobar—
+ * la copia anidada vieja del tablero seguía viva.)
+ */
 export function expandirPuntero(doc: Record<string, unknown>): Record<string, unknown> {
   const copia = structuredClone(doc);
-  const valor = copia[PUNTERO_F3];
-  if (valor === undefined) return copia;
-  delete copia[PUNTERO_F3];
-  const phases = (copia.phases ??= {}) as Record<string, Record<string, unknown>>;
-  (phases.investigacion ??= {}).revision = valor;
+  for (const [clave, valor] of Object.entries(copia)) {
+    if (!clave.includes(".")) continue;
+    delete copia[clave];
+    const partes = clave.split(".");
+    let cur = copia;
+    for (const p of partes.slice(0, -1)) {
+      if (typeof cur[p] !== "object" || cur[p] === null) cur[p] = {};
+      cur = cur[p] as Record<string, unknown>;
+    }
+    cur[partes.at(-1) as string] = valor;
+  }
   return copia;
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { huellaContenido, huellaTupla } from "@/lib/versionado/huella";
 import type { AsignacionCanal } from "@/types/moddulo.types";
 import {
-  ESQUEMA_F3, PUNTERO_F3, estadoAsignacion, estadoResultado, nombreAsignacion, nombreResultado, vivoAsignacion, vivoResultado,
+  ESQUEMA_F3, PUNTERO_F3, estadoAsignacion, estadoResultado, nombreAsignacion, nombreResultado, selloDeAprobacion, vivoAsignacion, vivoResultado,
 } from "./artefactosF3";
 
 const DOC = {
@@ -89,5 +89,17 @@ describe("asignación", () => {
     const reordenada = { activada: true, estado: "en_curso", justificacion: "j", tecnicaId: "T10", canal: "canal1", tipo: "primaria", asignacionId: "asig1" } as AsignacionCanal;
     expect(huellaContenido(vivoAsignacion(reordenada))).toBe(huellaContenido(vivoAsignacion(ASIG)));
     expect(huellaContenido(vivoAsignacion({ ...ASIG, activada: false }))).not.toBe(huellaContenido(vivoAsignacion(ASIG)));
+  });
+});
+
+describe("sello de la aprobación (C3a-2)", () => {
+  it("lleva el uid, el instante CONCRETO que se le pasa y la huella del CONTENIDO (sin aprobado, notas ni createdAt)", () => {
+    const doc = { ...DOC, aprobado: true, notasUsuario: "n", createdAt: { _seconds: 1 } };
+    const sello = selloDeAprobacion(doc, "uidA", "2026-11-16T10:00:00.000Z");
+    expect(sello).toEqual({ por: "uidA", en: "2026-11-16T10:00:00.000Z", huella: huellaContenido(estadoResultado(doc).contenido) });
+    // la huella no depende de la aprobación ni de lo volátil: aprobar o retirar sobre el mismo contenido da la misma huella
+    expect(selloDeAprobacion({ ...DOC, aprobado: false }, "uidB", "2027-01-01T00:00:00.000Z").huella).toBe(sello.huella);
+    // y sí cambia con el contenido
+    expect(selloDeAprobacion({ ...DOC, moduloPIP: "otra" }, "uidA", "2026-11-16T10:00:00.000Z").huella).not.toBe(sello.huella);
   });
 });
