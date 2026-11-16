@@ -12,6 +12,9 @@ export type TipoCambio =
   | "ajuste_manual"
   | "regeneracion_ia"
   | "reentrega"
+  // C3a — primera entrega de un resultado (Canal 1 de Fontana, vinculación de una fuente externa): aún no hay
+  // nada que «reentregar». Sigue siendo una causa técnica, no un efecto sobre lo aprobado.
+  | "entrega"
   | "reapertura"
   | "restauracion"
   | "previo_sin_historial";
@@ -23,12 +26,15 @@ export type FuenteEvento = "usuario" | "ia" | "propagacion";
 /** Aprobación tal como quedó EN esa versión (copia congelada de lo decidido). */
 export interface AprobacionVersion {
   aprobado: boolean;
-  por: string;
+  /** uid de quien aprobó; `null` = «sin autoría registrada» (la aprobación existía antes del historial). */
+  por: string | null;
   /** Marca de tiempo de la aprobación original (ISO o Timestamp, tal como la guardó el llamador). */
   en: unknown;
   huella?: string;
   /** Copia congelada de lo aprobado (p. ej. el mapa del M1). */
   mapa?: unknown;
+  /** Notas de quien aprobó o rechazó (p. ej. `notasUsuario` de un resultado de F3). */
+  notas?: string;
 }
 
 export interface DependeDe {
@@ -68,6 +74,13 @@ export interface EntradaManifiesto {
   tupla: string;
   dependeDe: DependeDe[];
   retenidas: RetenidaRef[];
+  /**
+   * C3a — huella de la PROYECCIÓN VIVA del artefacto tal como quedó en el documento vivo al registrar esta
+   * versión. Existe porque el sello de una aprobación (quién/cuándo) vive solo en la versión y NO en el
+   * documento vivo: comparar el estado vivo contra `tupla` daría una falsa deriva tras cada aprobación. La
+   * deriva se detecta comparando la proyección viva actual contra esta huella. No cambia `tupla`.
+   */
+  vivo?: string;
 }
 
 export interface Puntero {

@@ -54,6 +54,19 @@ export interface CambioArtefacto extends EstadoArtefacto {
    * vez que el artefacto entra al historial: crea la versión `previo_sin_historial` (`por: null`).
    */
   estadoPrevio?: EstadoArtefacto;
+  /**
+   * C3a — PROYECCIÓN VIVA del artefacto DESPUÉS de este cambio (lo que quedará en el documento vivo). Su huella
+   * se guarda en la entrada del manifiesto (`vivo`). El llamador es quien sabe qué parte del documento vivo es
+   * el artefacto y excluye lo volátil (createdAt…): este módulo solo la hashea.
+   */
+  vivo?: unknown;
+  /**
+   * C3a — la MISMA proyección, pero del estado vivo ANTES del cambio. Con ella se detecta la DERIVA: el vivo
+   * cambió por un escritor que no registra historial. Obligatoria cuando el artefacto ya tiene una versión con
+   * `vivo` y se pasa `estadoPrevio` (sin ella habría que comparar la tupla, y el sello de una aprobación no
+   * existe en el documento vivo: daría una falsa deriva en cada acción).
+   */
+  vivoPrevio?: unknown;
 }
 
 export interface CambioFase {
@@ -152,13 +165,13 @@ function docVersion(args: {
   items?: ItemConId[];
   editadoPorPersona?: string[];
   previo: boolean;
+  deriva?: boolean;
   tupla: string;
 }): Record<string, unknown> {
-  const { cambio, artefacto, n, e, items, editadoPorPersona, previo, tupla } = args;
+  const { cambio, artefacto, n, e, items, editadoPorPersona, previo, deriva, tupla } = args;
   const bytes = estimarBytes(e.contenido);
   const { guardarContenido } = decidirContenido(bytes);
-  if (!guardarContenido) reportarTamano(`versión ${artefacto} n=${n}`, evaluarTamanoVersion(bytes));
-  return {
+  const doc: Record<string, unknown> = {
     artefacto,
     n,
     fase: cambio.fase,
@@ -173,12 +186,20 @@ function docVersion(args: {
     ...(items && items.length > 0 ? { huellasItems: huellasPorItem(items) } : {}),
     ...(editadoPorPersona && editadoPorPersona.length > 0 ? { editadoPorPersona } : {}),
     tipoCambio: previo ? "previo_sin_historial" : cambio.tipoCambio,
+    // C3a — la versión de DERIVA (el vivo cambió sin registro) se marca para que el panel diga «estado detectado
+    // antes de este cambio; autor desconocido».
+    ...(previo && deriva ? { deriva: true } : {}),
     // «sin autoría registrada»: el estado previo al historial no tiene autor ni fecha conocidos.
     por: previo ? null : cambio.por,
     en: previo ? null : FieldValue.serverTimestamp(),
     ...(!previo && cambio.autorizadoPor ? { autorizadoPor: cambio.autorizadoPor, autorizadoEn: cambio.autorizadoEn ?? null } : {}),
     ...(!previo && cambio.motivo ? { motivo: cambio.motivo } : {}),
   };
+  // C3a (arreglo declarado): el tamaño se vigila SIEMPRE y sobre el documento COMPLETO de la versión (contenido
+  // + metadatos), que es lo que cuenta contra el 1 MiB de Firestore; antes solo se avisaba cuando el contenido
+  // ya se había omitido por exceso.
+  reportarTamano(`versión ${artefacto} n=${n}`, evaluarTamanoVersion(estimarBytes(doc)));
+  return doc;
 }
 
 export async function prepararVersion(tx: Transaction, cambio: CambioFase): Promise<PlanVersion> {
@@ -213,26 +234,70 @@ export async function prepararVersion(tx: Transaction, cambio: CambioFase): Prom
   const versionIds: Record<string, string> = {};
   const nuevas: Record<string, EntradaManifiesto> = {};
   const cambiados: string[] = [];
+  const conDeriva: string[] = [];
 
   for (const a of cambio.artefactos) {
     const estado: EstadoArtefacto = { contenido: a.contenido, aprobacion: a.aprobacion, insumos: a.insumos, estado: a.estado };
     const tupla = huellaTupla(estado);
     const vigente = entradasPrevias[a.artefacto];
-    if (vigente && vigente.tupla === tupla) continue; // misma tupla que la vigente → sin cambio
+    const huellaVivoNuevo = a.vivo !== undefined ? huellaContenido(a.vivo) : undefined;
+    const huellaVivoPrevio = a.vivoPrevio !== undefined ? huellaContenido(a.vivoPrevio) : undefined;
 
+    // «Última versión registrada» de este artefacto a medida que se decide: arranca en la vigente y puede
+    // avanzar por una versión previa / de deriva creada en esta misma acción.
     let retenidas: RetenidaRef[] = vigente ? [...vigente.retenidas] : [];
     let n = (vigente?.n ?? 0) + 1;
+    let ultimo: { versionId: string; n: number; tupla: string; dependeDe: EntradaManifiesto["dependeDe"]; vivo?: string } | undefined =
+      vigente ? { versionId: vigente.versionId, n: vigente.n, tupla: vigente.tupla, dependeDe: vigente.dependeDe, vivo: vigente.vivo } : undefined;
+    let registroPrevio = false;
 
-    if (!vigente && a.estadoPrevio) {
+    if (a.estadoPrevio) {
       const tuplaPrevia = huellaTupla(a.estadoPrevio);
-      if (tuplaPrevia === tupla) continue; // lo que hay vivo ya es esto: nada que registrar
-      const idPrevio = idVersion(a.artefacto, 1);
-      versiones.push({
-        ref: raiz.collection("versiones").doc(idPrevio),
-        data: docVersion({ cambio, artefacto: a.artefacto, n: 1, e: a.estadoPrevio, previo: true, tupla: tuplaPrevia }),
-      });
-      retenidas = [{ id: idPrevio, n: 1, aprobada: a.estadoPrevio.aprobacion?.aprobado === true, protegida: false }];
-      n = 2;
+      let crearPrevio = false;
+      let deriva = false;
+      if (!vigente) {
+        // Primera vez que el artefacto entra al historial.
+        if (tuplaPrevia === tupla) continue; // lo que hay vivo ya es esto: nada que registrar
+        crearPrevio = true;
+      } else {
+        // DERIVA (C3a): se evalúa ANTES del dedupe. Si la entrada trae `vivo`, se compara la proyección viva
+        // contra ella (el sello de una aprobación no existe en el vivo); si no, contra la tupla.
+        if (vigente.vivo !== undefined) {
+          if (huellaVivoPrevio === undefined) {
+            throw new CambioInvalidoError(`«${a.artefacto}»: se pasó estadoPrevio pero falta vivoPrevio (la entrada del manifiesto trae huella viva).`);
+          }
+          deriva = huellaVivoPrevio !== vigente.vivo;
+        } else {
+          deriva = tuplaPrevia !== vigente.tupla;
+        }
+        crearPrevio = deriva;
+      }
+      if (crearPrevio) {
+        const idPrevio = idVersion(a.artefacto, n);
+        versiones.push({
+          ref: raiz.collection("versiones").doc(idPrevio),
+          data: docVersion({ cambio, artefacto: a.artefacto, n, e: a.estadoPrevio, previo: true, deriva, tupla: tuplaPrevia }),
+        });
+        // Si el vivo tenía aprobación, cuenta como aprobada para la poda.
+        retenidas.push({ id: idPrevio, n, aprobada: a.estadoPrevio.aprobacion?.aprobado === true, protegida: false });
+        ultimo = { versionId: idPrevio, n, tupla: tuplaPrevia, dependeDe: a.estadoPrevio.insumos?.dependeDe ?? [], vivo: huellaVivoPrevio };
+        n += 1;
+        registroPrevio = true;
+        if (deriva) conDeriva.push(a.artefacto);
+      }
+    }
+
+    // Dedupe: contra la ÚLTIMA versión registrada (si hubo deriva, la de deriva): A, B (deriva), A.
+    if (ultimo && ultimo.tupla === tupla) {
+      if (!registroPrevio) continue; // misma tupla que la vigente y nada nuevo → sin cambio
+      // La acción deja el vivo igual a lo que se acaba de detectar: la deriva queda registrada, sin versión nueva.
+      nuevas[a.artefacto] = {
+        versionId: ultimo.versionId, n: ultimo.n, tupla: ultimo.tupla, dependeDe: ultimo.dependeDe, retenidas,
+        ...(huellaVivoNuevo !== undefined ? { vivo: huellaVivoNuevo } : ultimo.vivo !== undefined ? { vivo: ultimo.vivo } : {}),
+      };
+      versionIds[a.artefacto] = ultimo.versionId;
+      cambiados.push(a.artefacto);
+      continue;
     }
 
     const id = idVersion(a.artefacto, n);
@@ -243,7 +308,10 @@ export async function prepararVersion(tx: Transaction, cambio: CambioFase): Prom
       }),
     });
     retenidas.push({ id, n, aprobada: a.aprobacion?.aprobado === true, protegida: false });
-    nuevas[a.artefacto] = { versionId: id, n, tupla, dependeDe: a.insumos?.dependeDe ?? [], retenidas };
+    nuevas[a.artefacto] = {
+      versionId: id, n, tupla, dependeDe: a.insumos?.dependeDe ?? [], retenidas,
+      ...(huellaVivoNuevo !== undefined ? { vivo: huellaVivoNuevo } : {}),
+    };
     versionIds[a.artefacto] = id;
     cambiados.push(a.artefacto);
   }
@@ -302,6 +370,8 @@ export async function prepararVersion(tx: Transaction, cambio: CambioFase): Prom
     artefactos: cambiados,
     revisionN,
     versionIds,
+    // C3a — artefactos cuyo estado vivo había cambiado sin registro (versión de deriva creada antes de este cambio).
+    ...(conDeriva.length > 0 ? { artefactosConDeriva: conDeriva } : {}),
     por: cambio.por,
     en: FieldValue.serverTimestamp(),
     fuente: cambio.fuente ?? (cambio.tipoCambio === "regeneracion_ia" ? "ia" : "usuario"),

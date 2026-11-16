@@ -20,6 +20,12 @@ import { esStoragePathDeUsuario } from "@/lib/moddulo/storagePathAuth";
 import type { TareaPIP, PIPItem, ModduloProject, AsignacionCanal } from "@/types/moddulo.types";
 import type { ResultadoCanal1 } from "@/types/f3.types";
 import type { FontanaSesion } from "@/types/fontana.types";
+import { aplicarVersion, prepararVersion, type CambioArtefacto } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F3, FASE_F3, PUNTERO_F3, estadoAsignacion, estadoResultado, nombreAsignacion, nombreResultado,
+  vivoAsignacion, vivoResultado,
+} from "@/lib/moddulo/versionado/artefactosF3";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
 interface Body {
   projectId?: string;
@@ -99,7 +105,11 @@ export async function POST(request: NextRequest) {
 
   const rechazo = (status: number, error: string) => ({ tipo: "rechazo" as const, status, error });
 
-  const salida = await adminDb.runTransaction(async (tx) => {
+  // C3a: la entrega queda en el HISTORIAL unificado en esta misma transacción (versión del resultado y, si la
+  // reentrega reinicia la asignación, versión de la asignación). Un fallo del historial aborta todo.
+  let salida;
+  try {
+    salida = await adminDb.runTransaction(async (tx) => {
     const sesionTx = await tx.get(sesionRef);
     const proyectoTx = await tx.get(proyectoRef);
 
@@ -138,6 +148,10 @@ export async function POST(request: NextRequest) {
 
     const resultadoId = sesionActual.entregaCanal1?.resultadoId ?? resultadoIdNuevo;
     const esReentrega = !!sesionActual.entregaCanal1?.resultadoId;
+    const resultadoRef = proyectoRef.collection("f3Resultados").doc(resultadoId);
+    // Estado VIVO del resultado antes de reescribirlo (solo si ya existía): es la «versión previa» del historial.
+    const resultadoPrevioSnap = esReentrega ? await tx.get(resultadoRef) : null;
+    const resultadoPrevio = resultadoPrevioSnap?.exists ? (resultadoPrevioSnap.data() as Record<string, unknown>) : undefined;
 
     const resultado: ResultadoCanal1 = {
       moduloPIP,
@@ -150,11 +164,47 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    tx.set(proyectoRef.collection("f3Resultados").doc(resultadoId), {
+    const reiniciaAsignacion = esReentrega && asignacionTx.resultadoId === resultadoId;
+    const asignacionNueva = reiniciaAsignacion ? reiniciarAsignacion(asignacionTx) : undefined;
+
+    // ---- Historial (lee el manifiesto vigente; las lecturas van ANTES de la primera escritura) ----
+    const artefactos: CambioArtefacto[] = [
+      {
+        artefacto: nombreResultado(resultadoId),
+        ...estadoResultado(resultado as unknown as Record<string, unknown>),
+        vivo: vivoResultado(resultado as unknown as Record<string, unknown>),
+        ...(resultadoPrevio
+          ? { estadoPrevio: estadoResultado(resultadoPrevio), vivoPrevio: vivoResultado(resultadoPrevio) }
+          : {}),
+      },
+    ];
+    if (asignacionNueva) {
+      artefactos.push({
+        artefacto: nombreAsignacion(asignacionTx.asignacionId),
+        ...estadoAsignacion(asignacionNueva),
+        vivo: vivoAsignacion(asignacionNueva),
+        estadoPrevio: estadoAsignacion(asignacionTx),
+        vivoPrevio: vivoAsignacion(asignacionTx),
+      });
+    }
+    const plan = await prepararVersion(tx, {
+      raiz: proyectoRef,
+      datosRaiz: proyectoTx.data() as Record<string, unknown> | undefined,
+      punteroCampo: PUNTERO_F3,
+      ambito: AMBITO_F3,
+      fase: FASE_F3,
+      tipoCambio: esReentrega ? "reentrega" : "entrega",
+      por: session.uid,
+      fuente: "usuario",
+      artefactos,
+    });
+
+    tx.set(resultadoRef, {
       ...resultado,
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    const versionado = aplicarVersion(tx, plan);
     // Reentrega sobre un resultado que ya había sido aprobado en M2: invalida
     // esa aprobación anterior (misma lógica que la propagación de staleness
     // ya usada en el proyecto — el contenido de origen cambió, la aprobación
@@ -164,24 +214,33 @@ export async function POST(request: NextRequest) {
     // NOTA (7b-7): la semántica NO cambia en este corte (se rediseña en la ronda Fontana ↔ F3);
     // solo se corrige la FORMA: la clave `resultadoId` se OMITE, nunca se escribe como `undefined`
     // (el Admin SDK rechaza `undefined` y la entrega daba 500 después de pisar el resultado).
-    if (esReentrega && asignacionTx.resultadoId === resultadoId) {
+    if (reiniciaAsignacion) {
       const tareasActualizadas = tareasTx.map((t) => ({
         pipItemId: t.pipItemId,
         asignaciones:
           t.pipItemId !== pipItemIdTx
             ? t.asignaciones
-            : t.asignaciones.map((a) => (a.asignacionId === asignacionTx.asignacionId ? reiniciarAsignacion(a) : a)),
+            : t.asignaciones.map((a) => (a.asignacionId === asignacionTx.asignacionId ? (asignacionNueva as AsignacionCanal) : a)),
       }));
       tx.update(proyectoRef, {
         "phases.investigacion.f3TareasPIP": tareasActualizadas,
         updatedAt: FieldValue.serverTimestamp(),
+        ...versionado.updatesRaiz,
       });
+    } else if (versionado.cambio) {
+      // Solo el puntero del historial: NO se toca `updatedAt` (entregar no movía el proyecto en las listas).
+      tx.update(proyectoRef, versionado.updatesRaiz);
     }
 
     tx.update(sesionRef, { entregaCanal1: { fecha: fechaEntrega, resultadoId } });
 
     return { tipo: "ok" as const, resultadoId };
-  });
+    });
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F3, ruta: "canal1/entregar" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   if (salida.tipo === "rechazo") {
     return NextResponse.json({ error: salida.error }, { status: salida.status });

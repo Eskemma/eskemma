@@ -78,7 +78,11 @@ describe("canal1/entregar — caracterización (comportamiento actual)", () => {
       fecha: json.fecha,
       resultadoId: json.resultadoId,
     });
-    expect(db.updates().filter((u) => u.path === rutaProyecto)).toHaveLength(0);
+    // C3a: ANTES `toHaveLength(0)` (la primera entrega no tocaba el proyecto). AHORA el único update del proyecto
+    // es el puntero del historial: sin tablero y sin `updatedAt`.
+    expect(db.updates().filter((u) => u.path === rutaProyecto).map((u) => Object.keys(u.data))).toEqual([
+      ["phases.investigacion.revision"],
+    ]);
   });
 
   it("con reporteStoragePath: el resultado lleva reporteInterpretativoUrl", async () => {
@@ -96,7 +100,10 @@ describe("canal1/entregar — caracterización (comportamiento actual)", () => {
     expect(res.status).toBe(200);
     expect(json.resultadoId).toBe(RESULTADO_PREVIO);
     expect(resultadosEscritos().map(([k]) => k)).toEqual([rutaResultado(RESULTADO_PREVIO)]);
-    expect(db.updates().filter((u) => u.path === rutaProyecto)).toHaveLength(0);
+    // C3a: ANTES `toHaveLength(0)`. AHORA solo el puntero del historial (el tablero sigue sin tocarse).
+    expect(db.updates().filter((u) => u.path === rutaProyecto).map((u) => Object.keys(u.data))).toEqual([
+      ["phases.investigacion.revision"],
+    ]);
     expect((db.snapshot()[rutaSesion] as { entregaCanal1: { resultadoId: string } }).entregaCanal1.resultadoId).toBe(RESULTADO_PREVIO);
   });
 

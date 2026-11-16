@@ -90,9 +90,10 @@
     {
       "id": "historial-versionado",
       "anchor": "## Historial unificado — `lib/versionado/`",
-      "description": "Sección «Historial unificado» (C1a, 26-11-15). Afirma que NINGUNA ruta usa todavía `lib/versionado/`: por eso `paths` incluye las rutas que lo adoptarán (C3a, C1b); cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
+      "description": "Sección «Historial unificado» (C1a 26-11-15, C3a-1 26-11-16). Afirma qué rutas usan `lib/versionado/` (hoy `canal1/entregar`) y cuáles todavía no: `paths` incluye las rutas que lo adoptarán (C3a-2, C1b) y el registro de artefactos de F3; cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
       "paths": [
         "lib/versionado",
+        "lib/moddulo/versionado",
         "app/api/moddulo/f2/m1-approve",
         "app/api/moddulo/f2/m1-reopen",
         "app/api/moddulo/f2/unlink-pestel",
