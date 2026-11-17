@@ -26,6 +26,10 @@ import {
   vivoAsignacion, vivoResultado,
 } from "@/lib/moddulo/versionado/artefactosF3";
 import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
+import {
+  confirmacionValida, huellaReentrega, lineasReentrega, requiereConfirmacionReentrega,
+} from "@/lib/moddulo/impactoReentrega";
+import { leerSelloVigente } from "@/lib/moddulo/versionado/selloVigente";
 
 interface Body {
   projectId?: string;
@@ -35,6 +39,10 @@ interface Body {
   // de Fontana. Opcional; capa adicional para la revisión humana en M2, la
   // síntesis M3 nunca la lee (serializa el string, nunca lo resuelve).
   reporteStoragePath?: string;
+  // C3b — la reentrega sobre un resultado APROBADO pide confirmación: el cuerpo la trae junto con la huella del
+  // estado que el usuario vio (la que devolvió el 409). Ausente o malformada = no confirmado (409, nunca 400).
+  confirmarReemplazo?: boolean;
+  huella?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -165,6 +173,29 @@ export async function POST(request: NextRequest) {
     };
 
     const reiniciaAsignacion = esReentrega && asignacionTx.resultadoId === resultadoId;
+
+    // C3b — ÚLTIMA decisión antes de escribir (y DESPUÉS de todas las validaciones que devuelven 404/400: no se le
+    // pide confirmación a una petición que va a fallar). Un resultado APROBADO no se pisa en silencio: sin una
+    // confirmación con la huella del estado ACTUAL (releído aquí dentro) se responde 409 y NO se escribe nada.
+    if (requiereConfirmacionReentrega(resultadoPrevio)) {
+      const huellaActual = huellaReentrega({ resultado: resultadoPrevio ?? {}, asignacion: asignacionTx });
+      if (!confirmacionValida(body, huellaActual)) {
+        const selloEn = await leerSelloVigente(
+          tx, proyectoRef, proyectoTx.data() as Record<string, unknown> | undefined, nombreResultado(resultadoId)
+        );
+        return {
+          tipo: "confirmar" as const,
+          huella: huellaActual,
+          // Llegó una huella (otro estado) y ya no coincide: algo cambió entre el aviso y la confirmación.
+          huellaVencida: typeof body.huella === "string" && body.confirmarReemplazo === true,
+          lineas: lineasReentrega({
+            selloEn,
+            tieneNotas: typeof resultadoPrevio?.notasUsuario === "string" && resultadoPrevio.notasUsuario.trim() !== "",
+            reiniciaAsignacion,
+          }),
+        };
+      }
+    }
     const asignacionNueva = reiniciaAsignacion ? reiniciarAsignacion(asignacionTx) : undefined;
 
     // ---- Historial (lee el manifiesto vigente; las lecturas van ANTES de la primera escritura) ----
@@ -244,6 +275,18 @@ export async function POST(request: NextRequest) {
 
   if (salida.tipo === "rechazo") {
     return NextResponse.json({ error: salida.error }, { status: salida.status });
+  }
+  if (salida.tipo === "confirmar") {
+    // El código `error` (no el status) distingue este 409 del de colisión del historial.
+    return NextResponse.json(
+      {
+        error: "reemplazo_requiere_confirmacion",
+        lineas: salida.lineas,
+        huella: salida.huella,
+        ...(salida.huellaVencida ? { huellaVencida: true } : {}),
+      },
+      { status: 409 }
+    );
   }
   return NextResponse.json({ resultadoId: salida.resultadoId, fecha: fechaEntrega }, { status: 200 });
 }

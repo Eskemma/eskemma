@@ -57,3 +57,25 @@ export function sesionDoc(extra: Record<string, unknown> = {}) {
 
 /** Lo que devuelve getProject (copia del proyecto que usa el pre-chequeo). */
 export const comoProject = (doc: unknown) => doc as unknown as ModduloProject;
+
+/**
+ * C3b — reentrega sobre un resultado APROBADO: el servidor pregunta (409 `reemplazo_requiere_confirmacion`) y devuelve
+ * la huella del estado actual. Esta función hace la primera llamada, toma la huella DE LA RESPUESTA y reenvía con
+ * `confirmarReemplazo:true`: así las pruebas cubren el contrato real y no calculan la huella por su cuenta.
+ * Si la primera respuesta no es esa pregunta, la devuelve tal cual.
+ */
+export async function entregarConfirmando(
+  post: (req: never) => Promise<Response>,
+  extra: Record<string, unknown> = {}
+): Promise<Response> {
+  const pedir = (cuerpo: Record<string, unknown>) =>
+    new Request("http://localhost/api/moddulo/f3/canal1/entregar", {
+      method: "POST",
+      body: JSON.stringify({ projectId: PROJECT_ID, sesionId: SESION_ID, storagePath: OWN_PATH, ...cuerpo }),
+    }) as never;
+  const primera = await post(pedir(extra));
+  if (primera.status !== 409) return primera;
+  const cuerpo = (await primera.clone().json()) as { error?: string; huella?: string };
+  if (cuerpo.error !== "reemplazo_requiere_confirmacion") return primera;
+  return post(pedir({ ...extra, confirmarReemplazo: true, huella: cuerpo.huella }));
+}

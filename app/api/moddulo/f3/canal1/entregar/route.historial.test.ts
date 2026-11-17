@@ -32,7 +32,7 @@ import {
 } from "@/lib/moddulo/versionado/artefactosF3";
 import type { AsignacionCanal } from "@/types/moddulo.types";
 import {
-  UID, PROJECT_ID, SESION_ID, OWN_PATH, RESULTADO_PREVIO,
+  UID, PROJECT_ID, SESION_ID, OWN_PATH, RESULTADO_PREVIO, entregarConfirmando,
   rutaProyecto, rutaSesion, rutaResultado, proyectoDoc, sesionDoc, comoProject,
 } from "./siembraEntregar";
 
@@ -143,7 +143,7 @@ describe("primera entrega — versión del resultado, sin estado previo", () => 
 describe("reentrega — la versión previa conserva lo que la persona tenía (estadoPrevio)", () => {
   it("de un resultado APROBADO sin historial: la previa conserva aprobado/notas (por null) y la nueva queda SIN aprobar; la asignación también", async () => {
     sembrar({ asig: ASIG_RECIBIDA, sesion: ENTREGADA, resultadoVivo: DOC_APROBADO });
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect(res.status).toBe(200);
 
     const porId: Record<string, Version> = Object.fromEntries(versiones().map((x) => [x.id, x]));
@@ -190,7 +190,7 @@ describe("reentrega — la versión previa conserva lo que la persona tenía (es
 describe("sello y deriva — la aprobación registrada NO produce falsa deriva; un cambio no registrado produce UNA", () => {
   it("aprobar (registrado) y luego entregar → CERO deriva: una versión nueva por artefacto", async () => {
     await sembrarAprobadoRegistrado();
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect(res.status).toBe(200);
     const v = versiones();
     expect(v.filter((x) => x.deriva === true)).toHaveLength(0);
@@ -207,7 +207,7 @@ describe("sello y deriva — la aprobación registrada NO produce falsa deriva; 
 
   it("aprobar (registrado), un cambio NO registrado de la asignación (p. ej. tareas/aprobar la desactiva) y entregar → UNA versión de deriva", async () => {
     await sembrarAprobadoRegistrado({ activada: false });
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect(res.status).toBe(200);
     const na = nombreAsignacion("asig1");
     const deriva = versiones().filter((x) => x.deriva === true);
@@ -229,7 +229,7 @@ describe("errores del historial — JSON claro, sin dejar nada escrito", () => {
     db.rechazarUndefined(true);
     db.atomico(true);
     const antes = JSON.stringify(snap());
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({
       error: "historial_no_confirmado", causa: "colision",
@@ -263,7 +263,7 @@ describe("errores del historial — JSON claro, sin dejar nada escrito", () => {
 describe("puntero — no se solapa con las rutas que la ruta ya escribe", () => {
   it("las claves de UN mismo update del proyecto no son prefijo unas de otras (Firestore rechaza `specified multiple times`)", async () => {
     sembrar({ asig: ASIG_RECIBIDA, sesion: ENTREGADA, resultadoVivo: DOC_APROBADO });
-    await POST(peticion());
+    await entregarConfirmando(POST);
     const updates = updatesProyecto();
     expect(updates).toHaveLength(1);
     const claves = Object.keys(updates[0]);

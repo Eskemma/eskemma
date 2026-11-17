@@ -27,7 +27,7 @@ import { POST } from "./route";
 import { mockSessionPayload } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 import {
-  UID, PROJECT_ID, SESION_ID, OWN_PATH, RESULTADO_PREVIO,
+  UID, PROJECT_ID, SESION_ID, OWN_PATH, RESULTADO_PREVIO, entregarConfirmando,
   rutaProyecto, rutaSesion, rutaResultado, proyectoDoc, sesionDoc, comoProject,
 } from "./siembraEntregar";
 
@@ -64,9 +64,11 @@ describe("canal1/entregar — atomicidad", () => {
 
   it("camino feliz: UNA transacción con las tres escrituras (resultado, tablero, sesión)", async () => {
     sembrar();
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect(res.status).toBe(200);
-    expect(db.runTransaction).toHaveBeenCalledTimes(1);
+    // C3b: la reentrega sobre un APROBADO hace DOS llamadas (la pregunta 409 y la confirmación); cada una corre UNA
+    // transacción y solo la segunda escribe.
+    expect(db.runTransaction).toHaveBeenCalledTimes(2);
     expect((db.snapshot()[rutaResultado(RESULTADO_PREVIO)] as { marca?: string }).marca).toBeUndefined(); // reescrito
     expect(db.updates().map((u) => u.path).sort()).toEqual([rutaProyecto, rutaSesion].sort());
   });
@@ -74,7 +76,7 @@ describe("canal1/entregar — atomicidad", () => {
   it("falla la escritura del tablero: el resultado anterior NO queda pisado y la sesión no cambia", async () => {
     sembrar();
     db.failUpdateOn(rutaProyecto);
-    await expect(POST(peticion())).rejects.toThrow();
+    await expect(entregarConfirmando(POST)).rejects.toThrow();
     expect((db.snapshot()[rutaResultado(RESULTADO_PREVIO)] as { marca: string }).marca).toBe("resultado anterior");
     expect((db.snapshot()[rutaSesion] as { entregaCanal1: unknown }).entregaCanal1).toEqual(SESION_ENTREGADA.entregaCanal1);
   });
@@ -82,7 +84,7 @@ describe("canal1/entregar — atomicidad", () => {
   it("falla la escritura de la sesión: ni el resultado ni el tablero cambian", async () => {
     sembrar();
     db.failUpdateOn(rutaSesion);
-    await expect(POST(peticion())).rejects.toThrow();
+    await expect(entregarConfirmando(POST)).rejects.toThrow();
     expect((db.snapshot()[rutaResultado(RESULTADO_PREVIO)] as { marca: string }).marca).toBe("resultado anterior");
     const asig = (db.snapshot()[rutaProyecto] as ReturnType<typeof proyectoDoc>).phases.investigacion.f3TareasPIP[0].asignaciones[0];
     expect(asig).toMatchObject(APROBADA);
@@ -94,7 +96,7 @@ describe("canal1/entregar — atomicidad", () => {
       await db.collection("fontana_sesiones").doc(SESION_ID).set(sesionDoc(SESION_ENTREGADA)); // la otra entrega ya escribió
       return comoProject(proyectoDoc());
     });
-    const res = await POST(peticion());
+    const res = await entregarConfirmando(POST);
     expect((await res.json()).resultadoId).toBe(RESULTADO_PREVIO);
     expect(resultadosEscritos()).toEqual([rutaResultado(RESULTADO_PREVIO)]);
   });

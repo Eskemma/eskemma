@@ -46,11 +46,19 @@ const body = (o: Record<string, unknown> = {}) =>
     method: "POST",
     body: JSON.stringify({ projectId: "p1", resultadoId: "r1", pipItemId: "t1", asignacionId: "a1", aprobado: true, ...o }),
   }) as never;
-const bodyEntregar = () =>
+const bodyEntregar = (extra: Record<string, unknown> = {}) =>
   new Request("http://local/x", {
     method: "POST",
-    body: JSON.stringify({ projectId: "p1", sesionId: "s1", storagePath: `moddulo/${UID}/p1/f3/r1/f.json` }),
+    body: JSON.stringify({ projectId: "p1", sesionId: "s1", storagePath: `moddulo/${UID}/p1/f3/r1/f.json`, ...extra }),
   }) as never;
+// C3b: entregar sobre un resultado APROBADO pregunta primero (409); se confirma con la huella de ESA respuesta.
+async function entregarConfirmando() {
+  const primera = await ENTREGAR(bodyEntregar());
+  if (primera.status !== 409) return primera;
+  const cuerpo = (await primera.clone().json()) as { error?: string; huella?: string };
+  if (cuerpo.error !== "reemplazo_requiere_confirmacion") return primera;
+  return ENTREGAR(bodyEntregar({ confirmarReemplazo: true, huella: cuerpo.huella }));
+}
 
 const DOC_RES = {
   moduloPIP: "¿Pregunta?",
@@ -224,7 +232,7 @@ describe("sello y deriva con la ruta REAL de aprobar", () => {
     vi.mocked(getProject).mockResolvedValue({
       phases: { investigacion: { f3TareasPIP: [{ pipItemId: "t1", asignaciones: [asigViva()] }] } },
     } as never);
-    const res = await ENTREGAR(bodyEntregar());
+    const res = await entregarConfirmando();
     expect(res.status).toBe(200);
     expect(versiones().filter((v) => v.deriva === true)).toHaveLength(0);
     expect(eventos().every((e) => (e as Doc).artefactosConDeriva === undefined)).toBe(true);
@@ -245,7 +253,7 @@ describe("sello y deriva con la ruta REAL de aprobar", () => {
     vi.mocked(getProject).mockResolvedValue({
       phases: { investigacion: { f3TareasPIP: [{ pipItemId: "t1", asignaciones: [asigViva()] }] } },
     } as never);
-    expect((await ENTREGAR(bodyEntregar())).status).toBe(200);
+    expect((await entregarConfirmando()).status).toBe(200);
     const deriva = versiones().filter((v) => v.deriva === true);
     expect(deriva).toHaveLength(1);
     expect(deriva[0].id.startsWith(na)).toBe(true);

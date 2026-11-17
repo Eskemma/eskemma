@@ -41,10 +41,10 @@ const db = adminDb as unknown as ReturnType<typeof createMockAdminDb>;
 type Doc = Record<string, unknown>;
 const snap = () => db.snapshot() as Record<string, Doc>;
 
-const peticion = () =>
+const peticion = (extra: Record<string, unknown> = {}) =>
   new Request("http://localhost/api/moddulo/f3/canal1/entregar", {
     method: "POST",
-    body: JSON.stringify({ projectId: PROJECT_ID, sesionId: SESION_ID, storagePath: OWN_PATH }),
+    body: JSON.stringify({ projectId: PROJECT_ID, sesionId: SESION_ID, storagePath: OWN_PATH, ...extra }),
   }) as unknown as Parameters<typeof POST>[0];
 
 const ENTREGADA = { entregaCanal1: { fecha: "2026-01-01", resultadoId: RESULTADO_PREVIO } };
@@ -105,9 +105,17 @@ async function medir(e: Escenario) {
     }
   }
   vi.mocked(getProject).mockResolvedValue(comoProject(snap()[rutaProyecto]));
+  // C3b: sobre un resultado APROBADO la ruta pregunta primero (409, solo lecturas: se mide aparte en
+  // route.reentrega.test.ts). Aquí se mide la llamada que CONFIRMA, con la huella tomada de esa respuesta.
+  let confirmacion: { confirmarReemplazo: true; huella: string } | undefined;
+  if ((e.resultadoVivo as Doc | undefined)?.aprobado === true) {
+    const pregunta = await POST(peticion());
+    expect(pregunta.status).toBe(409);
+    confirmacion = { confirmarReemplazo: true, huella: (await pregunta.json()).huella };
+  }
   const antesClaves = new Set(Object.keys(snap()));
   const c0 = db.contadores();
-  const res = await POST(peticion());
+  const res = await POST(confirmacion ? peticion(confirmacion) : peticion());
   expect(res.status).toBe(200);
   const c1 = db.contadores();
   const nuevas = Object.keys(snap()).filter((k) => !antesClaves.has(k));

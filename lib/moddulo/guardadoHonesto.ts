@@ -48,6 +48,8 @@ export type AccionGuardado =
   | "agregar_cadena_impacto"
   | "marcar_alerta_leida"
   | "aprobar_resultado"
+  // C3b: la entrega de Fontana a F3 (canal1/entregar).
+  | "entregar_canal1"
   | "cambiar_asignacion"
   | "reconocer_sesgo"
   | "editar_exploracion"
@@ -102,6 +104,7 @@ export const GRUPO_ACCION = {
   agregar_cadena_impacto: "simple",
   marcar_alerta_leida: "simple",
   aprobar_resultado: "simple",
+  entregar_canal1: "simple",
   cambiar_asignacion: "simple",
   reconocer_sesgo: "simple",
   editar_exploracion: "simple",
@@ -262,6 +265,8 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "el marcado de la alerta como leída";
     case "aprobar_resultado":
       return "la aprobación del resultado";
+    case "entregar_canal1":
+      return "la entrega a Moddulo F3";
     case "cambiar_asignacion":
       return ctx.cambio ?? "el cambio de la asignación";
     case "reconocer_sesgo":
@@ -337,6 +342,8 @@ function consecuencia(accion: AccionGuardado): string {
       return "La alerta sigue sin leer; inténtalo de nuevo.";
     case "aprobar_resultado":
       return "El resultado sigue sin aprobar; inténtalo de nuevo.";
+    case "entregar_canal1":
+      return "La entrega anterior no cambió; inténtalo de nuevo.";
     case "cambiar_asignacion":
       return "La asignación queda como estaba; inténtalo de nuevo.";
     case "reconocer_sesgo":
@@ -548,6 +555,20 @@ const TEXTOS_SIMPLES: Record<
     especifico: (r) =>
       r.status === 404 && (r.codigo ?? "").startsWith("Asignación no encontrada")
         ? "No se encontró la asignación en el tablero; puede que el tablero haya cambiado. Esta solicitud no registró ningún cambio. Recarga la página para ver el estado real."
+        : null,
+  },
+  // C3b. El archivo ya se subió a Storage cuando falla; un 4xx/404 del servidor conserva su motivo (antes el botón
+  // mostraba `message ?? error`: p. ej. «Asignación de Canal 1 (T10) no encontrada en el tablero»). Los dos 409
+  // especiales (`reemplazo_requiere_confirmacion`, `historial_no_confirmado`) NO llegan aquí: los decide
+  // `decidirRespuestaEntregaCanal1` antes de pedir este texto.
+  entregar_canal1: {
+    hecho: "entregado",
+    verificar: "recarga la página para verificar el estado.",
+    noEncontrado: "El resultado se subió pero no se encontró la sesión o el proyecto; puede que ya no exista. Recarga la página para verificar.",
+    permiso: "No tienes permiso para entregar a este proyecto.",
+    especifico: (r) =>
+      (r.status === 400 || r.status === 403 || r.status === 404) && r.codigo
+        ? `El resultado se subió pero no se pudo registrar la entrega: ${r.codigo}.`
         : null,
   },
   cambiar_asignacion: {

@@ -13,6 +13,23 @@ import { useRouter } from "next/navigation";
 import type { FontanaSesion } from "@/types/fontana.types";
 import { subirContextoTerritorial, subirReporteInterpretativo } from "@/lib/fontana/exportarContextoTerritorial";
 import type { FontanaContextoTerritorial } from "@/types/fontana.types";
+import { decidirRespuestaEntregaCanal1 } from "@/lib/moddulo/respuestaEntregaCanal1";
+
+// C3b — textos del modal que pregunta antes de reemplazar un resultado APROBADO (a aprobar por Raúl).
+const TITULO_REEMPLAZO = "Esta entrega reemplaza un resultado aprobado";
+const BOTON_CONFIRMAR_REEMPLAZO = "Actualizar y retirar la aprobación";
+const AVISO_HUELLA_VENCIDA = "Algo cambió mientras decidías. Revisa lo nuevo y confirma de nuevo.";
+
+// Lo que quedó listo para reenviar cuando el servidor pidió confirmación: el archivo YA está en Storage, así que
+// confirmar no vuelve a subirlo.
+interface EntregaPendiente {
+  storagePath: string;
+  reporteStoragePath?: string;
+  lineas: string[];
+  huella: string;
+  huellaVencida: boolean;
+  esActualizacion: boolean;
+}
 
 export default function FontanaCanal1Button({
   sesion, onSesionActualizada, reporteListo,
@@ -36,7 +53,57 @@ export default function FontanaCanal1Button({
   // Fontana (FontanaMunicipiosModal.tsx: fixed inset-0 + backdrop + panel
   // rounded-xl), consistente con el resto del módulo.
   const [resultadoModal, setResultadoModal] = useState<{ tipo: "exito" | "error"; mensaje: string } | null>(null);
+  const [pendiente, setPendiente] = useState<EntregaPendiente | null>(null);
   const projectId = sesion.modduloProjectId!;
+
+  // Una sola decisión de respuesta (función pura, probada): por el código `error` del cuerpo, no por el status.
+  async function enviarEntrega(
+    storagePath: string, reporteStoragePath: string | undefined, esActualizacion: boolean,
+    confirmacion?: { huella: string }
+  ) {
+    const res = await fetch("/api/moddulo/f3/canal1/entregar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId, sesionId: sesion.sesionId, storagePath, reporteStoragePath,
+        ...(confirmacion ? { confirmarReemplazo: true, huella: confirmacion.huella } : {}),
+      }),
+    });
+    let cuerpo: unknown = {};
+    try { cuerpo = await res.json(); } catch { cuerpo = {}; }
+    const accion = decidirRespuestaEntregaCanal1({ status: res.status, cuerpo });
+    if (accion.tipo === "pedir_confirmacion") {
+      setPendiente({
+        storagePath, reporteStoragePath, esActualizacion,
+        lineas: accion.lineas, huella: accion.huella, huellaVencida: accion.huellaVencida,
+      });
+      return;
+    }
+    if (accion.tipo === "error_historial" || accion.tipo === "error") throw new Error(accion.mensaje);
+    const data = cuerpo as { fecha: string; resultadoId: string };
+    setPendiente(null);
+    onSesionActualizada({ ...sesion, entregaCanal1: { fecha: data.fecha, resultadoId: data.resultadoId } });
+    if (esActualizacion) {
+      setResultadoModal({ tipo: "exito", mensaje: "La entrega se actualizó correctamente." });
+    }
+  }
+
+  async function handleConfirmarReemplazo() {
+    if (!pendiente) return;
+    setEntregando(true);
+    setError(null);
+    try {
+      await enviarEntrega(pendiente.storagePath, pendiente.reporteStoragePath, pendiente.esActualizacion, {
+        huella: pendiente.huella,
+      });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error inesperado";
+      setPendiente(null);
+      setError(mensaje);
+      setResultadoModal({ tipo: "error", mensaje });
+    } finally {
+      setEntregando(false);
+    }
+  }
 
   async function handleEntregar() {
     const esActualizacion = !!sesion.entregaCanal1;
@@ -64,29 +131,7 @@ export default function FontanaCanal1Button({
         // best-effort: no bloquear la entrega de datos por la capa interpretativa
       }
 
-      const res = await fetch("/api/moddulo/f3/canal1/entregar", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, sesionId: sesion.sesionId, storagePath, reporteStoragePath }),
-      });
-      const data = await res.json();
-      // Mejora tras verificación en navegador (2026-08-19) — el mensaje
-      // genérico ocultaba la causa real (ej. "Asignación de Canal 1 (T10)
-      // no encontrada en el tablero"), indiagnosticable desde la UI. El
-      // resultado ya se subió a Storage en este punto; se muestra el
-      // motivo real del servidor cuando viene, con el genérico como
-      // respaldo.
-      if (!res.ok) {
-        const motivo = data.message ?? data.error;
-        throw new Error(
-          motivo
-            ? `El resultado se subió pero no se pudo confirmar la entrega: ${motivo}`
-            : "El resultado se subió pero no se pudo confirmar la entrega."
-        );
-      }
-      onSesionActualizada({ ...sesion, entregaCanal1: { fecha: data.fecha, resultadoId: data.resultadoId } });
-      if (esActualizacion) {
-        setResultadoModal({ tipo: "exito", mensaje: "La entrega se actualizó correctamente." });
-      }
+      await enviarEntrega(storagePath, reporteStoragePath, esActualizacion);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error inesperado";
       setError(mensaje);
@@ -97,6 +142,50 @@ export default function FontanaCanal1Button({
       setEntregando(false);
     }
   }
+
+  const modalConfirmacion = pendiente && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reemplazo-entrega-title"
+    >
+      <div className="absolute inset-0 bg-black-eske/40" aria-hidden="true" />
+      <div className="relative z-10 bg-white-eske dark:bg-[#18324A] rounded-xl shadow-lg border border-gray-eske-20 dark:border-white/10 w-full max-w-md p-6 flex flex-col gap-3">
+        <h2 id="reemplazo-entrega-title" className="text-base font-semibold text-black-eske dark:text-[#EAF2F8]">
+          {TITULO_REEMPLAZO}
+        </h2>
+        {pendiente.huellaVencida && (
+          <p role="status" className="text-sm text-brown-eske-60 dark:text-yellow-eske">
+            {AVISO_HUELLA_VENCIDA}
+          </p>
+        )}
+        <ul className="list-disc pl-5 text-sm text-black-eske dark:text-[#C7D6E0] flex flex-col gap-1">
+          {pendiente.lineas.map((linea) => (
+            <li key={linea}>{linea}</li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setPendiente(null)}
+            disabled={entregando}
+            className="px-4 py-2 border border-gray-eske-30 dark:border-white/20 text-black-eske dark:text-[#C7D6E0] rounded-lg text-sm hover:bg-gray-eske-10 dark:hover:bg-white/5 transition-colors disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmarReemplazo}
+            disabled={entregando}
+            className="px-4 py-2 bg-bluegreen-eske text-white rounded-lg text-sm font-medium hover:bg-bluegreen-eske-60 transition-colors disabled:opacity-60"
+          >
+            {entregando ? "Actualizando…" : BOTON_CONFIRMAR_REEMPLAZO}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (!sesion.entregaCanal1) {
     return (
@@ -115,6 +204,7 @@ export default function FontanaCanal1Button({
           {entregando ? "Entregando…" : "Entregar a Moddulo F3"}
         </button>
         {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
+        {modalConfirmacion}
       </div>
     );
   }
@@ -142,6 +232,7 @@ export default function FontanaCanal1Button({
         </button>
       </div>
       {error && <p className="text-xs text-red-eske max-w-xs text-right">{error}</p>}
+      {modalConfirmacion}
 
       {resultadoModal && (
         <div
