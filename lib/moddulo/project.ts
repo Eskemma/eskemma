@@ -354,6 +354,17 @@ export async function getProject(
   // Actualizar lastAccessedAt
   await snap.ref.update({ lastAccessedAt: FieldValue.serverTimestamp() });
 
+  return normalizarProyectoLeido(snap.id, data);
+}
+
+/**
+ * La vista normalizada de LECTURA de un documento `moddulo_projects` (backfills de ids sintéticos, forma
+ * multi-asignación del tablero, `numero`, `estadoApp`), sin acceso ni `lastAccessedAt`. Extraída de `getProject`
+ * (C1b-3a, sin cambio de comportamiento) para que una ruta pueda DECIDIR dentro de su transacción sobre el
+ * documento crudo releído, con la misma vista que `getProject` entrega. MUTA `data` (como siempre): pásale
+ * una copia fresca (p. ej. `snap.data()` de una lectura nueva).
+ */
+export function normalizarProyectoLeido(id: string, data: ModduloProject): ModduloProject {
   const { id: _id, ...rest } = data as ModduloProject & { id?: string };
 
   // Backfill de pipItemId en el PIP de F2 — proyectos creados antes de este
@@ -392,7 +403,7 @@ export async function getProject(
     rest.phases.investigacion.f3Sintesis!.vaciosResiduales = attachNumero(vacios.map(normalizeVacioResidual), pipVigente);
   }
 
-  return { id: snap.id, ...rest };
+  return { id, ...rest };
 }
 
 /**

@@ -341,6 +341,10 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       escriturasN = 0;
       borradosN = 0;
     },
+    /** C1b-3a: siembra/reemplaza UN documento sin tocar bitácoras ni contadores (reset() los borra). */
+    seed(path: string, doc: unknown) {
+      store.set(path, doc);
+    },
     /** C1a: contadores de lecturas de documentos, escrituras (set/update/create) y borrados aplicados desde el último reset. */
     contadores(): { lecturas: number; escrituras: number; borrados: number } {
       return { lecturas: lecturasN, escrituras: escriturasN, borrados: borradosN };

@@ -8,7 +8,7 @@ vi.mock("@/lib/firebase-admin", async () => {
   return { adminDb: createMockAdminDb() };
 });
 vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS", arrayUnion: (...a: unknown[]) => a } }));
-vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
+vi.mock("@/lib/moddulo/project", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/moddulo/project")>()), getProject: vi.fn() })); // C1b-3a: la ruta usa también `normalizarProyectoLeido` (real)
 vi.mock("@/lib/moddulo/rda", () => ({ planRDAUpdate: vi.fn(() => ({ nuevos: [], resueltos: [] })) }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";

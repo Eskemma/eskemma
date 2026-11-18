@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { getProject } from "@/lib/moddulo/project";
+import { getProject, normalizarProyectoLeido } from "@/lib/moddulo/project";
 import { PHASE_ORDER } from "@/types/moddulo.types";
-import type { PhaseId } from "@/types/moddulo.types";
+import type { ModduloProject, PhaseId } from "@/types/moddulo.types";
 import { planRDAUpdate } from "@/lib/moddulo/rda";
 import { analizarM1, proyectoConMapaParaCriterios, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { motivoNoCerrarF2 } from "@/lib/moddulo/pantallaM1";
@@ -14,6 +14,31 @@ interface CompletePhaseBody {
   phaseId: PhaseId;
   reportText?: string; // markdown generado por Claude
 }
+
+/**
+ * Reconciliación del RDA (acumulativo, barre TODAS las fases con evaluador) sobre la vista del documento releído.
+ * Devuelve las claves a escribir (`rda.<id>…`) y cuántos ítems nuevos y resueltos trae el plan. Pura salvo por los
+ * marcadores de servidor; sin lecturas: es el mismo documento que la transacción ya leyó.
+ */
+function reconciliarRDA(vista: ModduloProject): { updates: Record<string, unknown>; nuevos: number; resueltos: number } {
+  const plan = planRDAUpdate(proyectoConMapaParaCriterios(vista));
+  const updates: Record<string, unknown> = {};
+  for (const item of plan.nuevos) {
+    updates[`rda.${item.id}`] = { ...item, fechaCreacion: FieldValue.serverTimestamp() };
+  }
+  for (const id of plan.resueltos) {
+    updates[`rda.${id}.estado`] = "resuelto";
+    updates[`rda.${id}.fechaResolucion`] = FieldValue.serverTimestamp();
+    updates[`rda.${id}.resueltoPor`] = "sistema";
+  }
+  return { updates, nuevos: plan.nuevos.length, resueltos: plan.resueltos.length };
+}
+
+type ResultadoCierre =
+  | { t: "no_encontrado" }
+  | { t: "ya_cerrada"; nuevos: number; resueltos: number }
+  | { t: "bloqueado"; motivo: string }
+  | { t: "ok" };
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +56,10 @@ export async function POST(
       return NextResponse.json({ error: "phaseId inválido" }, { status: 400 });
     }
 
+    // `getProject` solo sirve de ACCESO y de ROL (colaborador no analista/cliente). Todo lo que depende del estado del
+    // proyecto se decide DENTRO de la transacción, sobre el documento releído (C1b-3a, H-V20): antes la decisión, el
+    // plan de RDA y las escrituras salían de la lectura previa y una reapertura o edición entre ambas dejaba cerrar la
+    // Fase 2 con un M1 sin aprobar.
     const project = await getProject(projectId, session.uid);
     if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
@@ -39,115 +68,116 @@ export async function POST(
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
-    // Idempotent (commit 5): a Fase 2 that is already closed is NOT closed again. completedAt, currentPhase and
-    // RDA are never rewritten; the only thing a retry may still complete is `data.aprobadoEn` (the approval
-    // date, written in the SAME transaction as the close, so it can only be missing in projects closed before
-    // that, or if a past close was partial), and only when it is absent. Present = zero writes. The check runs
-    // again inside the transaction (another request may have closed it meanwhile).
-    const nextPhaseCerrada = PHASE_ORDER[PHASE_ORDER.indexOf(phaseId) + 1] ?? phaseId;
-    if (phaseId === "exploracion" && project.phases?.exploracion?.status === "completed") {
-      const ref0 = adminDb.collection("moddulo_projects").doc(projectId);
-      const r0 = await adminDb.runTransaction(async (tx): Promise<"no_encontrado" | "ok"> => {
-        const snap = await tx.get(ref0);
-        if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
-        const exp = snap.data()?.phases?.exploracion;
-        if (exp?.status === "completed" && !exp?.data?.aprobadoEn) {
-          tx.update(ref0, {
-            "phases.exploracion.data.aprobadoEn": exp.completedAt ?? new Date().toISOString(),
-          });
-        }
-        return "ok";
-      });
-      if (r0 === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-      return NextResponse.json({ success: true, yaCerrada: true, nextPhase: nextPhaseCerrada });
-    }
-
-    // F2 closes only with a FINALIZED Reporte F2 and, when the project has an M1 under review, with that M1
-    // APPROVED and the Reporte F2 generated from it (paso 4, H). A project with no `m1` record (created before the review existed) or with no payload
-    // is not asked for an approval it can never have: it only needs its Reporte F2. The «Cerrar Fase 2» button is
-    // already off in both situations; this is the server saying the same.
-    if (phaseId === "exploracion") {
-      const exploracion = project.phases?.exploracion as ExploracionParaM1 | undefined;
-      const a = analizarM1(exploracion);
-      // The same pure decision the «Cerrar Fase 2» button uses. With an approved M1 the finalized Reporte F2 must
-      // come from THIS M1 (m1.generacion.huella === m1.aprobacion.huella, i.e. no `motoresSinGenerar`).
-      // Only a project WITH an `m1` record is under review: a payload without `m1` that estadoM1 reads as «borrador»
-      // (no report, no motors) is a project from before the review existed.
-      const estado = a.m1 ? a.estado.estado : a.payload ? "anterior" : "sin_m1";
-      const motivo = motivoNoCerrarF2({
-        estado,
-        hayDvs: !!exploracion?.dvs,
-        motoresSinGenerar: a.estado.motoresSinGenerar,
-        // The finalized Reporte F2 must come from THIS approval (finalization seal, or the compatibility rule for a
-        // `dvs` finalized before the seal). A phase that is already closed never gets here (idempotent path above).
-        dvsDeOtroAnalisis: a.estado.dvsDeOtroAnalisis,
-      });
-      if (motivo) return NextResponse.json({ error: motivo }, { status: 409 });
-    }
-
     const phaseIndex = PHASE_ORDER.indexOf(phaseId);
     const nextPhase = PHASE_ORDER[phaseIndex + 1] ?? phaseId;
-
-    const ahora = new Date().toISOString();
-    const updates: Record<string, unknown> = {
-      [`phases.${phaseId}.status`]: "completed",
-      [`phases.${phaseId}.completedAt`]: ahora,
-      currentPhase: nextPhase,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    // Fase 2: the approval date goes in the same write as the close (key-wise, so pestl/semaforo/hipotesis stay).
-    if (phaseId === "exploracion") {
-      updates["phases.exploracion.data.aprobadoEn"] = ahora;
-    }
-
-    if (reportText) {
-      updates[`phases.${phaseId}.reportText`] = reportText;
-    }
-
-    if (phaseId === "proposito") {
-      updates.fasesCompletadas = FieldValue.arrayUnion(1);
-      updates.faseActual = 2;
-    }
-
-    // RDA — generación de ítems nuevos + reconciliación automática,
-    // barriendo todas las fases con evaluador disponible (no solo la que
-    // se está cerrando). Evaluado server-side contra los datos que
-    // getProject ya trajo — no se confía en nada calculado por el cliente.
-    const { nuevos, resueltos } = planRDAUpdate(proyectoConMapaParaCriterios(project));
-    for (const item of nuevos) {
-      updates[`rda.${item.id}`] = { ...item, fechaCreacion: FieldValue.serverTimestamp() };
-    }
-    for (const id of resueltos) {
-      updates[`rda.${id}.estado`] = "resuelto";
-      updates[`rda.${id}.fechaResolucion`] = FieldValue.serverTimestamp();
-      updates[`rda.${id}.resueltoPor`] = "sistema";
-    }
-
     const ref = adminDb.collection("moddulo_projects").doc(projectId);
-    const resultado = await adminDb.runTransaction(async (tx): Promise<"ok" | "ya_cerrada" | "no_encontrado"> => {
-      const snap = await tx.get(ref);
-      if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
-      if (phaseId === "exploracion" && snap.data()?.phases?.exploracion?.status === "completed") return "ya_cerrada";
-      tx.update(ref, updates);
-      return "ok";
-    });
-    if (resultado === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-    if (resultado === "ya_cerrada") return NextResponse.json({ success: true, yaCerrada: true, nextPhase });
 
-    // Auto-transition to "completed" when all 9 phases are done
-    const updatedPhases = {
-      ...(project.phases ?? {}),
-      [phaseId]: { ...(project.phases?.[phaseId] ?? {}), status: "completed" },
-    };
-    const allDone = PHASE_ORDER.every((p) => updatedPhases[p]?.status === "completed");
-    if (allDone && project.status !== "completed") {
-      await adminDb.collection("moddulo_projects").doc(projectId).update({
-        status: "completed",
+    // El callback puede reintentarse: lee primero, no tiene efectos externos, devuelve un resultado y la respuesta
+    // HTTP se arma fuera. Una sola transacción escribe el cierre, el RDA y, si es la 9.ª fase, el estado del proyecto
+    // (H-V22: antes un `update` aparte tras la transacción).
+    const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoCierre> => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.deletedAt) return { t: "no_encontrado" };
+      const crudo = snap.data() as ModduloProject;
+
+      // Idempotente en TODAS las fases (H-V21): una fase ya cerrada no se vuelve a cerrar (no se reescriben
+      // `completedAt`, `currentPhase`, el RDA ni el texto del reporte). Lo único que un reintento puede completar es
+      // `data.aprobadoEn` de la Fase 2 (se escribe en la misma transacción del cierre; solo puede faltar en proyectos
+      // cerrados antes de eso), y solo si falta. Presente = cero escrituras.
+      if (crudo.phases?.[phaseId]?.status === "completed") {
+        const actualizaciones: Record<string, unknown> = {};
+        if (phaseId === "exploracion") {
+          const exp = crudo.phases.exploracion;
+          if (!exp?.data?.aprobadoEn) {
+            actualizaciones["phases.exploracion.data.aprobadoEn"] = exp?.completedAt ?? new Date().toISOString();
+          }
+        }
+        // Reconciliación del RDA (C1b-3a, decisión de Raúl): `complete-phase` es el ÚNICO llamador de `planRDAUpdate`,
+        // así que re-cerrar una fase tras editarla (p. ej. «Editar variables» de la Fase 1) era la única forma de
+        // refrescar el RDA. La rama «ya cerrada» NO toca `completedAt`, `currentPhase`, `reportText`,
+        // `fasesCompletadas` ni `faseActual`, pero sí reconcilia el RDA sobre el documento releído y escribe SOLO si
+        // el plan trae ítems nuevos o resueltos (sin cambios en el plan: cero escrituras). Aplica a las 9 fases.
+        const vistaCerrada = normalizarProyectoLeido(snap.id, crudo);
+        const rdaCerrada = reconciliarRDA(vistaCerrada);
+        const hayCambiosRDA = rdaCerrada.nuevos + rdaCerrada.resueltos > 0;
+        if (hayCambiosRDA) {
+          Object.assign(actualizaciones, rdaCerrada.updates);
+          actualizaciones.updatedAt = FieldValue.serverTimestamp();
+        }
+        if (Object.keys(actualizaciones).length > 0) tx.update(ref, actualizaciones);
+        return { t: "ya_cerrada", nuevos: rdaCerrada.nuevos, resueltos: rdaCerrada.resueltos };
+      }
+
+      // Estado actual del proyecto con la misma vista que entrega `getProject` (backfills de lectura).
+      const estadoActual = crudo.status;
+      const vista = normalizarProyectoLeido(snap.id, crudo);
+
+      // La Fase 2 solo cierra con un Reporte F2 FINALIZADO y, si el proyecto tiene un `m1` bajo revisión, con ese M1
+      // APROBADO y el Reporte F2 generado de él. Un proyecto sin `m1` (anterior a la revisión) o sin payload no
+      // necesita una aprobación que nunca podrá tener: solo su Reporte F2.
+      if (phaseId === "exploracion") {
+        const exploracion = vista.phases?.exploracion as ExploracionParaM1 | undefined;
+        const a = analizarM1(exploracion);
+        const estado = a.m1 ? a.estado.estado : a.payload ? "anterior" : "sin_m1";
+        const motivo = motivoNoCerrarF2({
+          estado,
+          hayDvs: !!exploracion?.dvs,
+          motoresSinGenerar: a.estado.motoresSinGenerar,
+          // El Reporte F2 debe salir de ESTA aprobación (sello de finalización o la regla de compatibilidad).
+          dvsDeOtroAnalisis: a.estado.dvsDeOtroAnalisis,
+        });
+        if (motivo) return { t: "bloqueado", motivo };
+      }
+
+      const ahora = new Date().toISOString();
+      const updates: Record<string, unknown> = {
+        [`phases.${phaseId}.status`]: "completed",
+        [`phases.${phaseId}.completedAt`]: ahora,
+        currentPhase: nextPhase,
         updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      // Fase 2: la fecha de aprobación va en la misma escritura del cierre (por clave: pestl/semaforo/hipotesis quedan).
+      if (phaseId === "exploracion") {
+        updates["phases.exploracion.data.aprobadoEn"] = ahora;
+      }
+
+      if (reportText) {
+        updates[`phases.${phaseId}.reportText`] = reportText;
+      }
+
+      if (phaseId === "proposito") {
+        updates.fasesCompletadas = FieldValue.arrayUnion(1);
+        updates.faseActual = 2;
+      }
+
+      // RDA — ítems nuevos + reconciliación automática barriendo todas las fases con evaluador (no solo la que se
+      // cierra). Evaluado server-side contra el documento releído DENTRO de la transacción (sin lecturas extra:
+      // es el mismo documento): nada calculado por el cliente.
+      Object.assign(updates, reconciliarRDA(vista).updates);
+
+      // Cierre automático del proyecto cuando las 9 fases quedan completas (H-V22: en esta MISMA escritura).
+      const fasesCerradas = PHASE_ORDER.every((p) => (p === phaseId ? true : vista.phases?.[p]?.status === "completed"));
+      if (fasesCerradas && estadoActual !== "completed") {
+        updates.status = "completed";
+      }
+
+      tx.update(ref, updates);
+      return { t: "ok" };
+    });
+
+    if (resultado.t === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+    if (resultado.t === "bloqueado") return NextResponse.json({ error: resultado.motivo }, { status: 409 });
+    if (resultado.t === "ya_cerrada") {
+      // `rda` solo aparece cuando la reconciliación aplicó ítems (ausente = ninguno): la respuesta sin cambios es la de siempre.
+      const hayRDA = resultado.nuevos + resultado.resueltos > 0;
+      return NextResponse.json({
+        success: true,
+        yaCerrada: true,
+        nextPhase,
+        ...(hayRDA ? { rda: { nuevos: resultado.nuevos, resueltos: resultado.resueltos } } : {}),
       });
     }
-
     return NextResponse.json({ success: true, nextPhase });
   } catch (error) {
     console.error("[complete-phase] Error:", error);
