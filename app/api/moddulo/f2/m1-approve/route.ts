@@ -9,14 +9,25 @@
 // approved content differs from the one the current motors draft was generated from, the draft, the
 // motor approvals and the generation mark are discarded in the SAME transaction; if it is identical
 // they are kept (conservación diferida). 409 fase_cerrada when F2 is closed.
+//
+// C1b-1 — HISTORIAL: the approval leaves a version of `f2M1` in `lib/versionado/` in the SAME transaction
+// (kind `ajuste_manual`, motivo `aprobacion`). ONE instant per operation: the live document gets
+// `Timestamp.fromDate(instante)` and the version `instante.toISOString()`. The event names the motors whose
+// work is discarded (`detalle`). A failure of the history aborts the whole transaction (nothing is written) and
+// answers `{error: "historial_no_confirmado", causa}`. The idempotent and 409 paths write nothing.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { contarDimensionesEditadas, totalDimensiones } from "@/lib/moddulo/m1Aprobacion";
 import { analizarM1 } from "@/lib/moddulo/m1Servidor";
+import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, PUNTERO_F2, detalleMotoresDescartados, estadoF2M1, vivoF2M1,
+} from "@/lib/moddulo/versionado/artefactosF2";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
 type Resultado =
   | { t: "no_encontrado" }
@@ -44,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
   const ref = adminDb.collection("moddulo_projects").doc(projectId);
-  const r = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+  const transaccion = async (tx: Transaction): Promise<Resultado> => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data()?.deletedAt) return { t: "no_encontrado" };
     const exp = snap.data()?.phases?.exploracion;
@@ -57,10 +68,12 @@ export async function POST(request: NextRequest) {
 
     const categoriasEditadas = contarDimensionesEditadas(a.m1?.ediciones, a.payload);
     const total = totalDimensiones(a.payload);
+    // ONE instant for the live document and for the version (H-V25).
+    const instante = new Date();
     const updates: Record<string, unknown> = {
       "phases.exploracion.m1.aprobacion": {
         por: session.uid,
-        en: FieldValue.serverTimestamp(),
+        en: Timestamp.fromDate(instante),
         huella: a.huellaPayload,
         categoriasEditadas,
         total,
@@ -80,9 +93,42 @@ export async function POST(request: NextRequest) {
       updates["phases.exploracion.motorAprobaciones"] = {};
       updates["phases.exploracion.m1.generacion"] = FieldValue.delete();
     }
-    tx.update(ref, updates);
+
+    // Historial (C1b-1): the state after approving = same content + the approval seal; the previous state is the live one.
+    const expDespues = { ...exp, m1: { ...(a.m1 ?? {}), aprobacion: { huella: a.huellaPayload }, reabiertoEn: undefined } };
+    const plan = await prepararVersion(tx, {
+      raiz: ref,
+      datosRaiz: snap.data() as Record<string, unknown> | undefined,
+      punteroCampo: PUNTERO_F2,
+      ambito: AMBITO_F2,
+      fase: FASE_F2,
+      tipoCambio: "ajuste_manual",
+      por: session.uid,
+      fuente: "usuario",
+      // Internal code (not screen text).
+      motivo: "aprobacion",
+      // Audit detail: which motors' work this approval discarded (names and a flag only; never content).
+      ...(descartar ? { detalle: detalleMotoresDescartados({ motoresAprobados: a.impacto.motoresAprobados, hayBorrador: !!exp?.draftDVS }) } : {}),
+      artefactos: [{
+        artefacto: NOMBRE_F2_M1,
+        ...estadoF2M1(exp, { aprobado: true, por: session.uid, en: instante.toISOString(), huella: a.huellaPayload, categoriasEditadas, total }),
+        vivo: vivoF2M1(expDespues),
+        estadoPrevio: estadoF2M1(exp),
+        vivoPrevio: vivoF2M1(exp),
+      }],
+    });
+    const versionado = aplicarVersion(tx, plan);
+    tx.update(ref, { ...updates, ...versionado.updatesRaiz });
     return { t: "ok", huella: a.huellaPayload, categoriasEditadas, total, motoresDescartados: descartar };
-  });
+  };
+  let r: Resultado;
+  try {
+    r = await adminDb.runTransaction(transaccion);
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F2, ruta: "m1-approve" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   switch (r.t) {
     case "no_encontrado": return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });

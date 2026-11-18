@@ -43,6 +43,9 @@ const nr = nombreResultado(RESULTADO_ID);
 const peticion = (extra: Record<string, unknown> = {}) =>
   new Request("http://localhost/x", { method: "POST", body: JSON.stringify({ ...bodyValido, ...extra }) }) as unknown as Parameters<typeof POST>[0];
 
+// Claves EXACTAS del evento de bitácora de esta ruta (sin `detalle`).
+const CLAVES_EVENTO_ESPERADAS: string[] = ["ambito", "artefactos", "en", "fase", "fuente", "por", "revisionN", "tipo", "versionIds"];
+
 type Doc = Record<string, unknown>;
 type Version = Doc & { id: string; n: number; contenido?: Doc; aprobacion?: Doc; deriva?: boolean; insumos?: unknown };
 const snap = () => db.snapshot() as Record<string, Doc>;
@@ -93,6 +96,9 @@ describe("vincular — primera versión del resultado externo", () => {
     expect((v[0].contenido as Doc).moduloPIP).toBe("¿Pregunta?");
     expect(eventos()).toHaveLength(1);
     expect(eventos()[0]).toMatchObject({ tipo: "entrega", por: UID, artefactos: [nr] });
+    // C1b-1: el campo aditivo `detalle` NO aparece en el evento de quien no lo usa (mismas claves que antes)
+    expect(Object.keys(eventos()[0] as object)).not.toContain("detalle");
+    expect(Object.keys(eventos()[0] as object).sort()).toEqual(CLAVES_EVENTO_ESPERADAS);
     const rev = bajo("revisiones")[0][1] as { artefactos: Record<string, { dependeDe: unknown[] }> };
     expect(rev.artefactos[nr].dependeDe).toEqual([]);
     expect(updatesProyecto()).toEqual([{ "phases.investigacion.revision": expect.objectContaining({ n: 1, por: UID }) }]);

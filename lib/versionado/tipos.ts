@@ -35,7 +35,17 @@ export interface AprobacionVersion {
   mapa?: unknown;
   /** Notas de quien aprobó o rechazó (p. ej. `notasUsuario` de un resultado de F3). */
   notas?: string;
+  /** C1b-1 — M1 de F2: cuántas categorías del análisis llevaban una edición del usuario al aprobar, y de cuántas. */
+  categoriasEditadas?: number;
+  total?: number;
 }
+
+/**
+ * C1b-1 — detalle opcional de un evento de la bitácora. El evento es un REGISTRO DE AUDITORÍA: solo nombres y
+ * banderas (p. ej. los motores cuyo contenido se descartó), NUNCA contenido del usuario. Tipo deliberadamente
+ * estrecho: valores primitivos o listas de textos, sin objetos anidados ni `undefined`/`null`.
+ */
+export type DetalleEvento = Record<string, string | number | boolean | string[]>;
 
 export interface DependeDe {
   artefacto: string;

@@ -2,13 +2,18 @@
 // [local] = depende del mock (atomico/failUpdateOn/carrera simulada).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Timestamp } from "firebase-admin/firestore";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
 vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
 });
-vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" } }));
+// C1b-1: the routes now write `Timestamp.fromDate(instante)`, so the REAL Timestamp class is kept; only FieldValue is stubbed.
+vi.mock("firebase-admin/firestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("firebase-admin/firestore")>()),
+  FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" },
+}));
 vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -78,9 +83,11 @@ describe("H15 en servidor", () => {
     expect(u).toHaveLength(1);
     expect(u[0].data).toEqual({
       "phases.exploracion.m1.aprobacion": "__DELETE__",
-      "phases.exploracion.m1.reabiertoEn": "TS",
+      "phases.exploracion.m1.reabiertoEn": expect.any(Timestamp),
       "phases.exploracion.m1.reabiertoPor": "u1",
       updatedAt: "TS",
+      // C1b-1: the pointer to the history revision is merged into the SAME update.
+      "phases.exploracion.revision": { n: 1, huella: expect.any(String), por: "u1", en: "TS" },
     });
   });
 

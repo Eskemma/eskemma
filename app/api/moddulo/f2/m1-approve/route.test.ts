@@ -3,13 +3,18 @@
 // Firestore modelan la garantía, no la demuestran.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Timestamp } from "firebase-admin/firestore";
 
 vi.mock("@/lib/server/auth-helpers", () => ({ getSessionFromRequest: vi.fn() }));
 vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
 });
-vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" } }));
+// C1b-1: the routes now write `Timestamp.fromDate(instante)`, so the REAL Timestamp class is kept; only FieldValue is stubbed.
+vi.mock("firebase-admin/firestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("firebase-admin/firestore")>()),
+  FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" },
+}));
 vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -41,7 +46,7 @@ describe("aprobar", () => {
     expect(await res.json()).toMatchObject({ ok: true, huella: H, categoriasEditadas: 0, total: 6, motoresDescartados: false });
     expect(mockDb.runTransaction).toHaveBeenCalledTimes(1);
     const d = mockDb.updates()[0].data;
-    expect(d["phases.exploracion.m1.aprobacion"]).toMatchObject({ por: "u1", en: "TS", huella: H, categoriasEditadas: 0, total: 6, mapa: mapaM1() });
+    expect(d["phases.exploracion.m1.aprobacion"]).toMatchObject({ por: "u1", en: expect.any(Timestamp), huella: H, categoriasEditadas: 0, total: 6, mapa: mapaM1() });
     expect(d["phases.exploracion.m1.reabiertoEn"]).toBe("__DELETE__");
     expect(d).not.toHaveProperty("phases.exploracion.draftDVS"); // nada que descartar
   });

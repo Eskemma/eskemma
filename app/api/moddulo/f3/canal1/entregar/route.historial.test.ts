@@ -55,6 +55,9 @@ const DOC_VIVO = {
 const DOC_APROBADO = { ...DOC_VIVO, aprobado: true, notasUsuario: "lo revisé" };
 const ASIG_RECIBIDA = { estado: "recibido", resultadoId: RESULTADO_PREVIO };
 
+// Claves EXACTAS del evento de bitácora de esta ruta (sin `detalle`).
+const CLAVES_EVENTO_ESPERADAS: string[] = ["ambito", "artefactos", "en", "fase", "fuente", "por", "revisionN", "tipo", "versionIds"];
+
 type Doc = Record<string, unknown>;
 const snap = () => db.snapshot() as Record<string, Doc>;
 const bajo = (prefijo: string) => Object.entries(snap()).filter(([k]) => k.startsWith(`${rutaProyecto}/${prefijo}/`));
@@ -132,6 +135,9 @@ describe("primera entrega — versión del resultado, sin estado previo", () => 
     expect(revisiones()).toHaveLength(1);
     expect(eventos()).toHaveLength(1);
     expect(eventos()[0]).toMatchObject({ tipo: "entrega", por: UID, artefactos: [`f3Resultado:${resultadoId}`] });
+    // C1b-1: el campo aditivo `detalle` NO aparece en el evento de quien no lo usa (mismas claves que antes)
+    expect(Object.keys(eventos()[0] as object)).not.toContain("detalle");
+    expect(Object.keys(eventos()[0] as object).sort()).toEqual(CLAVES_EVENTO_ESPERADAS);
     // el contenido guardado es el del resultado sin lo volátil
     expect((v[0].contenido as Doc).createdAt).toBeUndefined();
     expect((v[0].contenido as Doc).payload).toMatchObject({ archivoUrl: OWN_PATH });

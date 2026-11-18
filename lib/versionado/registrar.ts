@@ -34,6 +34,7 @@ import {
   HistorialInconsistenteError,
   MAX_BORRADOS_POR_ESCRITURA,
   TOPE_VERSIONES,
+  type DetalleEvento,
   type EntradaManifiesto,
   type EstadoArtefacto,
   type FuenteEvento,
@@ -84,6 +85,11 @@ export interface CambioFase {
   autorizadoEn?: string;
   motivo?: string;
   fuente?: FuenteEvento;
+  /**
+   * C1b-1 — detalle de AUDITORÍA que se copia al evento (solo nombres y banderas; nunca contenido del usuario).
+   * Se OMITE la clave cuando no se pasa o viene vacío: el evento de quien no lo usa es idéntico al de siempre.
+   */
+  detalle?: DetalleEvento;
   artefactos: CambioArtefacto[];
   /** Cierra la fase en esta revisión: deja constancia de quién y marca las versiones vigentes como protegidas. */
   cierre?: { por: string };
@@ -143,6 +149,17 @@ function validar(cambio: CambioFase): void {
   }
   if (cambio.tipoCambio === "regeneracion_ia" && (!cambio.autorizadoPor || !cambio.autorizadoEn)) {
     throw new AutorizacionIARequeridaError();
+  }
+  if (cambio.detalle !== undefined) {
+    if (cambio.detalle === null || typeof cambio.detalle !== "object" || Array.isArray(cambio.detalle)) {
+      throw new CambioInvalidoError("`detalle` debe ser un objeto plano.");
+    }
+    for (const [k, v] of Object.entries(cambio.detalle)) {
+      const ok =
+        typeof v === "string" || typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)) ||
+        (Array.isArray(v) && v.every((x) => typeof x === "string"));
+      if (!ok) throw new CambioInvalidoError(`\`detalle.${k}\` debe ser texto, número, booleano o lista de textos (sin anidados, null ni undefined).`);
+    }
   }
 }
 
@@ -376,6 +393,7 @@ export async function prepararVersion(tx: Transaction, cambio: CambioFase): Prom
     en: FieldValue.serverTimestamp(),
     fuente: cambio.fuente ?? (cambio.tipoCambio === "regeneracion_ia" ? "ia" : "usuario"),
     ...(cambio.motivo ? { motivo: cambio.motivo } : {}),
+    ...(cambio.detalle && Object.keys(cambio.detalle).length > 0 ? { detalle: structuredClone(cambio.detalle) } : {}),
   };
 
   return {

@@ -72,6 +72,9 @@ const asignacionCruda = (extra: Record<string, unknown> = {}) => ({
 });
 const TABLERO = (extra: Record<string, unknown> = {}) => [{ pipItemId: "t1", asignaciones: [asignacionCruda(extra)] }];
 
+// Claves EXACTAS del evento de bitácora de esta ruta (sin `detalle`).
+const CLAVES_EVENTO_ESPERADAS: string[] = ["ambito", "artefactos", "en", "fase", "fuente", "motivo", "por", "revisionN", "tipo", "versionIds"];
+
 type Doc = Record<string, unknown>;
 type Version = Doc & { id: string; n: number; contenido?: Doc; aprobacion?: Doc; deriva?: boolean; tipoCambio?: string; por?: unknown; en?: unknown };
 const snap = () => db.snapshot() as Record<string, Doc>;
@@ -135,6 +138,9 @@ describe("aprobar (aprobado:true) — versión del resultado y de la asignación
     expect(porId[`${na}__000002`].contenido).toMatchObject({ estado: "recibido", resultadoId: "r1" });
     expect(porId[`${na}__000002`]).toMatchObject({ tipoCambio: "ajuste_manual", por: UID });
     expect(eventos()[0]).toMatchObject({ tipo: "ajuste_manual", motivo: "aprobacion", artefactos: [nr, na] });
+    // C1b-1: el campo aditivo `detalle` NO aparece en el evento de quien no lo usa (mismas claves que antes)
+    expect(Object.keys(eventos()[0] as object)).not.toContain("detalle");
+    expect(Object.keys(eventos()[0] as object).sort()).toEqual(CLAVES_EVENTO_ESPERADAS);
   });
 
   it("el SELLO vive SOLO en la versión: el documento vivo conserva su forma de siempre y no contiene uid, huella ni sello", async () => {

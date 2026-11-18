@@ -8,13 +8,26 @@
 //     and the generation mark stay, paused until M1 is approved again).
 // Idempotent: already reopened → 200 { yaReabierto: true }. 409 m1_no_aprobado when there is
 // nothing approved to reopen; 409 fase_cerrada when F2 is closed. Decided inside ONE transaction.
+//
+// C1b-1 — HISTORIAL: reopening leaves a version of `f2M1` in `lib/versionado/` in the SAME transaction
+// (kind `reapertura`, with `aprobacion {aprobado: false, por, en}` as the record). ONE instant per operation:
+// `reabiertoEn` of the live document is `Timestamp.fromDate(instante)` and the version carries its ISO. Reopening
+// discards nothing (the motors draft stays, paused), so the event carries no `detalle`. A failure of the history
+// aborts the whole transaction and answers `{error: "historial_no_confirmado", causa}`; the H15 409
+// (`reemplazo_requiere_confirmacion`) shares that status but a different `error` code. Idempotent and 409 paths
+// write nothing.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { analizarM1 } from "@/lib/moddulo/m1Servidor";
+import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, PUNTERO_F2, estadoF2M1, vivoF2M1,
+} from "@/lib/moddulo/versionado/artefactosF2";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 import { huellaTexto } from "@/lib/moddulo/m1Huella";
 import {
   decidirCandadoM1,
@@ -50,10 +63,11 @@ export async function POST(request: NextRequest) {
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
 
   const ref = adminDb.collection("moddulo_projects").doc(projectId);
-  const r = await adminDb.runTransaction(async (tx): Promise<Resultado> => {
+  const transaccion = async (tx: Transaction): Promise<Resultado> => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data()?.deletedAt) return { t: "no_encontrado" };
-    const a = analizarM1(snap.data()?.phases?.exploracion);
+    const exp = snap.data()?.phases?.exploracion;
+    const a = analizarM1(exp);
     if (a.cerrada) return { t: "fase_cerrada" };
     if (!a.payload || !a.huellaPayload) return { t: "m1_no_encontrado" };
     if (a.estado.estado === "reabierto") return { t: "ya_reabierto", huella: a.huellaPayload };
@@ -70,14 +84,46 @@ export async function POST(request: NextRequest) {
     if (decision === "requiere_confirmacion") return { t: "requiere", lineas, huellaImpacto };
     if (decision === "huella_vencida") return { t: "vencida", lineas, huellaImpacto };
 
+    // ONE instant for the live document and for the version (H-V25).
+    const instante = new Date();
+    const expDespues = { ...exp, m1: { ...(a.m1 ?? {}), aprobacion: undefined, reabiertoEn: instante, reabiertoPor: session.uid } };
+    const plan = await prepararVersion(tx, {
+      raiz: ref,
+      datosRaiz: snap.data() as Record<string, unknown> | undefined,
+      punteroCampo: PUNTERO_F2,
+      ambito: AMBITO_F2,
+      fase: FASE_F2,
+      tipoCambio: "reapertura",
+      por: session.uid,
+      fuente: "usuario",
+      // Internal code (not screen text). Reopening discards nothing: no `detalle`.
+      motivo: "reapertura",
+      artefactos: [{
+        artefacto: NOMBRE_F2_M1,
+        ...estadoF2M1(exp, { aprobado: false, por: session.uid, en: instante.toISOString() }),
+        vivo: vivoF2M1(expDespues),
+        estadoPrevio: estadoF2M1(exp),
+        vivoPrevio: vivoF2M1(exp),
+      }],
+    });
+    const versionado = aplicarVersion(tx, plan);
     tx.update(ref, {
       "phases.exploracion.m1.aprobacion": FieldValue.delete(),
-      "phases.exploracion.m1.reabiertoEn": FieldValue.serverTimestamp(),
+      "phases.exploracion.m1.reabiertoEn": Timestamp.fromDate(instante),
       "phases.exploracion.m1.reabiertoPor": session.uid,
       updatedAt: FieldValue.serverTimestamp(),
+      ...versionado.updatesRaiz,
     });
     return { t: "ok", huella: a.huellaPayload };
-  });
+  };
+  let r: Resultado;
+  try {
+    r = await adminDb.runTransaction(transaccion);
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F2, ruta: "m1-reopen" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   switch (r.t) {
     case "no_encontrado": return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
