@@ -920,16 +920,17 @@ function mensajeDeFallo(
 export const CODIGO_HISTORIAL_NO_CONFIRMADO = "historial_no_confirmado";
 
 /**
- * C1b-1 — `m1-approve` / `m1-reopen` answer `historial_no_confirmado` when the history could not be registered:
+ * C1b-1 — `m1-approve` / `m1-reopen` (C1b-2: also `unlink-pestel`) answer `historial_no_confirmado` when the history could not be registered:
  * the transaction aborted, so nothing changed. It is decided by the body's `error` CODE, never by the status: the
  * collision (409) shares the status with the H15 confirmation 409 of `m1-reopen`. The text refines by status only
  * AFTER the code matched: 409 = collision (try again), 500 = inconsistency (do not insist).
  * Null for any other action or code.
  */
 function textoHistorialNoConfirmadoM1(accion: AccionGuardado, resp: RespuestaGuardado): string | null {
-  if ((accion !== "aprobar_m1" && accion !== "reabrir_m1") || resp.tipo !== "respuesta") return null;
+  if ((accion !== "aprobar_m1" && accion !== "reabrir_m1" && accion !== "desvincular_pestel") || resp.tipo !== "respuesta") return null;
   if (resp.codigo !== CODIGO_HISTORIAL_NO_CONFIRMADO) return null;
-  const sigue = accion === "aprobar_m1" ? "El análisis sigue sin aprobar" : "El análisis sigue aprobado";
+  const sigue =
+    accion === "aprobar_m1" ? "El análisis sigue sin aprobar" : accion === "reabrir_m1" ? "El análisis sigue aprobado" : "El proyecto sigue vinculado";
   if (resp.status === 500) {
     return `No se pudo CONFIRMAR el registro del historial. ${sigue}. Si vuelve a pasar, no insistas: hay que revisarlo.`;
   }

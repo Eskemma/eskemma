@@ -3,6 +3,17 @@
 // H15 (paso 4): the confirmation is ALWAYS required (409 reemplazo_requiere_confirmacion with the real lines
 // and the fingerprint to confirm against); 409 fase_cerrada when F2 is closed. On success it discards the
 // motors draft, the motor approvals and the M1 record together with the link.
+//
+// C1b-2 — HISTORIAL: unlinking an M1 (or the remains of one: payload, `m1`, motors draft or motor approvals) leaves
+// versions of `f2M1` in `lib/versionado/` in the SAME transaction: the PREVIOUS state (first time only) and a NEW one
+// «without M1» (`contenido {kind: null, mapa: null, ediciones: {}}`, `aprobacion {aprobado: false, por, en}`), kind
+// `ajuste_manual`, motivo `desvinculacion`. ONE instant per operation: `lastUnlinkedLinkedSource.desvinculadoEn` is
+// `Timestamp.fromDate(instante)` and the version carries its ISO. The event names what is discarded (`detalle`, only
+// booleans, numbers and motor names); the CONTENT of the motors draft and the generation/finalization marks is NOT
+// versioned (H-V28). The pointer `phases.exploracion.revision` is KEPT (the history of `f2M1` continues after a
+// relink). The pending-link branch discards nothing and writes no history. All reads (project, PESTEL back-link,
+// history manifest) happen before the first write; a history failure aborts everything (the link, the M1 and the
+// back-link stay as they were) and answers `{error: "historial_no_confirmado", causa}`.
 // Desvincula explícitamente un proyecto Moddulo de su análisis de Centinela
 // PESTEL. Limpia los punteros y el M1 asociado, dejando F2 listo para
 // regenerar vía el flujo express. Contraparte deliberada del guard 409 en
@@ -13,7 +24,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
+import { analizarM1 } from "@/lib/moddulo/m1Servidor";
+import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
+import {
+  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, PUNTERO_F2, detalleDesvinculacion, estadoF2M1, hayAlgoQueVersionarAlDesvincular, vivoF2M1,
+} from "@/lib/moddulo/versionado/artefactosF2";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
 import { decidirCandadoM1Servidor, respuestaCandadoM1, type DecisionCandadoM1Servidor } from "@/lib/moddulo/candadoM1Servidor";
 import { MENSAJE_PENDIENTE_CAMBIO, MENSAJE_PENDIENTE_NO_ENCONTRADO } from "@/lib/moddulo/textosVinculo";
@@ -57,7 +74,7 @@ export async function POST(request: NextRequest) {
     | "pendiente_no_encontrado"
     | "estado_cambio"
     | { candado: Exclude<DecisionCandadoM1Servidor, { accion: "continuar" }> };
-  const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoDesvinculo> => {
+  const transaccion = async (tx: Transaction): Promise<ResultadoDesvinculo> => {
     const snap = await tx.get(proyectoRef);
     if (!snap.exists || snap.data()?.deletedAt) return "no_encontrado";
     const exploracion = snap.data()?.phases?.exploracion;
@@ -125,20 +142,55 @@ export async function POST(request: NextRequest) {
     const pestelSnap = pestelRef ? await tx.get(pestelRef) : null;
     const pestelApuntaAqui = !!pestelSnap?.exists && pestelSnap.data()?.modduloProjectId === projectId;
 
+    // ONE instant for the live document and for the version (H-V25). Every read (project, PESTEL back-link above,
+    // history manifest in `prepararVersion`) happens BEFORE the first write below.
+    const instante = new Date();
+    let updatesRaiz: Record<string, unknown> = {};
+    if (hayAlgoQueVersionarAlDesvincular(exploracion)) {
+      const a = analizarM1(exploracion);
+      const expDespues = { ...exploracion, linkedSource: undefined, m1: undefined };
+      const plan = await prepararVersion(tx, {
+        raiz: proyectoRef,
+        datosRaiz: snap.data() as Record<string, unknown> | undefined,
+        punteroCampo: PUNTERO_F2,
+        ambito: AMBITO_F2,
+        fase: FASE_F2,
+        tipoCambio: "ajuste_manual",
+        por: session.uid,
+        fuente: "usuario",
+        // Internal code (not screen text); C4 tells this version apart by it and by `kind: null`.
+        motivo: "desvinculacion",
+        detalle: detalleDesvinculacion({
+          aprobacion: exploracion?.m1?.aprobacion ?? null,
+          motoresAprobados: a.impacto.motoresAprobados,
+          hayBorrador: !!exploracion?.draftDVS,
+          hayReporteF2: !!exploracion?.dvs,
+        }),
+        artefactos: [{
+          artefacto: NOMBRE_F2_M1,
+          ...estadoF2M1(expDespues, { aprobado: false, por: session.uid, en: instante.toISOString() }),
+          vivo: vivoF2M1(expDespues),
+          estadoPrevio: estadoF2M1(exploracion),
+          vivoPrevio: vivoF2M1(exploracion),
+        }],
+      });
+      updatesRaiz = aplicarVersion(tx, plan).updatesRaiz;
+    }
+
     tx.update(proyectoRef, {
       "phases.exploracion.linkedSource": FieldValue.delete(),
       "phases.exploracion.fuentesConsultadas": FieldValue.delete(),
       "phases.exploracion.xpctoSnapshotAtGeneration": FieldValue.delete(),
-      // Conserva el vínculo anterior completo para permitir deshacer
-      // ("Vincular de nuevo") sin pasar por el picker.
-      "phases.exploracion.lastUnlinkedLinkedSource": linkedSource,
+      // Conserva el vínculo anterior completo para permitir deshacer ("Vincular de nuevo") sin pasar por el picker,
+      // más el instante de la desvinculación (campo aditivo; el único lector usa `.sourceAnalysisId`).
+      "phases.exploracion.lastUnlinkedLinkedSource": { ...linkedSource, desvinculadoEn: Timestamp.fromDate(instante) },
       // The M1 goes away and so does everything made against it: the motors draft, the motor approvals and
       // the M1 record itself (approval, edits, generation mark). The finalized Reporte F2 (`dvs`) stays.
-      // NOTE for the reopening round: the record of the approval is lost with the M1.
       "phases.exploracion.motorAprobaciones": {},
       "phases.exploracion.draftDVS": FieldValue.delete(),
       "phases.exploracion.m1": FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
+      ...updatesRaiz,
     });
     if (pestelRef && pestelApuntaAqui) {
       tx.update(pestelRef, {
@@ -147,7 +199,15 @@ export async function POST(request: NextRequest) {
       });
     }
     return "ok";
-  });
+  };
+  let resultado: ResultadoDesvinculo;
+  try {
+    resultado = await adminDb.runTransaction(transaccion);
+  } catch (err) {
+    const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: FASE_F2, ruta: "unlink-pestel" });
+    if (respuesta) return respuesta;
+    throw err;
+  }
 
   if (typeof resultado === "object") return respuestaCandadoM1(resultado.candado);
   if (resultado === "fase_cerrada") return respuestaFaseCerrada();

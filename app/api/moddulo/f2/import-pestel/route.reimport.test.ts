@@ -13,7 +13,10 @@ vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
 });
-vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" } }));
+vi.mock("firebase-admin/firestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("firebase-admin/firestore")>()),
+  FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" },
+}));
 vi.mock("@/lib/moddulo/project", async (orig) => ({ ...(await orig<typeof import("@/lib/moddulo/project")>()), getProject: vi.fn() }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
@@ -113,6 +116,16 @@ describe("secuencia A → Desvincular → B (el servidor no arrastra la nota)", 
     expect(exp().lastUnlinkedLinkedSource).toBeUndefined();
     expect(exp().m1.creadoEn).toBeDefined();
     expect(clon(r.cuerpo.linkedSource)).toEqual(clon(ls())); // la respuesta del import == la lectura posterior
+  });
+
+  it("C1b-2: la copia que deja Desvincular lleva `desvinculadoEn`, y importar B borra el objeto COMPLETO (no solo `sourceAnalysisId`)", async () => {
+    await importa("aA");
+    const s = await desvincula();
+    await desvincula({ confirmar: true, huella: s.cuerpo.huella });
+    expect(Object.keys(exp().lastUnlinkedLinkedSource)).toContain("desvinculadoEn");
+    expect(exp().lastUnlinkedLinkedSource.sourceAnalysisId).toBe("aA");
+    await importa("aB");
+    expect(exp().lastUnlinkedLinkedSource).toBeUndefined(); // el objeto entero, con su campo nuevo
   });
 
   it("«Vincular de nuevo» tras B no restaura A por sí solo: ya no hay copia que ofrecer; solo el POST explícito con el id de A (el botón) la reimporta, con confirmación", async () => {

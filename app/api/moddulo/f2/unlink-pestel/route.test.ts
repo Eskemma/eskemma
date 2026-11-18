@@ -9,12 +9,16 @@ vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
 });
-vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" } }));
+vi.mock("firebase-admin/firestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("firebase-admin/firestore")>()),
+  FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" },
+}));
 vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { getProject } from "@/lib/moddulo/project";
 import { adminDb } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
 import { POST } from "./route";
 import type { createMockAdminDb } from "@/lib/moddulo/__tests__/fixtures/adminMocks";
 
@@ -91,7 +95,10 @@ describe("POST unlink-pestel — éxito", () => {
       "phases.exploracion.linkedSource": "__DELETE__",
       "phases.exploracion.fuentesConsultadas": "__DELETE__",
       "phases.exploracion.xpctoSnapshotAtGeneration": "__DELETE__",
-      "phases.exploracion.lastUnlinkedLinkedSource": T22,
+      // C1b-2: el vínculo anterior ahora lleva el instante de la desvinculación (Timestamp) y el puntero del historial
+      // (el T22 de esta prueba trae mapa, así que hay algo que versionar).
+      "phases.exploracion.lastUnlinkedLinkedSource": { ...T22, desvinculadoEn: expect.any(Timestamp) },
+      "phases.exploracion.revision": expect.objectContaining({ n: 1 }),
       "phases.exploracion.motorAprobaciones": {},
       "phases.exploracion.draftDVS": "__DELETE__", // paso 4: ya no se conserva el borrador de motores
       "phases.exploracion.m1": "__DELETE__", // paso 4: el registro del M1 se va con el vínculo

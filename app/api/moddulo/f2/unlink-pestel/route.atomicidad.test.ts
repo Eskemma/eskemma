@@ -8,7 +8,10 @@ vi.mock("@/lib/firebase-admin", async () => {
   const { createMockAdminDb } = await import("@/lib/moddulo/__tests__/fixtures/adminMocks");
   return { adminDb: createMockAdminDb() };
 });
-vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" } }));
+vi.mock("firebase-admin/firestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("firebase-admin/firestore")>()),
+  FieldValue: { delete: () => "__DELETE__", serverTimestamp: () => "TS" },
+}));
 vi.mock("@/lib/moddulo/project", () => ({ getProject: vi.fn() }));
 
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";

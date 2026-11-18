@@ -16,7 +16,7 @@ type Db = ReturnType<typeof createMockAdminDb>;
 type Doc = Record<string, unknown>;
 
 /** Copia profunda que conserva los objetos NO planos (Timestamp…): `structuredClone` les quitaría el prototipo. */
-function clonar<T>(v: T): T {
+export function clonar<T>(v: T): T {
   if (Array.isArray(v)) return v.map(clonar) as unknown as T;
   if (v !== null && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype) {
     return Object.fromEntries(Object.entries(v as Doc).map(([k, x]) => [k, clonar(x)])) as T;

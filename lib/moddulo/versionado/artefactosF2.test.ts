@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import {
-  detalleMotoresDescartados, enAIso, estadoF2M1, vivoF2M1, ESQUEMA_F2, PUNTERO_F2, FASE_F2, AMBITO_F2, NOMBRE_F2_M1,
+  detalleDesvinculacion, detalleMotoresDescartados, enAIso, hayAlgoQueVersionarAlDesvincular, estadoF2M1, vivoF2M1, ESQUEMA_F2, PUNTERO_F2, FASE_F2, AMBITO_F2, NOMBRE_F2_M1,
 } from "./artefactosF2";
 import { aprobacionDe, docProyectoM1, mapaM1 } from "@/lib/moddulo/__tests__/fixtures/m1Siembra";
 
@@ -128,5 +128,37 @@ describe("detalleMotoresDescartados", () => {
     const src = ["M2"]; const d = detalleMotoresDescartados({ motoresAprobados: src, hayBorrador: false });
     src.push("M3");
     expect(d.motoresAprobadosDescartados).toEqual(["M2"]);
+  });
+});
+
+describe("C1b-2 — hayAlgoQueVersionarAlDesvincular", () => {
+  const T = { payload: { P: {} } };
+  it("sí: payload, m1, borrador o aprobaciones con contenido (cualquiera de los cuatro)", () => {
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: T })).toBe(true);
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: {}, m1: { creadoEn: "t" } })).toBe(true);
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: {}, draftDVS: { x: 1 } })).toBe(true);
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: {}, motorAprobaciones: { M2: true } })).toBe(true);
+  });
+  it("no: un T22 realmente vacío en esos cuatro puntos ({} / undefined / null no cuentan)", () => {
+    expect(hayAlgoQueVersionarAlDesvincular(undefined)).toBe(false);
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: {} })).toBe(false);
+    expect(hayAlgoQueVersionarAlDesvincular({ linkedSource: { payload: {} }, m1: {}, draftDVS: null, motorAprobaciones: {} })).toBe(false);
+  });
+});
+
+describe("C1b-2 — detalleDesvinculacion (solo booleanos, números y nombres de motor)", () => {
+  it("con aprobación: cuenta categorías; motores en orden M2..M5; `dvs` conservado", () => {
+    expect(detalleDesvinculacion({ aprobacion: { categoriasEditadas: 2, total: 6 }, motoresAprobados: ["M4", "M2"], hayBorrador: true, hayReporteF2: true })).toEqual({
+      teniaAprobacion: true, categoriasEditadas: 2, totalCategorias: 6, motoresAprobadosDescartados: ["M2", "M4"], borradorDescartado: true, reporteF2Conservado: true,
+    });
+  });
+  it("SIN aprobación: false, 0 y 0", () => {
+    expect(detalleDesvinculacion({ aprobacion: null, motoresAprobados: [], hayBorrador: false, hayReporteF2: false })).toEqual({
+      teniaAprobacion: false, categoriasEditadas: 0, totalCategorias: 0, motoresAprobadosDescartados: [], borradorDescartado: false, reporteF2Conservado: false,
+    });
+  });
+  it("campos raros de la aprobación (texto, NaN, ausentes) → 0; un nombre que no es M2..M5 se descarta (nunca texto libre)", () => {
+    const d = detalleDesvinculacion({ aprobacion: { categoriasEditadas: "x", total: Number.NaN }, motoresAprobados: ["M2", "texto-del-usuario", "M9"], hayBorrador: false, hayReporteF2: false });
+    expect(d).toMatchObject({ teniaAprobacion: true, categoriasEditadas: 0, totalCategorias: 0, motoresAprobadosDescartados: ["M2"] });
   });
 });

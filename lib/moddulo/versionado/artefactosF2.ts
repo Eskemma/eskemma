@@ -17,6 +17,10 @@
 //
 // NO se versiona (declarado): `draftDVS`, `motorAprobaciones`, `dvs` (tiene `dvsVersiones`), `rda`, la marca de
 // generación y la de finalización. Lo descartado al aprobar solo se NOMBRA en el evento (`detalle`), no se guarda.
+//
+// C1b-2 — DESVINCULAR (`unlink-pestel`): el estado NUEVO es «sin M1» (`contenido {kind: null, mapa: null,
+// ediciones: {}}`, la misma función de siempre sobre el documento sin `linkedSource` ni `m1`) con `aprobacion
+// {aprobado: false, por, en}` como constancia; el motivo `desvinculacion` y `kind: null` lo distinguen en el lector.
 
 import type { M1Datos } from "@/types/moddulo.types";
 import type { DetalleEvento, EstadoArtefacto } from "@/lib/versionado/tipos";
@@ -145,4 +149,46 @@ export function vivoF2M1(exp: ExploracionCruda | undefined): unknown {
  */
 export function detalleMotoresDescartados(i: { motoresAprobados: readonly string[]; hayBorrador: boolean }): DetalleEvento {
   return { motoresAprobadosDescartados: [...i.motoresAprobados], borradorDescartado: i.hayBorrador };
+}
+
+/** Motores cuyo nombre puede aparecer en un `detalle` de evento (nunca texto libre). */
+const MOTORES_DETALLE = ["M2", "M3", "M4", "M5"] as const;
+
+/**
+ * C1b-2 — ¿hay algo que versionar al DESVINCULAR? Sí si existe CUALQUIERA de: el payload (el mapa del análisis), el
+ * registro `m1`, el borrador de motores o aprobaciones de motores con contenido (pueden existir sin M1: «sin M1 con
+ * restos»). Solo un T22 realmente vacío en esos cuatro puntos se desvincula sin versión (no se destruye nada).
+ */
+export function hayAlgoQueVersionarAlDesvincular(exp: {
+  linkedSource?: { payload?: unknown };
+  m1?: unknown;
+  draftDVS?: unknown;
+  motorAprobaciones?: unknown;
+} | undefined): boolean {
+  const lleno = (v: unknown) => v !== null && typeof v === "object" && Object.keys(v as object).length > 0;
+  return lleno(exp?.linkedSource?.payload) || lleno(exp?.m1) || !!exp?.draftDVS || lleno(exp?.motorAprobaciones);
+}
+
+/**
+ * C1b-2 — `detalle` de AUDITORÍA del evento de desvinculación. «Descartado» al desvincular es INCONDICIONAL: se van el
+ * borrador de motores, sus aprobaciones y el registro `m1` completo (aprobación y su copia congelada, ediciones, marcas
+ * de generación y finalización); el `dvs` (Reporte F2 finalizado) se conserva y queda sin su M1 de origen. Solo
+ * booleanos, números y nombres de motor (M2..M5): nunca texto del usuario ni ids de proyecto o de PESTEL. Sin
+ * aprobación: `teniaAprobacion: false`, `categoriasEditadas: 0`, `totalCategorias: 0`.
+ */
+export function detalleDesvinculacion(i: {
+  aprobacion?: { categoriasEditadas?: unknown; total?: unknown } | null;
+  motoresAprobados: readonly string[];
+  hayBorrador: boolean;
+  hayReporteF2: boolean;
+}): DetalleEvento {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return {
+    teniaAprobacion: !!i.aprobacion,
+    categoriasEditadas: i.aprobacion ? num(i.aprobacion.categoriasEditadas) : 0,
+    totalCategorias: i.aprobacion ? num(i.aprobacion.total) : 0,
+    motoresAprobadosDescartados: MOTORES_DETALLE.filter((m) => i.motoresAprobados.includes(m)),
+    borradorDescartado: i.hayBorrador,
+    reporteF2Conservado: i.hayReporteF2,
+  };
 }
