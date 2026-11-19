@@ -9,6 +9,11 @@ import type { ModduloProject, PhaseId } from "@/types/moddulo.types";
 import { planRDAUpdate } from "@/lib/moddulo/rda";
 import { analizarM1, proyectoConMapaParaCriterios, type ExploracionParaM1 } from "@/lib/moddulo/m1Servidor";
 import { motivoNoCerrarF2 } from "@/lib/moddulo/pantallaM1";
+import { aplicarVersion, prepararVersion } from "@/lib/versionado";
+import {
+  AMBITO_CIERRE, MOTIVO_CIERRE, detalleCierre, estadoAbierto, estadoCierre, nombreCierre, punteroFase, vivoCierre, type FaseCruda,
+} from "@/lib/moddulo/versionado/artefactosCierre";
+import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
 interface CompletePhaseBody {
   phaseId: PhaseId;
@@ -75,7 +80,9 @@ export async function POST(
     // El callback puede reintentarse: lee primero, no tiene efectos externos, devuelve un resultado y la respuesta
     // HTTP se arma fuera. Una sola transacción escribe el cierre, el RDA y, si es la 9.ª fase, el estado del proyecto
     // (H-V22: antes un `update` aparte tras la transacción).
-    const resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoCierre> => {
+    let resultado: ResultadoCierre;
+    try {
+    resultado = await adminDb.runTransaction(async (tx): Promise<ResultadoCierre> => {
       const snap = await tx.get(ref);
       if (!snap.exists || snap.data()?.deletedAt) return { t: "no_encontrado" };
       const crudo = snap.data() as ModduloProject;
@@ -129,6 +136,7 @@ export async function POST(
         if (motivo) return { t: "bloqueado", motivo };
       }
 
+      // UN solo instante por operación (H-V25): `completedAt` del vivo y `aprobacion.en` de la versión salen de aquí.
       const ahora = new Date().toISOString();
       const updates: Record<string, unknown> = {
         [`phases.${phaseId}.status`]: "completed",
@@ -154,7 +162,8 @@ export async function POST(
       // RDA — ítems nuevos + reconciliación automática barriendo todas las fases con evaluador (no solo la que se
       // cierra). Evaluado server-side contra el documento releído DENTRO de la transacción (sin lecturas extra:
       // es el mismo documento): nada calculado por el cliente.
-      Object.assign(updates, reconciliarRDA(vista).updates);
+      const rda = reconciliarRDA(vista);
+      Object.assign(updates, rda.updates);
 
       // Cierre automático del proyecto cuando las 9 fases quedan completas (H-V22: en esta MISMA escritura).
       const fasesCerradas = PHASE_ORDER.every((p) => (p === phaseId ? true : vista.phases?.[p]?.status === "completed"));
@@ -162,9 +171,56 @@ export async function POST(
         updates.status = "completed";
       }
 
+      // C1b-3b — historial: el cierre deja una versión de `cierre:{fase}` en la MISMA transacción (previa «abierta» con
+      // el borrador de `reportText` que se pisa, siempre que el artefacto aún no esté en el manifiesto vigente; el
+      // núcleo lo decide). Todas las lecturas (proyecto, manifiesto) van antes de la primera escritura.
+      const faseAntes = crudo.phases?.[phaseId] as unknown as FaseCruda | undefined;
+      const faseDespues: FaseCruda = {
+        ...faseAntes,
+        status: "completed",
+        completedAt: ahora,
+        ...(reportText ? { reportText } : {}),
+        ...(phaseId === "exploracion" ? { data: { ...(faseAntes?.data ?? {}), aprobadoEn: ahora } } : {}),
+      };
+      const previoTexto = typeof faseAntes?.reportText === "string" && faseAntes.reportText.length > 0 ? faseAntes.reportText : null;
+      const plan = await prepararVersion(tx, {
+        raiz: ref,
+        datosRaiz: crudo as unknown as Record<string, unknown>,
+        punteroCampo: punteroFase(phaseId),
+        ambito: AMBITO_CIERRE,
+        fase: phaseId,
+        tipoCambio: "ajuste_manual",
+        por: session.uid,
+        fuente: "usuario",
+        motivo: MOTIVO_CIERRE,
+        cierre: { por: session.uid },
+        detalle: detalleCierre({
+          reporteNuevo: !!reportText,
+          reporteSustituido: !!reportText && previoTexto !== null && previoTexto !== reportText,
+          rdaNuevos: rda.nuevos,
+          rdaResueltos: rda.resueltos,
+          proyectoCompletado: updates.status === "completed",
+        }),
+        artefactos: [
+          {
+            artefacto: nombreCierre(phaseId),
+            ...estadoCierre(phaseId, faseDespues, { por: session.uid, en: ahora }),
+            vivo: vivoCierre(phaseId, faseDespues),
+            estadoPrevio: estadoAbierto(phaseId, faseAntes),
+            vivoPrevio: vivoCierre(phaseId, faseAntes),
+          },
+        ],
+      });
+      Object.assign(updates, aplicarVersion(tx, plan).updatesRaiz);
+
       tx.update(ref, updates);
       return { t: "ok" };
     });
+    } catch (err) {
+      const respuesta = respuestaDeErrorHistorial(err, { projectId, fase: phaseId, ruta: "complete-phase" });
+      if (respuesta) return respuesta;
+      throw err;
+    }
 
     if (resultado.t === "no_encontrado") return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
     if (resultado.t === "bloqueado") return NextResponse.json({ error: resultado.motivo }, { status: 409 });

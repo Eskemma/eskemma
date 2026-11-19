@@ -152,7 +152,8 @@ describe("el estado `completed` del proyecto sale en la MISMA escritura (H-V22)"
     expect(escrituras()).toHaveLength(1);
     expect(escrituras()[0].data.status).toBe("completed");
     expect(escrituras()[0].data["phases.evaluacion.status"]).toBe("completed");
-    expect(db.contadores().escrituras).toBe(1);
+    // C1b-3b: la escritura del proyecto sigue siendo UNA; el historial suma previa, versión, revisión y evento (4 creates).
+    expect(db.contadores().escrituras).toBe(5);
   });
   it("si falla la escritura no queda NI el cierre NI el estado del proyecto (todo o nada)", async () => {
     sembrar(base(ochoCerradas()));
@@ -190,18 +191,18 @@ describe("costo en lecturas/escrituras de la transacción (getProject aparte: +1
     const d = db.contadores();
     return { r, lecturas: d.lecturas - antes.lecturas, escrituras: d.escrituras - antes.escrituras };
   };
-  it("cierre normal: 1 lectura y 1 escritura (el plan de RDA dentro de la transacción no añade lecturas)", async () => {
+  it("cierre normal: 1 lectura y 5 escrituras (C1b-3b: proyecto + previa, versión, revisión y evento; antes 1 y 1)", async () => {
     sembrar(base({ exploracion: APROBADO }));
     const m = await medir("exploracion");
     expect(m.r.status).toBe(200);
-    expect({ l: m.lecturas, e: m.escrituras }).toEqual({ l: 1, e: 1 });
+    expect({ l: m.lecturas, e: m.escrituras }).toEqual({ l: 1, e: 5 });
   });
-  it("cierre de la 9.ª fase: 1 lectura y 1 escritura (antes: 1 y 2)", async () => {
+  it("cierre de la 9.ª fase: 1 lectura y 5 escrituras (antes de C1b-3a: 1 y 2; de C1b-3b: 1 y 1)", async () => {
     const ph: Record<string, unknown> = {};
     for (const p of PHASE_ORDER.slice(0, 8)) ph[p] = { status: "completed" };
     sembrar(base(ph));
     const m = await medir("evaluacion");
-    expect({ l: m.lecturas, e: m.escrituras }).toEqual({ l: 1, e: 1 });
+    expect({ l: m.lecturas, e: m.escrituras }).toEqual({ l: 1, e: 5 });
   });
   it("fase ya cerrada: 1 lectura y 0 escrituras", async () => {
     sembrar(base({ proposito: { status: "completed" } }));

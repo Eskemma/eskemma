@@ -648,31 +648,6 @@ export async function appendChatMessage(
 }
 
 // ==========================================
-// COMPLETAR UNA FASE (con reporte)
-// ==========================================
-
-export async function completePhase(
-  projectId: string,
-  userId: string,
-  phaseId: PhaseId,
-  report: ModduloProject["phases"][PhaseId]["report"]
-): Promise<void> {
-  const project = await getProject(projectId, userId);
-  if (!project) throw new Error("Proyecto no encontrado.");
-
-  const phaseIndex = PHASE_ORDER.indexOf(phaseId);
-  const nextPhase = PHASE_ORDER[phaseIndex + 1] ?? phaseId;
-
-  await adminDb.collection(COLLECTION).doc(projectId).update({
-    [`phases.${phaseId}.status`]: "completed",
-    [`phases.${phaseId}.completedAt`]: new Date().toISOString(),
-    [`phases.${phaseId}.report`]: report,
-    currentPhase: nextPhase,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-}
-
-// ==========================================
 // CAMBIAR ESTADO DEL PROYECTO
 // ==========================================
 

@@ -1,10 +1,8 @@
 // app/moddulo/proyecto/[projectId]/proposito/page.tsx
 "use client";
 
-import {
-  decidirCierreDeFase,
-  type RespuestaGuardado,
-} from "@/lib/moddulo/guardadoHonesto";
+import { decidirCierreDeFase } from "@/lib/moddulo/guardadoHonesto";
+import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
@@ -378,18 +376,15 @@ function PropositoPageContent() {
         report = await generateReport(form);
       }
 
-      let paso1: RespuestaGuardado;
-      try {
-        const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+      // The body is read so the server's own code (historial_no_confirmado) reaches the message.
+      const { resp: paso1 } = await leerRespuestaGuardado(() =>
+        fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ phaseId: "proposito", reportText: report ?? undefined }),
-        });
-        paso1 = { tipo: "respuesta", ok: r.ok, status: r.status };
-      } catch {
-        paso1 = { tipo: "error_red" };
-      }
+        })
+      );
       const d = decidirCierreDeFase(paso1, null, { fase: "Fase 1" });
       if (!d.navegar) {
         setCloseError(d.mensajeBloqueante);

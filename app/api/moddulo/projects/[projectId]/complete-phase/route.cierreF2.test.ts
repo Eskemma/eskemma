@@ -101,11 +101,11 @@ describe("Paso 4 (H) — lo nuevo", () => {
     dado(proyecto({ dvs: DVS, m1: { creadoEn: "t" } }) as never);
     expect((await cerrar()).status).toBe(200);
   });
-  it("lo que escribe al cerrar no cambió: status, completedAt, currentPhase (y nada de más)", async () => {
+  it("lo que escribe al cerrar: status, completedAt, currentPhase y (C1b-3b) el puntero del historial (y nada de más)", async () => {
     dado(proyecto({ dvs: DVS, ...express }) as never);
     await cerrar();
     const d = escrituras()[0].data;
-    expect(Object.keys(d).sort()).toEqual(["currentPhase", "phases.exploracion.completedAt", "phases.exploracion.data.aprobadoEn", "phases.exploracion.status", "updatedAt"]);
+    expect(Object.keys(d).sort()).toEqual(["currentPhase", "phases.exploracion.completedAt", "phases.exploracion.data.aprobadoEn", "phases.exploracion.revision", "phases.exploracion.status", "updatedAt"]);
   });
 
   describe("el Reporte F2 debe ser de ESTE M1 (m1.generacion.huella === m1.aprobacion.huella)", () => {

@@ -9,7 +9,6 @@ import {
   decidirResultadoGuardado,
   mensajeDeAviso,
   urlSinAviso,
-  type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
 import { leerRespuestaGuardado } from "@/lib/moddulo/leerRespuestaGuardado";
 import ModduloChat from "@/app/moddulo/components/ModduloChat";
@@ -505,16 +504,13 @@ export default function InvestigacionPage() {
               onClick={async () => {
                 setCerrandoFase(true);
                 setCierreError(null);
-                let resp: RespuestaGuardado;
-                try {
-                  const r = await fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
+                // The body is read so the server's own code (historial_no_confirmado) reaches the message.
+                const { resp } = await leerRespuestaGuardado(() =>
+                  fetch(`/api/moddulo/projects/${projectId}/complete-phase`, {
                     method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
                     body: JSON.stringify({ phaseId: "investigacion" }),
-                  });
-                  resp = { tipo: "respuesta", ok: r.ok, status: r.status };
-                } catch {
-                  resp = { tipo: "error_red" };
-                }
+                  })
+                );
                 const d = decidirCierreDeFase(resp, null, { fase: "Fase 3" });
                 if (!d.navegar) setCierreError(d.mensajeBloqueante);
                 setCerrandoFase(false);
