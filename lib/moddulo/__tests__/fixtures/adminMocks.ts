@@ -215,17 +215,33 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
   // get() sobre los hijos directos de la colección — lo que usa pestel/project POST en
   // su dedup y listUserProjects (papelera, 26-09-28). No pretende cubrir el resto de
   // operadores de Firestore.
+  // C4a-1 (aditivo): `startAfter(valor)` (cursor sobre el campo del `orderBy`, excluye el propio valor) y
+  // `select(...campos)` (máscara de campos: el documento devuelto solo trae esos campos; NO baja las lecturas
+  // contadas, igual que Firestore real). El orden compara Timestamp reales por milisegundos.
+  const comparar = (a: unknown, b: unknown): number => {
+    const ms = (v: unknown) =>
+      v !== null && typeof v === "object" && typeof (v as { toMillis?: unknown }).toMillis === "function"
+        ? (v as { toMillis: () => number }).toMillis()
+        : v;
+    const av = ms(a) as string | number;
+    const bv = ms(b) as string | number;
+    return av === bv ? 0 : av < bv ? -1 : 1;
+  };
   function queryRef(
     path: string,
     clauses: [string, unknown][],
     order?: { field: string; dir: "asc" | "desc" },
-    limitN?: number
+    limitN?: number,
+    cursor?: { valor: unknown },
+    campos?: string[]
   ) {
     const self = {
       where: (field: string, _op: "==", value: unknown) =>
-        queryRef(path, [...clauses, [field, value]], order, limitN),
-      orderBy: (field: string, dir: "asc" | "desc" = "asc") => queryRef(path, clauses, { field, dir }, limitN),
-      limit: (n: number) => queryRef(path, clauses, order, n),
+        queryRef(path, [...clauses, [field, value]], order, limitN, cursor, campos),
+      orderBy: (field: string, dir: "asc" | "desc" = "asc") => queryRef(path, clauses, { field, dir }, limitN, cursor, campos),
+      limit: (n: number) => queryRef(path, clauses, order, n, cursor, campos),
+      startAfter: (valor: unknown) => queryRef(path, clauses, order, limitN, { valor }, campos),
+      select: (...fields: string[]) => queryRef(path, clauses, order, limitN, cursor, fields),
       get: vi.fn(async () => {
         let docs = [...store.entries()]
           .filter(([p]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes("/"))
@@ -236,13 +252,31 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
         if (order) {
           const { field, dir } = order;
           docs = [...docs].sort((a, b) => {
-            const av = (a.data() as Record<string, unknown> | undefined)?.[field];
-            const bv = (b.data() as Record<string, unknown> | undefined)?.[field];
-            const cmp = av === bv ? 0 : (av as string) < (bv as string) ? -1 : 1;
+            const cmp = comparar(
+              (a.data() as Record<string, unknown> | undefined)?.[field],
+              (b.data() as Record<string, unknown> | undefined)?.[field]
+            );
             return dir === "asc" ? cmp : -cmp;
           });
         }
+        if (cursor && order) {
+          const { field, dir } = order;
+          docs = docs.filter((d) => {
+            const c = comparar((d.data() as Record<string, unknown> | undefined)?.[field], cursor.valor);
+            return dir === "asc" ? c > 0 : c < 0;
+          });
+        }
         if (limitN != null) docs = docs.slice(0, limitN);
+        if (campos) {
+          docs = docs.map((d) => ({
+            id: d.id,
+            data: () => {
+              const full = d.data() as Record<string, unknown> | undefined;
+              if (!full) return full;
+              return Object.fromEntries(campos.filter((c) => c in full).map((c) => [c, full[c]]));
+            },
+          }));
+        }
         lecturasN += docs.length;
         return { empty: docs.length === 0, docs };
       }),
@@ -322,8 +356,34 @@ export function createMockAdminDb(initialDocs: Record<string, unknown> = {}) {
       }),
     };
   });
+  // C4a-1 (aditivo): `db.getAll(...refs)` como el de Firestore Admin: un snapshot por ref (1 lectura contada por
+  // documento, exista o no), en el mismo orden. El último argumento puede ser `{ fieldMask: [...] }`.
+  const getAll = vi.fn(async (...args: unknown[]) => {
+    const ultimo = args[args.length - 1] as { fieldMask?: string[] } | DocRef | undefined;
+    const opciones = ultimo && !("path" in (ultimo as object)) ? (ultimo as { fieldMask?: string[] }) : undefined;
+    const refs = (opciones ? args.slice(0, -1) : args) as DocRef[];
+    const mascara = opciones?.fieldMask;
+    const salida = [];
+    for (const ref of refs) {
+      const snap = await ref.get();
+      salida.push(
+        mascara
+          ? {
+              ...snap,
+              data: () => {
+                const full = snap.data() as Record<string, unknown> | undefined;
+                if (!full) return full;
+                return Object.fromEntries(mascara.filter((c) => c in full).map((c) => [c, full[c]]));
+              },
+            }
+          : snap
+      );
+    }
+    return salida;
+  });
   return {
     collection,
+    getAll,
     runTransaction,
     batch,
     /** Reemplaza el estado en memoria — usar en beforeEach/cada test. */

@@ -90,7 +90,7 @@
     {
       "id": "historial-versionado",
       "anchor": "## Historial unificado — `lib/versionado/`",
-      "description": "Sección «Historial unificado» (C1a 26-11-15, C3a-1, C3a-2 y C3a-2b 26-11-16, C3b 26-11-17, C1b-3a 26-11-17: `complete-phase` decide dentro de la transacción, aún sin historial; C1b-1 26-11-17: `m1-approve` y `m1-reopen` registran versiones de `f2M1`). Afirma qué rutas usan `lib/versionado/` (hoy `canal1/entregar`, `resultados/aprobar`, `canal3/vincular`, `m1-approve` y `m1-reopen`) y cuáles todavía no (`unlink-pestel`, `complete-phase`): `paths` incluye las rutas de F3 y de M1/F2 que ya lo usan o lo adoptarán (C1b) y los registros de artefactos de F3 y F2 (`lib/moddulo/versionado`); incluye el aviso de la reentrega sobre un resultado aprobado (C3b: `canal1/entregar` pregunta con 409 y huella); cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
+      "description": "Sección «Historial unificado» (C1a 26-11-15, C3a-1, C3a-2 y C3a-2b 26-11-16, C3b 26-11-17, C1b-3a 26-11-17: `complete-phase` decide dentro de la transacción, aún sin historial; C1b-1 26-11-17: `m1-approve` y `m1-reopen` registran versiones de `f2M1`). Afirma qué rutas usan `lib/versionado/` (hoy `canal1/entregar`, `resultados/aprobar`, `canal3/vincular`, `m1-approve` y `m1-reopen`) y cuáles todavía no (`unlink-pestel`, `complete-phase`): `paths` incluye las rutas de F3 y de M1/F2 que ya lo usan o lo adoptarán (C1b) y los registros de artefactos de F3 y F2 (`lib/moddulo/versionado`); incluye el aviso de la reentrega sobre un resultado aprobado (C3b: `canal1/entregar` pregunta con 409 y huella); incluye el lector de solo lectura (C4a-1, 26-11-19: `GET /api/moddulo/projects/[projectId]/historial`, el índice compuesto de `eventos` y la tabla única de ids H-V): `paths` suma esa ruta y `firestore.indexes.json`; cuando una de ellas se toque, el detector marcará la sección para releerla y reescribir su estado.",
       "paths": [
         "lib/versionado",
         "lib/moddulo/versionado",
@@ -100,7 +100,9 @@
         "app/api/moddulo/projects/[projectId]/complete-phase",
         "app/api/moddulo/f3/canal1/entregar",
         "app/api/moddulo/f3/canal3/vincular",
-        "app/api/moddulo/f3/resultados/aprobar"
+        "app/api/moddulo/f3/resultados/aprobar",
+        "app/api/moddulo/projects/[projectId]/historial",
+        "firestore.indexes.json"
       ]
     }
   ]

@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "eventos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fase", "order": "ASCENDING" },
+        { "fieldPath": "revisionN", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "pestel_indicator_cache",
       "queryScope": "COLLECTION",
       "fields": [

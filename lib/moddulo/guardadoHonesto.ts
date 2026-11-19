@@ -1214,6 +1214,36 @@ export interface DecisionGeneracionF2 {
   abrirReporte: boolean;
 }
 
+// ── C4a-1: LECTURA del historial ──────────────────────────────────────────────────────────────────────────────────
+// Leer NO es guardar: aquí no hay «puede que sí se haya hecho» (una lectura no cambia nada), así que el texto es
+// «No se pudo cargar el historial…» y nunca «CONFIRMAR». Deliberadamente fuera del catálogo `AccionGuardado` (que es de
+// escrituras): una función propia, sin `ACCIONES_*` ni `TEXTOS_SIMPLES`. Nunca muestra un código interno.
+export const TEXTO_HISTORIAL_INDICE_NO_LISTO = "El historial se está preparando. Vuelve a intentarlo en unos minutos.";
+
+export function decidirLecturaHistorial(resp: RespuestaGuardado, cuerpoValido = true): { exito: boolean; mensajeError: string | null } {
+  if (resp.tipo === "respuesta" && resp.ok && cuerpoValido) return { exito: true, mensajeError: null };
+  if (resp.tipo === "error_red") {
+    return { exito: false, mensajeError: "No se pudo cargar el historial: sin conexión con el servidor. Revisa tu conexión y vuelve a intentarlo." };
+  }
+  if (resp.ok) {
+    // 200 con un cuerpo que no es el esperado.
+    return { exito: false, mensajeError: "No se pudo cargar el historial. Vuelve a intentarlo en unos minutos." };
+  }
+  if (resp.status === 401 || resp.status === 403) {
+    return { exito: false, mensajeError: "No se pudo cargar el historial: no tienes permiso para verlo en este proyecto." };
+  }
+  if (resp.status === 404) {
+    return { exito: false, mensajeError: "No se pudo cargar el historial: no se encontró el proyecto. Puede que ya no exista." };
+  }
+  if (resp.status === 503 && resp.codigo === "indice_en_construccion") {
+    return { exito: false, mensajeError: TEXTO_HISTORIAL_INDICE_NO_LISTO };
+  }
+  if (resp.codigo === "historial_ilegible") {
+    return { exito: false, mensajeError: "No se pudo cargar el historial: hay un problema con los registros de esta fase. Avisa al equipo de Eskemma." };
+  }
+  return { exito: false, mensajeError: "No se pudo cargar el historial. Vuelve a intentarlo en unos minutos." };
+}
+
 export function decidirResultadoGeneracionF2(resp: RespuestaGuardado): DecisionGeneracionF2 {
   const ok = resp.tipo === "respuesta" && resp.ok && resp.cuerpoValido !== false;
   if (ok) {
