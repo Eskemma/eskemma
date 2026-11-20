@@ -218,7 +218,10 @@ describe("formatearFechaFila: fecha absoluta es-MX en la zona horaria dada", () 
     expect(formatearFechaFila(tarde, { timeZone: "UTC" })).toContain("10 de noviembre");
     expect(formatearFechaFila(tarde, { timeZone: "America/Mexico_City" })).toContain("9 de noviembre");
   });
-  it("ausente, null, vacío o ilegible → «Fecha desconocida (anterior al historial)» (sin lanzar)", () => {
+  it("el texto de fecha ilegible es «Fecha desconocida» (no afirma que sea anterior al historial)", () => {
+    expect(TEXTO_SIN_FECHA).toBe("Fecha desconocida");
+  });
+  it("ausente, null, vacío o ilegible → «Fecha desconocida» (sin lanzar)", () => {
     for (const v of [undefined, null, "", "no es una fecha", "2026-13-45"]) {
       expect(formatearFechaFila(v as never)).toBe(TEXTO_SIN_FECHA);
     }

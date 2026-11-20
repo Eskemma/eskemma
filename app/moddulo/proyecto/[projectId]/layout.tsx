@@ -1,10 +1,11 @@
 // app/moddulo/proyecto/[projectId]/layout.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { notFound, useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import PhaseNav from "@/app/moddulo/components/PhaseNav";
+import HistorialFase from "@/app/moddulo/components/HistorialFase";
 import type { RDAItem, PhaseId, PhaseStatus } from "@/types/moddulo.types";
 import { PHASE_ORDER } from "@/types/moddulo.types";
 import { debeMostrarNotFound } from "@/lib/moddulo/proyectoNoEncontrado";
@@ -13,6 +14,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const params = useParams();
   const projectId = params?.projectId as string;
   const pathname = usePathname();
+  // Raíz del layout: el panel «Historial» la deja `inert` mientras está abierto (el panel va en un portal, fuera de ella).
+  const contenidoRef = useRef<HTMLDivElement>(null);
   // Mismo patrón que PhaseNav.tsx para derivar la fase activa — las rutas son
   // carpetas estáticas por fase, no [phaseId] dinámico.
   const isEvaluacionActive = pathname.includes("/evaluacion");
@@ -70,7 +73,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="h-[calc(100vh-80px)] bg-gray-eske-10 dark:bg-[#0B1620] flex flex-col overflow-hidden">
+    <div ref={contenidoRef} className="h-[calc(100vh-80px)] bg-gray-eske-10 dark:bg-[#0B1620] flex flex-col overflow-hidden">
       {/* Top Header */}
       <header className="bg-bluegreen-eske text-white-eske py-3 px-4 shrink-0">
         <div className="flex items-center justify-between">
@@ -117,6 +120,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Historial del proyecto: solo en las 3 fases con historial (segmento exacto de la ruta). Con el panel
+                cerrado no carga nada (C4a-2b). */}
+            <HistorialFase projectId={projectId} pathname={pathname} contenidoRef={contenidoRef} />
             {/* Descarga consolidada de todos los informes del proyecto —
                 oculta por completo (no solo deshabilitada) antes de F9. */}
             {isEvaluacionActive && (

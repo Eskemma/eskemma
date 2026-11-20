@@ -38,6 +38,14 @@ export type EstadoPanel =
       hayCambioNuevo: boolean;
       /** Si ya no hay más páginas y aun así faltan cambios por mostrar: el texto explícito (H-V54); si no, null. */
       estadoFinal: string | null;
+      /** Una petición de «Cargar más» está en vuelo (el botón se deshabilita y se anuncia con role="status"). */
+      cargandoMas: boolean;
+      /** Una petición de «Actualizar» (o de «Comprobar cambios sin registro») está en vuelo. */
+      actualizando: boolean;
+      /** Falló «Cargar más»: texto de `decidirLecturaHistorial`, junto al botón con «Reintentar»; las filas NO se borran. */
+      errorAlCargarMas: string | null;
+      /** Falló «Actualizar»: mismo trato (las filas anteriores se conservan). */
+      errorAlActualizar: string | null;
     };
 
 export interface EntradaEstadoPanel {
@@ -53,12 +61,16 @@ export interface EntradaEstadoPanel {
   siguienteCursor: number | null;
   /** `totalCambios` de la respuesta más reciente de la 1.ª página. */
   totalCambios: number;
+  cargandoMas?: boolean;
+  actualizando?: boolean;
+  errorAlCargarMas?: string | null;
+  errorAlActualizar?: string | null;
 }
 
 /**
  * Qué muestra el panel. Prioridad: error > cargando (sin filas) > vacío (la fase no tiene historial) > filas.
- * Un error con filas ya cargadas NO borra las filas: el panel muestra el error junto a ellas (el llamador conserva
- * `filas`); aquí el error solo domina cuando no hay nada que mostrar.
+ * Un error con filas ya cargadas NO borra las filas: llega en `errorAlCargarMas` / `errorAlActualizar` y el panel lo
+ * muestra junto al botón con «Reintentar»; `mensajeError` solo domina cuando no hay nada que mostrar.
  */
 export function decidirEstadoPanel(e: EntradaEstadoPanel): EstadoPanel {
   if (e.mensajeError !== null && e.filas.length === 0) {
@@ -91,6 +103,11 @@ export function decidirEstadoPanel(e: EntradaEstadoPanel): EstadoPanel {
     avisos,
     hayCambioNuevo: e.filas.some((f) => f.posteriorALaLectura) || codigos.has("cambio_durante_lectura"),
     estadoFinal: !puedeCargarMas && sinMostrar > 0 ? textoEstadoFinal(sinMostrar, e.totalCambios) : null,
+    cargandoMas: e.cargandoMas === true,
+    actualizando: e.actualizando === true,
+    // Con filas, un error de la petición NO las borra: se muestra junto a su botón. Sin filas domina `mensajeError`.
+    errorAlCargarMas: e.errorAlCargarMas ?? null,
+    errorAlActualizar: e.errorAlActualizar ?? null,
   };
 }
 
@@ -214,4 +231,68 @@ export function siguienteEnCiclo(enfocables: readonly string[], actual: string |
   if (!shift && i === enfocables.length - 1) return { prevenir: true, destino: enfocables[0] };
   if (shift && i === 0) return { prevenir: true, destino: enfocables[enfocables.length - 1] };
   return { prevenir: false, destino: null };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Textos de la interfaz (C4a-2b). Todos los demás salen de `textosHistorial` / `guardadoHonesto`.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export const TEXTOS_PANEL = {
+  boton: "Historial",
+  titulo: "Historial de esta fase",
+  cerrar: "Cerrar",
+  cargarMas: "Cargar más",
+  cargandoMas: "Cargando más cambios…",
+  reintentar: "Reintentar",
+  actualizar: "Actualizar",
+  actualizando: "Actualizando…",
+  comprobarDeriva: "Comprobar cambios sin registro",
+  ayudaComprobarDeriva:
+    "Revisa si algo de esta fase se cambió sin quedar en el historial. Puede tardar un poco más que abrirlo.",
+  /** `N cambios en esta fase` (singular para 1). */
+  total: (n: number) => (n === 1 ? "1 cambio en esta fase" : `${n} cambios en esta fase`),
+} as const;
+
+export interface AvisoDerivaVigente {
+  tipo: "cambio" | "sin_cambio";
+  texto: string;
+}
+
+export const TEXTO_CAMBIO_SIN_REGISTRO =
+  "Lo que ves hoy en esta fase es distinto de la última versión guardada en el historial: se hizo un cambio que no quedó registrado, y el historial no sabe quién lo hizo ni cuándo.";
+export const TEXTO_SIN_CAMBIO_SIN_REGISTRO = "Se comprobó: no hay cambios sin registro en esta fase.";
+
+/**
+ * Aviso (arriba de la lista) de que el estado ACTUAL difiere de la última versión registrada. Sale de
+ * `respuesta.vigente.artefactos[].derivaDetectada`. En F1 y F2 el lector lo calcula siempre: solo avisa si hay cambio.
+ * En F3 solo se comprueba cuando la persona lo pidió (`derivaF3Pedida`): sin pedirlo no se dice nada (los valores
+ * `null` significan «no comprobado»); pedido y sin cambios, se dice que se comprobó. Sin jerga y sin siglas.
+ */
+export function avisoDerivaVigente(
+  respuesta: Pick<RespuestaHistorial, "vigente"> | null,
+  fase: FaseConHistorial,
+  derivaF3Pedida: boolean
+): AvisoDerivaVigente | null {
+  const arts = respuesta?.vigente?.artefactos ?? [];
+  if (arts.length === 0) return null;
+  if (fase === "investigacion" && !derivaF3Pedida) return null;
+  if (arts.some((a) => a.derivaDetectada === true)) return { tipo: "cambio", texto: TEXTO_CAMBIO_SIN_REGISTRO };
+  if (fase === "investigacion" && arts.every((a) => a.derivaDetectada === false)) {
+    return { tipo: "sin_cambio", texto: TEXTO_SIN_CAMBIO_SIN_REGISTRO };
+  }
+  return null;
+}
+
+/**
+ * Dónde va el foco (R3 y H-V65): al empezar una carga el foco se queda en el DIÁLOGO (el botón que lo tenía se desmonta o
+ * se deshabilita); al terminar, al título («Actualizar», 1.ª página o «Reintentar») o al botón «Cargar más» si sigue
+ * habiendo páginas; al cerrar, al botón «Historial». Con el panel abierto el foco nunca debe quedar fuera del diálogo.
+ */
+export type MomentoFoco = "abrir" | "cargando_inicio" | "cargado" | "actualizado" | "cargado_mas" | "cerrar";
+export type DestinoFoco = "titulo" | "dialogo" | "cargar_mas" | "boton_historial";
+export function dondeVaElFoco(momento: MomentoFoco, hayMas = false): DestinoFoco {
+  if (momento === "cerrar") return "boton_historial";
+  if (momento === "cargando_inicio") return "dialogo";
+  if (momento === "cargado_mas") return hayMas ? "cargar_mas" : "titulo";
+  return "titulo"; // abrir, cargado, actualizado
 }

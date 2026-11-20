@@ -10,7 +10,7 @@ import type { TipoCambio } from "@/lib/versionado/tipos";
 
 export const TEXTO_RESPALDO = "Hizo un cambio";
 export const TEXTO_SIN_AUTORIA = "Sin autoría registrada";
-export const TEXTO_SIN_FECHA = "Fecha desconocida (anterior al historial)";
+export const TEXTO_SIN_FECHA = "Fecha desconocida";
 export const TEXTO_ALGUIEN_DEL_EQUIPO = "Alguien del equipo";
 
 /** `tipoCambio` → texto (cuando no hay un `motivo` más específico). */
@@ -111,7 +111,7 @@ export function textoQuien(a: { por: string | null; nombreColaborador?: unknown;
 /**
  * Fecha ABSOLUTA de una fila en es-MX (p. ej. «10 de noviembre de 2026, 9:00 a.m.») en la zona horaria del navegador
  * (`timeZone` ausente = la del entorno; las pruebas pasan una explícita). Ausente, null o ilegible →
- * «Fecha desconocida (anterior al historial)». Nunca lanza.
+ * «Fecha desconocida». Nunca lanza.
  */
 export function formatearFechaFila(iso: string | null | undefined, opciones: { timeZone?: string } = {}): string {
   if (typeof iso !== "string" || iso.length === 0) return TEXTO_SIN_FECHA;
@@ -128,4 +128,4 @@ export function formatearFechaFila(iso: string | null | undefined, opciones: { t
   }
 }
 
-export const TEXTO_FASE_SIN_HISTORIAL ="Aún no hay cambios registrados en esta fase. El historial empieza con el próximo cambio.";
+export const TEXTO_FASE_SIN_HISTORIAL = "Aún no hay cambios registrados en esta fase. El historial empieza con el próximo cambio.";

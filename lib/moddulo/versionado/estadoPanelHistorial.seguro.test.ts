@@ -10,6 +10,7 @@ const imports = (src: string) => [...src.matchAll(/^\s*(?:import|export)\s[^;]*?
 
 const PERMITIDOS: Record<string, string[]> = {
   "lib/moddulo/versionado/estadoPanelHistorial.ts": ["@/lib/versionado/lectura", "./textosHistorial", "@/lib/moddulo/guardadoHonesto"],
+  "lib/moddulo/versionado/estadoHookHistorial.ts": ["@/lib/versionado/lectura", "./estadoPanelHistorial"],
   "lib/moddulo/versionado/textosHistorial.ts": ["@/lib/versionado/tipos"],
   "lib/design/contraste.ts": [],
 };

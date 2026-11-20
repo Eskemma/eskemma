@@ -197,3 +197,82 @@ describe("siguienteEnCiclo: trampa de foco propia (recalcula los enfocables en c
     expect(siguienteEnCiclo(["cerrar", "f1", "cargar-mas"], "cargar-mas", false)).toEqual({ prevenir: true, destino: "cerrar" });
   });
 });
+
+// ---- C4a-2b: errores con filas, aviso del estado actual, foco ----
+import { TEXTOS_PANEL, TEXTO_CAMBIO_SIN_REGISTRO, TEXTO_SIN_CAMBIO_SIN_REGISTRO, avisoDerivaVigente, dondeVaElFoco } from "./estadoPanelHistorial";
+
+describe("decidirEstadoPanel: cargando más, actualizando y errores con filas", () => {
+  const base = { filas: [fila(2), fila(1)], respuesta: resp({ totalCambios: 4 }), siguienteCursor: 1, totalCambios: 4 };
+  it("sin los campos nuevos, valen false / null", () => {
+    expect(decidirEstadoPanel(entrada(base))).toMatchObject({ cargandoMas: false, actualizando: false, errorAlCargarMas: null, errorAlActualizar: null });
+  });
+  it("cargandoMas y actualizando pasan tal cual, con las filas intactas", () => {
+    const s = decidirEstadoPanel(entrada({ ...base, cargandoMas: true, actualizando: true }));
+    expect(s).toMatchObject({ tipo: "filas", cargandoMas: true, actualizando: true });
+    expect((s as { filas: unknown[] }).filas).toHaveLength(2);
+  });
+  it("el error de «Cargar más» viaja junto a las filas y deja «Cargar más» disponible", () => {
+    expect(decidirEstadoPanel(entrada({ ...base, errorAlCargarMas: "No se pudo cargar el historial." }))).toMatchObject({
+      tipo: "filas", errorAlCargarMas: "No se pudo cargar el historial.", puedeCargarMas: true,
+    });
+  });
+  it("el error de «Actualizar» viaja aparte", () => {
+    expect(decidirEstadoPanel(entrada({ ...base, errorAlActualizar: "No se pudo cargar el historial." }))).toMatchObject({ errorAlActualizar: "No se pudo cargar el historial.", errorAlCargarMas: null });
+  });
+});
+
+describe("avisoDerivaVigente: el estado ACTUAL difiere de la última versión registrada", () => {
+  const vig = (...d: (boolean | null)[]) => ({ vigente: { revisionN: 3, artefactos: d.map((x, i) => ({ nombre: `a${i}`, etiqueta: "x", versionVigenteId: "v", n: 1, derivaDetectada: x })) } });
+  it("F1 y F2: avisa solo si hay cambio sin registro (sale sola)", () => {
+    for (const f of ["proposito", "exploracion"] as const) {
+      expect(avisoDerivaVigente(vig(true), f, false)).toEqual({ tipo: "cambio", texto: TEXTO_CAMBIO_SIN_REGISTRO });
+      expect(avisoDerivaVigente(vig(false), f, false)).toBeNull();
+    }
+  });
+  it("F3 sin pedirlo no dice nada, ni siquiera si el lector trajo true", () => {
+    expect(avisoDerivaVigente(vig(true, false), "investigacion", false)).toBeNull();
+    expect(avisoDerivaVigente(vig(null, null), "investigacion", false)).toBeNull();
+  });
+  it("F3 pedido: cambio → aviso; todo false → «se comprobó»; null (no comprobado) → nada", () => {
+    expect(avisoDerivaVigente(vig(false, true), "investigacion", true)?.tipo).toBe("cambio");
+    expect(avisoDerivaVigente(vig(false, false), "investigacion", true)).toEqual({ tipo: "sin_cambio", texto: TEXTO_SIN_CAMBIO_SIN_REGISTRO });
+    expect(avisoDerivaVigente(vig(false, null), "investigacion", true)).toBeNull();
+  });
+  it("sin respuesta, sin vigente o sin artefactos → null", () => {
+    expect(avisoDerivaVigente(null, "exploracion", false)).toBeNull();
+    expect(avisoDerivaVigente({ vigente: null }, "exploracion", false)).toBeNull();
+    expect(avisoDerivaVigente(vig(), "exploracion", false)).toBeNull();
+  });
+  it("el aviso es neutro: no atribuye el cambio a un tercero («alguien») y dice lo que pasó", () => {
+    expect(TEXTO_CAMBIO_SIN_REGISTRO).toBe("Lo que ves hoy en esta fase es distinto de la última versión guardada en el historial: se hizo un cambio que no quedó registrado, y el historial no sabe quién lo hizo ni cuándo.");
+    expect(TEXTO_CAMBIO_SIN_REGISTRO).not.toMatch(/alguien/i);
+  });
+  it("los textos no usan «deriva», siglas ni «Centinela» a secas", () => {
+    for (const t of [TEXTO_CAMBIO_SIN_REGISTRO, TEXTO_SIN_CAMBIO_SIN_REGISTRO, TEXTOS_PANEL.ayudaComprobarDeriva, TEXTOS_PANEL.comprobarDeriva]) {
+      expect(t).not.toMatch(/deriva|\b(HEI|DIE|RDA|M[1-5]|PIP)\b|Centinela|CONFIRMAR/i);
+    }
+  });
+});
+
+describe("dondeVaElFoco y textos del panel", () => {
+  it("abrir y actualizar → título; cerrar → botón «Historial»", () => {
+    expect(dondeVaElFoco("abrir")).toBe("titulo");
+    expect(dondeVaElFoco("actualizado")).toBe("titulo");
+    expect(dondeVaElFoco("cerrar")).toBe("boton_historial");
+  });
+  it("al empezar una carga el foco se queda en el diálogo; al terminar va al título (H-V65: nunca a body)", () => {
+    expect(dondeVaElFoco("cargando_inicio")).toBe("dialogo");
+    expect(dondeVaElFoco("cargado")).toBe("titulo");
+  });
+  it("tras «Cargar más» el foco vuelve al botón si hay más; si no, al título", () => {
+    expect(dondeVaElFoco("cargado_mas", true)).toBe("cargar_mas");
+    expect(dondeVaElFoco("cargado_mas", false)).toBe("titulo");
+  });
+  it("total en singular y plural", () => {
+    expect(TEXTOS_PANEL.total(1)).toBe("1 cambio en esta fase");
+    expect(TEXTOS_PANEL.total(45)).toBe("45 cambios en esta fase");
+  });
+  it("ningún texto fijo usa siglas internas ni «CONFIRMAR»", () => {
+    for (const t of Object.values(TEXTOS_PANEL)) if (typeof t === "string") expect(t).not.toMatch(/\b(HEI|DIE|RDA|M[1-5]|PIP)\b|CONFIRMAR|Centinela/);
+  });
+});

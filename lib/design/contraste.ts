@@ -52,3 +52,18 @@ export function tokensDeCss(css: string): Record<string, string> {
   for (const m of css.matchAll(/--color-([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/g)) tokens[m[1]] = m[2].toLowerCase();
   return tokens;
 }
+
+/** Texto de un bloque CSS: desde `inicio` (p. ej. `.dark,`) hasta la primera línea que cierra con `}`. Vacío si no existe. */
+export function bloqueCss(css: string, inicio: string): string {
+  const i = css.indexOf(inicio);
+  if (i === -1) return "";
+  const fin = css.indexOf("\n}", i);
+  return css.slice(i, fin === -1 ? undefined : fin);
+}
+
+/** `--nombre: #rrggbb;` (cualquier variable, no solo `--color-*`) → { nombre: "#rrggbb" }. Útil con `bloqueCss` para el modo oscuro. */
+export function variablesDeCss(css: string): Record<string, string> {
+  const v: Record<string, string> = {};
+  for (const m of css.matchAll(/--([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/g)) v[m[1]] = m[2].toLowerCase();
+  return v;
+}

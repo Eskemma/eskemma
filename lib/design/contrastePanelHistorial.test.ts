@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { UMBRAL_NO_TEXTO, UMBRAL_TEXTO, componer, hexARgb, luminanciaRelativa, razonDeContraste, tokensDeCss } from "./contraste";
+import { UMBRAL_NO_TEXTO, UMBRAL_TEXTO, bloqueCss, componer, hexARgb, luminanciaRelativa, razonDeContraste, tokensDeCss, variablesDeCss } from "./contraste";
 
 const css = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8");
 const t = tokensDeCss(css);
@@ -16,10 +16,17 @@ const token = (n: string): string => {
 };
 
 const CLARO = token("white-eske");
-const OSCURO = "#18324a"; // fondo oscuro de los diálogos (surface-2 de globals.css)
-// Los literales hexadecimales de modo oscuro que usan los componentes (no son tokens): se fijan aquí.
-const TEXTO_OSCURO = "#eaf2f8";
-const SECUNDARIO_OSCURO = "#9aaebe";
+// Modo oscuro: se LEE del bloque `.dark` de globals.css (superficie y colores de texto de los diálogos). Lo único que sigue
+// fijo en los componentes son las clases `dark:text-[#EAF2F8]` y `dark:text-[#9AAEBE]`, que son exactamente --text-hi y
+// --text-mid; la prueba comprueba que valen eso.
+const oscuroCss = variablesDeCss(bloqueCss(css, ".dark,\n[data-theme=\"dark\"]"));
+const dark = (n: string): string => {
+  if (!oscuroCss[n]) throw new Error(`La variable --${n} no existe en el bloque .dark de globals.css`);
+  return oscuroCss[n];
+};
+const OSCURO = dark("surface-2"); // #18324A: fondo de los diálogos (NO el #0F2233 de ResponsivePanel)
+const TEXTO_OSCURO = dark("text-hi");
+const SECUNDARIO_OSCURO = dark("text-mid");
 
 interface Par { nombre: string; frente: string; fondo: string; umbral: number }
 const pares: Par[] = [
@@ -39,6 +46,30 @@ const pares: Par[] = [
   { nombre: "anillo de foco oscuro: blue-eske-30", frente: token("blue-eske-30"), fondo: OSCURO, umbral: UMBRAL_NO_TEXTO },
   { nombre: "ícono de cerrar claro (black-eske-20)", frente: token("black-eske-20"), fondo: CLARO, umbral: UMBRAL_NO_TEXTO },
   { nombre: "ícono de cerrar oscuro (#9AAEBE)", frente: SECUNDARIO_OSCURO, fondo: OSCURO, umbral: UMBRAL_NO_TEXTO },
+  // ---- C4a-2b: pares de la interfaz ----
+  // Botón «Historial» de la cabecera (fondo bluegreen-eske en claro Y en oscuro: la cabecera no cambia de tema)
+  { nombre: "botón Historial: texto e ícono white-eske sobre la cabecera", frente: token("white-eske"), fondo: token("bluegreen-eske"), umbral: UMBRAL_TEXTO },
+  { nombre: "botón Historial en hover (white-eske/10 sobre la cabecera)", frente: token("white-eske"), fondo: componer(token("white-eske"), token("bluegreen-eske"), 0.1), umbral: UMBRAL_TEXTO },
+  { nombre: "botón Historial: anillo de foco white-eske sobre la cabecera", frente: token("white-eske"), fondo: token("bluegreen-eske"), umbral: UMBRAL_NO_TEXTO },
+  // Título, marcas y avisos sobre el panel
+  { nombre: "marca «★ Versión actual» claro (bluegreen-eske)", frente: token("bluegreen-eske"), fondo: CLARO, umbral: UMBRAL_TEXTO },
+  { nombre: "marca «★ Versión actual» oscuro (blue-eske-30)", frente: token("blue-eske-30"), fondo: OSCURO, umbral: UMBRAL_TEXTO },
+  { nombre: "marcas de cambio nuevo / sin registro / retención claro (brown-eske-60)", frente: token("brown-eske-60"), fondo: CLARO, umbral: UMBRAL_TEXTO },
+  { nombre: "marcas de cambio nuevo / sin registro / retención oscuro (yellow-eske)", frente: token("yellow-eske"), fondo: OSCURO, umbral: UMBRAL_TEXTO },
+  { nombre: "ícono de aviso claro (brown-eske-60)", frente: token("brown-eske-60"), fondo: CLARO, umbral: UMBRAL_NO_TEXTO },
+  // Error con tinte (role="alert")
+  { nombre: "error claro (red-eske-60) sobre tinte rojo /10", frente: token("red-eske-60"), fondo: componer(token("red-eske"), CLARO, 0.1), umbral: UMBRAL_TEXTO },
+  { nombre: "error oscuro (red-eske-10) sobre tinte rojo /10", frente: token("red-eske-10"), fondo: componer(token("red-eske"), OSCURO, 0.1), umbral: UMBRAL_TEXTO },
+  // Botones «Actualizar», «Cargar más», «Reintentar», «Comprobar cambios sin registro»: texto y borde, reposo y hover
+  { nombre: "botón claro: borde y texto bluegreen-eske", frente: token("bluegreen-eske"), fondo: CLARO, umbral: UMBRAL_NO_TEXTO },
+  { nombre: "botón claro en hover (bluegreen-eske sobre su tinte /10)", frente: token("bluegreen-eske"), fondo: componer(token("bluegreen-eske"), CLARO, 0.1), umbral: UMBRAL_TEXTO },
+  { nombre: "botón oscuro: borde y texto blue-eske-30", frente: token("blue-eske-30"), fondo: OSCURO, umbral: UMBRAL_NO_TEXTO },
+  { nombre: "botón oscuro en hover (blue-eske-30 sobre su tinte /10)", frente: token("blue-eske-30"), fondo: componer(token("blue-eske-30"), OSCURO, 0.1), umbral: UMBRAL_TEXTO },
+  // Botón de cerrar en hover
+  { nombre: "cerrar claro en hover (black-eske-20 sobre gray-eske-10)", frente: token("black-eske-20"), fondo: token("gray-eske-10"), umbral: UMBRAL_TEXTO },
+  { nombre: "cerrar oscuro en hover (#9AAEBE sobre blanco/5)", frente: SECUNDARIO_OSCURO, fondo: componer("#ffffff", OSCURO, 0.05), umbral: UMBRAL_TEXTO },
+  // Textos de fila y de estado final (secundario) sobre el panel: ya cubiertos arriba; el estado final usa la caja de aviso
+  { nombre: "texto principal oscuro sobre el panel (título y filas)", frente: TEXTO_OSCURO, fondo: OSCURO, umbral: UMBRAL_TEXTO },
 ];
 
 describe("contraste del panel «Historial» (WCAG AA, medido con los tokens reales)", () => {
@@ -90,5 +121,17 @@ describe("módulo de medición", () => {
     for (const n of ["white-eske", "black-eske", "black-eske-10", "black-eske-20", "red-eske-60", "red-eske-10", "brown-eske-60", "yellow-eske", "bluegreen-eske", "blue-eske-30"]) {
       expect(t[n], n).toMatch(/^#[0-9a-f]{6}$/);
     }
+  });
+});
+
+describe("las clases fijas de modo oscuro de los componentes valen lo que dice globals.css", () => {
+  it("#EAF2F8 = --text-hi, #9AAEBE = --text-mid y #18324A = --surface-2 (el único literal que queda en el código)", () => {
+    expect(TEXTO_OSCURO).toBe("#eaf2f8");
+    expect(SECUNDARIO_OSCURO).toBe("#9aaebe");
+    expect(OSCURO).toBe("#18324a");
+  });
+  it("las variables oscuras vienen del bloque .dark, no del claro", () => {
+    expect(bloqueCss(css, ".dark,\n[data-theme=\"dark\"]")).toContain("--surface-2");
+    expect(bloqueCss(css, "no-existe")).toBe("");
   });
 });
