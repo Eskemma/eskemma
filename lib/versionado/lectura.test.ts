@@ -3,6 +3,8 @@
 import { describe, expect, it } from "vitest";
 import {
   analizarContinuidad,
+  clasificarEvento,
+  esCursorValido,
   esFaseConHistorial,
   recuperabilidad,
   revisionDeEvento,
@@ -115,5 +117,67 @@ describe("esFaseConHistorial", () => {
     for (const f of ["diagnostico", "estrategia", "tactica", "gerencia", "seguimiento", "evaluacion", "", null, undefined, 3]) {
       expect(esFaseConHistorial(f)).toBe(false);
     }
+  });
+});
+
+// ---- C4a-2a (H-V54): el cursor cumple EXACTAMENTE la validación de la ruta ----
+describe("esCursorValido (misma regla que la ruta: entero >= 1 y de hasta 9 dígitos)", () => {
+  it("acepta enteros desde 1 hasta 999 999 999", () => {
+    for (const v of [1, 2, 7, 20, 999_999_999]) expect(esCursorValido(v)).toBe(true);
+  });
+  it("rechaza 0, negativos, fracciones, texto, NaN, infinitos, null, undefined y más de 9 dígitos", () => {
+    for (const v of [0, -1, -7, 7.5, 0.5, "7", "", NaN, Infinity, -Infinity, null, undefined, {}, [], true, 1_000_000_000]) {
+      expect(esCursorValido(v)).toBe(false);
+    }
+  });
+});
+
+describe("analizarContinuidad: el cursor producido siempre es válido (H-V54)", () => {
+  it("una página llena de revisiones inválidas (0, 7.5, NaN, negativos) NO produce cursor", () => {
+    const r = analizarContinuidad([0, 7.5, NaN, -3, -1], { techo: 10, pedidos: 5, limite: 5 });
+    expect(r.siguienteCursor).toBeNull();
+  });
+  it("valores inválidos mezclados con válidos: el cursor sale del menor VÁLIDO, nunca del inválido", () => {
+    const r = analizarContinuidad([9, 8, 0.5, -2], { techo: 9, pedidos: 4, limite: 4 });
+    expect(r.siguienteCursor).toBe(8);
+    expect(esCursorValido(r.siguienteCursor)).toBe(true);
+  });
+  it("el último válido es 1 → no hay nada debajo → sin cursor", () => {
+    expect(analizarContinuidad([3, 2, 1], { techo: 3, pedidos: 3, limite: 3 }).siguienteCursor).toBeNull();
+  });
+  it("página corta con inválidos → sin cursor (la consulta se agotó)", () => {
+    expect(analizarContinuidad([5, 0], { techo: 5, pedidos: 2, limite: 20 }).siguienteCursor).toBeNull();
+  });
+  it("un cursor de más de 9 dígitos (la ruta lo rechazaría) no se devuelve nunca", () => {
+    const r = analizarContinuidad([1_000_000_002, 1_000_000_001], { techo: 1_000_000_002, pedidos: 2, limite: 2 });
+    expect(r.siguienteCursor).toBeNull();
+  });
+  it("todo cursor devuelto (barrido de formas de página) cumple esCursorValido", () => {
+    const cabezas = [[10, 9], [10, 7.5], [10, NaN], [0], [], [1], [2, 1], [999_999_999, 999_999_998]];
+    for (const rev of cabezas) {
+      const c = analizarContinuidad(rev, { techo: 999_999_999, pedidos: rev.length, limite: rev.length || 1 }).siguienteCursor;
+      expect(c === null || esCursorValido(c)).toBe(true);
+    }
+  });
+});
+
+// ---- C4a-2a (H-V55): evento incompleto ≠ retención ----
+describe("clasificarEvento", () => {
+  const existentes = new Set(["a__000001", "a__000002"]);
+  it("todas las versiones existen → ni incompleto ni retención", () => {
+    expect(clasificarEvento(["a__000001", "a__000002"], existentes)).toEqual({ incompleto: false, retencionParcial: false });
+  });
+  it("una versión citada que ya no existe → retención (no incompleto)", () => {
+    expect(clasificarEvento(["a__000001", "a__000009"], existentes)).toEqual({ incompleto: false, retencionParcial: true });
+  });
+  it("evento sin artefactos → INCOMPLETO y no retención", () => {
+    expect(clasificarEvento([], existentes)).toEqual({ incompleto: true, retencionParcial: false });
+  });
+  it("artefacto sin versionId (null) → INCOMPLETO y no retención", () => {
+    expect(clasificarEvento([null], existentes)).toEqual({ incompleto: true, retencionParcial: false });
+    expect(clasificarEvento(["a__000001", null], existentes)).toEqual({ incompleto: true, retencionParcial: false });
+  });
+  it("null más una versión podada → ambas cosas, cada una por su causa", () => {
+    expect(clasificarEvento([null, "a__000009"], existentes)).toEqual({ incompleto: true, retencionParcial: true });
   });
 });

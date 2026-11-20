@@ -5,6 +5,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  TEXTO_ALGUIEN_DEL_EQUIPO,
+  TEXTO_SIN_AUTORIA,
+  TEXTO_SIN_FECHA,
+  formatearFechaFila,
+  textoQuien,
   TEXTO_AVISO,
   TEXTO_FASE_SIN_HISTORIAL,
   TEXTO_POR_MOTIVO,
@@ -176,5 +181,52 @@ describe("criterios de redacción", () => {
   });
   it("el aviso de eventos incompletos es el pedido por producto", () => {
     expect(TEXTO_AVISO.eventos_incompletos).toBe("Algunos cambios antiguos no se pueden mostrar.");
+  });
+});
+
+// ---- C4a-2a: quién hizo el cambio y fecha absoluta de la fila ----
+describe("textoQuien: «Sin autoría registrada» frente a «Alguien del equipo»", () => {
+  it("sin `por` (versión previa, H-V43) → «Sin autoría registrada», también si el rol no ve nombres", () => {
+    expect(textoQuien({ por: null, verDetalle: true })).toBe(TEXTO_SIN_AUTORIA);
+    expect(textoQuien({ por: null, nombreColaborador: "Raúl", verDetalle: false })).toBe(TEXTO_SIN_AUTORIA);
+  });
+  it("con `por` pero el rol no ve nombres → «Alguien del equipo»", () => {
+    expect(textoQuien({ por: "u1", nombreColaborador: "Raúl", verDetalle: false })).toBe(TEXTO_ALGUIEN_DEL_EQUIPO);
+  });
+  it("con `por` pero ya no es colaborador o no tiene nombre (vacío, espacios, no texto) → «Alguien del equipo»", () => {
+    for (const n of [undefined, null, "", "   ", 7, {}]) {
+      expect(textoQuien({ por: "u9", nombreColaborador: n, verDetalle: true })).toBe(TEXTO_ALGUIEN_DEL_EQUIPO);
+    }
+  });
+  it("con nombre → el nombre (recortado)", () => {
+    expect(textoQuien({ por: "u1", nombreColaborador: "  Raúl  ", verDetalle: true })).toBe("Raúl");
+  });
+});
+
+describe("formatearFechaFila: fecha absoluta es-MX en la zona horaria dada", () => {
+  const iso = "2026-11-10T15:30:00.000Z";
+  it("día, mes y año en español, con hora", () => {
+    const t = formatearFechaFila(iso, { timeZone: "UTC" });
+    expect(t).toContain("10 de noviembre de 2026");
+    expect(t).toMatch(/3:30/);
+  });
+  it("respeta la zona horaria (Ciudad de México = UTC−6 en noviembre)", () => {
+    expect(formatearFechaFila(iso, { timeZone: "America/Mexico_City" })).toMatch(/9:30/);
+  });
+  it("cambia de día según la zona", () => {
+    const tarde = "2026-11-10T03:00:00.000Z";
+    expect(formatearFechaFila(tarde, { timeZone: "UTC" })).toContain("10 de noviembre");
+    expect(formatearFechaFila(tarde, { timeZone: "America/Mexico_City" })).toContain("9 de noviembre");
+  });
+  it("ausente, null, vacío o ilegible → «Fecha desconocida (anterior al historial)» (sin lanzar)", () => {
+    for (const v of [undefined, null, "", "no es una fecha", "2026-13-45"]) {
+      expect(formatearFechaFila(v as never)).toBe(TEXTO_SIN_FECHA);
+    }
+  });
+  it("una zona horaria inválida no lanza", () => {
+    expect(formatearFechaFila(iso, { timeZone: "Marte/Olympus" })).toBe(TEXTO_SIN_FECHA);
+  });
+  it("sin zona dada usa la del entorno (no lanza y trae el año)", () => {
+    expect(formatearFechaFila(iso)).toContain("2026");
   });
 });

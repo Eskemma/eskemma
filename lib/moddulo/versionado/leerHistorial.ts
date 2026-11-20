@@ -22,6 +22,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { idRevision } from "@/lib/versionado/registrar";
 import {
   analizarContinuidad,
+  clasificarEvento,
   recuperabilidad,
   revisionDeEvento,
   versionesExistentes,
@@ -36,14 +37,7 @@ import {
 import { enAIso } from "./artefactosF2";
 import { detectarDeriva } from "./derivaVivo";
 import { puedeVerDetalleHistorial, puedeVerPanelHistorial } from "./visibilidadHistorial";
-import {
-  TEXTO_ALGUIEN_DEL_EQUIPO,
-  TEXTO_AVISO,
-  TEXTO_SIN_AUTORIA,
-  detalleEnTexto,
-  etiquetaArtefacto,
-  tituloAccion,
-} from "./textosHistorial";
+import { TEXTO_AVISO, detalleEnTexto, etiquetaArtefacto, textoQuien, tituloAccion } from "./textosHistorial";
 import type { CollaboratorRole } from "@/types/moddulo.types";
 
 type Doc = Record<string, unknown>;
@@ -148,6 +142,10 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
   const validas: number[] = [];
   let invalidos = 0;
   let hayPosterior = false;
+  // H-V55: un evento sin artefactos o sin `versionId` es un registro INCOMPLETO, no retención; solo una versión citada
+  // que ya no está entre las existentes cuenta como retención parcial.
+  let eventosSinVersiones = 0;
+  let hayRetencion = false;
   for (const d of docs) {
     const data = (d.data() ?? {}) as Doc;
     const n = revisionDeEvento({ id: d.id, data }, fase);
@@ -162,6 +160,11 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
     const nombres = (Array.isArray(data.artefactos) ? data.artefactos : []).filter((x): x is string => typeof x === "string");
     const versionIds = (data.versionIds ?? {}) as Record<string, unknown>;
     const idsDelEvento = nombres.map((nom) => (typeof versionIds[nom] === "string" ? (versionIds[nom] as string) : null));
+    if (!posterior) {
+      const c = clasificarEvento(idsDelEvento, existentes);
+      if (c.incompleto) eventosSinVersiones++;
+      if (c.retencionParcial) hayRetencion = true;
+    }
     const artefactos: ArtefactoDeFila[] = nombres.map((nom, i) => {
       const id = idsDelEvento[i];
       return {
@@ -173,16 +176,11 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
       };
     });
     const por = typeof data.por === "string" && data.por.length > 0 ? data.por : null;
-    const quien =
-      por === null
-        ? TEXTO_SIN_AUTORIA
-        : !verDetalle
-          ? TEXTO_ALGUIEN_DEL_EQUIPO
-          : (() => {
-              const c = colaboradores.find((x) => x.uid === por);
-              const nombre = typeof c?.displayName === "string" ? c.displayName.trim() : "";
-              return nombre.length > 0 ? nombre : TEXTO_ALGUIEN_DEL_EQUIPO;
-            })();
+    const quien = textoQuien({
+      por,
+      nombreColaborador: colaboradores.find((x) => x.uid === por)?.displayName,
+      verDetalle,
+    });
 
     filas.push({
       revisionN: n,
@@ -228,8 +226,8 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
   // 7) Avisos (nunca «sin historial» ni omisión silenciosa).
   const codigos: CodigoAviso[] = [];
   if (punteroN === null && docs.length > 0) codigos.push("historial_sin_puntero");
-  if (cont.faltantesTotal > 0 || invalidos > 0) codigos.push("eventos_incompletos");
-  if (filas.some((f) => !f.posteriorALaLectura && f.recuperable !== "completo")) codigos.push("retencion_parcial");
+  if (cont.faltantesTotal > 0 || invalidos > 0 || eventosSinVersiones > 0) codigos.push("eventos_incompletos");
+  if (hayRetencion) codigos.push("retencion_parcial");
   if (hayPosterior) codigos.push("cambio_durante_lectura");
 
   return {

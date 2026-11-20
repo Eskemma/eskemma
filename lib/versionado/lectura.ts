@@ -20,6 +20,8 @@ export const esFaseConHistorial = (f: unknown): f is FaseConHistorial =>
 
 export const LIMITE_POR_DEFECTO = 20;
 export const LIMITE_MAXIMO = 50;
+/** Tope del cursor (mismo que la ruta: de 1 a 9 dígitos). */
+export const CURSOR_MAXIMO = 999_999_999;
 /** Máximo de revisiones faltantes que se listan en una respuesta (el conteo completo va en `faltantesTotal`). */
 export const MAX_FALTANTES_LISTADOS = 50;
 
@@ -109,6 +111,37 @@ export function recuperabilidad(versionIds: readonly (string | null)[], existent
   return vivas === 0 ? "no" : "parcial";
 }
 
+// ---- cursor ----
+
+/**
+ * ÚNICA definición de un cursor válido (C4a-2a, H-V54): entero >= 1 y de a lo más 9 dígitos. La ruta aplica exactamente
+ * esta regla al parámetro `cursor` y `analizarContinuidad` solo produce cursores que la cumplen: un valor que la ruta
+ * rechazaría (0, negativo, fracción, texto, NaN) nunca se devuelve como «siguiente página».
+ */
+export function esCursorValido(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= CURSOR_MAXIMO;
+}
+
+// ---- clasificación de un evento (C4a-2a, H-V55) ----
+
+export interface ClasificacionEvento {
+  /** El evento no cita artefactos, o alguno sin `versionId`: el registro está incompleto (NO es poda). */
+  incompleto: boolean;
+  /** Cita al menos una versión que ya no se conserva (la poda la quitó de las `retenidas` vigentes). */
+  retencionParcial: boolean;
+}
+
+/**
+ * Separa dos cosas que antes se confundían: un evento sin artefactos o con un `versionId` ausente es un registro
+ * INCOMPLETO (aviso «algunos cambios no se pueden mostrar»); solo una versión citada que falta entre las existentes es
+ * RETENCIÓN. `ids` = un `versionId` por artefacto del evento (null = ausente).
+ */
+export function clasificarEvento(ids: readonly (string | null)[], existentes: ReadonlySet<string>): ClasificacionEvento {
+  const incompleto = ids.length === 0 || ids.some((v) => v === null);
+  const retencionParcial = ids.some((v) => v !== null && !existentes.has(v));
+  return { incompleto, retencionParcial };
+}
+
 // ---- validación de un evento ----
 
 export interface EventoCrudo {
@@ -145,29 +178,33 @@ export function analizarContinuidad(
   opciones: { techo: number; pedidos: number; limite: number }
 ): ResultadoContinuidad {
   const { techo, pedidos, limite } = opciones;
+  // Defensa: solo cuentan revisiones enteras >= 1 (cualquier otro valor se ignora; quien llama lo cuenta como inválido).
+  revisiones = revisiones.filter((r) => Number.isInteger(r) && r >= 1);
   const faltantes: number[] = [];
   let total = 0;
-  const anotar = (n: number) => {
-    total++;
-    if (faltantes.length < MAX_FALTANTES_LISTADOS) faltantes.push(n);
+  // Anota las revisiones `desde` a `hasta` (inclusive, descendente) que faltan: el total se calcula por aritmética y
+  // solo se LISTAN las primeras MAX_FALTANTES_LISTADOS (sin recorrer rangos enormes).
+  const anotarRango = (desde: number, hasta: number) => {
+    if (desde < hasta) return;
+    total += desde - hasta + 1;
+    for (let n = desde; n >= hasta && faltantes.length < MAX_FALTANTES_LISTADOS; n--) faltantes.push(n);
   };
 
   let esperado = techo;
   for (const r of revisiones) {
     if (r > esperado) continue; // duplicado o fuera de orden: no cuenta como hueco ni avanza
-    while (esperado > r) {
-      anotar(esperado);
-      esperado--;
-    }
+    anotarRango(esperado, r + 1);
     esperado = r - 1;
   }
   const paginaCompleta = pedidos >= limite;
   if (!paginaCompleta) {
     // La consulta se agotó: todo lo que quede por debajo de `esperado` (hasta 1) no tiene evento.
-    for (let n = esperado; n >= 1; n--) anotar(n);
+    anotarRango(esperado, 1);
   }
   const ultimo = revisiones.length > 0 ? revisiones[revisiones.length - 1] : null;
   // Una página llena y con al menos un evento válido continúa desde su menor revisión (si es 1 no hay nada debajo).
-  const siguienteCursor = paginaCompleta && ultimo !== null && ultimo > 1 ? ultimo : null;
+  // El cursor cumple EXACTAMENTE la validación de la ruta (`esCursorValido`); sin ningún evento válido, o con la
+  // página corta, no hay cursor y el panel muestra el estado final explícito (H-V54).
+  const siguienteCursor = paginaCompleta && ultimo !== null && ultimo > 1 && esCursorValido(ultimo) ? ultimo : null;
   return { faltantes, faltantesTotal: total, siguienteCursor };
 }

@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/server/auth-helpers";
 import { adminDb } from "@/lib/firebase-admin";
-import { LIMITE_MAXIMO, LIMITE_POR_DEFECTO, esFaseConHistorial } from "@/lib/versionado/lectura";
+import { LIMITE_MAXIMO, LIMITE_POR_DEFECTO, esCursorValido, esFaseConHistorial } from "@/lib/versionado/lectura";
 import { HistorialIlegibleError, IndiceNoListoError, leerHistorialFase } from "@/lib/moddulo/versionado/leerHistorial";
 
 const entero = (v: string | null): number | null | undefined => {
@@ -38,7 +38,7 @@ export async function GET(
     return NextResponse.json({ error: "parametro_invalido" }, { status: 400 });
   }
   const limite = limiteCrudo === undefined ? LIMITE_POR_DEFECTO : limiteCrudo;
-  if (limite < 1 || limite > LIMITE_MAXIMO || (cursorCrudo !== undefined && cursorCrudo < 1)) {
+  if (limite < 1 || limite > LIMITE_MAXIMO || (cursorCrudo !== undefined && !esCursorValido(cursorCrudo))) {
     return NextResponse.json({ error: "parametro_invalido" }, { status: 400 });
   }
 

@@ -489,3 +489,48 @@ describe("integración con el registrador REAL (la forma de lo que escribe produ
     expect(r.faltantesTotal).toBe(0);
   });
 });
+
+describe("C4a-2a — retención vs evento incompleto (H-V55) y cursor con eventos inválidos (H-V54)", () => {
+  it("evento sin artefactos: aviso de eventos incompletos y NO de retención", async () => {
+    sembrar({ n: 2 });
+    db.reset({ ...db.snapshot(), [`${P}/eventos/e2`]: evento("exploracion", 2, { artefactos: [], versionIds: {} }) });
+    const r = await ok();
+    const codigos = r.avisos.map((a) => a.codigo);
+    expect(codigos).toContain("eventos_incompletos");
+    expect(codigos).not.toContain("retencion_parcial");
+  });
+  it("evento con un artefacto sin versionId: incompleto, no retención", async () => {
+    sembrar({ n: 2 });
+    db.reset({ ...db.snapshot(), [`${P}/eventos/e2`]: evento("exploracion", 2, { versionIds: {} }) });
+    const codigos = (await ok()).avisos.map((a) => a.codigo);
+    expect(codigos).toContain("eventos_incompletos");
+    expect(codigos).not.toContain("retencion_parcial");
+  });
+  it("versión citada que ya no está en las retenidas: retención y NO evento incompleto", async () => {
+    sembrar({ n: 3, artefactos: { f2M1: entrada("f2M1", 3, [3, 2]) } }); // la versión 1 fue podada
+    const codigos = (await ok()).avisos.map((a) => a.codigo);
+    expect(codigos).toContain("retencion_parcial");
+    expect(codigos).not.toContain("eventos_incompletos");
+  });
+  it("sin poda y con eventos completos: ningún aviso", async () => {
+    sembrar({ n: 3 });
+    expect((await ok()).avisos).toEqual([]);
+  });
+  it("página llena de eventos con revisionN inválido (7.5, texto, 0): sin cursor y aviso de incompletos", async () => {
+    sembrar({ n: 10, eventos: [] });
+    const malos = [7.5, "7", 0, -1, NaN];
+    const extra: Record<string, unknown> = {};
+    malos.forEach((m, i) => { extra[`${P}/eventos/m${i}`] = evento("exploracion", 1, { revisionN: m }); });
+    db.reset({ ...db.snapshot(), ...extra });
+    const r = await ok({ limite: malos.length });
+    expect(r.siguienteCursor).toBeNull();
+    expect(r.avisos.map((a) => a.codigo)).toContain("eventos_incompletos");
+    expect(r.filas).toEqual([]);
+  });
+  it("el cursor devuelto es siempre un entero >= 1 (el mismo que acepta la ruta)", async () => {
+    sembrar({ n: 30 });
+    const r = await ok({ limite: 10 });
+    expect(Number.isInteger(r.siguienteCursor)).toBe(true);
+    expect(r.siguienteCursor).toBeGreaterThanOrEqual(1);
+  });
+});

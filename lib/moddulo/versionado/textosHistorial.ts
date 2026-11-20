@@ -93,4 +93,39 @@ export const TEXTO_AVISO: Record<string, string> = {
   cambio_durante_lectura: "Hubo un cambio mientras se cargaba el historial. Vuelve a abrirlo para verlo al día.",
 };
 
-export const TEXTO_FASE_SIN_HISTORIAL = "Aún no hay cambios registrados en esta fase. El historial empieza con el próximo cambio.";
+/**
+ * Quién hizo el cambio (C4a-2a). Regla única:
+ *   · `por` ausente (null) → «Sin autoría registrada». Es el caso de la versión previa al historial (`por: null`,
+ *     H-V43): no hay nadie a quien atribuirla, y ocurre aunque el rol no vea nombres.
+ *   · `por` presente pero el rol no ve nombres, o ese uid ya no es colaborador, o su colaborador no tiene nombre
+ *     → «Alguien del equipo» (hay autor, pero no se puede decir quién).
+ *   · si no, el nombre del colaborador.
+ */
+export function textoQuien(a: { por: string | null; nombreColaborador?: unknown; verDetalle: boolean }): string {
+  if (a.por === null) return TEXTO_SIN_AUTORIA;
+  if (!a.verDetalle) return TEXTO_ALGUIEN_DEL_EQUIPO;
+  const nombre = typeof a.nombreColaborador === "string" ? a.nombreColaborador.trim() : "";
+  return nombre.length > 0 ? nombre : TEXTO_ALGUIEN_DEL_EQUIPO;
+}
+
+/**
+ * Fecha ABSOLUTA de una fila en es-MX (p. ej. «10 de noviembre de 2026, 9:00 a.m.») en la zona horaria del navegador
+ * (`timeZone` ausente = la del entorno; las pruebas pasan una explícita). Ausente, null o ilegible →
+ * «Fecha desconocida (anterior al historial)». Nunca lanza.
+ */
+export function formatearFechaFila(iso: string | null | undefined, opciones: { timeZone?: string } = {}): string {
+  if (typeof iso !== "string" || iso.length === 0) return TEXTO_SIN_FECHA;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return TEXTO_SIN_FECHA;
+  try {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "long",
+      timeStyle: "short",
+      ...(opciones.timeZone ? { timeZone: opciones.timeZone } : {}),
+    }).format(new Date(t));
+  } catch {
+    return TEXTO_SIN_FECHA; // zona horaria inválida
+  }
+}
+
+export const TEXTO_FASE_SIN_HISTORIAL ="Aún no hay cambios registrados en esta fase. El historial empieza con el próximo cambio.";
