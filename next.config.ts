@@ -115,6 +115,12 @@ const nextConfig: NextConfig = {
   // TypeScript estricto
   typescript: {
     ignoreBuildErrors: false,
+    // `next build` (Next >= 16.3) corre `tsc --project <este archivo>` sobre
+    // todo el proyecto, pruebas incluidas. Vercel no sube functions/
+    // (.vercelignore) y dos pruebas de lib/geo importan desde ahí. Este
+    // tsconfig extiende el principal y solo excluye las pruebas del build;
+    // `tsc --noEmit` y vitest siguen usando tsconfig.json y revisan todo.
+    tsconfigPath: "tsconfig.build.json",
   },
   
   // Optimizaciones
