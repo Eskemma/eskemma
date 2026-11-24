@@ -43,6 +43,18 @@ function hasRequiredRole(userRole: UserRole, requiredRole: UserRole): boolean {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Páginas de prueba (app/dev): solo existen en desarrollo local. En
+  // producción responden 404 REAL (una guarda con notFound() en el layout
+  // pinta la página «no encontrada» pero con estado HTTP 200).
+  if (
+    process.env.NODE_ENV === "production" &&
+    (pathname === "/dev" || pathname.startsWith("/dev/"))
+  ) {
+    return NextResponse.rewrite(new URL("/__dev-no-disponible", request.url), {
+      status: 404,
+    });
+  }
+
   const rule = PROTECTED_ROUTES.find((r) => r.pattern.test(pathname));
 
   if (!rule) {
@@ -91,5 +103,6 @@ export const config = {
     // /sefix no está en el matcher — acceso público sin interceptar
     "/monitor/:path*",
     "/recursos/:path*",
+    "/dev/:path*", // 404 en producción (ver arriba)
   ],
 };
