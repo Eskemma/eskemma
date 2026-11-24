@@ -1,5 +1,6 @@
 import { runFontanaInegiDiagnostics } from "@/lib/dev/fontanaInegiSandbox";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Sandbox INEGI BIE — Fontana",
@@ -19,6 +20,10 @@ const ERROR_LABELS: Record<string, string> = {
 };
 
 export default async function FontanaInegiSandboxPage() {
+  // Primera sentencia: en producción no se lee ningún secreto ni se consulta
+  // nada (el 404 real lo da proxy.ts; esta guarda es la segunda capa).
+  if (process.env.NODE_ENV === "production") notFound();
+
   const results = await runFontanaInegiDiagnostics();
   const ranAt = new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
 

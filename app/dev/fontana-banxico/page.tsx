@@ -1,5 +1,6 @@
 import { runFontanaBanxicoDiagnostics } from "@/lib/dev/fontanaBanxicoSandbox";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Sandbox Banxico SIE — Fontana",
@@ -19,6 +20,10 @@ const ERROR_LABELS: Record<string, string> = {
 };
 
 export default async function FontanaBanxicoSandboxPage() {
+  // Primera sentencia: en producción no se lee ningún secreto ni se consulta
+  // nada (el 404 real lo da proxy.ts; esta guarda es la segunda capa).
+  if (process.env.NODE_ENV === "production") notFound();
+
   const results = await runFontanaBanxicoDiagnostics();
   const ranAt = new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
 

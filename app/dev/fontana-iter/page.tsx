@@ -1,5 +1,6 @@
 import { runFontanaIterDiagnostics } from "@/lib/dev/fontanaIterSandbox";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Sandbox ITER — Fontana",
@@ -9,6 +10,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function FontanaIterSandboxPage() {
+  // Primera sentencia: en producción no se lee ningún secreto ni se consulta
+  // nada (el 404 real lo da proxy.ts; esta guarda es la segunda capa).
+  if (process.env.NODE_ENV === "production") notFound();
+
   const diag = runFontanaIterDiagnostics();
   const ranAt = new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
 
