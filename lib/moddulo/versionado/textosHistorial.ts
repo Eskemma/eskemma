@@ -82,6 +82,17 @@ export function detalleEnTexto(detalle: unknown): string | null {
   if (d.reporteF2Conservado === true) frases.push("El reporte de la Fase 2 se conservó.");
   if (d.reporteSustituido === true) frases.push("El reporte guardado de la fase se reemplazó.");
   if (d.proyectoCompletado === true) frases.push("Con esto el proyecto quedó completo.");
+  // C4b-1b — «volver a una versión anterior» de un resultado de investigación (claves propias; no se reutiliza
+  // `teniaAprobacion`, que en F2 dice «análisis»). El evento nunca trae el texto de la pregunta.
+  if (d.resultadoEstabaAprobado === true) frases.push("El resultado estaba aprobado.");
+  if (d.notasEliminadas === true) frases.push("Se quitaron las notas.");
+  if (typeof d.tareasReiniciadas === "number" && Number.isFinite(d.tareasReiniciadas) && d.tareasReiniciadas > 0) {
+    const n = d.tareasReiniciadas;
+    frases.push(n === 1 ? "Se reinició 1 tarea de investigación." : `Se reiniciaron ${n} tareas de investigación.`);
+  }
+  if (d.sintesisExistente === true) frases.push("La síntesis ya generada no se recalculó.");
+  if (d.veredictoExistente === true) frases.push("El veredicto ya generado no se recalculó.");
+  if (d.archivoNoEncontrado === true) frases.push("El archivo de esa versión ya no estaba guardado.");
   return frases.length > 0 ? frases.join(" ") : null;
 }
 

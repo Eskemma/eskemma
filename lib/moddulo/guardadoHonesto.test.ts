@@ -896,6 +896,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
       "marcar_alerta_leida",
       "aprobar_resultado",
       "entregar_canal1", // C3b
+      "volver_a_version", // C4b-1b
       "cambiar_asignacion",
       "reconocer_sesgo",
       "editar_exploracion",
@@ -910,7 +911,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
     expect([...ACCIONES_NO_BLOQUEANTES]).toEqual(["registrar_aprobacion", "importar_adjuntos_moddulo"]);
   });
 
-  it("el catálogo clasifica TODAS las acciones (38), sin duplicar grupos ni dejar ninguna fuera", () => {
+  it("el catálogo clasifica TODAS las acciones (39), sin duplicar grupos ni dejar ninguna fuera", () => {
     const todas = Object.keys(GRUPO_ACCION).sort();
     expect(todas).toEqual(
       [
@@ -922,7 +923,7 @@ describe("catálogo de acciones (6a): la infraestructura derivada no cambia la p
         "eliminar_cadena_impacto", "eliminar_reporte_sesion", "desvincular_sesion",
         "cambiar_monitoreo_automatico", "desvincular_pestel",
         "agregar_cadena_impacto", "marcar_alerta_leida", "aprobar_resultado", "cambiar_asignacion",
-        "entregar_canal1", "reconocer_sesgo", "editar_exploracion", "archivar_exploracion",
+        "entregar_canal1", "volver_a_version", "reconocer_sesgo", "editar_exploracion", "archivar_exploracion",
         "guardar_edicion_m1", "aprobar_m1", "generar_motores", "reabrir_m1", "generar_m1",
       ].sort()
     );

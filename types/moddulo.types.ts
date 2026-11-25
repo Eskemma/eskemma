@@ -460,7 +460,10 @@ export interface DVSF2 {
 // técnica del ecosistema para señales públicas + gestión humana directa
 // para entrevistas de élite) — asignaciones[] reemplaza el canal único.
 export interface AsignacionCanal {
-  // Estable, generado por el endpoint (no por Claude) — ej. `${numero}-${índice}`.
+  // Estable, generado por el endpoint (no por Claude): se deriva del contenido,
+  // `${pipItemId}_${canal}_${tipo}[_${tecnicaId}][_n]` (lib/moddulo/f3TareasGenerator.ts);
+  // `${numero}-0` solo subsiste en tareas heredadas sin `asignaciones[]` (lib/moddulo/project.ts).
+  // Ver H-V87: `tareas/aprobar` puede cambiar el canal sin cambiar el id.
   // Es lo que vincula un resultado recibido a ESTA asignación específica,
   // independiente del canal (Canal 2/3 también pueden tener más de una
   // asignación por tarea, no solo Canal 1).

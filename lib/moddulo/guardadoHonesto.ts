@@ -50,6 +50,8 @@ export type AccionGuardado =
   | "aprobar_resultado"
   // C3b: la entrega de Fontana a F3 (canal1/entregar).
   | "entregar_canal1"
+  // C4b-1b: «volver a una versión anterior» de un resultado de F3 (resultados/volver).
+  | "volver_a_version"
   | "cambiar_asignacion"
   | "reconocer_sesgo"
   | "editar_exploracion"
@@ -105,6 +107,7 @@ export const GRUPO_ACCION = {
   marcar_alerta_leida: "simple",
   aprobar_resultado: "simple",
   entregar_canal1: "simple",
+  volver_a_version: "simple",
   cambiar_asignacion: "simple",
   reconocer_sesgo: "simple",
   editar_exploracion: "simple",
@@ -267,6 +270,8 @@ function sujeto(accion: AccionGuardado, ctx: ContextoGuardado): string {
       return "la aprobación del resultado";
     case "entregar_canal1":
       return "la entrega a Moddulo F3";
+    case "volver_a_version":
+      return "la vuelta a la versión anterior";
     case "cambiar_asignacion":
       return ctx.cambio ?? "el cambio de la asignación";
     case "reconocer_sesgo":
@@ -344,6 +349,8 @@ function consecuencia(accion: AccionGuardado): string {
       return "El resultado sigue sin aprobar; inténtalo de nuevo.";
     case "entregar_canal1":
       return "La entrega anterior no cambió; inténtalo de nuevo.";
+    case "volver_a_version":
+      return "El resultado sigue como estaba.";
     case "cambiar_asignacion":
       return "La asignación queda como estaba; inténtalo de nuevo.";
     case "reconocer_sesgo":
@@ -571,6 +578,15 @@ const TEXTOS_SIMPLES: Record<
         ? `El resultado se subió pero no se pudo registrar la entrega: ${r.codigo}.`
         : null,
   },
+  // C4b-1b. Los textos de FALLO los arma `mensajeDeFalloVolver` (exactos, ver abajo); esta entrada solo completa
+  // la tabla que exige el compilador.
+  volver_a_version: {
+    hecho: "hecho",
+    verificar: "abre el historial y revisa antes de intentarlo de nuevo.",
+    noEncontrado: "No se encontró el resultado o esa versión; puede que ya no se conserve. Recarga el historial.",
+    permiso: "No tienes permiso para hacer este cambio.",
+    especifico: () => null,
+  },
   cambiar_asignacion: {
     hecho: "registrado",
     verificar: "recarga la página para verificar el estado.",
@@ -657,7 +673,42 @@ const TEXTOS_SIMPLES: Record<
   },
 };
 
+/**
+ * C4b-1b — textos EXACTOS de «volver a una versión anterior». El servidor NO formatea fechas: la frase de apertura
+ * («Vas a volver a la versión del {fecha} de «{pregunta}»…», «Listo: volviste a la versión del {fecha}…») la compone la
+ * interfaz con la fecha de la FILA del panel y el mismo formateador del panel, para que coincida con lo que la persona vio.
+ * Se decide por el CÓDIGO `error` del cuerpo, nunca por el status.
+ */
+export const TEXTOS_VOLVER = {
+  ambiguo:
+    "No se pudo CONFIRMAR que se haya vuelto a la versión anterior. Puede que sí; abre el historial y revisa antes de intentarlo de nuevo.",
+  sesion: "No se volvió a la versión anterior: tu sesión terminó. El resultado sigue como estaba.",
+  permiso: "No se volvió a la versión anterior: no tienes permiso para hacer este cambio. El resultado sigue como estaba.",
+  noEncontrado: "No se encontró el resultado o esa versión; puede que ya no se conserve. Recarga el historial.",
+  huellaVencida: "Algo cambió mientras decidías. No se hizo nada: revisa el aviso actualizado y confirma de nuevo.",
+  versionNoRestaurable: "Esa versión es demasiado grande para guardarse completa; no se puede restaurar.",
+  sinCambios: "Esa ya es la versión actual del resultado y no tiene nada que deshacer. No se hizo ningún cambio.",
+  bloqueado: "Ya se emitió el «Reporte F3». Mientras exista no se puede volver a una versión anterior de un resultado.",
+} as const;
+
+function mensajeDeFalloVolver(resp: RespuestaGuardado): string {
+  if (resp.tipo === "error_red") return TEXTOS_VOLVER.ambiguo;
+  if (resp.ok || resp.status >= 500 || resp.codigo === "reemplazo_escritura_incierta") return TEXTOS_VOLVER.ambiguo;
+  if (resp.status === 401) return TEXTOS_VOLVER.sesion;
+  if (resp.status === 403) return TEXTOS_VOLVER.permiso;
+  // Un 404 NUNCA afirma que el resultado o la versión siguen ahí (tras una red ambigua el primer intento pudo haber vuelto).
+  if (resp.status === 404) return TEXTOS_VOLVER.noEncontrado;
+  if (resp.status === 409) {
+    if (resp.codigo === "reemplazo_huella_vencida") return TEXTOS_VOLVER.huellaVencida;
+    if (resp.codigo === "reemplazo_bloqueado") return resp.mensaje ?? TEXTOS_VOLVER.bloqueado;
+    if (resp.codigo === "version_no_restaurable") return TEXTOS_VOLVER.versionNoRestaurable;
+    if (resp.codigo === "sin_cambios") return TEXTOS_VOLVER.sinCambios;
+  }
+  return `No se pudo registrar la vuelta a la versión anterior. ${motivo(resp)} ${consecuencia("volver_a_version")}`;
+}
+
 function mensajeDeFalloSimple(accion: AccionSimple, resp: RespuestaGuardado, ctx: ContextoGuardado): string {
+  if (accion === "volver_a_version") return mensajeDeFalloVolver(resp);
   const t = TEXTOS_SIMPLES[accion];
   const que = sujeto(accion, ctx);
   if (resp.tipo === "error_red") {
@@ -927,7 +978,7 @@ export const CODIGO_HISTORIAL_NO_CONFIRMADO = "historial_no_confirmado";
  * Null for any other action or code.
  */
 function textoHistorialNoConfirmadoM1(accion: AccionGuardado, resp: RespuestaGuardado): string | null {
-  if ((accion !== "aprobar_m1" && accion !== "reabrir_m1" && accion !== "desvincular_pestel" && accion !== "cerrar_fase") || resp.tipo !== "respuesta") return null;
+  if ((accion !== "aprobar_m1" && accion !== "reabrir_m1" && accion !== "desvincular_pestel" && accion !== "cerrar_fase" && accion !== "volver_a_version") || resp.tipo !== "respuesta") return null;
   if (resp.codigo !== CODIGO_HISTORIAL_NO_CONFIRMADO) return null;
   const sigue =
     accion === "aprobar_m1"
@@ -936,7 +987,9 @@ function textoHistorialNoConfirmadoM1(accion: AccionGuardado, resp: RespuestaGua
         ? "El análisis sigue aprobado"
         : accion === "cerrar_fase"
           ? "La fase sigue abierta"
-          : "El proyecto sigue vinculado";
+          : accion === "volver_a_version"
+            ? "El resultado sigue como estaba"
+            : "El proyecto sigue vinculado";
   if (resp.status === 500) {
     return `No se pudo CONFIRMAR el registro del historial. ${sigue}. Si vuelve a pasar, no insistas: hay que revisarlo.`;
   }
@@ -1121,7 +1174,9 @@ export type AccionConConfirmacion =
   | "finalizar_analisis"
   // M1 de F2 (3a): same three H15 409s, same modal + retry with the fingerprint.
   | "reabrir_m1"
-  | "generar_m1";
+  | "generar_m1"
+  // C4b-1b: «volver a una versión anterior» de un resultado (los mismos tres 409 de la familia (i), con huella).
+  | "volver_a_version";
 
 export function decidirReemplazoAnalisis(
   resp: RespuestaGuardado,

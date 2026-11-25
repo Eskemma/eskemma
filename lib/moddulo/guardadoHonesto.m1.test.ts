@@ -34,8 +34,8 @@ describe("catálogo: grupo de cada acción de M1", () => {
     expect(GRUPO_ACCION.generar_m1).toBe("clasica");
     expect(ACCIONES_SIMPLES.slice(-3)).toEqual(["guardar_edicion_m1", "aprobar_m1", "generar_motores"]);
   });
-  it("el catálogo pasó de 32 a 37 acciones (3a) y a 38 con entregar_canal1 (C3b)", () => {
-    expect(Object.keys(GRUPO_ACCION)).toHaveLength(38);
+  it("el catálogo pasó de 32 a 37 acciones (3a) y a 38 con entregar_canal1 (C3b) y a 39 con volver_a_version (C4b-1b)", () => {
+    expect(Object.keys(GRUPO_ACCION)).toHaveLength(39);
   });
 });
 

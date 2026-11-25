@@ -186,3 +186,97 @@ export function detalleDeVolver(e: EntradaDetalleVolver): DetalleEvento {
   if (e.archivoFaltaba === true) d.archivoNoEncontrado = true;
   return d;
 }
+
+// ---- confirmación (familia (i) de `respuestaCandado`) ----
+
+export type AccionVolver = "continuar" | "requiere_confirmacion" | "huella_vencida";
+
+/**
+ * Misma regla que `decidirCandadoReemplazo` (F2): sin `confirmarReemplazo: true` y una huella no vacía → pregunta;
+ * con ambas pero otra huella → vencida (algo cambió entre el aviso y la confirmación); igual → continuar. El
+ * bloqueo y `sin_cambios` se deciden ANTES. `huellaRecibida` ausente o malformada es «no confirmado» (409), nunca 400.
+ */
+export function decidirConfirmacionVolver(args: {
+  confirmar: unknown;
+  huellaRecibida: unknown;
+  huellaActual: string;
+}): AccionVolver {
+  const { confirmar, huellaRecibida, huellaActual } = args;
+  if (confirmar !== true || typeof huellaRecibida !== "string" || huellaRecibida.length === 0) return "requiere_confirmacion";
+  return huellaRecibida === huellaActual ? "continuar" : "huella_vencida";
+}
+
+// ---- `sin_cambios` ----
+
+export interface EntradaSinCambios {
+  /** `versionId` de la versión que se quiere restaurar y la vigente según el manifiesto (null = sin historial). */
+  objetivo: string;
+  vigente: string | null;
+  /** El vivo cambió sin registro (huella viva ≠ la del manifiesto): true / false / null = no se puede saber. */
+  deriva: boolean | null;
+  vivo: Doc;
+  /** Asignaciones que hoy apuntan a este resultado. */
+  afectadas: readonly AsignacionCanal[];
+}
+
+/**
+ * La versión objetivo YA es la vigente, el vivo no derivó, no hay aprobación que retirar ni notas que quitar y ninguna
+ * tarea que reiniciar → volver no cambiaría nada (409 `sin_cambios`). Un resultado APROBADO nunca es «sin cambios»
+ * (hay una aprobación que retirar); una deriva desconocida (`null`) tampoco: ante la duda se deja volver.
+ */
+export function esSinCambios(e: EntradaSinCambios): boolean {
+  return (
+    e.vigente !== null &&
+    e.objetivo === e.vigente &&
+    e.deriva === false &&
+    e.vivo.aprobado !== true &&
+    e.vivo.notasUsuario === undefined &&
+    e.afectadas.length === 0
+  );
+}
+
+// ---- textos del servidor (sin fecha: la fecha de la fila la pone la interfaz con el formateador del panel) ----
+
+/** La pregunta del resultado recortada a ~120 caracteres con «…» (por caracteres, no por unidades UTF-16). */
+export function nombreDeResultado(moduloPIP: unknown, max = 120): string | undefined {
+  if (typeof moduloPIP !== "string") return undefined;
+  const t = moduloPIP.replace(/\s+/g, " ").trim();
+  if (t.length === 0) return undefined;
+  const cars = Array.from(t);
+  return cars.length > max ? `${cars.slice(0, max).join("").trimEnd()}…` : t;
+}
+
+export interface EntradaLineasVolver {
+  estabaAprobado: boolean;
+  teniaNotas: boolean;
+  tareasReiniciadas: number;
+  haySintesis: boolean;
+  hayVeredicto: boolean;
+  /** `true` solo si se COMPROBÓ y el archivo de la versión no existe. */
+  archivoFaltaba: boolean;
+}
+
+/**
+ * Líneas CONDICIONALES de la pregunta, en español cotidiano y con los rótulos de la pantalla. Sin fecha, sin el
+ * nombre del resultado y sin la frase de apertura (las compone la interfaz con la fila del panel).
+ */
+export function lineasDeVolver(e: EntradaLineasVolver): string[] {
+  const l: string[] = [];
+  if (e.estabaAprobado) {
+    l.push("Este resultado está aprobado. Al volver quedará sin aprobar y tendrás que aprobarlo otra vez en «M2 · Resultados recibidos».");
+  }
+  if (e.teniaNotas) l.push("Las notas que escribiste al aprobarlo dejarán de verse.");
+  if (e.tareasReiniciadas === 1) {
+    l.push("1 tarea de investigación que usaba este resultado volverá a «En curso» y se desvinculará de él.");
+  } else if (e.tareasReiniciadas > 1) {
+    l.push(`${e.tareasReiniciadas} tareas de investigación que usaban este resultado volverán a «En curso» y se desvincularán de él.`);
+  }
+  if (e.haySintesis || e.hayVeredicto) {
+    const que = e.haySintesis && e.hayVeredicto ? "La síntesis y el veredicto que ya generaste no se vuelven" : e.haySintesis ? "La síntesis que ya generaste no se vuelve" : "El veredicto que ya generaste no se vuelve";
+    l.push(`${que} a calcular: seguirá${e.haySintesis && e.hayVeredicto ? "n" : ""} reflejando lo que tenías antes de volver.`);
+  }
+  if (e.archivoFaltaba) {
+    l.push("El archivo de esa versión ya no está guardado; el texto sí se conserva, pero no podrás consultar el archivo original.");
+  }
+  return l;
+}
