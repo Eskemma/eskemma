@@ -1186,6 +1186,14 @@ export function decidirGeneracionF3UI(accion: AccionGuardado, resp: RespuestaGua
         mensajeError: `Esta pantalla está desactualizada: ${que} ya existe. No se generó nada; recarga la página.`,
       };
     }
+    // H-V48: the investigation changed while the model was generating; nothing was written.
+    if (resp.codigo === "f3_estado_cambio" && (accion === "generar_sintesis" || accion === "generar_veredicto")) {
+      const [que, vuelve] = accion === "generar_sintesis" ? ["una síntesis desactualizada", "generarla"] : ["un veredicto desactualizado", "generarlo"];
+      return {
+        tipo: "desactualizado",
+        mensajeError: `Mientras se generaba, cambió la investigación (por ejemplo, se entregó o se aprobó un resultado). Para no mostrarte ${que} no se guardó; el crédito de esta generación ya se usó. Vuelve a ${vuelve}.`,
+      };
+    }
     if (resp.codigo === "reemplazo_bloqueado") {
       const verbo = VERBO_F3[accion];
       return {

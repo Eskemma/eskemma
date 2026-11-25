@@ -74,6 +74,15 @@ function sembrar(resultado: Record<string, unknown>) {
 
 /** Corre sintesis/generar y devuelve el prompt de USUARIO completo que recibió el modelo. */
 async function promptQueRecibeM3(): Promise<string> {
+  // H-V48 (C4b-0): sintesis/generar compara `revision.n`; el getProject simulado debe ver la misma
+  // revisión que el documento (en producción es la misma lectura), si no parecería una carrera.
+  const doc = (await db.collection("moddulo_projects").doc("p1").get()).data() as { phases?: { investigacion?: { revision?: unknown } } };
+  const revision = doc?.phases?.investigacion?.revision;
+  const actual = (await vi.mocked(getProject)("p1", UID)) as unknown as { phases: { investigacion: Record<string, unknown> } };
+  vi.mocked(getProject).mockResolvedValue({
+    ...actual,
+    phases: { ...actual.phases, investigacion: { ...actual.phases.investigacion, ...(revision ? { revision } : {}) } },
+  } as never);
   crear.mockClear();
   crear.mockResolvedValue({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(SIEMBRA_SINTESIS) }] } as never);
   const res = await SINTESIS(reqSintesis());

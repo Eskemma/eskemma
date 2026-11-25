@@ -16,12 +16,15 @@ import type { TareaPIP, PIPItem, SintesisF3, ActorVetoF2, FODAInsumo } from "@/t
 import { tareasConSustentoUnico } from "@/lib/moddulo/triangulacion";
 import {
   GeneracionF3RechazadaError,
+  InvestigacionCambioError,
   decidirGeneracionF3,
   estadoF3Desde,
+  exigirRevisionSinCambio,
+  revisionDeInvestigacion,
   type DecisionGeneracionF3,
 } from "@/lib/moddulo/impactoRegeneracionF3";
 import { escribirF3Condicional } from "@/lib/moddulo/escrituraF3Guardada";
-import { respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
+import { respuestaAprobacionRechazada, respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
 
 function extractText(response: Anthropic.Message): string {
   return response.content
@@ -69,6 +72,8 @@ export async function POST(request: NextRequest) {
   // F3 or approved verdict) blocks. The write below re-checks inside a transaction.
   const previa = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "sintesis");
   if (previa.accion !== "continuar") return respuestaRechazo(previa);
+  // H-V48: `revision.n` of the SAME read as the pre-check (no extra read), captured before the model.
+  const nCapturado = revisionDeInvestigacion(project.phases?.investigacion);
 
   const pip = (project.phases?.exploracion?.dvs?.pip ?? []) as PIPItem[];
   const tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
@@ -177,12 +182,15 @@ Responde ÚNICAMENTE con JSON con esta forma exacta:
     await escribirF3Condicional(adminDb, projectId, {
       updates: { "phases.investigacion.f3Sintesis": sintesis, updatedAt: FieldValue.serverTimestamp() },
       guardia: (proyecto) => {
-        const d = decidirGeneracionF3(estadoF3Desde((proyecto?.phases as Record<string, unknown> | undefined)?.investigacion), "sintesis");
+        const inv = (proyecto?.phases as Record<string, unknown> | undefined)?.investigacion;
+        const d = decidirGeneracionF3(estadoF3Desde(inv), "sintesis");
         if (d.accion !== "continuar") throw new GeneracionF3RechazadaError(d);
+        exigirRevisionSinCambio(inv, nCapturado);
       },
     });
   } catch (err) {
     if (err instanceof GeneracionF3RechazadaError) return respuestaRechazo(err.decision);
+    if (err instanceof InvestigacionCambioError) return respuestaAprobacionRechazada("estado_cambio");
     // The commit may or may not have reached the server: do not claim it did not.
     console.error("[sintesis/generar] no se pudo confirmar el guardado:", err);
     return NextResponse.json(

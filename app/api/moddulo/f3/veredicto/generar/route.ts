@@ -15,12 +15,15 @@ import { tareasSinCubrir, contarTareasCubiertas } from "@/lib/moddulo/f3Suficien
 import type { TareaPIP, SintesisF3, HEIF2, VeredictoHEI } from "@/types/moddulo.types";
 import {
   GeneracionF3RechazadaError,
+  InvestigacionCambioError,
   decidirGeneracionF3,
   estadoF3Desde,
+  exigirRevisionSinCambio,
+  revisionDeInvestigacion,
   type DecisionGeneracionF3,
 } from "@/lib/moddulo/impactoRegeneracionF3";
 import { escribirF3Condicional } from "@/lib/moddulo/escrituraF3Guardada";
-import { respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
+import { respuestaAprobacionRechazada, respuestaBloqueadoF3, respuestaYaExisteF3 } from "@/lib/moddulo/respuestaCandado";
 
 function extractText(response: Anthropic.Message): string {
   return response.content
@@ -67,6 +70,8 @@ export async function POST(request: NextRequest) {
   // stale tab; a closed F3 (Reporte F3 or approved verdict) blocks.
   const previa = decidirGeneracionF3(estadoF3Desde(project.phases?.investigacion), "veredicto");
   if (previa.accion !== "continuar") return respuestaRechazo(previa);
+  // H-V48: `revision.n` of the SAME read as the pre-check (no extra read), captured before the model.
+  const nCapturado = revisionDeInvestigacion(project.phases?.investigacion);
 
   const tareas = (project.phases?.investigacion?.f3TareasPIP ?? []) as TareaPIP[];
   const sintesis = project.phases?.investigacion?.f3Sintesis as SintesisF3 | undefined;
@@ -126,12 +131,15 @@ Responde ÚNICAMENTE con JSON: {"resultado": "validada|ajustada|refutada", "cont
     await escribirF3Condicional(adminDb, projectId, {
       updates: { "phases.investigacion.f3Veredicto": veredicto, updatedAt: FieldValue.serverTimestamp() },
       guardia: (proyecto) => {
-        const d = decidirGeneracionF3(estadoF3Desde((proyecto?.phases as Record<string, unknown> | undefined)?.investigacion), "veredicto");
+        const inv = (proyecto?.phases as Record<string, unknown> | undefined)?.investigacion;
+        const d = decidirGeneracionF3(estadoF3Desde(inv), "veredicto");
         if (d.accion !== "continuar") throw new GeneracionF3RechazadaError(d);
+        exigirRevisionSinCambio(inv, nCapturado);
       },
     });
   } catch (err) {
     if (err instanceof GeneracionF3RechazadaError) return respuestaRechazo(err.decision);
+    if (err instanceof InvestigacionCambioError) return respuestaAprobacionRechazada("estado_cambio");
     console.error("[veredicto/generar] no se pudo confirmar el guardado:", err);
     return NextResponse.json(
       { error: "reemplazo_escritura_incierta", mensaje: "No se pudo confirmar el guardado del veredicto. Recarga la página para verificar el estado." },

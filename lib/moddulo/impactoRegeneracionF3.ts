@@ -72,6 +72,32 @@ export class GeneracionF3RechazadaError extends Error {
   }
 }
 
+// ── H-V48 (C4b-0): the investigation changed while Claude was generating ─────
+// `phases.investigacion.revision.n` only moves when a route WITH history writes
+// (canal1/entregar, canal3/vincular, resultados/aprobar). The generators capture it
+// BEFORE the model call and compare it inside the transaction against the document
+// re-read there. LIMIT (H-V89): confirm, tareas/* and revisar-territorio write
+// without history and do not move `n`, so this guard does not see them.
+
+/** `revision.n` of the investigation phase; a project without `revision` counts as 0. */
+export function revisionDeInvestigacion(investigacion: unknown): number {
+  const n = (investigacion as { revision?: { n?: unknown } } | null | undefined)?.revision?.n;
+  return typeof n === "number" ? n : 0;
+}
+
+/** Thrown inside the conditional write when `revision.n` is not the one captured before the model. */
+export class InvestigacionCambioError extends Error {
+  constructor() {
+    super("La investigación cambió mientras se generaba");
+    this.name = "InvestigacionCambioError";
+  }
+}
+
+/** Throws InvestigacionCambioError unless the re-read `revision.n` equals the captured one. */
+export function exigirRevisionSinCambio(investigacionReleida: unknown, nCapturado: number): void {
+  if (revisionDeInvestigacion(investigacionReleida) !== nCapturado) throw new InvestigacionCambioError();
+}
+
 // ── veredicto/aprobar (commit 5a, H25 #6) ────────────────────────────────────
 // Approving writes the verdict (approved) + the Reporte F3 (DIE) + estado "lista"
 // in ONE update. It used to have no guard: re-approving rebuilt the DIE from the

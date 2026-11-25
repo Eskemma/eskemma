@@ -366,7 +366,12 @@ export default function InvestigacionPage() {
       const { resp, datos } = await pedirF3("/api/moddulo/f3/sintesis/generar", { projectId });
       const d = decidirGeneracionF3UI("generar_sintesis", resp);
       if (d.tipo === "exito" && datos.sintesis) setSintesis(datos.sintesis as typeof sintesis);
-      else if (d.tipo !== "exito") setAvisoErrorF3(d.mensajeError);
+      else if (d.tipo !== "exito") {
+        setAvisoErrorF3(d.mensajeError);
+        // H-V48: la investigación cambió mientras se generaba; se recarga lo que ve la pantalla para que el
+        // usuario vea lo nuevo antes de volver a generar (el botón sigue disponible: no se escribió nada).
+        if (d.tipo === "desactualizado") { loadProject(); loadResultados(); }
+      }
       else setAvisoErrorF3("No se pudo CONFIRMAR la generación de la síntesis: el servidor respondió algo inesperado. Recarga la página para verificar el estado.");
     } finally {
       setGenerandoSintesis(false);
@@ -380,7 +385,12 @@ export default function InvestigacionPage() {
       const { resp, datos } = await pedirF3("/api/moddulo/f3/veredicto/generar", { projectId });
       const d = decidirGeneracionF3UI("generar_veredicto", resp);
       if (d.tipo === "exito" && datos.veredicto) setVeredicto(datos.veredicto as typeof veredicto);
-      else if (d.tipo !== "exito") setAvisoErrorF3(d.mensajeError);
+      else if (d.tipo !== "exito") {
+        setAvisoErrorF3(d.mensajeError);
+        // H-V48: la investigación cambió mientras se generaba; se recarga lo que ve la pantalla para que el
+        // usuario vea lo nuevo antes de volver a generar (el botón sigue disponible: no se escribió nada).
+        if (d.tipo === "desactualizado") { loadProject(); loadResultados(); }
+      }
       else setAvisoErrorF3("No se pudo CONFIRMAR la generación del veredicto: el servidor respondió algo inesperado. Recarga la página para verificar el estado.");
     } finally {
       setGenerandoVeredicto(false);

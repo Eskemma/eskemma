@@ -653,6 +653,21 @@ describe("decidirGeneracionF3UI", () => {
       expect(d.mensajeError).not.toMatch(/\bDIE\b/);
     }
   });
+  it("H-V48: 409 f3_estado_cambio al generar síntesis/veredicto → desactualizado, con el crédito ya usado", () => {
+    const s = decidirGeneracionF3UI("generar_sintesis", con409("f3_estado_cambio"));
+    expect(s).toEqual({
+      tipo: "desactualizado",
+      mensajeError:
+        "Mientras se generaba, cambió la investigación (por ejemplo, se entregó o se aprobó un resultado). Para no mostrarte una síntesis desactualizada no se guardó; el crédito de esta generación ya se usó. Vuelve a generarla.",
+    });
+    const v = decidirGeneracionF3UI("generar_veredicto", con409("f3_estado_cambio")) as { tipo: string; mensajeError: string };
+    expect(v.tipo).toBe("desactualizado");
+    expect(v.mensajeError).toContain("un veredicto desactualizado");
+    expect(v.mensajeError.endsWith("Vuelve a generarlo.")).toBe(true);
+  });
+  it("H-V48: f3_estado_cambio en el tablero NO es este caso (fallo real)", () => {
+    expect(decidirGeneracionF3UI("generar_tablero", con409("f3_estado_cambio")).tipo).toBe("error");
+  });
   it("un 409 con otro código (o «ya existe» en el tablero) es un fallo real, no un caso especial", () => {
     expect(decidirGeneracionF3UI("generar_sintesis", con409("otra_cosa")).tipo).toBe("error");
     expect(decidirGeneracionF3UI("generar_tablero", con409("f3_ya_existe")).tipo).toBe("error");
