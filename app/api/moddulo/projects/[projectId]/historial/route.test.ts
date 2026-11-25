@@ -126,7 +126,7 @@ describe("respuesta", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("cache-control")).toBe("no-store");
     const c = await r.json();
-    expect(Object.keys(c).sort()).toEqual(["avisos", "faltantes", "faltantesTotal", "fase", "filas", "siguienteCursor", "totalCambios", "vigente"]);
+    expect(Object.keys(c).sort()).toEqual(["avisos", "faltantes", "faltantesTotal", "fase", "filas", "puedeVolver", "siguienteCursor", "totalCambios", "vigente"]);
     expect(c.fase).toBe("exploracion");
     expect(c.filas.map((f: { revisionN: number }) => f.revisionN)).toEqual([3, 2]);
     expect(c.siguienteCursor).toBe(2);

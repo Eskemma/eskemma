@@ -19,7 +19,7 @@
 import { motivoBloqueoF3, type VerboF3 } from "./impactoReemplazoDVS";
 import { sonIgualesEstable } from "./serializacionEstable";
 
-export type DestinoF3 = "sintesis" | "veredicto" | "tablero";
+export type DestinoF3 = "sintesis" | "veredicto" | "tablero" | "volver_resultado";
 
 export interface EstadoF3 {
   sintesis?: unknown;
@@ -38,6 +38,7 @@ const VERBO_BLOQUEO: Record<DestinoF3 | "sincronizar_tablero", VerboF3> = {
   veredicto: "generar_veredicto",
   tablero: "generar_tablero",
   sincronizar_tablero: "sincronizar_tablero",
+  volver_resultado: "volver_resultado",
 };
 
 export function estadoF3Desde(investigacion: unknown): EstadoF3 {

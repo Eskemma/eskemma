@@ -24,7 +24,7 @@ const fila = (n: number, over: Partial<FilaHistorial> = {}): FilaHistorial => ({
   posteriorALaLectura: false, recuperable: "completo", ...over,
 });
 const resp = (over: Partial<RespuestaHistorial> = {}): RespuestaHistorial => ({
-  fase: "exploracion", totalCambios: 0, vigente: null, filas: [], siguienteCursor: null, avisos: [], faltantes: [], faltantesTotal: 0, ...over,
+  fase: "exploracion", puedeVolver: false, totalCambios: 0, vigente: null, filas: [], siguienteCursor: null, avisos: [], faltantes: [], faltantesTotal: 0, ...over,
 });
 const entrada = (over: Partial<EntradaEstadoPanel> = {}): EntradaEstadoPanel => ({
   cargando: false, mensajeError: null, filas: [], respuesta: null, siguienteCursor: null, totalCambios: 0, ...over,

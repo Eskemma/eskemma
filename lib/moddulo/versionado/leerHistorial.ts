@@ -23,7 +23,7 @@ import { idRevision } from "@/lib/versionado/registrar";
 import {
   analizarContinuidad,
   clasificarEvento,
-  recuperabilidad,
+  recuperabilidadDeEvento,
   revisionDeEvento,
   versionesExistentes,
   vigenteDeManifiesto,
@@ -36,7 +36,7 @@ import {
 } from "@/lib/versionado/lectura";
 import { enAIso } from "./artefactosF2";
 import { detectarDeriva } from "./derivaVivo";
-import { puedeVerDetalleHistorial, puedeVerPanelHistorial } from "./visibilidadHistorial";
+import { puedeVerDetalleHistorial, puedeVerPanelHistorial, puedeVolverAVersion } from "./visibilidadHistorial";
 import { TEXTO_AVISO, detalleEnTexto, etiquetaArtefacto, textoQuien, tituloAccion } from "./textosHistorial";
 import type { CollaboratorRole } from "@/types/moddulo.types";
 
@@ -172,7 +172,7 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
         etiqueta: etiquetaArtefacto(nom),
         versionId: id,
         vigente: id !== null && vigenteDeManifiesto(manifiesto, nom) === id,
-        recuperable: recuperabilidad([id], existentes),
+        recuperable: recuperabilidadDeEvento([id], existentes),
       };
     });
     const por = typeof data.por === "string" && data.por.length > 0 ? data.por : null;
@@ -194,7 +194,7 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
       esVigente: punteroN !== null && n === punteroN,
       derivaAntes: Array.isArray(data.artefactosConDeriva) && data.artefactosConDeriva.length > 0,
       posteriorALaLectura: posterior,
-      recuperable: recuperabilidad(idsDelEvento, existentes),
+      recuperable: recuperabilidadDeEvento(idsDelEvento, existentes),
     });
   }
 
@@ -234,6 +234,7 @@ export async function leerHistorialFase(db: Firestore, o: OpcionesLectura): Prom
     tipo: "ok",
     respuesta: {
       fase,
+      puedeVolver: puedeVolverAVersion(rol),
       totalCambios: punteroN ?? 0,
       vigente,
       filas,

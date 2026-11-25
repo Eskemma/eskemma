@@ -26,6 +26,8 @@ const vis = vi.hoisted(() => ({
 vi.mock("@/lib/moddulo/versionado/visibilidadHistorial", () => ({
   puedeVerPanelHistorial: (r: string) => vis.panel(r),
   puedeVerDetalleHistorial: (r: string) => vis.detalle(r),
+  // C4b-1a: la regla real de quién puede volver (owner y co-consultant).
+  puedeVolverAVersion: (r: string) => r === "owner" || r === "co-consultant",
 }));
 
 import { Timestamp } from "firebase-admin/firestore";

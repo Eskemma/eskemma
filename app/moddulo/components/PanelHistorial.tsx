@@ -39,6 +39,7 @@ const MARCA_CLASE: Record<ClaveMarca, string> = {
   deriva_antes: "text-brown-eske-60 dark:text-yellow-eske",
   parcial: "text-brown-eske-60 dark:text-yellow-eske",
   no_conservada: "text-brown-eske-60 dark:text-yellow-eske",
+  no_comprobada: "text-brown-eske-60 dark:text-yellow-eske",
 };
 
 export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, onCargarMas, onComprobarDeriva, renderAcciones }: Props) {

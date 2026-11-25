@@ -25,7 +25,11 @@ export const CURSOR_MAXIMO = 999_999_999;
 /** Máximo de revisiones faltantes que se listan en una respuesta (el conteo completo va en `faltantesTotal`). */
 export const MAX_FALTANTES_LISTADOS = 50;
 
-export type Recuperable = "completo" | "parcial" | "no";
+/**
+ * `desconocido` (H-V62, C4b-1a): el evento o el artefacto de la fila no trae `versionId` (registro incompleto): no se
+ * sabe qué versión era, así que NO se puede decir que «ya no se conserva». Nunca lleva botón.
+ */
+export type Recuperable = "completo" | "parcial" | "no" | "desconocido";
 
 export type CodigoAviso =
   | "eventos_incompletos" // hay cambios (según el contador de la fase) cuyo evento no se pudo leer o no es válido
@@ -72,6 +76,11 @@ export interface ArtefactoVigente {
 
 export interface RespuestaHistorial {
   fase: FaseConHistorial;
+  /**
+   * C4b-1a (aditivo): ¿quien lee puede «volver a una versión anterior»? Solo owner y co-consultant. Es una ayuda para
+   * mostrar o no el botón: el servidor decide siempre al volver.
+   */
+  puedeVolver: boolean;
   /** puntero.n (un evento por revisión). 0 = la fase no tiene historial todavía. */
   totalCambios: number;
   vigente: { revisionN: number; artefactos: ArtefactoVigente[] } | null;
@@ -109,6 +118,15 @@ export function recuperabilidad(versionIds: readonly (string | null)[], existent
   const vivas = versionIds.filter((v) => v !== null && existentes.has(v)).length;
   if (vivas === versionIds.length) return "completo";
   return vivas === 0 ? "no" : "parcial";
+}
+
+/**
+ * Recuperabilidad de una FILA o de un artefacto de la fila, con el caso «registro incompleto» aparte (H-V62): un
+ * evento sin artefactos o con algún `versionId` ausente es `desconocido`; en cualquier otro caso rige `recuperabilidad`
+ * (completo / parcial / no por poda). `recuperabilidad` no cambia (sigue diciendo «no» ante una lista vacía o nula).
+ */
+export function recuperabilidadDeEvento(ids: readonly (string | null)[], existentes: ReadonlySet<string>): Recuperable {
+  return ids.length === 0 || ids.some((v) => v === null) ? "desconocido" : recuperabilidad(ids, existentes);
 }
 
 // ---- cursor ----

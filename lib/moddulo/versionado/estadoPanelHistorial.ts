@@ -156,7 +156,7 @@ export function textoEstadoFinal(sinMostrar: number, total: number): string {
 // Marcas de las filas
 // ---------------------------------------------------------------------------------------------------------------------
 
-export type ClaveMarca = "vigente" | "cambio_nuevo" | "deriva_antes" | "parcial" | "no_conservada";
+export type ClaveMarca = "vigente" | "cambio_nuevo" | "deriva_antes" | "parcial" | "no_conservada" | "no_comprobada";
 export interface MarcaFila {
   clave: ClaveMarca;
   texto: string;
@@ -168,6 +168,8 @@ export const TEXTO_MARCA: Record<ClaveMarca, string> = {
   deriva_antes: "Antes de este cambio, algo se modificó sin dejar registro.",
   parcial: "Parte de esta versión ya no se conserva.",
   no_conservada: "Esta versión ya no se conserva.",
+  // H-V62 (C4b-1a): un registro incompleto no permite saber qué versión era; antes se rotulaba «ya no se conserva».
+  no_comprobada: "No se pudo comprobar si esta versión se conserva.",
 };
 
 /**
@@ -183,6 +185,7 @@ export function marcasDeFila(f: FilaHistorial): MarcaFila[] {
   if (f.derivaAntes) marca("deriva_antes");
   if (f.recuperable === "parcial") marca("parcial");
   else if (f.recuperable === "no") marca("no_conservada");
+  else if (f.recuperable === "desconocido") marca("no_comprobada");
   return m;
 }
 

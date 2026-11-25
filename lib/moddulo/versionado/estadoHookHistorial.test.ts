@@ -9,7 +9,7 @@ const fila = (n: number, over: Partial<FilaHistorial> = {}): FilaHistorial => ({
   artefactos: [], esVigente: false, derivaAntes: false, posteriorALaLectura: false, recuperable: "completo", ...over,
 });
 const resp = (o: Partial<RespuestaHistorial> = {}): RespuestaHistorial => ({
-  fase: "exploracion", totalCambios: 0, vigente: null, filas: [], siguienteCursor: null, avisos: [], faltantes: [], faltantesTotal: 0, ...o,
+  fase: "exploracion", puedeVolver: false, totalCambios: 0, vigente: null, filas: [], siguienteCursor: null, avisos: [], faltantes: [], faltantesTotal: 0, ...o,
 });
 const seq = (...a: AccionHistorial[]) => a.reduce(r, ESTADO_INICIAL);
 const abierto = (fase: "proposito" | "exploracion" | "investigacion" = "exploracion") => seq({ tipo: "abrir", fase, proyectoId: "p1" });

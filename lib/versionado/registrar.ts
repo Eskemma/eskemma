@@ -150,6 +150,17 @@ function validar(cambio: CambioFase): void {
   if (cambio.tipoCambio === "regeneracion_ia" && (!cambio.autorizadoPor || !cambio.autorizadoEn)) {
     throw new AutorizacionIARequeridaError();
   }
+  // H-V86: «volver a una versión anterior» es un acto de la persona, no una regeneración con IA: exige el
+  // `motivo` (qué acto fue) y no admite `autorizadoPor` (esa marca es de `regeneracion_ia`). La constancia de la
+  // aprobación (`aprobacion`) NO se exige aquí: no es universal (`cierre`, `f2M1`); es regla del llamador.
+  if (cambio.tipoCambio === "restauracion") {
+    if (typeof cambio.motivo !== "string" || cambio.motivo.trim().length === 0) {
+      throw new CambioInvalidoError("una `restauracion` exige `motivo`.");
+    }
+    if (cambio.autorizadoPor !== undefined || cambio.autorizadoEn !== undefined) {
+      throw new CambioInvalidoError("una `restauracion` no lleva `autorizadoPor`/`autorizadoEn` (es de `regeneracion_ia`).");
+    }
+  }
   if (cambio.detalle !== undefined) {
     if (cambio.detalle === null || typeof cambio.detalle !== "object" || Array.isArray(cambio.detalle)) {
       throw new CambioInvalidoError("`detalle` debe ser un objeto plano.");
