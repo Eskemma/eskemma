@@ -107,6 +107,9 @@
         "app/moddulo/components/PanelHistorial.tsx",
         "app/moddulo/components/HistorialFase.tsx",
         "app/moddulo/components/useHistorialFase.ts",
+        "app/moddulo/components/useVolver.ts",
+        "app/moddulo/components/VistaVolver.tsx",
+        "app/moddulo/components/estilosPanel.ts",
         "app/moddulo/proyecto/[projectId]/layout.tsx"
       ]
     }

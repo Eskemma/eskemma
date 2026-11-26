@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TEXTOS_VOLVER, type RespuestaGuardado } from "@/lib/moddulo/guardadoHonesto";
 import type { ArtefactoDeFila, FilaHistorial } from "@/lib/versionado/lectura";
 import {
-  cuerpoPeticionVolver, destinosVolverDeFila, dondeVuelveFocoVolver, ESTADO_VOLVER_INICIAL, ofreceConfirmar, ofreceVerHistorial,
+  claveBotonVolver, conPunto, cuerpoPeticionVolver, debeEnfocarTituloVista, destinosVolverDeFila, fechaTextoDeFila, dondeVuelveFocoVolver, ESTADO_VOLVER_INICIAL, ofreceConfirmar, ofreceVerHistorial,
   reducirEstadoVolver, TEXTOS_VISTA_VOLVER, type AccionVolver, type EstadoVolver, type ObjetivoVolver,
 } from "./estadoVolver";
 
@@ -196,19 +196,113 @@ describe("respuestas fuera de turno", () => {
   });
 });
 
+describe("fallo de red o 5xx en la PREGUNTA: nada se escribió", () => {
+  for (const [nombre, r] of [["red", RED], ["500", resp(500)], ["504", resp(504)]] as [string, RespuestaGuardado][]) {
+    it(`${nombre} al preguntar → texto que afirma que no se hizo ningún cambio, sin «Ver el historial» ni confirmar`, () => {
+      const e = responder(preguntando(), r);
+      expect(e).toMatchObject({ fase: "error", errorTipo: "otro", mensajeError: TEXTOS_VISTA_VOLVER.noSePudoRevisar });
+      expect(e.mensajeError).not.toMatch(/Puede que sí|abre el historial/);
+      expect(ofreceVerHistorial(e)).toBe(false);
+      expect(ofreceConfirmar(e)).toBe(false);
+    });
+  }
+  it("al CONFIRMAR, en cambio, la red sigue siendo ambigua y ofrece «Ver el historial»", () => {
+    const e = responder(volviendo(), RED);
+    expect(e).toMatchObject({ errorTipo: "ambiguo", mensajeError: TEXTOS_VOLVER.ambiguo });
+    expect(ofreceVerHistorial(e)).toBe(true);
+  });
+});
+
+describe("foco de la vista en cada cambio de etapa", () => {
+  it("va al título al pasar de una etapa a otra (confirmando, volviendo, éxito, error) y desde reposo", () => {
+    const etapas = ["preguntando", "confirmando", "volviendo", "exito", "error"] as const;
+    expect(debeEnfocarTituloVista("reposo", "preguntando")).toBe(true);
+    for (let i = 1; i < etapas.length; i++) expect(debeEnfocarTituloVista(etapas[i - 1], etapas[i])).toBe(true);
+    expect(debeEnfocarTituloVista("confirmando", "volviendo")).toBe(true);
+    expect(debeEnfocarTituloVista("volviendo", "error")).toBe(true);
+  });
+  it("no se mueve si la etapa no cambió ni al volver a reposo (eso lo decide el regreso a la lista)", () => {
+    expect(debeEnfocarTituloVista("confirmando", "confirmando")).toBe(false);
+    expect(debeEnfocarTituloVista("exito", "reposo")).toBe(false);
+    expect(debeEnfocarTituloVista("reposo", "reposo")).toBe(false);
+  });
+});
+
+describe("el efecto de éxito solo existe tras un 200 confirmado", () => {
+  const SIN_EXITO: [string, RespuestaGuardado][] = [
+    ["red", RED], ["500", resp(500)], ["401", resp(401)], ["403", resp(403)], ["404", resp(404)],
+    ["bloqueado", resp(409, "reemplazo_bloqueado")], ["sin_cambios", resp(409, "sin_cambios")],
+    ["version_no_restaurable", resp(409, "version_no_restaurable")], ["historial_no_confirmado", resp(409, "historial_no_confirmado")],
+  ];
+  for (const [n, r] of SIN_EXITO) {
+    it(`${n}: sin efecto, en la pregunta y al confirmar`, () => {
+      expect(responder(preguntando(), r).efecto).toBeNull();
+      expect(responder(volviendo(), r).efecto).toBeNull();
+    });
+  }
+  it("la pregunta (409 de confirmación) y la huella vencida tampoco lo dan", () => {
+    expect(confirmando().efecto).toBeNull();
+    expect(responder(volviendo(), resp(409, "reemplazo_huella_vencida"), { lineas: [], huella: "h2" }).efecto).toBeNull();
+  });
+  it("solo el 200 tras confirmar lo da, y `efecto_hecho` lo consume", () => {
+    const e = responder(volviendo(), resp(200));
+    expect(e.efecto).toBe("avisar_y_recargar");
+    expect(reducirEstadoVolver(reducirEstadoVolver(e, { tipo: "efecto_hecho" }), { tipo: "efecto_hecho" }).efecto).toBeNull();
+  });
+  it("«cancelar» desde el éxito vuelve a reposo sin dejar efecto", () => {
+    expect(reducirEstadoVolver(responder(volviendo(), resp(200)), { tipo: "cancelar" })).toMatchObject({ fase: "reposo", efecto: null });
+  });
+});
+
 describe("textos", () => {
+  const RESTO = "El resultado como está ahora no se borra: queda en el historial y puedes volver a él.";
   it("apertura con nombre y fecha", () => {
     expect(TEXTOS_VISTA_VOLVER.apertura("¿Qué pasa con X?", "12 de noviembre de 2026, 10:00")).toBe(
-      "Vas a volver a la versión del 12 de noviembre de 2026, 10:00 de «¿Qué pasa con X?». El resultado como está ahora no se borra: queda en el historial y puedes volver a él."
+      `Vas a volver a la versión del 12 de noviembre de 2026, 10:00, del resultado «¿Qué pasa con X?». ${RESTO}`
     );
   });
-  it("sin nombre o sin fecha la frase se compone sin ellos: nunca «undefined» ni «null»", () => {
-    for (const [n, f] of [[null, "fecha"], ["pregunta", null], [null, null]] as const) {
-      const t = TEXTOS_VISTA_VOLVER.apertura(n, f);
-      expect(t).not.toMatch(/undefined|null|«»/);
-    }
-    expect(TEXTOS_VISTA_VOLVER.apertura(null, null)).toContain("una versión anterior de este resultado");
+  it("sin nombre: se omite «del resultado»", () => {
+    expect(TEXTOS_VISTA_VOLVER.apertura(null, "12 de noviembre")).toBe(`Vas a volver a la versión del 12 de noviembre. ${RESTO}`);
   });
+  it("sin fecha: «una versión anterior del resultado «…»»", () => {
+    expect(TEXTOS_VISTA_VOLVER.apertura("¿X?", null)).toBe(`Vas a volver a una versión anterior del resultado «¿X?». ${RESTO}`);
+  });
+  it("sin ambos: «de este resultado»", () => {
+    expect(TEXTOS_VISTA_VOLVER.apertura(null, null)).toBe(`Vas a volver a una versión anterior de este resultado. ${RESTO}`);
+  });
+  it("nunca «undefined», «null» ni comillas vacías", () => {
+    for (const [n, f] of [[null, "fecha"], ["pregunta", null], [null, null], ["p", "f"]] as const) {
+      expect(TEXTOS_VISTA_VOLVER.apertura(n, f)).not.toMatch(/undefined|null|«»/);
+    }
+  });
+  it("una fecha que termina en «p.m.» no duplica el punto (apertura con y sin nombre, con y sin fecha, y éxito)", () => {
+    const f = "26 de noviembre de 2026, 1:36 p.m.";
+    const todas = [
+      TEXTOS_VISTA_VOLVER.apertura("¿X?", f), TEXTOS_VISTA_VOLVER.apertura(null, f), TEXTOS_VISTA_VOLVER.apertura("¿X?", null),
+      TEXTOS_VISTA_VOLVER.apertura(null, null), TEXTOS_VISTA_VOLVER.exito(f), TEXTOS_VISTA_VOLVER.exito(null),
+    ];
+    for (const t of todas) expect(t).not.toMatch(/\.\./);
+    expect(TEXTOS_VISTA_VOLVER.apertura(null, f)).toBe(`Vas a volver a la versión del ${f} ${RESTO}`);
+    expect(TEXTOS_VISTA_VOLVER.apertura("¿X?", f)).toBe(`Vas a volver a la versión del ${f}, del resultado «¿X?». ${RESTO}`);
+    expect(TEXTOS_VISTA_VOLVER.exito(f)).toBe(`Listo: volviste a la versión del ${f} El resultado quedó sin aprobar.`);
+  });
+  it("con el formateador REAL del panel (cualquier hora, incluida p.m.) nunca sale «..»", () => {
+    for (const h of ["01", "13", "19", "23"]) {
+      const f = fechaTextoDeFila(`2026-11-26T${h}:36:00.000Z`);
+      expect(TEXTOS_VISTA_VOLVER.apertura(null, f)).not.toMatch(/\.\./);
+      expect(TEXTOS_VISTA_VOLVER.exito(f)).not.toMatch(/\.\./);
+    }
+  });
+  it("conPunto: un solo punto final", () => {
+    expect(conPunto("a")).toBe("a.");
+    expect(conPunto("a.")).toBe("a.");
+    expect(conPunto("1:36 p.m.")).toBe("1:36 p.m.");
+  });
+  it("fechaTextoDeFila: fecha legible o null (nunca «Fecha desconocida» en la frase)", () => {
+    expect(fechaTextoDeFila("2026-11-20T10:00:00.000Z")).toMatch(/2026/);
+    for (const v of [null, undefined, "", "no es fecha"]) expect(fechaTextoDeFila(v as never)).toBeNull();
+  });
+  it("clave del botón de la fila", () => expect(claveBotonVolver(3, "r1")).toBe("3:r1"));
   it("éxito con y sin fecha", () => {
     expect(TEXTOS_VISTA_VOLVER.exito("12 de noviembre")).toBe("Listo: volviste a la versión del 12 de noviembre. El resultado quedó sin aprobar.");
     expect(TEXTOS_VISTA_VOLVER.exito(null)).toBe("Listo: volviste a una versión anterior. El resultado quedó sin aprobar.");

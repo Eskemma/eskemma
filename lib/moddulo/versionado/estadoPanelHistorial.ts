@@ -225,12 +225,30 @@ export interface DecisionTab {
  *   · lista vacía → se queda en el contenedor;
  *   · foco fuera de la lista → entra por el primero (Tab) o por el último (Shift+Tab);
  *   · Tab en el último → vuelve al primero; Shift+Tab en el primero → va al último;
+ *   · con el activo fuera de la lista pero dentro del diálogo, se sigue el orden del documento (`antesDelActivo`);
  *   · en cualquier otro caso el navegador sigue su orden natural.
  */
-export function siguienteEnCiclo(enfocables: readonly string[], actual: string | null, shift: boolean): DecisionTab {
+export function siguienteEnCiclo(
+  enfocables: readonly string[],
+  actual: string | null,
+  shift: boolean,
+  /**
+   * Solo cuando el elemento activo NO está en la lista pero SÍ dentro del diálogo (p. ej. un título con `tabIndex=-1` que
+   * recibió el foco por código): cuántos enfocables lo PRECEDEN en el orden del documento. Entonces Tab va al siguiente
+   * enfocable en ese orden (Shift+Tab, al anterior), con recorrido circular. Sin este dato, un activo ajeno a la lista va
+   * al primero (Tab) o al último (Shift+Tab), como antes.
+   */
+  antesDelActivo?: number | null
+): DecisionTab {
   if (enfocables.length === 0) return { prevenir: true, destino: null };
   const i = actual === null ? -1 : enfocables.indexOf(actual);
-  if (i === -1) return { prevenir: true, destino: shift ? enfocables[enfocables.length - 1] : enfocables[0] };
+  if (i === -1) {
+    const n = enfocables.length;
+    if (typeof antesDelActivo === "number" && Number.isInteger(antesDelActivo) && antesDelActivo >= 0 && antesDelActivo <= n) {
+      return { prevenir: true, destino: shift ? enfocables[(antesDelActivo - 1 + n) % n] : enfocables[antesDelActivo % n] };
+    }
+    return { prevenir: true, destino: shift ? enfocables[n - 1] : enfocables[0] };
+  }
   if (!shift && i === enfocables.length - 1) return { prevenir: true, destino: enfocables[0] };
   if (shift && i === 0) return { prevenir: true, destino: enfocables[enfocables.length - 1] };
   return { prevenir: false, destino: null };

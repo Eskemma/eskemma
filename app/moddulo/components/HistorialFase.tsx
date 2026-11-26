@@ -7,8 +7,10 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { dondeVaElFoco, TEXTOS_PANEL } from "@/lib/moddulo/versionado/estadoPanelHistorial";
+import { inertarCubiertos } from "@/lib/moddulo/versionado/inertCubiertos";
 import PanelHistorial from "./PanelHistorial";
 import { useHistorialFase } from "./useHistorialFase";
+import { useVolver } from "./useVolver";
 
 interface Props {
   projectId: string;
@@ -20,13 +22,25 @@ export default function HistorialFase({ projectId, pathname, contenidoRef }: Pro
   const h = useHistorialFase(projectId, pathname);
   const botonRef = useRef<HTMLButtonElement>(null);
   const abierto = h.estado.abierto;
+  // «Volver» (solo F3). Tras un 200 confirmado se recarga la 1.ª página del historial (la versión nueva queda «★ Versión actual»).
+  const volver = useVolver(projectId, () => {
+    if (abierto) h.actualizar();
+  });
+  const cancelarVolver = volver.cancelar;
+  // Al abrir o cerrar el panel se descarta una vista terminada (éxito/error); con la escritura en vuelo no hace nada.
+  useEffect(() => {
+    cancelarVolver();
+  }, [abierto, cancelarVolver]);
 
   useEffect(() => {
     if (!abierto) return;
     const contenido = contenidoRef.current;
     if (contenido) contenido.inert = true;
+    // H-V63: cabecera y pie (solo los marcados con `data-cubre-dialogo`) también quedan inertes; se restauran en el cleanup.
+    const restaurarCubiertos = inertarCubiertos(document);
     return () => {
       if (contenido) contenido.inert = false;
+      restaurarCubiertos();
       // Primero se quita el `inert`, después se devuelve el foco (un elemento inerte no puede recibirlo).
       if (dondeVaElFoco("cerrar") === "boton_historial") botonRef.current?.focus();
     };
@@ -57,6 +71,21 @@ export default function HistorialFase({ projectId, pathname, contenidoRef }: Pro
               onActualizar={h.actualizar}
               onCargarMas={h.cargarMas}
               onComprobarDeriva={h.comprobarDeriva}
+              volver={
+                h.fase === "investigacion"
+                  ? {
+                      estado: volver.estado,
+                      clave: volver.claveRef.current,
+                      onAbrir: volver.abrir,
+                      onConfirmar: volver.confirmar,
+                      onCancelar: volver.cancelar,
+                      onVerHistorial: () => {
+                        volver.cancelar();
+                        h.actualizar();
+                      },
+                    }
+                  : undefined
+              }
             />,
             document.body
           )

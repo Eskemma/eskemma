@@ -19,6 +19,7 @@
 import {
   decidirReemplazoAnalisis, TEXTOS_VOLVER, type RespuestaGuardado,
 } from "@/lib/moddulo/guardadoHonesto";
+import { formatearFechaFila, TEXTO_SIN_FECHA } from "@/lib/moddulo/versionado/textosHistorial";
 import type { ArtefactoDeFila, FilaHistorial } from "@/lib/versionado/lectura";
 
 export const PREFIJO_RESULTADO = "f3Resultado:";
@@ -33,17 +34,42 @@ export const TEXTOS_VISTA_VOLVER = {
   cerrar: "Cerrar",
   verHistorial: "Ver el historial",
   avisoHuella: TEXTOS_VOLVER.huellaVencida,
-  /** Frase de apertura; la fecha es la de la FILA del panel, ya formateada. Sin nombre o sin fecha se compone sin ellos. */
-  apertura: (nombre: string | null, fechaTexto: string | null): string =>
-    `Vas a volver a ${fraseVersion(fechaTexto)} de ${nombre ? `«${nombre}»` : "este resultado"}. ` +
-    "El resultado como está ahora no se borra: queda en el historial y puedes volver a él.",
+  /**
+   * Frase de apertura; la fecha es la de la FILA del panel, ya formateada. Sin nombre se omite «del resultado «…»»; sin
+   * fecha dice «una versión anterior»; sin ambos, «de este resultado».
+   */
+  apertura: (nombre: string | null, fechaTexto: string | null): string => {
+    const resto = "El resultado como está ahora no se borra: queda en el historial y puedes volver a él.";
+    if (fechaTexto) return `${conPunto(`Vas a volver a la versión del ${fechaTexto}${nombre ? `, del resultado «${nombre}»` : ""}`)} ${resto}`;
+    return `${conPunto(`Vas a volver a una versión anterior ${nombre ? `del resultado «${nombre}»` : "de este resultado"}`)} ${resto}`;
+  },
   exito: (fechaTexto: string | null): string =>
-    `Listo: volviste a ${fraseVersion(fechaTexto)}. El resultado quedó sin aprobar.`,
+    `${conPunto(`Listo: volviste a ${fraseVersion(fechaTexto)}`)} El resultado quedó sin aprobar.`,
+  /** Fallo AMBIGUO de la PREGUNTA (red, 5xx): la pregunta nunca escribe, así que se puede afirmar que no se hizo nada. */
+  noSePudoRevisar:
+    "No se pudo revisar qué cambiaría esta vuelta. No se hizo ningún cambio. Cierra esta vista e inténtalo de nuevo.",
 } as const;
+
+/**
+ * Cierra la frase con UN punto: la fecha de `formatearFechaFila` ya puede terminar en «.» («1:36 p.m.») y añadir otro
+ * produciría «p.m..».
+ */
+export function conPunto(frase: string): string {
+  return frase.endsWith(".") ? frase : `${frase}.`;
+}
 
 function fraseVersion(fechaTexto: string | null): string {
   return fechaTexto ? `la versión del ${fechaTexto}` : "una versión anterior";
 }
+
+/** Fecha de la FILA con el mismo formateador del panel; null si la fila no tiene fecha legible. */
+export function fechaTextoDeFila(en: string | null | undefined): string | null {
+  const t = formatearFechaFila(en);
+  return t === TEXTO_SIN_FECHA ? null : t;
+}
+
+/** Clave estable del botón de una fila (para devolverle el foco al cerrar la vista). */
+export const claveBotonVolver = (revisionN: number, resultadoId: string): string => `${revisionN}:${resultadoId}`;
 
 // ---- botón de la fila ----
 
@@ -183,7 +209,9 @@ export function reducirEstadoVolver(e: EstadoVolver, a: AccionVolver): EstadoVol
         // En la pregunta el servidor nunca escribe: un éxito es una respuesta inesperada, no un «listo».
         if (d.tipo === "exito") return error(e, "ambiguo", TEXTOS_VOLVER.ambiguo);
         if (d.tipo === "huella_vencida") return error(e, "otro", TEXTOS_VOLVER.huellaVencida);
-        return error(e, "otro", d.mensajeError);
+        // Red caída o 5xx en la PREGUNTA: el servidor nunca escribe al preguntar, así que no hay nada que revisar en el
+        // historial (por eso sin «Ver el historial») y el texto lo dice, en vez del de «puede que sí se haya vuelto».
+        return error(e, "otro", esAmbiguo(a.resp) ? TEXTOS_VISTA_VOLVER.noSePudoRevisar : d.mensajeError);
       }
       // volviendo
       if (d.tipo === "exito") {
@@ -213,6 +241,12 @@ export const ofreceVerHistorial = (e: EstadoVolver): boolean => e.fase === "erro
 
 /** Solo la fase «confirmando» ofrece confirmar: ningún error ni estado intermedio tiene esa acción (sin reintento a ciegas). */
 export const ofreceConfirmar = (e: EstadoVolver): boolean => e.fase === "confirmando" && !!e.huella;
+
+/**
+ * El foco debe ir al título de la vista en CADA cambio de etapa (confirmando, volviendo, éxito, error): el botón que lo
+ * tenía se desmonta y, sin esto, el siguiente Tab cae en la «X» de cerrar. En «reposo» lo gobierna el regreso a la lista.
+ */
+export const debeEnfocarTituloVista = (antes: FaseVolver, ahora: FaseVolver): boolean => ahora !== "reposo" && antes !== ahora;
 
 export type DestinoFocoVolver = "boton_fila" | "titulo";
 /** Al volver a la lista el foco regresa al botón de la fila; si esa fila ya no está (p. ej. tras recargar), al título. */

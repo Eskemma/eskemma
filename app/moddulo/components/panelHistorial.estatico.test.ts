@@ -9,6 +9,7 @@ const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
 const sinComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const panel = sinComentarios(leer("app/moddulo/components/PanelHistorial.tsx"));
 const boton = sinComentarios(leer("app/moddulo/components/HistorialFase.tsx"));
+const vistaVolver = sinComentarios(leer("app/moddulo/components/VistaVolver.tsx"));
 const hook = sinComentarios(leer("app/moddulo/components/useHistorialFase.ts"));
 const layout = sinComentarios(leer("app/moddulo/proyecto/[projectId]/layout.tsx"));
 
@@ -21,9 +22,11 @@ describe("PanelHistorial: contrato de accesibilidad", () => {
   it("es un diálogo modal con aria-labelledby que apunta a un id que EXISTE en el título", () => {
     expect(panel).toContain('role="dialog"');
     expect(panel).toContain('aria-modal="true"');
-    const ref = /aria-labelledby=\{(\w+)\}/.exec(panel);
-    expect(ref).not.toBeNull();
-    expect(panel).toMatch(new RegExp(`<h2 id=\\{${ref![1]}\\}`));
+    // C4b-2b: el diálogo apunta al título de la lista o al de la vista «Volver», según cuál esté a la vista; ambos existen.
+    expect(panel).toMatch(/aria-labelledby=\{vista \? idVista : idTitulo\}/);
+    expect(panel).toMatch(/<h2 id=\{idTitulo\}/);
+    expect(vistaVolver).toMatch(/<h2 id=\{idTitulo\}/);
+    expect(panel).toMatch(/idTitulo=\{idVista\}/);
     expect(panel).toMatch(/<h2[^>]*tabIndex=\{-1\}/); // foco inicial y tras «Actualizar» en el título (R3)
   });
   it("trampa de foco propia: siguienteEnCiclo recalculando los enfocables en cada Tab (R1)", () => {
@@ -58,10 +61,10 @@ describe("PanelHistorial: contrato de accesibilidad", () => {
     expect(panel).toContain("env(safe-area-inset-bottom)");
     expect(panel).not.toMatch(/\banimate-|transition-transform|duration-/);
   });
-  it("declara el slot de acciones por fila y no lo llena (sin «Volver»)", () => {
+  it("conserva el slot de acciones por fila; «Volver» (C4b-2b) llega por la prop `volver`, no por el slot", () => {
     expect(panel).toContain("renderAcciones");
     expect(boton).not.toContain("renderAcciones");
-    expect(panel).not.toMatch(/Volver/);
+    expect(panel).toContain("volver");
   });
 });
 

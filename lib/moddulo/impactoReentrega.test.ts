@@ -64,6 +64,8 @@ describe("lineasReentrega", () => {
     expect(l[0]).toBe("El resultado que entregaste antes está aprobado (desde el 12 de noviembre de 2026).");
     expect(l.join(" ")).not.toMatch(/por ahora no hay pantalla/);
     expect(l.at(-1)).toContain("panel «Historial»");
+    expect(l.at(-1)).toContain("la fase de Investigación del proyecto en Moddulo");
+    expect(l.at(-1)).not.toContain("de esta fase");
     expect(l.at(-1)).toContain("si tienes permiso");
   });
   it("sin sello: «sin autoría registrada»", () => {

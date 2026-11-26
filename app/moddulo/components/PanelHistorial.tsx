@@ -12,7 +12,10 @@ import { entradaDePanel, type EstadoHistorial } from "@/lib/moddulo/versionado/e
 import {
   TEXTOS_PANEL, avisoDerivaVigente, debePedirDeriva, decidirEstadoPanel, dondeVaElFoco, marcasDeFila, siguienteEnCiclo, type ClaveMarca, type DestinoFoco,
 } from "@/lib/moddulo/versionado/estadoPanelHistorial";
+import { claveBotonVolver, debeEnfocarTituloVista, destinosVolverDeFila, dondeVuelveFocoVolver, fechaTextoDeFila, TEXTOS_VISTA_VOLVER, type DestinoVolver, type EstadoVolver, type FaseVolver, type ObjetivoVolver } from "@/lib/moddulo/versionado/estadoVolver";
 import { formatearFechaFila } from "@/lib/moddulo/versionado/textosHistorial";
+import { BOTON, CAJA_AVISO, CAJA_ERROR, ENFOCABLES, FOCO, SECUNDARIO, TEXTO_PROCESO } from "./estilosPanel";
+import VistaVolver from "./VistaVolver";
 import type { FaseConHistorial, FilaHistorial } from "@/lib/versionado/lectura";
 
 interface Props {
@@ -22,17 +25,20 @@ interface Props {
   onActualizar: () => void;
   onCargarMas: () => void;
   onComprobarDeriva: () => void;
-  /** Slot de acciones por fila (reservado para «Volver», C4b/C4c). Hoy vacío. */
+  /** Slot de acciones por fila (otras acciones futuras). */
   renderAcciones?: (fila: FilaHistorial) => ReactNode;
+  /** «Volver a esta versión» (C4b-2b): estado de la vista y sus acciones. Solo existe para F3. */
+  volver?: {
+    estado: EstadoVolver;
+    /** Clave del último botón pulsado, para devolverle el foco al volver a la lista. */
+    clave: string | null;
+    onAbrir: (objetivo: ObjetivoVolver, clave: string) => void;
+    onConfirmar: () => void;
+    onCancelar: () => void;
+    onVerHistorial: () => void;
+  };
 }
 
-const ENFOCABLES = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-const FOCO = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bluegreen-eske dark:focus-visible:outline-blue-eske-30";
-const BOTON = `inline-flex min-h-[44px] items-center justify-center rounded-lg border border-bluegreen-eske px-3 text-sm font-medium text-bluegreen-eske transition-colors hover:bg-bluegreen-eske/10 disabled:opacity-50 sm:min-h-[36px] dark:border-blue-eske-30 dark:text-blue-eske-30 dark:hover:bg-blue-eske-30/10 ${FOCO}`;
-const TEXTO_PROCESO = "text-sm text-red-eske-60 dark:text-red-eske-10";
-const CAJA_AVISO = "rounded-lg border border-yellow-eske/40 bg-yellow-eske/10 px-3 py-2 text-sm text-brown-eske-60 dark:text-yellow-eske";
-const CAJA_ERROR = "rounded-lg bg-red-eske/10 px-3 py-2 text-sm text-red-eske-60 dark:text-red-eske-10";
-const SECUNDARIO = "text-black-eske-20 dark:text-[#9AAEBE]";
 const MARCA_CLASE: Record<ClaveMarca, string> = {
   vigente: "font-semibold text-bluegreen-eske dark:text-blue-eske-30",
   cambio_nuevo: "text-brown-eske-60 dark:text-yellow-eske",
@@ -42,10 +48,12 @@ const MARCA_CLASE: Record<ClaveMarca, string> = {
   no_comprobada: "text-brown-eske-60 dark:text-yellow-eske",
 };
 
-export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, onCargarMas, onComprobarDeriva, renderAcciones }: Props) {
+export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, onCargarMas, onComprobarDeriva, renderAcciones, volver }: Props) {
   const idTitulo = useId();
   const dialogoRef = useRef<HTMLDivElement>(null);
   const tituloRef = useRef<HTMLHeadingElement>(null);
+  const idVista = useId();
+  const vistaTituloRef = useRef<HTMLHeadingElement>(null);
   const masRef = useRef<HTMLButtonElement>(null);
   const cierreRef = useRef(onCerrar);
   cierreRef.current = onCerrar;
@@ -55,6 +63,20 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
   const enVuelo = estado.cargando || estado.cargandoMas || estado.actualizando;
   const aviso = avisoDerivaVigente(estado.primera, fase, estado.derivaF3Pedida);
   const puedeCargarMas = panel.tipo === "filas" && panel.puedeCargarMas;
+
+  // «Volver» (solo F3): la vista reemplaza a la lista dentro del MISMO diálogo. Mientras la escritura está en vuelo
+  // («volviendo») NINGUNA salida cierra nada (Escape, botón de cerrar, clic fuera): la persona debe ver el resultado.
+  const vista = !!volver && volver.estado.fase !== "reposo";
+  const enEscritura = !!volver && volver.estado.fase === "volviendo";
+  const puedeVolver = fase === "investigacion" && estado.primera?.puedeVolver === true;
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+  const salirRef = useRef<() => void>(() => {});
+  salirRef.current = () => {
+    if (enEscritura) return;
+    if (vista) volver?.onCancelar(); // Escape / clic fuera en la vista: vuelve a la lista, no cierra el panel
+    else cierreRef.current();
+  };
 
   // Foco inicial: el título.
   useEffect(() => {
@@ -68,6 +90,7 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
   useEffect(() => {
     const p = previo.current;
     const enfocar = (d: DestinoFoco) => {
+      if (vistaRef.current) return; // con la vista abierta el foco lo gobierna el efecto de la vista
       if (d === "dialogo") dialogoRef.current?.focus();
       else if (d === "cargar_mas") masRef.current?.focus();
       else tituloRef.current?.focus();
@@ -79,6 +102,21 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
     previo.current = { mas: estado.cargandoMas, act: estado.actualizando, carg: estado.cargando };
   }, [estado.cargandoMas, estado.actualizando, estado.cargando, puedeCargarMas]);
 
+  // Foco de la vista «Volver»: en CADA cambio de etapa (el botón que lo tenía se desmonta) va al título de la vista; al
+  // volver a la lista, al botón de la fila (si ya no está, al título del panel).
+  const fasePrevia = useRef<FaseVolver>("reposo");
+  const faseVolver: FaseVolver = volver?.estado.fase ?? "reposo";
+  const claveBoton = volver?.clave ?? null;
+  useEffect(() => {
+    const antes = fasePrevia.current;
+    fasePrevia.current = faseVolver;
+    if (debeEnfocarTituloVista(antes, faseVolver)) vistaTituloRef.current?.focus();
+    if (faseVolver === "reposo" && antes !== "reposo") {
+      const el = claveBoton ? dialogoRef.current?.querySelector<HTMLElement>(`[data-volver-clave="${claveBoton}"]`) ?? null : null;
+      (dondeVuelveFocoVolver(el !== null) === "boton_fila" ? el : tituloRef.current)?.focus();
+    }
+  }, [faseVolver, claveBoton]);
+
   // Escape y Tab: UN solo listener nativo en `document`, en fase de captura, mientras el panel está montado. Así funcionan
   // aunque el foco esté en `body`, y un mismo Escape no llega a los demás listeners (el de un modal de página, por ejemplo).
   useEffect(() => {
@@ -86,13 +124,18 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
       if (ev.key === "Escape") {
         ev.stopPropagation();
         ev.preventDefault();
-        cierreRef.current();
+        salirRef.current();
         return;
       }
       if (ev.key !== "Tab") return;
       const els = Array.from(dialogoRef.current?.querySelectorAll<HTMLElement>(ENFOCABLES) ?? []);
       const i = els.indexOf(document.activeElement as HTMLElement);
-      const d = siguienteEnCiclo(els.map((_, k) => String(k)), i === -1 ? null : String(i), ev.shiftKey);
+      // Activo fuera de la lista pero dentro del diálogo (el título de la vista, `tabIndex=-1`): se sigue el orden del documento.
+      const activo = document.activeElement as HTMLElement | null;
+      const antes = i === -1 && activo && activo !== dialogoRef.current && dialogoRef.current?.contains(activo)
+        ? els.filter((el) => activo.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING).length
+        : null;
+      const d = siguienteEnCiclo(els.map((_, k) => String(k)), i === -1 ? null : String(i), ev.shiftKey, antes);
       if (!d.prevenir) return;
       ev.preventDefault();
       (d.destino === null ? dialogoRef.current : els[Number(d.destino)])?.focus();
@@ -105,14 +148,14 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCerrar();
+        if (e.target === e.currentTarget) salirRef.current();
       }}
     >
       <div
         ref={dialogoRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={idTitulo}
+        aria-labelledby={vista ? idVista : idTitulo}
         tabIndex={-1}
         className="flex max-h-[85dvh] w-full flex-col rounded-t-2xl bg-white-eske pb-[env(safe-area-inset-bottom)] shadow-2xl outline-none sm:max-h-[80vh] sm:max-w-xl sm:rounded-xl dark:bg-[#18324A]"
       >
@@ -124,14 +167,17 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
             {panel.tipo === "filas" && <p className={`text-sm ${SECUNDARIO}`}>{TEXTOS_PANEL.total(panel.totalCambios)}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {panel.tipo !== "cargando" && (
+            {!vista && panel.tipo !== "cargando" && (
               <button type="button" onClick={onActualizar} disabled={enVuelo} className={BOTON}>
                 {estado.actualizando ? TEXTOS_PANEL.actualizando : TEXTOS_PANEL.actualizar}
               </button>
             )}
             <button
               type="button"
-              onClick={onCerrar}
+              onClick={() => {
+                if (!enEscritura) onCerrar();
+              }}
+              aria-disabled={enEscritura || undefined}
               aria-label={TEXTOS_PANEL.cerrar}
               className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg ${SECUNDARIO} hover:bg-gray-eske-10 sm:min-h-[36px] sm:min-w-[36px] dark:hover:bg-white/5 ${FOCO}`}
             >
@@ -143,6 +189,17 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+          {vista && volver ? (
+            <VistaVolver
+              estado={volver.estado}
+              idTitulo={idVista}
+              tituloRef={vistaTituloRef}
+              onConfirmar={volver.onConfirmar}
+              onCancelar={volver.onCancelar}
+              onVerHistorial={volver.onVerHistorial}
+            />
+          ) : (
+          <>
           {estado.actualizando && <p role="status" className={TEXTO_PROCESO}>{TEXTOS_PANEL.actualizando}</p>}
           {estado.errorAlActualizar && (
             <div role="alert" className={CAJA_ERROR}>
@@ -182,6 +239,17 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
                     <ul className="mt-1 space-y-0.5">
                       {marcasDeFila(f).map((m) => <li key={m.clave} className={`text-sm ${MARCA_CLASE[m.clave]}`}>{m.texto}</li>)}
                     </ul>
+                    {puedeVolver && volver && destinosVolverDeFila(f, puedeVolver).map((d: DestinoVolver) => (
+                      <button
+                        key={d.artefacto.nombre}
+                        type="button"
+                        data-volver-clave={claveBotonVolver(f.revisionN, d.resultadoId)}
+                        onClick={() => volver.onAbrir({ resultadoId: d.resultadoId, versionId: d.versionId, fechaTexto: fechaTextoDeFila(f.en) }, claveBotonVolver(f.revisionN, d.resultadoId))}
+                        className={`${BOTON} mt-2`}
+                      >
+                        {TEXTOS_VISTA_VOLVER.botonFila}
+                      </button>
+                    ))}
                     {renderAcciones?.(f)}
                   </li>
                 ))}
@@ -195,6 +263,8 @@ export default function PanelHistorial({ fase, estado, onCerrar, onActualizar, o
               )}
               {panel.estadoFinal && <p role="status" className={CAJA_AVISO}>{panel.estadoFinal}</p>}
             </>
+          )}
+          </>
           )}
         </div>
       </div>

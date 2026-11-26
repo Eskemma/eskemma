@@ -77,6 +77,6 @@ export function lineasReentrega(e: EntradaLineas): string[] {
   if (e.tieneNotas) {
     lineas.push("Las notas que escribiste al aprobar dejarán de verse en el resultado.");
   }
-  lineas.push("La versión aprobada queda guardada en el historial del proyecto: puedes consultarla en el panel «Historial» de esta fase y, si tienes permiso, volver a ella desde ahí.");
+  lineas.push("La versión aprobada queda guardada en el historial del proyecto: puedes consultarla en el panel «Historial» de la fase de Investigación del proyecto en Moddulo y, si tienes permiso, volver a ella desde ahí.");
   return lineas;
 }

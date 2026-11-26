@@ -198,6 +198,39 @@ describe("siguienteEnCiclo: trampa de foco propia (recalcula los enfocables en c
   });
 });
 
+describe("siguienteEnCiclo: activo fuera de la lista pero dentro del diálogo (título de la vista, tabIndex=-1)", () => {
+  // Orden del documento: X (cabecera) · [título de la vista, no enfocable] · Cancelar · Volver
+  const lista = ["x", "cancelar", "volver"];
+  it("Tab desde el título va al enfocable SIGUIENTE en el documento (no a la «X»)", () => {
+    expect(siguienteEnCiclo(lista, null, false, 1)).toEqual({ prevenir: true, destino: "cancelar" });
+  });
+  it("Shift+Tab desde el título va al enfocable ANTERIOR", () => {
+    expect(siguienteEnCiclo(lista, null, true, 1)).toEqual({ prevenir: true, destino: "x" });
+  });
+  it("circular: título después de todos → Tab al primero; título antes de todos → Shift+Tab al último", () => {
+    expect(siguienteEnCiclo(lista, null, false, 3)).toEqual({ prevenir: true, destino: "x" });
+    expect(siguienteEnCiclo(lista, null, true, 0)).toEqual({ prevenir: true, destino: "volver" });
+  });
+  it("en la LISTA el recorrido no cambia: del título a «Actualizar» (el primero que le sigue) y Shift+Tab al último", () => {
+    const l = ["actualizar", "x", "f1"]; // el título precede a todos: 0 antes
+    expect(siguienteEnCiclo(l, null, false, 0)).toEqual({ prevenir: true, destino: "actualizar" });
+    expect(siguienteEnCiclo(l, null, true, 0)).toEqual({ prevenir: true, destino: "f1" });
+  });
+  it("sin dato de posición, o con un dato inválido, se conserva el comportamiento anterior (primero / último)", () => {
+    for (const v of [undefined, null, -1, 4, 1.5, Number.NaN]) {
+      expect(siguienteEnCiclo(lista, null, false, v as never)).toEqual({ prevenir: true, destino: "x" });
+      expect(siguienteEnCiclo(lista, null, true, v as never)).toEqual({ prevenir: true, destino: "volver" });
+    }
+  });
+  it("un activo que SÍ está en la lista ignora el dato de posición", () => {
+    expect(siguienteEnCiclo(lista, "cancelar", false, 0)).toEqual({ prevenir: false, destino: null });
+    expect(siguienteEnCiclo(lista, "volver", false, 0)).toEqual({ prevenir: true, destino: "x" });
+  });
+  it("sin enfocables, enfoca el diálogo", () => {
+    expect(siguienteEnCiclo([], null, false, 0)).toEqual({ prevenir: true, destino: null });
+  });
+});
+
 // ---- C4a-2b: errores con filas, aviso del estado actual, foco ----
 import { TEXTOS_PANEL, TEXTO_CAMBIO_SIN_REGISTRO, TEXTO_SIN_CAMBIO_SIN_REGISTRO, avisoDerivaVigente, dondeVaElFoco } from "./estadoPanelHistorial";
 

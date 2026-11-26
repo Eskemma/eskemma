@@ -20,6 +20,7 @@ import F3Onboarding from "./components/F3Onboarding";
 import F3Tablero from "./components/F3Tablero";
 import F3CoberturaSidebar from "./components/F3CoberturaSidebar";
 import F3ReporteDIE from "./components/F3ReporteDIE";
+import { suscribirProyectoActualizado } from "@/lib/moddulo/eventosProyecto";
 import { detectPipStaleness, type PipCambio } from "@/lib/moddulo/pipPropagation";
 import { extraerTerritorioEscalar } from "@/lib/territorio/staleness";
 import type {
@@ -165,6 +166,14 @@ export default function InvestigacionPage() {
 
   useEffect(() => { loadProject(); }, [loadProject]);
   useEffect(() => { if (!showLanding) loadResultados(); }, [showLanding, loadResultados]);
+  // C4b-2b: tras «Volver a esta versión» en el panel «Historial» (que vive en el layout) se vuelven a leer proyecto y resultados.
+  useEffect(() => {
+    if (!projectId) return;
+    return suscribirProyectoActualizado(projectId, () => {
+      loadProject();
+      loadResultados();
+    });
+  }, [projectId, loadProject, loadResultados]);
 
   // Pieza 3 (2026-08-19) — red de seguridad: si el wizard de creación
   // (Flujo 1) no logró confirmar vincular-moddulo antes de redirigir aquí,
