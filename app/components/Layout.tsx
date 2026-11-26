@@ -32,7 +32,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
   return (
     <div>
       {/* Encabezado Fixed */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white-eske dark:bg-[#112230]">
+      <header data-cubre-dialogo className="fixed top-0 left-0 right-0 z-50 bg-white-eske dark:bg-[#112230]">
         <Header />
       </header>
 
@@ -42,7 +42,9 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Pie de Página */}
-      <Footer />
+      <div data-cubre-dialogo>
+        <Footer />
+      </div>
 
       {/* Modal de Correo Verificado */}
       {isCompleteRegisterModalOpen && (

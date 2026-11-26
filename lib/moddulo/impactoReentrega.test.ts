@@ -59,11 +59,12 @@ describe("formatearFechaAprobacion — hora de la Ciudad de México, nunca UTC",
 });
 
 describe("lineasReentrega", () => {
-  it("con sello: la fecha en la primera línea; sin uid; sin prometer volver a la anterior", () => {
+  it("con sello: la fecha en la primera línea; sin uid; dice dónde consultar y volver (H-V90)", () => {
     const l = lineasReentrega({ selloEn: "2026-11-13T03:30:00.000Z", tieneNotas: false, reiniciaAsignacion: false });
     expect(l[0]).toBe("El resultado que entregaste antes está aprobado (desde el 12 de noviembre de 2026).");
-    expect(l.join(" ").toLowerCase()).not.toMatch(/restaur|volver a la anterior|deshacer/);
-    expect(l.at(-1)).toContain("queda registrada en el historial del proyecto");
+    expect(l.join(" ")).not.toMatch(/por ahora no hay pantalla/);
+    expect(l.at(-1)).toContain("panel «Historial»");
+    expect(l.at(-1)).toContain("si tienes permiso");
   });
   it("sin sello: «sin autoría registrada»", () => {
     expect(lineasReentrega({ selloEn: null, tieneNotas: false, reiniciaAsignacion: false })[0]).toContain("sin autoría registrada");
