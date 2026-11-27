@@ -38,6 +38,7 @@ export const TEXTO_POR_MOTIVO: Record<string, string> = {
 
 export function etiquetaArtefacto(nombre: string): string {
   if (nombre === "f2M1") return "Análisis de la Fase 2";
+  if (nombre === "f2Motores") return "Copia de los motores (M2 a M5)";
   if (nombre.startsWith("cierre:")) return "Cierre de la fase";
   if (nombre.startsWith("f3Resultado:")) return "Resultado de investigación";
   if (nombre.startsWith("f3Asignacion:")) return "Tarea de investigación";
@@ -78,6 +79,9 @@ export function detalleEnTexto(detalle: unknown): string | null {
   } else if (motores > 0) {
     frases.push(`Se descartaron ${motores} ${plural(motores, "motor aprobado", "motores aprobados")}.`);
   }
+  // C4c-0a — la copia puntual del borrador (artefacto `f2Motores`). Con `copiaMotores:false` no se dice nada de copia:
+  // el borrador era demasiado grande para guardarse completo y la frase «se guardó una copia» sería falsa.
+  if (d.copiaMotores === true) frases.push("Se guardó una copia de los motores en el historial.");
   if (d.teniaAprobacion === true) frases.push("El análisis estaba aprobado.");
   if (d.reporteF2Conservado === true) frases.push("El reporte de la Fase 2 se conservó.");
   if (d.reporteSustituido === true) frases.push("El reporte guardado de la fase se reemplazó.");

@@ -56,39 +56,40 @@ async function medirConfirmando() {
 }
 
 describe("costo de desvincular (totales de la transacción que confirma)", () => {
-  it("SIN historial previo, con back-link: 2 lecturas (proyecto + PESTEL) / 6 escrituras (proyecto, PESTEL, previa, nueva, revisión, evento)", async () => {
+  it("SIN historial previo, con back-link: 2 lecturas (proyecto + PESTEL) / 7 escrituras (proyecto, PESTEL, previa, nueva, copia de motores, revisión, evento)", async () => {
     sembrar(t22());
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 6, borrados: 0 });
+    // C4c-0a: antes 6 E; +1 por la copia puntual de los motores (el T22 de la siembra trae borrador).
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 7, borrados: 0 });
   });
 
-  it("CON historial vigente (régimen): 3 lecturas (+ manifiesto) / 5 escrituras", async () => {
+  it("CON historial vigente (régimen): 3 lecturas (+ manifiesto) / 6 escrituras (5 + la copia de motores, C4c-0a)", async () => {
     sembrar(t22());
     await registrarVigenteF2(db, P);
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 3, escrituras: 5, borrados: 0 });
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 3, escrituras: 6, borrados: 0 });
   });
 
-  it("con DERIVA: 3 lecturas / 6 escrituras (+1: la versión de deriva)", async () => {
+  it("con DERIVA: 3 lecturas / 7 escrituras (+1: la versión de deriva; +1 la copia de motores, C4c-0a)", async () => {
     sembrar(t22());
     await registrarVigenteF2(db, P);
     const doc = clonar(db.snapshot()[P]) as { phases: { exploracion: { m1: Record<string, unknown> } } };
     doc.phases.exploracion.m1.ediciones = { "P.narrativa": { original: "x", editado: "x", por: "u9", en: Timestamp.fromDate(new Date("2026-11-11T00:00:00Z")) } };
     db.seed(P, doc);
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 3, escrituras: 6, borrados: 0 });
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 3, escrituras: 7, borrados: 0 });
   });
 
-  it("SIN back-link (el vínculo no trae sourceId): 1 lectura / 5 escrituras (sin PESTEL)", async () => {
+  it("SIN back-link (el vínculo no trae sourceId): 1 lectura / 6 escrituras (sin PESTEL; 5 + la copia de motores, C4c-0a)", async () => {
     sembrar(t22({ sourceId: null }), false);
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 1, escrituras: 5, borrados: 0 });
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 1, escrituras: 6, borrados: 0 });
   });
 
-  it("con sourceId pero el PESTEL ya no existe: 2 lecturas / 5 escrituras (se lee, no se escribe)", async () => {
+  it("con sourceId pero el PESTEL ya no existe: 2 lecturas / 6 escrituras (se lee, no se escribe; 5 + la copia, C4c-0a)", async () => {
     sembrar(t22(), false);
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 5, borrados: 0 });
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 6, borrados: 0 });
   });
 
-  it("con RESTOS sin M1 (borrador y aprobaciones, sin payload ni m1): igual que el caso base, 2 L / 6 E", async () => {
+  it("con RESTOS sin M1 (borrador y aprobaciones, sin payload ni m1): igual que el caso base, 2 L / 7 E (C4c-0a: +1 la copia)", async () => {
     sembrar(t22({ sinPayload: true, sinM1: true }));
-    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 6, borrados: 0 });
+    expect(await medirConfirmando()).toEqual({ status: 200, lecturas: 2, escrituras: 7, borrados: 0 });
   });
 
   it("T22 totalmente vacío (nada que versionar): como ANTES de C1b-2, 2 L / 2 E", async () => {

@@ -73,7 +73,7 @@ describe("aprobar — versión de f2M1 con su estado previo", () => {
     expect(v[1].aprobacion).toEqual({ aprobado: true, por: "u1", en: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/), huella: H, categoriasEditadas: 0, total: 6 });
     // decisión 1: el mapa aprobado NO se duplica dentro de `aprobacion`; vive en `contenido.mapa`
     expect(v[1].aprobacion).not.toHaveProperty("mapa");
-    expect(v[1].contenido).toEqual({ kind: "express", mapa: mapaM1(), ediciones: {} });
+    expect(v[1].contenido).toEqual({ kind: "express", mapa: mapaM1(), ediciones: {}, origen: { componente: "moddulo", sourceId: "p1" } });
     expect(v[1].huella).toBe(huellaContenido(v[1].contenido));
 
     expect(revisionesDe(db, P).map((r) => r.id)).toEqual(["exploracion_000001"]);
@@ -174,13 +174,13 @@ describe("aprobar — qué se descarta (detalle del evento)", () => {
   it("contenido DISTINTO: el evento nombra los motores aprobados descartados y que había borrador", async () => {
     sembrar(conMotores("huella-de-otro-contenido"));
     expect((await (await POST(req())).json()).motoresDescartados).toBe(true);
-    expect(eventosDe(db, P)[0].detalle).toEqual({ motoresAprobadosDescartados: ["M2", "M3"], borradorDescartado: true });
+    expect(eventosDe(db, P)[0].detalle).toEqual({ motoresAprobadosDescartados: ["M2", "M3"], borradorDescartado: true, copiaMotores: true });
   });
 
   it("contenido distinto con borrador pero SIN motores aprobados: lista vacía y borradorDescartado true", async () => {
     sembrar(conMotores("otro", { motorAprobaciones: {} }));
     await POST(req());
-    expect(eventosDe(db, P)[0].detalle).toEqual({ motoresAprobadosDescartados: [], borradorDescartado: true });
+    expect(eventosDe(db, P)[0].detalle).toEqual({ motoresAprobadosDescartados: [], borradorDescartado: true, copiaMotores: true });
   });
 
   it("solo la marca de generación (sin borrador ni aprobaciones): se descarta la marca y el detalle lo dice (lista vacía, sin borrador)", async () => {
@@ -200,10 +200,12 @@ describe("aprobar — qué se descarta (detalle del evento)", () => {
     expect(Object.keys(eventosDe(db, P)[0])).not.toContain("detalle");
   });
 
-  it("el contenido descartado NO se versiona (deuda H-V28): las versiones no traen el borrador", async () => {
+  it("C4c-0a: el borrador descartado NO vive en las versiones de f2M1; solo en la copia puntual f2Motores", async () => {
     sembrar(conMotores("otro"));
     await POST(req());
-    expect(JSON.stringify(versionesDe(db, P))).not.toContain("tensionCentral");
+    const vs = versionesDe(db, P);
+    expect(JSON.stringify(vs.filter((x) => x.artefacto === "f2M1"))).not.toContain("tensionCentral");
+    expect(JSON.stringify(vs.filter((x) => x.artefacto === "f2Motores"))).toContain("tensionCentral");
   });
 
   it("el detalle del evento es solo nombres y banderas: nunca contenido del usuario", async () => {

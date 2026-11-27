@@ -37,6 +37,8 @@ const PEST = "pestel_projects/pest1";
 const M = mapaM1();
 const H = huellaDe(M);
 const ISO = INSTANTE_APROBACION.toISOString();
+// C4c-0a: la identidad del vínculo (sin el payload) que ahora viaja en `contenido.origen` de cada versión de f2M1.
+const ORIGEN_T22 = { componente: "centinela", sourceId: "pest1", sourceAnalysisId: "a1", huellaFuente: { v: 2, h: "huella-origen" } };
 const req = (o: Record<string, unknown> = {}) =>
   new Request("http://local/x", { method: "POST", body: JSON.stringify({ projectId: "p1", ...o }) }) as never;
 
@@ -86,13 +88,15 @@ describe("fixture: marcas de tiempo REALES (la lección de C1b-1)", () => {
 describe("desvincular — versiones de f2M1", () => {
   it("SIN historial: la previa guarda TODO lo que se pierde (aprobación con autor y fecha, mapa); la nueva es «sin M1» con constancia", async () => {
     expect((await desvincularConfirmando()).status).toBe(200);
-    const v = versionesDe(db, P);
-    expect(v.map((x) => x.id)).toEqual(["f2M1__000001", "f2M1__000002"]);
+    const todas = versionesDe(db, P);
+    // C4c-0a: el T22 de la siembra trae borrador, así que además de las 2 de f2M1 queda la copia puntual de los motores.
+    expect(todas.map((x) => x.id)).toEqual(["f2M1__000001", "f2M1__000002", "f2Motores__000001"]);
+    const v = todas.filter((x) => x.artefacto === "f2M1");
 
     expect(v[0]).toMatchObject({ tipoCambio: "previo_sin_historial", por: null, estado: "reemplazada" });
     expect(v[0].aprobacion).toEqual({ aprobado: true, por: "u1", en: ISO, huella: H, categoriasEditadas: 2, total: 6 });
     expect(v[0].aprobacion).not.toHaveProperty("mapa");
-    expect(v[0].contenido).toEqual({ kind: "T22", mapa: M, ediciones: {} });
+    expect(v[0].contenido).toEqual({ kind: "T22", mapa: M, ediciones: {}, origen: ORIGEN_T22 });
 
     expect(v[1]).toMatchObject({ tipoCambio: "ajuste_manual", por: "u1", motivo: "desvinculacion" });
     expect(v[1].contenido).toEqual({ kind: null, mapa: null, ediciones: {} });
@@ -101,7 +105,7 @@ describe("desvincular — versiones de f2M1", () => {
     expect(revisionesDe(db, P).map((r) => r.id)).toEqual(["exploracion_000001"]);
     const ev = eventosDe(db, P);
     expect(ev).toHaveLength(1);
-    expect(ev[0]).toMatchObject({ tipo: "ajuste_manual", motivo: "desvinculacion", fase: "exploracion", ambito: "moddulo", artefactos: ["f2M1"], por: "u1", fuente: "usuario" });
+    expect(ev[0]).toMatchObject({ tipo: "ajuste_manual", motivo: "desvinculacion", fase: "exploracion", ambito: "moddulo", artefactos: ["f2M1", "f2Motores"], por: "u1", fuente: "usuario" });
   });
 
   it("CON historial vigente: solo la versión nueva; la aprobación anterior queda en SU versión; sin deriva", async () => {
@@ -109,7 +113,8 @@ describe("desvincular — versiones de f2M1", () => {
     expect(versionesDe(db, P)).toHaveLength(1);
     expect((await desvincularConfirmando()).status).toBe(200);
     const v = versionesDe(db, P);
-    expect(v.map((x) => `${x.id}:${x.tipoCambio}`)).toEqual(["f2M1__000001:ajuste_manual", "f2M1__000002:ajuste_manual"]);
+    // C4c-0a: + la copia puntual de los motores (solo una versión, sin previa).
+    expect(v.map((x) => `${x.id}:${x.tipoCambio}`)).toEqual(["f2M1__000001:ajuste_manual", "f2M1__000002:ajuste_manual", "f2Motores__000001:ajuste_manual"]);
     expect(v[0].aprobacion).toMatchObject({ aprobado: true, por: "u1", en: ISO });
     expect(v[1]).toMatchObject({ motivo: "desvinculacion", contenido: { kind: null, mapa: null, ediciones: {} } });
     expect(v.some((x) => x.deriva)).toBe(false);
@@ -122,7 +127,7 @@ describe("desvincular — versiones de f2M1", () => {
     db.seed(P, doc);
     expect((await desvincularConfirmando()).status).toBe(200);
     const v = versionesDe(db, P);
-    expect(v.map((x) => x.id)).toEqual(["f2M1__000001", "f2M1__000002", "f2M1__000003"]);
+    expect(v.map((x) => x.id)).toEqual(["f2M1__000001", "f2M1__000002", "f2M1__000003", "f2Motores__000001"]);
     expect(v[1]).toMatchObject({ tipoCambio: "previo_sin_historial", deriva: true, por: null });
     expect(eventosDe(db, P).at(-1)).toMatchObject({ artefactosConDeriva: ["f2M1"] });
   });
@@ -171,11 +176,14 @@ describe("desvincular — versiones de f2M1", () => {
     expect(huellaContenido(vivoF2M1(exploracionDe(db, P)))).toBe(manifiesto);
   });
 
-  it("el CONTENIDO del borrador de motores no aparece en ninguna versión (H-V28: solo se nombra)", async () => {
+  it("C4c-0a: el CONTENIDO del borrador de motores solo aparece en la copia puntual f2Motores; ni f2M1, ni revisiones, ni eventos", async () => {
     await desvincularConfirmando();
-    const todo = JSON.stringify([versionesDe(db, P), revisionesDe(db, P), eventosDe(db, P)]);
-    expect(todo).not.toContain("TEXTO-DEL-BORRADOR-SECRETO");
-    expect(todo).not.toContain("tensionCentral");
+    const vs = versionesDe(db, P);
+    const resto = JSON.stringify([vs.filter((x) => x.artefacto === "f2M1"), revisionesDe(db, P), eventosDe(db, P)]);
+    expect(resto).not.toContain("TEXTO-DEL-BORRADOR-SECRETO");
+    expect(resto).not.toContain("tensionCentral");
+    const copia = JSON.stringify(vs.filter((x) => x.artefacto === "f2Motores"));
+    expect(copia).toContain("TEXTO-DEL-BORRADOR-SECRETO");
   });
 });
 
@@ -184,7 +192,7 @@ describe("desvincular — el evento nombra lo que se descarta (`detalle`)", () =
     await desvincularConfirmando();
     expect(eventosDe(db, P)[0].detalle).toEqual({
       teniaAprobacion: true, categoriasEditadas: 2, totalCategorias: 6,
-      motoresAprobadosDescartados: ["M2", "M3"], borradorDescartado: true, reporteF2Conservado: true,
+      motoresAprobadosDescartados: ["M2", "M3"], borradorDescartado: true, reporteF2Conservado: true, copiaMotores: true,
     });
   });
 
@@ -257,8 +265,8 @@ describe("desvincular — cuándo se registra: payload, m1, borrador o aprobacio
     sembrar(t22({ sinPayload: true, sinM1: true }));
     expect((await desvincularConfirmando()).status).toBe(200);
     const v = versionesDe(db, P);
-    expect(v.map((x) => x.tipoCambio)).toEqual(["previo_sin_historial", "ajuste_manual"]);
-    expect(v[0].contenido).toEqual({ kind: "T22", mapa: null, ediciones: {} });
+    expect(v.map((x) => x.tipoCambio)).toEqual(["previo_sin_historial", "ajuste_manual", "ajuste_manual"]); // + la copia de motores
+    expect(v[0].contenido).toEqual({ kind: "T22", mapa: null, ediciones: {}, origen: ORIGEN_T22 });
     expect(v[0]).not.toHaveProperty("aprobacion");
     expect(eventosDe(db, P)[0].detalle).toMatchObject({ teniaAprobacion: false, motoresAprobadosDescartados: ["M2", "M3"], borradorDescartado: true });
   });
@@ -266,7 +274,7 @@ describe("desvincular — cuándo se registra: payload, m1, borrador o aprobacio
   it("[solo borrador] sin payload, sin m1 y sin aprobaciones: el borrador basta para registrar", async () => {
     sembrar(t22({ sinPayload: true, sinM1: true, motorAprobaciones: {}, dvs: null }));
     await desvincularConfirmando();
-    expect(versionesDe(db, P)).toHaveLength(2);
+    expect(versionesDe(db, P)).toHaveLength(3); // previa + nueva de f2M1 + la copia de motores (C4c-0a)
   });
 
   it("[solo aprobaciones de motores] sin payload, sin m1 y sin borrador, pero con motorAprobaciones: basta para registrar", async () => {

@@ -28,7 +28,8 @@ import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestor
 import { analizarM1 } from "@/lib/moddulo/m1Servidor";
 import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
 import {
-  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, PUNTERO_F2, detalleDesvinculacion, estadoF2M1, hayAlgoQueVersionarAlDesvincular, vivoF2M1,
+  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, NOMBRE_F2_MOTORES, PUNTERO_F2, copiaMotoresRestaurable, detalleDesvinculacion, estadoF2M1,
+  estadoF2Motores, hayAlgoQueVersionarAlDesvincular, vivoF2M1,
 } from "@/lib/moddulo/versionado/artefactosF2";
 import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 import { exploracionCerrada, respuestaFaseCerrada } from "@/lib/moddulo/faseCerrada";
@@ -149,6 +150,9 @@ export async function POST(request: NextRequest) {
     if (hayAlgoQueVersionarAlDesvincular(exploracion)) {
       const a = analizarM1(exploracion);
       const expDespues = { ...exploracion, linkedSource: undefined, m1: undefined };
+      // C4c-0a: unlinking always destroys the motors draft; keep a point-in-time COPY of it in the same revision. Built
+      // from `exploracion`, i.e. the document read by `tx.get` at the top of this transaction.
+      const copia = estadoF2Motores(exploracion);
       const plan = await prepararVersion(tx, {
         raiz: proyectoRef,
         datosRaiz: snap.data() as Record<string, unknown> | undefined,
@@ -165,14 +169,19 @@ export async function POST(request: NextRequest) {
           motoresAprobados: a.impacto.motoresAprobados,
           hayBorrador: !!exploracion?.draftDVS,
           hayReporteF2: !!exploracion?.dvs,
+          ...(copia ? { copiaMotores: copiaMotoresRestaurable(copia) } : {}),
         }),
-        artefactos: [{
-          artefacto: NOMBRE_F2_M1,
-          ...estadoF2M1(expDespues, { aprobado: false, por: session.uid, en: instante.toISOString() }),
-          vivo: vivoF2M1(expDespues),
-          estadoPrevio: estadoF2M1(exploracion),
-          vivoPrevio: vivoF2M1(exploracion),
-        }],
+        artefactos: [
+          {
+            artefacto: NOMBRE_F2_M1,
+            ...estadoF2M1(expDespues, { aprobado: false, por: session.uid, en: instante.toISOString() }),
+            vivo: vivoF2M1(expDespues),
+            estadoPrevio: estadoF2M1(exploracion),
+            vivoPrevio: vivoF2M1(exploracion),
+          },
+          // No `vivo` and no `estadoPrevio`: a photo of what is lost, not a live state (no drift, no previous version).
+          ...(copia ? [{ artefacto: NOMBRE_F2_MOTORES, ...copia }] : []),
+        ],
       });
       updatesRaiz = aplicarVersion(tx, plan).updatesRaiz;
     }

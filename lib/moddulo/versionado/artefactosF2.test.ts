@@ -48,7 +48,7 @@ describe("estadoF2M1", () => {
   it("sin revisión (ni aprobado ni reabierto): contenido sin `aprobacion`", () => {
     const e = estadoF2M1(exp());
     expect(e.aprobacion).toBeUndefined();
-    expect(e.contenido).toEqual({ kind: "express", mapa: M, ediciones: {} });
+    expect(e.contenido).toEqual({ kind: "express", mapa: M, ediciones: {}, origen: { componente: "moddulo", sourceId: "p1" } });
   });
 
   it("aprobado en el vivo: aprobación con autor, fecha ISO, huella y conteos, SIN `mapa` (decisión 1)", () => {

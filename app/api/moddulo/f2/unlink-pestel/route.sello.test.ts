@@ -63,7 +63,8 @@ describe("desvincular — el instante del vivo y el de la versión son el MISMO"
     const ls = db.updates()[0].data["phases.exploracion.lastUnlinkedLinkedSource"] as { desvinculadoEn: unknown };
     expect(ls.desvinculadoEn).toBeInstanceOf(Timestamp);
     expect(ls.desvinculadoEn).not.toBe("TS");
-    const nueva = versionesDe(db, P).at(-1)!;
+    // C4c-0a: la última por id puede ser la copia de motores (`f2Motores__…`); la que se compara es la de f2M1.
+    const nueva = versionesDe(db, P).filter((x) => x.artefacto === "f2M1").at(-1)!;
     expect(nueva.motivo).toBe("desvinculacion");
     expect(nueva.aprobacion?.en).toBe((ls.desvinculadoEn as Timestamp).toDate().toISOString());
   });

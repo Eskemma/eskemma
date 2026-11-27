@@ -25,7 +25,8 @@ import { contarDimensionesEditadas, totalDimensiones } from "@/lib/moddulo/m1Apr
 import { analizarM1 } from "@/lib/moddulo/m1Servidor";
 import { aplicarVersion, prepararVersion } from "@/lib/versionado/registrar";
 import {
-  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, PUNTERO_F2, detalleMotoresDescartados, estadoF2M1, vivoF2M1,
+  AMBITO_F2, FASE_F2, NOMBRE_F2_M1, NOMBRE_F2_MOTORES, PUNTERO_F2, copiaMotoresRestaurable, detalleMotoresDescartados, estadoF2M1,
+  estadoF2Motores, vivoF2M1,
 } from "@/lib/moddulo/versionado/artefactosF2";
 import { respuestaDeErrorHistorial } from "@/lib/moddulo/versionado/respuestaHistorial";
 
@@ -96,6 +97,9 @@ export async function POST(request: NextRequest) {
 
     // Historial (C1b-1): the state after approving = same content + the approval seal; the previous state is the live one.
     const expDespues = { ...exp, m1: { ...(a.m1 ?? {}), aprobacion: { huella: a.huellaPayload }, reabiertoEn: undefined } };
+    // C4c-0a: if this approval discards a motors draft, keep a point-in-time COPY of it in the same revision. It is
+    // built from `exp`, i.e. the document read by `tx.get` above (never from an earlier read).
+    const copia = descartar && exp?.draftDVS ? estadoF2Motores(exp) : null;
     const plan = await prepararVersion(tx, {
       raiz: ref,
       datosRaiz: snap.data() as Record<string, unknown> | undefined,
@@ -108,14 +112,18 @@ export async function POST(request: NextRequest) {
       // Internal code (not screen text).
       motivo: "aprobacion",
       // Audit detail: which motors' work this approval discarded (names and a flag only; never content).
-      ...(descartar ? { detalle: detalleMotoresDescartados({ motoresAprobados: a.impacto.motoresAprobados, hayBorrador: !!exp?.draftDVS }) } : {}),
-      artefactos: [{
-        artefacto: NOMBRE_F2_M1,
-        ...estadoF2M1(exp, { aprobado: true, por: session.uid, en: instante.toISOString(), huella: a.huellaPayload, categoriasEditadas, total }),
-        vivo: vivoF2M1(expDespues),
-        estadoPrevio: estadoF2M1(exp),
-        vivoPrevio: vivoF2M1(exp),
-      }],
+      ...(descartar ? { detalle: detalleMotoresDescartados({ motoresAprobados: a.impacto.motoresAprobados, hayBorrador: !!exp?.draftDVS, ...(copia ? { copiaMotores: copiaMotoresRestaurable(copia) } : {}) }) } : {}),
+      artefactos: [
+        {
+          artefacto: NOMBRE_F2_M1,
+          ...estadoF2M1(exp, { aprobado: true, por: session.uid, en: instante.toISOString(), huella: a.huellaPayload, categoriasEditadas, total }),
+          vivo: vivoF2M1(expDespues),
+          estadoPrevio: estadoF2M1(exp),
+          vivoPrevio: vivoF2M1(exp),
+        },
+        // No `vivo` and no `estadoPrevio`: it is a photo of what is lost, not a live state (no drift, no previous version).
+        ...(copia ? [{ artefacto: NOMBRE_F2_MOTORES, ...copia }] : []),
+      ],
     });
     const versionado = aplicarVersion(tx, plan);
     tx.update(ref, { ...updates, ...versionado.updatesRaiz });

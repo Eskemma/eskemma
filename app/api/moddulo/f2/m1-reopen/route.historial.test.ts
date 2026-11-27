@@ -76,7 +76,7 @@ describe("reabrir — versión `reapertura` de f2M1", () => {
 
     expect(v[1]).toMatchObject({ tipoCambio: "reapertura", por: "u1", motivo: "reapertura" });
     expect(v[1].aprobacion).toEqual({ aprobado: false, por: "u1", en: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) });
-    expect(v[1].contenido).toEqual({ kind: "express", mapa: M, ediciones: {} });
+    expect(v[1].contenido).toEqual({ kind: "express", mapa: M, ediciones: {}, origen: { componente: "moddulo", sourceId: "p1" } });
 
     expect(revisionesDe(db, P).map((r) => r.id)).toEqual(["exploracion_000001"]);
     const ev = eventosDe(db, P);
